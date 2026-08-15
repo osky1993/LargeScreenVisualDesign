@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 经营目标达成看板</title>
+<style>
+  :root {
+    --kb-bg: #0a1e3c;
+    --kb-panel: rgba(13, 32, 58, 0.72);
+    --kb-border: rgba(120, 172, 90, 0.24);
+    --kb-border-blue: rgba(86, 150, 224, 0.24);
+    --kb-text: #eaf5e4;
+    --kb-muted: #9fb0a0;
+    --kb-lime: #a3e635;
+    --kb-lime-soft: #d9f99d;
+    --kb-lime-deep: #4d7c0f;
+    --kb-good: #4ade80;
+    --kb-near: #facc15;
+    --kb-lag: #f87171;
+    --kb-cyan: #3fe1ff;
+    --kb-violet: #c084fc;
+    --kb-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--kb-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .kb-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% -2%, rgba(163, 230, 53, 0.13), transparent 44%),
+      radial-gradient(circle at 90% 8%, rgba(63, 225, 255, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 120%, rgba(77, 124, 15, 0.26), transparent 56%),
+      linear-gradient(rgba(120, 172, 90, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(120, 172, 90, 0.05) 1px, transparent 1px),
+      var(--kb-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-rows: 84px 1fr 54px;
+    gap: 14px;
+    padding: 14px 20px 16px;
+  }
+
+  .kb-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .kb-error.is-visible { display: block; }
+
+  /* ===== 顶栏：页头（面包屑 + 渐变标题 + 徽章 + tabs + 时钟） ===== */
+  .kb-header {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .kb-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(163, 230, 53, 0.55) 16%, rgba(217, 249, 157, 0.9) 50%, rgba(163, 230, 53, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(163, 230, 53, 0.4);
+  }
+  .kb-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .kb-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--kb-muted); }
+  .kb-crumb b { font-weight: 400; color: #a9cf6e; }
+  .kb-crumb i { font-style: normal; color: rgba(159, 176, 160, 0.55); }
+  .kb-crumb em { font-style: normal; color: #e4f2d3; }
+  .kb-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .kb-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 24%, var(--kb-lime-soft) 96%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(163, 230, 53, 0.32));
+  }
+  .kb-badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 12px; border-radius: 999px;
+    border: 1px solid rgba(163, 230, 53, 0.5); background: rgba(77, 124, 15, 0.22);
+    font-size: 12.5px; letter-spacing: 0.06em; color: var(--kb-lime-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .kb-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--kb-lime); box-shadow: 0 0 8px var(--kb-lime); }
+  .kb-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--kb-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .kb-head-meta b { font-weight: 400; color: #cfe89a; }
+  .kb-head-meta i { font-style: normal; color: rgba(159, 176, 160, 0.4); }
+
+  .kb-head-right { display: flex; align-items: center; gap: 24px; flex: none; }
+  .kb-tabs { display: flex; align-items: stretch; gap: 6px; padding: 4px; border-radius: 11px; border: 1px solid rgba(120, 172, 90, 0.3); background: rgba(20, 40, 26, 0.4); }
+  .kb-tab {
+    padding: 6px 20px; border-radius: 8px; cursor: pointer; user-select: none;
+    border: 1px solid transparent; background: transparent;
+    color: #bcd39a; font-size: 14px; letter-spacing: 0.1em; font-family: inherit;
+    transition: color 0.2s, background 0.2s, box-shadow 0.2s;
+  }
+  .kb-tab:hover { color: #eaf5e4; }
+  .kb-tab.is-active {
+    color: #10230a; font-weight: 700;
+    background: linear-gradient(160deg, var(--kb-lime), #7fb52a);
+    box-shadow: 0 0 14px rgba(163, 230, 53, 0.45), inset 0 0 8px rgba(255, 255, 255, 0.2);
+  }
+  .kb-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 24px; border-left: 1px solid rgba(120, 172, 90, 0.28); }
+  .kb-clock-time { font: 700 26px/1 var(--kb-mono); color: #f4fbec; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(163, 230, 53, 0.4); }
+  .kb-clock-date { font-size: 12px; color: var(--kb-muted); letter-spacing: 0.08em; }
+
+  /* ===== 中区：上「核心指标达成」 / 下「分行排行 + 趋势」 ===== */
+  .kb-main { min-height: 0; display: grid; grid-template-rows: 1fr 1fr; gap: 18px; }
+  .kb-bottom { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+  /* ===== 面板通用 ===== */
+  .kb-panel {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--kb-border-blue); border-radius: 12px; background: var(--kb-panel);
+    display: flex; flex-direction: column;
+  }
+  .kb-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 32px 0 14px;
+    background: linear-gradient(90deg, rgba(163, 230, 53, 0.22), rgba(163, 230, 53, 0.04) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 100%, 0 100%);
+  }
+  .kb-panel-head i { flex: none; width: 5px; height: 16px; background: var(--kb-lime); box-shadow: 0 0 8px var(--kb-lime); transform: skewX(-12deg); }
+  .kb-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f2fae8; white-space: nowrap; }
+  .kb-panel-head .kb-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #7f9a5e; align-self: flex-end; padding-bottom: 7px; white-space: nowrap; }
+  .kb-panel-head .kb-panel-scope { margin-left: auto; font-size: 12px; color: var(--kb-lime-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .kb-panel-head .kb-panel-scope b { font-weight: 700; color: #eaffc4; }
+  .kb-chart { flex: 1; min-height: 0; }
+
+  /* ===== 上行：核心指标达成 8 卡网格 ===== */
+  .kb-kpi { }
+  .kb-kpi-grid {
+    flex: 1; min-height: 0;
+    display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr);
+    gap: 14px; padding: 14px 16px 16px;
+  }
+  .kb-kpi-card {
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; gap: 14px;
+    border: 1px solid var(--kb-border-blue); border-radius: 12px;
+    background: radial-gradient(ellipse at 100% 0%, rgba(163, 230, 53, 0.07), transparent 62%), rgba(16, 34, 60, 0.55);
+    padding: 10px 16px;
+    transition: border-color 0.4s, box-shadow 0.4s;
+  }
+  .kb-kpi-card::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: linear-gradient(180deg, var(--kb-lime), rgba(163, 230, 53, 0.1));
+  }
+  .kb-kpi-card.is-good {
+    border-color: rgba(74, 222, 128, 0.5);
+    box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.16), 0 0 18px rgba(74, 222, 128, 0.14);
+    animation: kbGoodPulse 2.6s ease-in-out infinite;
+  }
+  .kb-kpi-card.is-good::before { background: linear-gradient(180deg, var(--kb-good), rgba(74, 222, 128, 0.1)); }
+  .kb-kpi-card.is-near { border-color: rgba(250, 204, 21, 0.42); }
+  .kb-kpi-card.is-near::before { background: linear-gradient(180deg, var(--kb-near), rgba(250, 204, 21, 0.1)); }
+  .kb-kpi-card.is-lag { border-color: rgba(248, 113, 113, 0.45); }
+  .kb-kpi-card.is-lag::before { background: linear-gradient(180deg, var(--kb-lag), rgba(248, 113, 113, 0.1)); }
+  @keyframes kbGoodPulse {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.16), 0 0 14px rgba(74, 222, 128, 0.12); }
+    50% { box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.3), 0 0 26px rgba(74, 222, 128, 0.28); }
+  }
+  .kb-kpi-ring { flex: none; width: 96px; height: 96px; }
+  .kb-kpi-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .kb-kpi-name {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 14.5px; font-weight: 700; letter-spacing: 0.04em; color: #f0f7e6;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .kb-kpi-flag {
+    flex: none; font-size: 10px; font-weight: 400; letter-spacing: 0.08em;
+    padding: 1px 6px; border-radius: 5px; color: #ffd9b0;
+    border: 1px solid rgba(255, 180, 84, 0.45); background: rgba(180, 100, 20, 0.2);
+  }
+  .kb-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .kb-kpi-val { font: 700 30px/1 var(--kb-mono); color: #f6fce9; letter-spacing: 0.01em; text-shadow: 0 0 12px rgba(163, 230, 53, 0.35); }
+  .kb-kpi-unit { font-size: 12px; color: #a9cf6e; }
+  .kb-kpi-target { font-size: 12px; color: var(--kb-muted); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+  .kb-kpi-target b { color: #c9dca8; font-weight: 700; }
+  .kb-kpi-status { display: flex; align-items: center; gap: 6px; font-size: 11.5px; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+  .kb-kpi-status .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .kb-kpi-status b { font-weight: 700; }
+  .kb-kpi-status.is-good b, .kb-kpi-status.is-good .dot { color: var(--kb-good); }
+  .kb-kpi-status.is-good .dot { background: var(--kb-good); box-shadow: 0 0 7px var(--kb-good); }
+  .kb-kpi-status.is-near b, .kb-kpi-status.is-near .dot { color: var(--kb-near); }
+  .kb-kpi-status.is-near .dot { background: var(--kb-near); box-shadow: 0 0 7px var(--kb-near); }
+  .kb-kpi-status.is-lag b, .kb-kpi-status.is-lag .dot { color: var(--kb-lag); }
+  .kb-kpi-status.is-lag .dot { background: var(--kb-lag); box-shadow: 0 0 7px var(--kb-lag); }
+  .kb-kpi-status span.qual { color: var(--kb-muted); }
+
+  /* ===== 底部跑马灯 ===== */
+  .kb-marquee {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--kb-border); border-radius: 12px; background: var(--kb-panel);
+  }
+  .kb-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 24px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #12250a;
+    background: linear-gradient(120deg, var(--kb-lime), #7fb52a 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .kb-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #12250a; animation: kbDot 1.6s ease-in-out infinite; }
+  @keyframes kbDot { 50% { opacity: 0.3; } }
+  .kb-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .kb-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: kbMarquee 46s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #e2f2cf;
+  }
+  .kb-marquee-track b { color: var(--kb-lime-soft); font-weight: 700; }
+  .kb-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(163, 230, 53, 0.5); }
+  @keyframes kbMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .kb-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="kb-stage" id="kb-stage">
+    <!-- mockflag:begin --><div class="kb-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="kb-error" id="kb-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏：页头 -->
+    <header class="kb-header">
+      <div class="kb-head-left">
+        <div class="kb-crumb"><b>绩效考核</b><i>›</i><em>目标达成</em></div>
+        <div class="kb-head-title-row">
+          <div class="kb-head-title">经营目标达成看板</div>
+          <span class="kb-badge"><i></i><span id="kb-badge-txt">2026 年度考核 · YTD</span></span>
+          <div class="kb-head-meta">
+            <span>全行综合达成率 <b id="kb-overall">--</b></span><i>|</i>
+            <span>核心指标 <b id="kb-kpi-cnt">--</b> 项达标</span><i>|</i>
+            <span>数据口径 <b>T+1</b> · 单一数据源</span>
+          </div>
+        </div>
+      </div>
+      <div class="kb-head-right">
+        <div class="kb-tabs" id="kb-tabs" aria-label="考核口径切换">
+          <button class="kb-tab is-active" data-scope="year" type="button">年度</button>
+          <button class="kb-tab" data-scope="quarter" type="button">季度</button>
+          <button class="kb-tab" data-scope="month" type="button">月度</button>
+        </div>
+        <div class="kb-clock" aria-label="实时时钟">
+          <span class="kb-clock-time" id="kb-clock-time">--:--:--</span>
+          <span class="kb-clock-date" id="kb-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 中区 -->
+    <div class="kb-main">
+      <!-- 上行：核心指标达成 8 卡 -->
+      <section class="kb-panel kb-kpi">
+        <header class="kb-panel-head">
+          <i></i><h2>核心指标达成</h2>
+          <span class="kb-panel-en">CORE KPI ACHIEVEMENT</span>
+          <span class="kb-panel-scope">达成率＝实际/目标现算 · 全行综合 <b id="kb-scope-overall">--</b></span>
+        </header>
+        <div class="kb-kpi-grid" id="kb-kpi-grid"></div>
+      </section>
+
+      <!-- 下行：分行排行 + 趋势 -->
+      <div class="kb-bottom">
+        <section class="kb-panel">
+          <header class="kb-panel-head">
+            <i></i><h2>分行综合达成率排行</h2>
+            <span class="kb-panel-en">BRANCH RANKING · TOP 15</span>
+            <span class="kb-panel-scope">达标 <b id="kb-branch-good">--</b>/15 家 · 加权综合 <b id="kb-branch-avg">--</b></span>
+          </header>
+          <div class="kb-chart" id="kb-chart-branch" role="img" aria-label="15 家分行综合达成率横向条形排行，含 100% 达标参考线"></div>
+        </section>
+        <section class="kb-panel">
+          <header class="kb-panel-head">
+            <i></i><h2>季度多指标达成趋势</h2>
+            <span class="kb-panel-en">QUARTERLY ACHIEVEMENT TREND</span>
+            <span class="kb-panel-scope">近 8 季度累计达成率 %</span>
+          </header>
+          <div class="kb-chart" id="kb-chart-trend" role="img" aria-label="存款、贷款、中间业务收入近 8 季度达成率折线趋势"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="kb-marquee" aria-label="考核播报">
+      <div class="kb-marquee-tag"><i></i>考核播报</div>
+      <div class="kb-marquee-view"><div class="kb-marquee-track" id="kb-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("kb-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("kb-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#eaf5e4", muted: "#9fb0a0",
+    lime: "#a3e635", limeSoft: "#d9f99d", limeDeep: "#4d7c0f",
+    good: "#4ade80", near: "#facc15", lag: "#f87171",
+    cyan: "#3fe1ff", violet: "#c084fc"
+  };
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const round1 = (n) => Math.round(n * 10) / 10;
+
+  /* ===== 3. 数据模型（单一数据源：每指标只存 目标 t / 实际 a，达成率一律现算） =====
+     达成率现算规则：
+       · 正向指标（越高越好）：rate = 实际 / 目标 × 100%
+       · 反向指标（不良率，越低越好）：rate = 目标 / 实际 × 100%
+         例：目标≤1.50%、实际 1.28% → 1.50/1.28 = 117.2%（实际优于目标记为超额达成）
+     8 项指标口径均随 tab（年度 YTD / 季度 QTD / 月度 MTD）整体切换，切换后达成率重算。 */
+  const KPI_META = [
+    { key: "deposit", name: "存款", unit: "亿元", dec: 0 },
+    { key: "loan", name: "贷款", unit: "亿元", dec: 0 },
+    { key: "intmid", name: "中间业务收入", unit: "亿元", dec: 0 },
+    { key: "profit", name: "净利润", unit: "亿元", dec: 0 },
+    { key: "npl", name: "不良率", unit: "%", dec: 2, reverse: true },
+    { key: "roe", name: "ROE", unit: "%", dec: 1 },
+    { key: "cust", name: "客户数", unit: "万户", dec: 0 },
+    { key: "aum", name: "AUM", unit: "亿元", dec: 0 }
+  ];
+
+  // 三套口径的「目标/实际」。存量类（存款/贷款/不良率/ROE/客户数/AUM）三口径量级相近；
+  // 流量类（中间业务收入/净利润）月度约为年度的 1/12，勾稽自洽。
+  const SCOPES = {
+    year: {
+      label: "年度", badge: "2026 年度考核 · YTD",
+      kpi: {
+        deposit: { t: 18000, a: 18650 }, loan: { t: 14000, a: 14360 },
+        intmid: { t: 17000, a: 18000 }, profit: { t: 520, a: 548 },
+        npl: { t: 1.50, a: 1.28 }, roe: { t: 12.0, a: 12.6 },
+        cust: { t: 850, a: 883 }, aum: { t: 26000, a: 27200 }
+      },
+      branchDelta: 0
+    },
+    quarter: {
+      label: "季度", badge: "2026 Q3 累计 · QTD",
+      kpi: {
+        deposit: { t: 13600, a: 14050 }, loan: { t: 10600, a: 10820 },
+        intmid: { t: 12800, a: 13380 }, profit: { t: 392, a: 406 },
+        npl: { t: 1.52, a: 1.33 }, roe: { t: 12.0, a: 12.4 },
+        cust: { t: 842, a: 868 }, aum: { t: 25400, a: 26300 }
+      },
+      branchDelta: -1.3
+    },
+    month: {
+      label: "月度", badge: "2026-07 当月 · MTD",
+      kpi: {
+        deposit: { t: 18200, a: 18420 }, loan: { t: 14200, a: 14210 },
+        intmid: { t: 1450, a: 1520 }, profit: { t: 46, a: 47 },
+        npl: { t: 1.50, a: 1.31 }, roe: { t: 12.0, a: 12.2 },
+        cust: { t: 870, a: 879 }, aum: { t: 26600, a: 27050 }
+      },
+      branchDelta: -2.6
+    }
+  };
+
+  // 达成率现算：正向 实际/目标，反向 目标/实际。
+  function rateOf(meta, v) {
+    return meta.reverse ? (v.t / v.a) * 100 : (v.a / v.t) * 100;
+  }
+
+  // 15 家分行「年度综合达成率」基准（已按达成率降序）与规模权重 w（用于加权呼应全行口径）。
+  // 分行综合达成率 = 该行各核心指标按规模加权后的整体完成度；口径切换按 branchDelta 平移。
+  const BRANCH_BASE = [
+    { name: "城中支行", rate: 112.4, w: 9.2 }, { name: "江南支行", rate: 109.8, w: 8.6 },
+    { name: "高新支行", rate: 108.6, w: 7.4 }, { name: "中心支行", rate: 107.2, w: 8.1 },
+    { name: "东湖支行", rate: 106.1, w: 6.8 }, { name: "港区支行", rate: 105.3, w: 5.9 },
+    { name: "开发区支行", rate: 104.4, w: 7.7 }, { name: "科技支行", rate: 103.6, w: 6.2 },
+    { name: "临江支行", rate: 102.5, w: 5.4 }, { name: "北城支行", rate: 101.2, w: 6.6 },
+    { name: "城南支行", rate: 100.4, w: 5.1 }, { name: "河东支行", rate: 99.1, w: 4.8 },
+    { name: "湖畔支行", rate: 97.6, w: 4.3 }, { name: "西岭支行", rate: 95.8, w: 3.9 },
+    { name: "空港支行", rate: 93.2, w: 3.5 }
+  ];
+
+  // 季度多指标达成趋势：近 8 季度累计达成率（固定历史视图，粒度恒为季度，与 tab 口径无关）。
+  // 最末季数据与「年度」口径下 存款/贷款/中收 达成率呼应（103.6 / 102.6 / 105.9）。
+  const TREND = {
+    quarters: ["24Q4", "25Q1", "25Q2", "25Q3", "25Q4", "26Q1", "26Q2", "26Q3"],
+    series: [
+      { name: "存款", color: C.lime, data: [98.2, 99.5, 100.8, 101.4, 102.0, 102.8, 103.2, 103.6] },
+      { name: "贷款", color: C.cyan, data: [96.5, 97.8, 99.2, 100.1, 100.9, 101.6, 102.2, 102.6] },
+      { name: "中间业务收入", color: C.violet, data: [99.0, 100.2, 101.5, 102.6, 103.4, 104.2, 105.1, 105.9] }
+    ]
+  };
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("kb-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("kb-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. 状态语义（达标绿 / 接近黄 / 滞后红） ===== */
+  function statusOf(rate) {
+    if (rate >= 100) return { cls: "is-good", color: C.good, label: "达标", ring: hGrad("#3f9d5e", C.good) };
+    if (rate >= 95) return { cls: "is-near", color: C.near, label: "接近", ring: hGrad("#b8860b", C.near) };
+    return { cls: "is-lag", color: C.lag, label: "滞后", ring: hGrad("#b91c1c", C.lag) };
+  }
+
+  /* ===== 6. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(10, 26, 14, 0.92)",
+    borderColor: "rgba(163, 230, 53, 0.4)",
+    textStyle: { color: "#eaf5e4", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+
+  /* ===== 7. 上行：8 张 KPI 卡（DOM 卡 + 内嵌环形达成率 gauge） ===== */
+  const gridBox = $("kb-kpi-grid");
+  const CARDS = KPI_META.map((meta) => {
+    const card = document.createElement("article");
+    card.className = "kb-kpi-card";
+    card.innerHTML =
+      '<div class="kb-kpi-ring"></div>' +
+      '<div class="kb-kpi-body">' +
+        '<div class="kb-kpi-name">' + meta.name +
+          (meta.reverse ? '<span class="kb-kpi-flag">反向 · 越低越好</span>' : '') + '</div>' +
+        '<div class="kb-kpi-num"><span class="kb-kpi-val">0</span><span class="kb-kpi-unit">' + meta.unit + '</span></div>' +
+        '<div class="kb-kpi-target">目标 <b>--</b></div>' +
+        '<div class="kb-kpi-status"><span class="dot"></span><b>--</b>&nbsp;<span class="qual"></span></div>' +
+      '</div>';
+    gridBox.appendChild(card);
+    const ringEl = card.querySelector(".kb-kpi-ring");
+    return {
+      meta, card,
+      chart: echarts.init(ringEl),
+      valNode: card.querySelector(".kb-kpi-val"),
+      targetNode: card.querySelector(".kb-kpi-target b"),
+      statusNode: card.querySelector(".kb-kpi-status"),
+      statusLabel: card.querySelector(".kb-kpi-status b"),
+      statusQual: card.querySelector(".kb-kpi-status .qual"),
+      cur: 0, target: 0
+    };
+  });
+
+  function ringOption(rate, st) {
+    return {
+      series: [{
+        type: "gauge", startAngle: 220, endAngle: -40, radius: "98%", center: ["50%", "50%"],
+        min: 0, max: 130, splitNumber: 1,
+        progress: { show: true, roundCap: true, width: 7, itemStyle: { color: st.ring } },
+        axisLine: { lineStyle: { width: 7, color: [[1, "rgba(120, 172, 90, 0.16)"]] } },
+        pointer: { show: false }, anchor: { show: false },
+        axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
+        title: { show: true, offsetCenter: [0, "34%"], color: C.muted, fontSize: 9.5, fontWeight: 400 },
+        detail: {
+          valueAnimation: true, offsetCenter: [0, "-2%"],
+          formatter: (v) => round1(v) + "%",
+          color: st.color, fontSize: 18, fontWeight: 700,
+          fontFamily: "Bahnschrift, DIN Alternate, sans-serif"
+        },
+        data: [{ value: rate, name: "达成率" }]
+      }]
+    };
+  }
+
+  // 每张卡：写目标、算达成率、更新环形与状态、翻牌数字目标
+  function setCard(cardObj, v) {
+    const meta = cardObj.meta;
+    const rate = rateOf(meta, v);
+    const st = statusOf(rate);
+    cardObj.target = v.a;
+    cardObj.targetNode.textContent = fmtDec(v.t, meta.dec) + (meta.reverse ? "%（上限）" : " " + meta.unit);
+    // 状态描述文案
+    let qual;
+    if (meta.reverse) {
+      qual = "低于上限 " + fmtDec(v.t - v.a, meta.dec) + "pct（优）";
+    } else {
+      const diff = v.a - v.t;
+      qual = (diff >= 0 ? "超目标 +" : "缺口 ") + fmtDec(Math.abs(diff), meta.dec) + " " + meta.unit;
+    }
+    cardObj.statusNode.className = "kb-kpi-status " + st.cls;
+    cardObj.statusLabel.textContent = st.label;
+    cardObj.statusQual.textContent = "· " + qual;
+    // 达标闪光 / 边框语义色
+    cardObj.card.classList.remove("is-good", "is-near", "is-lag");
+    cardObj.card.classList.add(st.cls);
+    // 环形达成率生长动画
+    cardObj.chart.setOption(ringOption(rate, st));
+  }
+
+  // KPI 实际值 DOM 翻牌缓动
+  setInterval(() => {
+    CARDS.forEach((c) => {
+      const diff = c.target - c.cur;
+      const eps = Math.pow(10, -c.meta.dec) / 2;
+      if (Math.abs(diff) < eps) { c.cur = c.target; } else { c.cur += diff * 0.16; }
+      c.valNode.textContent = fmtDec(c.cur, c.meta.dec);
+    });
+  }, 80);
+
+  /* ===== 8. 下行左：15 家分行综合达成率横向条形排行（100% 达标线 markLine） ===== */
+  const branchChart = echarts.init($("kb-chart-branch"));
+  let branchRows = [];
+  function buildBranchRows(scope) {
+    // 单一数据源：基准 + 口径平移；达标绿/未达红由与 100 的关系现判。
+    return BRANCH_BASE.map((b) => {
+      const rate = round1(Math.max(0, b.rate + scope.branchDelta));
+      return { name: b.name, rate, w: b.w, good: rate >= 100 };
+    });
+  }
+  function branchOption() {
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const p = ps[0]; const r = branchRows[p.dataIndex];
+          return r.name + "<br/>综合达成率：<b style=\"color:" + (r.good ? C.good : C.lag) + "\">" + r.rate + "%</b>" +
+            "<br/>规模权重：" + r.w + "%<br/>状态：" + (r.good ? "达标" : "未达标");
+        }
+      }),
+      grid: { left: 8, right: 46, top: 10, bottom: 8, containLabel: true },
+      xAxis: {
+        type: "value", min: 80, max: 120,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 10, formatter: "{value}%" },
+        splitLine: { lineStyle: { color: "rgba(120, 172, 90, 0.1)" } }
+      },
+      yAxis: {
+        type: "category", inverse: true, data: branchRows.map((r) => r.name),
+        axisLine: { lineStyle: { color: "rgba(120, 172, 90, 0.25)" } },
+        axisTick: { show: false },
+        axisLabel: { color: "#d3e2bf", fontSize: 11 }
+      },
+      series: [{
+        type: "bar", barWidth: 12,
+        data: branchRows.map((r) => ({
+          value: r.rate,
+          itemStyle: {
+            borderRadius: [0, 6, 6, 0],
+            color: r.good ? hGrad("#4d7c0f", C.lime) : hGrad("#b91c1c", C.lag)
+          }
+        })),
+        label: {
+          show: true, position: "right", fontSize: 11, fontWeight: 700,
+          color: (o) => (branchRows[o.dataIndex].good ? C.limeSoft : "#fca5a5"),
+          formatter: (o) => o.value + "%"
+        },
+        markLine: {
+          silent: true, symbol: "none",
+          lineStyle: { color: "rgba(217, 249, 157, 0.7)", width: 1.4, type: "dashed" },
+          label: { formatter: "达标线 100%", color: C.limeSoft, fontSize: 10, position: "insideEndTop" },
+          data: [{ xAxis: 100 }]
+        },
+        animationDuration: 900, animationDelay: (i) => i * 45
+      }]
+    };
+  }
+  // 排行滚动：周期性高亮扫过各分行
+  let scanIdx = 0;
+  setInterval(() => {
+    if (!branchRows.length) return;
+    branchChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    branchChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: scanIdx });
+    scanIdx = (scanIdx + 1) % branchRows.length;
+  }, 1600);
+
+  /* ===== 9. 下行右：季度多指标达成趋势折线（3 条达成率 %，100% 达标参考线） ===== */
+  const trendChart = echarts.init($("kb-chart-trend"));
+  function trendOption() {
+    return {
+      tooltip: tip({
+        trigger: "axis",
+        axisPointer: { type: "cross", crossStyle: { color: "rgba(163, 230, 53, 0.3)" }, label: { backgroundColor: "rgba(40, 60, 20, 0.9)" } },
+        valueFormatter: (v) => v + "%"
+      }),
+      legend: {
+        top: 6, right: 12, icon: "roundRect", itemWidth: 12, itemHeight: 4, itemGap: 16,
+        textStyle: { color: "#cdddb4", fontSize: 12 }
+      },
+      grid: { left: 10, right: 20, top: 40, bottom: 8, containLabel: true },
+      xAxis: {
+        type: "category", boundaryGap: false, data: TREND.quarters,
+        axisLine: { lineStyle: { color: "rgba(120, 172, 90, 0.3)" } },
+        axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      yAxis: {
+        type: "value", min: 94, max: 108,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 10, formatter: "{value}%" },
+        splitLine: { lineStyle: { color: "rgba(120, 172, 90, 0.12)" } }
+      },
+      series: TREND.series.map((s, i) => ({
+        name: s.name, type: "line", smooth: true, symbol: "circle", symbolSize: 6,
+        data: s.data,
+        lineStyle: { width: 2.6, color: s.color, shadowColor: s.color, shadowBlur: 8 },
+        itemStyle: { color: s.color, borderColor: "#0a1e14", borderWidth: 1.5 },
+        areaStyle: i === 0 ? { color: vGrad("rgba(163, 230, 53, 0.28)", "rgba(163, 230, 53, 0.01)") } : undefined,
+        markLine: i === 0 ? {
+          silent: true, symbol: "none",
+          lineStyle: { color: "rgba(217, 249, 157, 0.55)", width: 1.2, type: "dashed" },
+          label: { formatter: "达标线 100%", color: C.limeSoft, fontSize: 10, position: "insideStartTop" },
+          data: [{ yAxis: 100 }]
+        } : undefined,
+        animationDuration: 1000
+      }))
+    };
+  }
+
+  /* ===== 10. 底部跑马灯：考核播报（按当前口径的现算值生成，勾稽自洽） ===== */
+  function renderMarquee(scope, rates, overall, goodCnt, branchGood, branchAvg) {
+    const k = scope.kpi;
+    const news = [
+      "截至" + scope.badge + "，全行综合达成率 <b>" + overall + "%</b>，8 项核心指标 <b>" + goodCnt + "</b> 项达标",
+      "存款达成率 <b>" + round1(rates.deposit) + "%</b>、中间业务收入 <b>" + round1(rates.intmid) + "%</b>，双双超目标",
+      "不良率实际 <b>" + fmtDec(k.npl.a, 2) + "%</b> 优于 ≤" + fmtDec(k.npl.t, 2) + "% 上限（反向指标，达成率按 目标/实际 计 <b>" + round1(rates.npl) + "%</b>）",
+      "15 家分行 <b>" + branchGood + "</b> 家达标，加权综合达成率 <b>" + branchAvg + "%</b>，与全行口径同区间呼应",
+      "净利润 <b>" + fmtDec(k.profit.a, 0) + " 亿元</b> 完成目标 " + fmtDec(k.profit.t, 0) + " 亿元的 <b>" + round1(rates.profit) + "%</b>，ROE 达 " + fmtDec(k.roe.a, 1) + "%",
+      "客户数 <b>" + fmtDec(k.cust.a, 0) + " 万户</b>、AUM <b>" + fmtDec(k.aum.a, 0) + " 亿元</b>，达成率 " + round1(rates.cust) + "% / " + round1(rates.aum) + "%"
+    ];
+    const html = news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("kb-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+
+  /* ===== 11. 口径切换：整体重算并过渡 ===== */
+  let curScope = "year";
+  function applyScope(scopeKey) {
+    curScope = scopeKey;
+    const scope = SCOPES[scopeKey];
+
+    // 页头徽章
+    $("kb-badge-txt").textContent = scope.badge;
+
+    // KPI 卡：写目标/实际 → 现算达成率
+    const rates = {};
+    let sumRate = 0, goodCnt = 0;
+    CARDS.forEach((c) => {
+      const v = scope.kpi[c.meta.key];
+      const r = rateOf(c.meta, v);
+      rates[c.meta.key] = r;
+      sumRate += r;
+      if (r >= 100) goodCnt++;
+      setCard(c, v);
+    });
+    const overall = round1(sumRate / CARDS.length);
+
+    // 分行排行
+    branchRows = buildBranchRows(scope);
+    scanIdx = 0;
+    branchChart.setOption(branchOption());
+    const branchGood = branchRows.filter((r) => r.good).length;
+    const wSum = branchRows.reduce((s, r) => s + r.w, 0);
+    const branchAvg = round1(branchRows.reduce((s, r) => s + r.rate * r.w, 0) / wSum);
+    $("kb-branch-good").textContent = branchGood;
+    $("kb-branch-avg").textContent = branchAvg + "%";
+
+    // 趋势（固定历史视图，仅首次绘制即可，这里一并 setOption 保证切换后重绘）
+    trendChart.setOption(trendOption());
+
+    // 页头汇总 + 面板口径
+    $("kb-overall").textContent = overall + "%";
+    $("kb-kpi-cnt").textContent = goodCnt + " / 8";
+    $("kb-scope-overall").textContent = overall + "%";
+
+    // 跑马灯
+    renderMarquee(scope, rates, overall, goodCnt, branchGood, branchAvg);
+
+    // tab 高亮
+    document.querySelectorAll(".kb-tab").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.scope === scopeKey);
+    });
+  }
+
+  document.querySelectorAll(".kb-tab").forEach((btn) => {
+    btn.addEventListener("click", () => applyScope(btn.dataset.scope));
+  });
+  applyScope(curScope);
+
+  /* ===== 12. 实时感：核心指标微跳变（实际值轻微漂移，达成率同步现算重绘） ===== */
+  setInterval(() => {
+    const scope = SCOPES[curScope];
+    let sumRate = 0, goodCnt = 0;
+    CARDS.forEach((c) => {
+      const v = scope.kpi[c.meta.key];
+      // 极小幅漂移：存量类按量级，反向/比率类按小步长；始终由 实际/目标 现算
+      const step = c.meta.reverse ? rndf(-0.006, 0.006) : (v.t > 1000 ? rndf(-6, 8) : rndf(-0.06, 0.09));
+      v.a = +(v.a + step).toFixed(Math.max(c.meta.dec, 2));
+      const r = rateOf(c.meta, v);
+      sumRate += r;
+      if (r >= 100) goodCnt++;
+      setCard(c, v);
+    });
+    const overall = round1(sumRate / CARDS.length);
+    $("kb-overall").textContent = overall + "%";
+    $("kb-kpi-cnt").textContent = goodCnt + " / 8";
+    $("kb-scope-overall").textContent = overall + "%";
+  }, 6000);
+})();
+</script>
+</body>
+</html>

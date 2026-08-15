@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 公共资金专题总览</title>
+<style>
+  :root {
+    --gl-bg: #08203f;
+    --gl-panel: rgba(11, 38, 72, 0.72);
+    --gl-border: rgba(92, 156, 226, 0.28);
+    --gl-text: #e8f2ff;
+    --gl-muted: #8ea9cc;
+    --gl-gold: #f0c060;
+    --gl-gold-soft: #ffdc8f;
+    --gl-blue: #3d9cff;
+    --gl-cyan: #39d0d8;
+    --gl-green: #33e0a6;
+    --gl-red: #ff5f6e;
+    --gl-orange: #ff9d4d;
+    --gl-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--gl-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .gl-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(240, 192, 96, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(57, 208, 216, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 60, 120, 0.34), transparent 56%),
+      linear-gradient(rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      var(--gl-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 430px 1fr 430px;
+    grid-template-rows: 84px 132px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .gl-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .gl-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .gl-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .gl-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(240, 192, 96, 0.6) 16%, rgba(57, 208, 216, 0.85) 50%, rgba(240, 192, 96, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.4);
+  }
+  .gl-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .gl-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--gl-muted); }
+  .gl-crumb b { font-weight: 400; color: var(--gl-gold); }
+  .gl-crumb i { font-style: normal; color: rgba(142, 169, 204, 0.55); }
+  .gl-crumb em { font-style: normal; color: #d7e8ff; }
+  .gl-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .gl-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--gl-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(240, 192, 96, 0.35));
+  }
+  .gl-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--gl-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .gl-head-meta b { font-weight: 400; color: var(--gl-gold-soft); }
+  .gl-head-meta i { font-style: normal; color: rgba(142, 169, 204, 0.4); }
+
+  .gl-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .gl-chips { display: flex; align-items: center; gap: 9px; }
+  .gl-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid rgba(92, 156, 226, 0.4); background: rgba(16, 46, 86, 0.55);
+  }
+  .gl-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f88b8; }
+  .gl-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #d6e9ff; font-variant-numeric: tabular-nums; }
+  .gl-chip.is-gold { border-color: rgba(240, 192, 96, 0.5); background: rgba(72, 56, 24, 0.42); box-shadow: inset 0 0 14px rgba(240, 192, 96, 0.1); }
+  .gl-chip.is-gold b { color: var(--gl-gold-soft); }
+  .gl-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(92, 156, 226, 0.25); }
+  .gl-clock-time { font: 700 26px/1 var(--gl-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(57, 208, 216, 0.4); }
+  .gl-clock-date { font-size: 12px; color: var(--gl-muted); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带：系列级 5 枚核心指标 ===== */
+  .gl-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .gl-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--gl-border); border-radius: 12px; background: var(--gl-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .gl-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--gl-gold), transparent); }
+  .gl-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(240, 192, 96, 0.13), transparent 68%);
+  }
+  .gl-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.28), rgba(57, 208, 216, 0.12));
+    border: 1px solid rgba(240, 192, 96, 0.35); box-shadow: inset 0 0 12px rgba(240, 192, 96, 0.14);
+  }
+  .gl-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .gl-kpi-label { font-size: 12.5px; letter-spacing: 0.08em; color: var(--gl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gl-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .gl-kpi-val { font: 700 30px/1 var(--gl-mono); color: var(--gl-gold-soft); letter-spacing: 0.01em; text-shadow: 0 0 14px rgba(240, 192, 96, 0.45); }
+  .gl-kpi-unit { font-size: 12px; color: #b39a5e; }
+  .gl-kpi-sub { display: flex; align-items: center; gap: 6px; font-size: 11.5px; letter-spacing: 0.01em; color: var(--gl-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gl-kpi-sub b { font-weight: 700; }
+  .gl-up { color: var(--gl-green); }
+  .gl-down { color: var(--gl-red); }
+
+  /* KPI 卡内嵌进度条（序时进度专用） */
+  .gl-mini-track { position: relative; height: 6px; border-radius: 3px; background: rgba(63, 120, 200, 0.2); }
+  .gl-mini-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 3px; background: linear-gradient(90deg, #b8863a, var(--gl-gold-soft)); box-shadow: 0 0 10px rgba(240, 192, 96, 0.5); transition: width 1.2s cubic-bezier(0.22, 0.8, 0.3, 1); }
+  .gl-mini-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.8); }
+
+  /* ===== 面板通用 ===== */
+  .gl-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .gl-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--gl-border); border-radius: 12px; background: var(--gl-panel);
+    display: flex; flex-direction: column;
+  }
+  .gl-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(240, 192, 96, 0.22), rgba(57, 208, 216, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .gl-panel-head i { flex: none; width: 5px; height: 16px; background: var(--gl-gold); box-shadow: 0 0 8px var(--gl-gold); transform: skewX(-12deg); }
+  .gl-panel-head h2 { flex: none; margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f4f9ff; white-space: nowrap; }
+  /* EN 副标是头部唯一可压缩项：min-width 0 让它先让位，标题与右侧数字永不被挤出 */
+  .gl-panel-en { flex: 0 1 auto; min-width: 0; font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gl-panel-scope { flex: none; margin-left: auto; padding-left: 8px; font-size: 12px; color: var(--gl-gold-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .gl-chart { flex: 1; min-height: 0; }
+
+  .gl-navpanel { flex: 1.25; }
+  .gl-radar { flex: 1.15; }
+  .gl-risk-panel { flex: 0.85; }
+
+  /* ===== 中①主视觉：13 页导航宫格 ===== */
+  .gl-navgrid {
+    flex: 1; min-height: 0; display: grid;
+    grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr);
+    gap: 8px; padding: 9px 10px 10px;
+  }
+  .gl-nav {
+    --gl-ac: var(--gl-gold);
+    position: relative; overflow: hidden; min-width: 0;
+    border: 1px solid rgba(92, 156, 226, 0.26); border-radius: 9px;
+    background: linear-gradient(150deg, rgba(18, 52, 94, 0.62), rgba(11, 34, 64, 0.42));
+    padding: 7px 10px 7px 11px;
+    display: flex; flex-direction: column; justify-content: center; gap: 3px;
+    transition: transform 0.45s ease, box-shadow 0.45s ease, border-color 0.45s ease, background 0.45s ease;
+  }
+  /* 左上角三角角标：按三期着色 */
+  .gl-nav::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 0; height: 0;
+    border-top: 17px solid var(--gl-ac); border-right: 17px solid transparent; opacity: 0.9;
+  }
+  .gl-nav.is-p1 { --gl-ac: #f0c060; }
+  .gl-nav.is-p2 { --gl-ac: #39d0d8; }
+  .gl-nav.is-p3 { --gl-ac: #3d9cff; }
+  .gl-nav.is-live {
+    transform: translateY(-3px);
+    border-color: var(--gl-ac);
+    background: linear-gradient(150deg, rgba(30, 74, 126, 0.8), rgba(14, 42, 78, 0.55));
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06) inset, 0 6px 20px rgba(0, 0, 0, 0.35), 0 0 18px -2px var(--gl-ac);
+  }
+  /* 13 张导航卡是超链接：点击跳到对应专题页（末格「系列说明」仍是 article，不参与以下悬停态） */
+  a.gl-nav { text-decoration: none; color: inherit; cursor: pointer; }
+  a.gl-nav::after {
+    content: "↗"; position: absolute; right: 9px; top: 6px; z-index: 2;
+    font-size: 12px; line-height: 1; font-weight: 700; color: var(--gl-ac);
+    opacity: 0; transform: translate(-3px, 3px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  a.gl-nav:hover::after, a.gl-nav:focus-visible::after { opacity: 0.95; transform: translate(0, 0); }
+  a.gl-nav:hover, a.gl-nav:focus-visible {
+    transform: translateY(-3px);
+    border-color: var(--gl-ac);
+    background: linear-gradient(150deg, rgba(30, 74, 126, 0.85), rgba(14, 42, 78, 0.6));
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset, 0 8px 22px rgba(0, 0, 0, 0.4), 0 0 22px -2px var(--gl-ac);
+  }
+  a.gl-nav:focus-visible { outline: 2px solid var(--gl-ac); outline-offset: 2px; }
+  a.gl-nav:active { transform: translateY(-1px) scale(0.985); }
+  .gl-nav-top { display: flex; align-items: center; gap: 7px; min-width: 0; padding-right: 14px; }
+  .gl-nav-no {
+    flex: none; margin-left: 6px; font: 700 11px/1 var(--gl-mono); letter-spacing: 0.06em;
+    padding: 3px 5px; border-radius: 4px; color: #06182c;
+    background: var(--gl-ac); box-shadow: 0 0 9px -2px var(--gl-ac);
+  }
+  /* 可下钻角标：标记该专题有二级详情子页，点进父页后可再点表格行/卡片下钻 */
+  .gl-nav-drill {
+    flex: none; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; line-height: 1;
+    padding: 3px 5px; border-radius: 4px; color: #06182c;
+    background: linear-gradient(140deg, #9fe8ec, #39d0d8);
+    box-shadow: 0 0 8px -1px rgba(57, 208, 216, 0.75);
+  }
+  .gl-nav-name { font-size: 13.5px; font-weight: 700; letter-spacing: 0.03em; color: #f2f8ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gl-nav-desc { font-size: 11px; color: var(--gl-muted); letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gl-nav-foot { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  .gl-nav-val { font: 700 15px/1 var(--gl-mono); color: var(--gl-gold-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gl-nav-unit { min-width: 0; font-size: 10px; color: #b39a5e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gl-nav-tag {
+    margin-left: auto; flex: none; font-size: 10px; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 999px;
+    color: var(--gl-ac); border: 1px solid var(--gl-ac); background: rgba(6, 24, 44, 0.5); opacity: 0.88; white-space: nowrap;
+  }
+
+  /* 系列说明卡（占末行 3 格） */
+  .gl-note { grid-column: span 3; justify-content: center; gap: 6px; padding: 8px 13px; }
+  .gl-note::before { display: none; }
+  .gl-note-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .gl-note-title { flex: none; font-size: 13px; font-weight: 700; letter-spacing: 0.16em; color: var(--gl-gold-soft); }
+  .gl-note-en { flex: none; font-size: 9.5px; letter-spacing: 0.22em; color: #5f88b8; }
+  .gl-note-legend { margin-left: auto; display: flex; align-items: center; gap: 14px; flex: none; }
+  .gl-lg { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #c5daf2; letter-spacing: 0.02em; white-space: nowrap; }
+  .gl-lg i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .gl-lg b { font: 700 11.5px/1 var(--gl-mono); color: var(--gl-gold-soft); }
+  .gl-note-txt { font-size: 11px; line-height: 1.45; color: var(--gl-muted); overflow: hidden; }
+  .gl-note-txt b { color: var(--gl-gold-soft); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* ===== 右②：关键风险提示清单（DOM grid 表格范式） ===== */
+  .gl-thead {
+    flex: none; display: grid; grid-template-columns: 1fr 86px 76px; align-items: center;
+    margin: 7px 12px 0; padding: 0 8px; height: 24px;
+    font-size: 11px; letter-spacing: 0.1em; color: #7fa0c8;
+    background: rgba(63, 120, 200, 0.14); border-radius: 5px;
+  }
+  .gl-thead span:nth-child(2), .gl-thead span:nth-child(3) { text-align: right; }
+  .gl-risk { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 6px 12px 9px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .gl-risk li {
+    flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 86px 76px; align-items: center;
+    padding: 0 8px; border-radius: 5px; border-left: 2px solid transparent;
+  }
+  .gl-risk li:nth-child(odd) { background: rgba(63, 120, 200, 0.09); }
+  .gl-risk li.is-alarm { border-left-color: var(--gl-red); background: rgba(150, 34, 48, 0.16); animation: glAlarm 2.4s ease-in-out infinite; }
+  @keyframes glAlarm {
+    0%, 100% { box-shadow: inset 0 0 0 rgba(255, 95, 110, 0); }
+    50% { box-shadow: inset 0 0 22px -4px rgba(255, 95, 110, 0.55); }
+  }
+  .gl-risk-name { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .gl-risk-name b { font-size: 12.5px; font-weight: 700; color: #eaf4ff; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gl-risk-name span { font-size: 10.5px; color: #7fa0c8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .gl-risk-val { text-align: right; font: 700 15px/1 var(--gl-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gl-risk-badge { text-align: right; }
+  .gl-badge { display: inline-block; font-size: 10.5px; letter-spacing: 0.06em; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .gl-badge.is-warn { color: #2a1206; background: linear-gradient(120deg, var(--gl-orange), #ffc48e); }
+  .gl-badge.is-bad { color: #ffe4e7; background: rgba(180, 40, 56, 0.62); border: 1px solid rgba(255, 95, 110, 0.6); }
+
+  /* ===== 底部跑马灯 ===== */
+  .gl-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--gl-border); border-radius: 12px; background: var(--gl-panel);
+  }
+  .gl-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a1c05;
+    background: linear-gradient(120deg, var(--gl-gold-soft), #d8a03c 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .gl-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a1c05; animation: glDot 1.6s ease-in-out infinite; }
+  @keyframes glDot { 50% { opacity: 0.25; } }
+  .gl-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .gl-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: glMarquee 96s linear infinite; font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .gl-marquee-track b { color: var(--gl-gold-soft); font-weight: 700; }
+  .gl-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(240, 192, 96, 0.5); }
+  @keyframes glMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .gl-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="gl-stage" id="gl-stage">
+    <!-- mockflag:begin --><div class="gl-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="gl-error" id="gl-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="gl-header">
+      <div class="gl-head-left">
+        <div class="gl-crumb"><b>公共资金</b><i>›</i><em>专题总览</em></div>
+        <div class="gl-head-title-row">
+          <div class="gl-head-title">公共资金专题总览</div>
+          <div class="gl-head-meta">
+            <span><b>13</b> 个专题页</span><i>|</i>
+            <span>数据截至 <b>2026-07-31</b></span><i>|</i>
+            <span><b>2026 年 1-7 月累计</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="gl-head-right">
+        <div class="gl-chips">
+          <div class="gl-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="gl-chip is-gold"><span>TIME PROGRESS</span><b id="gl-timeprog">--%</b></div>
+        </div>
+        <div class="gl-clock" aria-label="实时时钟">
+          <span class="gl-clock-time" id="gl-clock-time">--:--:--</span>
+          <span class="gl-clock-date" id="gl-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <section class="gl-band" id="gl-band" aria-label="系列核心指标"></section>
+
+    <!-- 左列 -->
+    <div class="gl-col">
+      <section class="gl-panel">
+        <header class="gl-panel-head"><i></i><h2>四本预算全景</h2><span class="gl-panel-en">BUDGETS</span><span class="gl-panel-scope" id="gl-books-scope">四本合计 -- 亿元</span></header>
+        <div class="gl-chart" id="gl-chart-books" role="img" aria-label="四本预算收入横向条形与同比"></div>
+      </section>
+      <section class="gl-panel">
+        <header class="gl-panel-head"><i></i><h2>三大板块收入占比</h2><span class="gl-panel-en">MIX</span><span class="gl-panel-scope" id="gl-blocks-scope">全省合计 -- 亿元</span></header>
+        <div class="gl-chart" id="gl-chart-blocks" role="img" aria-label="苏南苏中苏北与省本级收入占比环形图"></div>
+      </section>
+    </div>
+
+    <!-- 中央 -->
+    <div class="gl-col">
+      <section class="gl-panel gl-navpanel">
+        <header class="gl-panel-head"><i></i><h2>13 个专题页导航</h2><span class="gl-panel-en">TOPIC NAVIGATOR</span><span class="gl-panel-scope" id="gl-nav-scope">一期 -- · 二期 -- · 三期 --</span></header>
+        <div class="gl-navgrid" id="gl-navgrid" aria-label="专题页导航宫格"></div>
+      </section>
+      <section class="gl-panel">
+        <header class="gl-panel-head"><i></i><h2>全省收入月度节奏</h2><span class="gl-panel-en">MONTHLY RHYTHM</span><span class="gl-panel-scope" id="gl-month-scope">合计 -- 亿元</span></header>
+        <div class="gl-chart" id="gl-chart-month" role="img" aria-label="江苏 1-7 月收入双柱与累计同比折线"></div>
+      </section>
+    </div>
+
+    <!-- 右列 -->
+    <div class="gl-col">
+      <section class="gl-panel gl-radar">
+        <header class="gl-panel-head"><i></i><h2>资金运行指数 6 分项</h2><span class="gl-panel-en">INDEX</span><span class="gl-panel-scope" id="gl-idx-scope">综合 --</span></header>
+        <div class="gl-chart" id="gl-chart-radar" role="img" aria-label="资金运行指数六分项雷达图"></div>
+      </section>
+      <section class="gl-panel gl-risk-panel">
+        <header class="gl-panel-head"><i></i><h2>关键风险提示</h2><span class="gl-panel-en">RISK WATCH</span><span class="gl-panel-scope" id="gl-risk-scope">-- 项待关注</span></header>
+        <div class="gl-thead"><span>风险项 / 口径</span><span>关键值</span><span>状态</span></div>
+        <ul class="gl-risk" id="gl-risk"></ul>
+      </section>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="gl-marquee" aria-label="系列导读">
+      <div class="gl-marquee-tag"><i></i>系列导读</div>
+      <div class="gl-marquee-view"><div class="gl-marquee-track" id="gl-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("gl-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 + 公共工具 ===== */
+  const errorNode = document.getElementById("gl-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e8f2ff", muted: "#8ea9cc",
+    gold: "#f0c060", goldSoft: "#ffdc8f", goldDeep: "#b8863a",
+    blue: "#3d9cff", cyan: "#39d0d8", green: "#33e0a6", red: "#ff5f6e", orange: "#ff9d4d"
+  };
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = Number(n).toFixed(dec == null ? 0 : dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const signed = (v, dec) => (v >= 0 ? "+" : "−") + fmtDec(Math.abs(v), dec == null ? 1 : dec);
+
+  /* ===== 3. 数据源（模拟，口径 2026 年 1-7 月累计 · 亿元）
+         全系列同源：合计一律由分项求和，占比 / 增速 / 进度 / 指数全部现算 ===== */
+
+  /* 3.1 时间基准：2026-07-31 为年内第 212 天（与系列各页一致） */
+  const DAY_OF_YEAR = 212, DAYS_IN_YEAR = 365;
+  const TIME_PROG = 100 * DAY_OF_YEAR / DAYS_IN_YEAR;
+
+  /* 3.2 全国地方一般公共预算收入（页 1、页 2） */
+  const NATION = { cur: 76500, pre: 74400 };
+
+  /* 3.3 江苏月度节奏：本年 / 上年同期（页 3 及以下省内各页共用） */
+  const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月"];
+  const JS_CUR = [1280, 820, 960, 1310, 1010, 1160, 940];
+  const JS_PRE = [1236, 796, 928, 1268, 976, 1122, 908];
+  const JS_BUDGET = 12600;                       /* 江苏全年预算 */
+  const JS_TAX = { cur: 5760, pre: 5625 };       /* 地方级税收（页 4 / 页 6 勾稽口径） */
+
+  /* 3.4 四本预算（页 3 / 页 8 / 页 9），上年同期用于现算同比 */
+  const BOOKS = [
+    { name: "一般公共预算", cur: 7480, pre: 7234, color: C.gold },
+    { name: "社保基金预算", cur: 4320, pre: 4098.7, color: C.cyan },
+    { name: "政府性基金预算", cur: 3318, pre: 3935, color: C.blue },
+    { name: "国有资本经营预算", cur: 186, pre: 175.1, color: C.green }
+  ];
+  const LAND = { cur: 2860, pre: 3505 };         /* 页 8：土地出让收入，含于政府性基金 */
+
+  /* 3.5 三大板块 + 省本级（页 3），四项之和 = 江苏一般公共预算收入 */
+  const BLOCKS = [
+    { name: "苏南", val: 4150, yoy: 3.6, color: C.gold },
+    { name: "苏北", val: 1360, yoy: 2.1, color: C.blue },
+    { name: "苏中", val: 1100, yoy: 3.1, color: C.cyan },
+    { name: "省本级", val: 870, yoy: null, color: C.green }   /* 同比由「全省 − 三板块」倒轧现算 */
+  ];
+
+  /* 3.6 资金运行指数 6 分项（页 11），综合指数由分项加权现算 */
+  const INDEX_ITEMS = [
+    { name: "收入景气", cur: 102.4, prev: 101.2, w: 0.25 },
+    { name: "支出强度", cur: 106.8, prev: 105.4, w: 0.20 },
+    { name: "资金保障", cur: 98.2, prev: 99.6, w: 0.20 },
+    { name: "债务压力", cur: 94.6, prev: 95.8, w: 0.15 },
+    { name: "现金收益", cur: 108.4, prev: 106.2, w: 0.10 },
+    { name: "收支均衡", cur: 101.2, prev: 100.4, w: 0.10 }
+  ];
+
+  /* 3.7 资金（页 13）：保障水平 = 余额 / 月均支出，预警地区数由清单现算 */
+  const KK = { bal: 2180, monthExp: 3516, warnLine: 0.30, floor: 0.30, ceil: 0.80 };
+  const KK_LIST = [
+    { name: "省本级", v: 0.68 }, { name: "苏州", v: 0.74 }, { name: "南京", v: 0.66 },
+    { name: "无锡", v: 0.71 }, { name: "常州", v: 0.58 }, { name: "南通", v: 0.54 },
+    { name: "扬州", v: 0.46 }, { name: "泰州", v: 0.42 }, { name: "镇江", v: 0.38 },
+    { name: "盐城", v: 0.41 }, { name: "徐州", v: 0.34 }, { name: "淮安", v: 0.31 },
+    { name: "宿迁", v: 0.28 }, { name: "连云港", v: 0.26 }
+  ];
+
+  /* 3.8 其他专题页代表值（页 5-12） */
+  const BOND = { issued: 4860, quota: 6900 };                 /* 页 12 */
+  const CASH = { amount: 3900, terms: 14 };                   /* 页 10 */
+  const NEWKE = { cur: 1730, yoy: 9.6 };                      /* 页 7：新动能税收 */
+  const REALTY = { cur: 720, yoy: -9.6 };                     /* 页 6：房地产业税收 */
+  const MANUF = 1560;                                          /* 页 6：制造业税收 */
+  const SOCIAL = 4320, SOE = 186;                              /* 页 9 */
+  const GD_TOP = 8380, SZ_TOP = 1580, CNTY100 = 9;             /* 页 2 / 页 3 / 页 5 */
+  const TAX_SHARE_PRE = 77.6;                                  /* 页 4：上年税收占比 */
+
+  /* ===== 4. 派生量：全部由 §3 现算，页面不出现硬编码合计 ===== */
+  const D = {};
+  /* 4.1 全国 */
+  D.natYoy = 100 * (NATION.cur / NATION.pre - 1);
+  /* 4.2 江苏收入 */
+  D.jsCur = sum(JS_CUR);
+  D.jsPre = sum(JS_PRE);
+  D.jsYoy = 100 * (D.jsCur / D.jsPre - 1);
+  D.jsProg = 100 * D.jsCur / JS_BUDGET;
+  D.jsProgGap = D.jsProg - TIME_PROG;
+  D.cumYoy = JS_CUR.map((_, i) => +(100 * (sum(JS_CUR.slice(0, i + 1)) / sum(JS_PRE.slice(0, i + 1)) - 1)).toFixed(2));
+  /* 4.3 税收 */
+  D.taxYoy = 100 * (JS_TAX.cur / JS_TAX.pre - 1);
+  D.taxShare = 100 * JS_TAX.cur / D.jsCur;
+  D.taxShareGap = D.taxShare - TAX_SHARE_PRE;
+  /* 4.4 四本预算：合计与各自同比现算 */
+  BOOKS.forEach((b) => { b.yoy = 100 * (b.cur / b.pre - 1); });
+  D.booksTotal = sum(BOOKS.map((b) => b.cur));
+  D.booksPre = sum(BOOKS.map((b) => b.pre));
+  D.booksYoy = 100 * (D.booksTotal / D.booksPre - 1);
+  D.fund = BOOKS.filter((b) => b.name === "政府性基金预算")[0].cur;
+  D.landYoy = 100 * (LAND.cur / LAND.pre - 1);
+  D.landDep = 100 * LAND.cur / D.fund;             /* 土地出让占政府性基金比重 */
+  /* 4.5 三板块 + 省本级：合计校验 + 省本级同比倒轧 */
+  D.blocksTotal = sum(BLOCKS.map((b) => b.val));
+  const namedPre = sum(BLOCKS.filter((b) => b.yoy !== null).map((b) => b.val / (1 + b.yoy / 100)));
+  BLOCKS.forEach((b) => {
+    if (b.yoy === null) b.yoy = 100 * (b.val / (D.jsPre - namedPre) - 1);
+    b.share = 100 * b.val / D.blocksTotal;
+  });
+  /* 4.6 资金运行指数：Σ(分项 × 权重)，四舍五入到 4 位消除浮点尾差 */
+  D.idx = +sum(INDEX_ITEMS.map((it) => it.cur * it.w)).toFixed(4);
+  D.idxPrev = +sum(INDEX_ITEMS.map((it) => it.prev * it.w)).toFixed(4);
+  D.idxDelta = +(D.idx - D.idxPrev).toFixed(4);
+  D.idxWeight = sum(INDEX_ITEMS.map((it) => it.w));
+  D.idxZone = D.idx < 95 ? "偏冷" : (D.idx <= 105 ? "正常" : (D.idx <= 115 ? "偏热" : "过热"));
+  /* 4.7 资金 */
+  D.kkRatio = KK.bal / KK.monthExp;
+  D.kkWarn = KK_LIST.filter((k) => k.v < KK.warnLine);
+  /* 4.8 债券 */
+  D.bondProg = 100 * BOND.issued / BOND.quota;
+  D.bondGap = D.bondProg - TIME_PROG;
+
+  /* ===== 5. 顶部时钟 + 时间进度 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("gl-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("gl-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("gl-timeprog").textContent = TIME_PROG.toFixed(1) + "%";
+
+  /* ===== 6. KPI 带：5 枚系列级核心指标（翻牌缓动，第 2 枚内嵌序时进度条） ===== */
+  const KPI_DEFS = [
+    { icon: "¥", label: "全国地方一般公共预算收入", val: NATION.cur, unit: "亿元", dec: 0,
+      sub: () => '同比 <b class="' + (D.natYoy >= 0 ? "gl-up" : "gl-down") + '">' + (D.natYoy >= 0 ? "▲" : "▼") + " " + signed(D.natYoy) + '%</b> · 上年同期 ' + fmtDec(NATION.pre) },
+    { icon: "苏", label: "江苏地方一般公共预算收入", val: D.jsCur, unit: "亿元", dec: 0, progress: true,
+      sub: () => '同比 <b class="' + (D.jsYoy >= 0 ? "gl-up" : "gl-down") + '">' + signed(D.jsYoy) + '%</b> · 序时 <b>' + D.jsProg.toFixed(1) + '%</b> · <b class="' +
+        (D.jsProgGap >= 0 ? "gl-up" : "gl-down") + '">' + (D.jsProgGap >= 0 ? "快 " : "慢 ") + Math.abs(D.jsProgGap).toFixed(2) + 'pct</b>' },
+    { icon: "◈", label: "江苏地方级税收收入", val: JS_TAX.cur, unit: "亿元", dec: 0,
+      sub: () => '税收占比 <b style="color:#ffdc8f">' + D.taxShare.toFixed(1) + '%</b> · 同比 <b class="' + (D.taxYoy >= 0 ? "gl-up" : "gl-down") + '">' + signed(D.taxYoy) + "%</b>" },
+    { icon: "◐", label: "资金运行指数（加权综合）", val: D.idx, unit: "", dec: 1,
+      sub: () => '较上月 <b class="' + (D.idxDelta >= 0 ? "gl-up" : "gl-down") + '">' + signed(D.idxDelta, 2) + '</b> · <b style="color:#ffdc8f">' + D.idxZone + '</b>区间 95-105' },
+    { icon: "◔", label: "全省资金保障水平", val: D.kkRatio, unit: "", dec: 2,
+      sub: () => '合理区间 ' + KK.floor.toFixed(2) + "-" + KK.ceil.toFixed(2) + ' · 预警地区 <b class="gl-down">' + D.kkWarn.length + '</b> 个' }
+  ];
+  const band = $("gl-band");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "gl-kpi";
+    card.innerHTML =
+      '<div class="gl-kpi-icon">' + k.icon + '</div>' +
+      '<div class="gl-kpi-main">' +
+        '<div class="gl-kpi-label">' + k.label + '</div>' +
+        '<div class="gl-kpi-num"><span class="gl-kpi-val">0</span><span class="gl-kpi-unit">' + k.unit + '</span></div>' +
+        (k.progress
+          ? '<div class="gl-mini-track"><div class="gl-mini-fill" id="gl-mini-fill"></div><div class="gl-mini-tick" style="left:' + TIME_PROG.toFixed(2) + '%"></div></div>'
+          : "") +
+        '<div class="gl-kpi-sub">' + k.sub() + '</div>' +
+      '</div>';
+    band.appendChild(card);
+    k.node = card.querySelector(".gl-kpi-val");
+    k.cur = 0;
+  });
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      const diff = k.val - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) k.cur = k.val; else k.cur += diff * 0.13;
+      k.node.textContent = fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+  setTimeout(() => { $("gl-mini-fill").style.width = Math.min(100, D.jsProg).toFixed(2) + "%"; }, 320);
+
+  /* ===== 7. 中①主视觉：13 页导航宫格（纯 DOM 卡片，title 标注文件名） ===== */
+  const PHASE = {
+    p1: { label: "一期 · 收入主线", color: "#f0c060" },
+    p2: { label: "二期 · 结构专题", color: "#39d0d8" },
+    p3: { label: "三期 · 资金运行", color: "#3d9cff" }
+  };
+  const PAGES = [
+    { no: 1, ph: "p1", name: "全国收入总览", desc: "全国累计收入与序时执行", val: fmtDec(NATION.cur), unit: "亿元", tag: "瀑布",
+      file: "大屏样板间-公共资金全国收入总览1920.html" },
+    { no: 2, ph: "p1", name: "分地区收入", desc: "31 省排行与规模-增速象限", val: fmtDec(GD_TOP), unit: "亿元 · 广东居首", tag: "全国地图",
+      file: "大屏样板间-公共资金分地区收入1920.html", drill: "四大板块 31 省" },
+    { no: 3, ph: "p1", name: "全省地市收入", desc: "13 设区市分布与执行进度", val: fmtDec(SZ_TOP), unit: "亿元 · 苏州居首", tag: "省域地图",
+      file: "大屏样板间-公共资金江苏地市收入1920.html", drill: "13 个设区市 / 三大板块" },
+    { no: 4, ph: "p1", name: "收入分项目", desc: "税种非税流向与收入质量", val: fmtDec(JS_TAX.cur), unit: "亿元 · 税收", tag: "桑基",
+      file: "大屏样板间-公共资金收入分项目1920.html", drill: "三级 21 项 / 六税叠加" },
+    { no: 5, ph: "p1", name: "重点城市与县区", desc: "五市演进与百亿县区方阵", val: String(CNTY100), unit: "个 · 百亿县区", tag: "排序柱",
+      file: "大屏样板间-公共资金重点城市县区1920.html", drill: "9 个百亿县区" },
+    { no: 6, ph: "p2", name: "税收分行业", desc: "13 行业规模增速与变迁", val: fmtDec(MANUF), unit: "亿元 · 制造业", tag: "treemap",
+      file: "大屏样板间-公共资金税收分行业1920.html", drill: "13 个行业门类" },
+    { no: 7, ph: "p2", name: "新动能税收", desc: "新旧动能剪刀差与赛道墙", val: fmtDec(NEWKE.cur), unit: "亿元 · " + signed(NEWKE.yoy) + "%", tag: "剪刀差",
+      file: "大屏样板间-公共资金新动能税收1920.html", drill: "四大类 / 12 赛道" },
+    { no: 8, ph: "p2", name: "土地出让形势", desc: "三年同期对比与市场温度", val: fmtDec(LAND.cur), unit: "亿元 · " + signed(D.landYoy) + "%", tag: "三年对比",
+      file: "大屏样板间-公共资金土地出让形势1920.html", drill: "全量逐宗台账" },
+    { no: 9, ph: "p2", name: "国资与社保预算", desc: "国资上缴与社保收支双联", val: fmtDec(SOCIAL), unit: "亿元 · 社保", tag: "双联屏",
+      file: "大屏样板间-公共资金国资社保预算1920.html" },
+    { no: 10, ph: "p3", name: "公共资金现金管理", desc: CASH.terms + " 期操作台账与利差收益", val: fmtDec(CASH.amount), unit: "亿元 · 操作量", tag: "甘特",
+      file: "大屏样板间-公共资金现金管理1920.html", drill: "14 期操作" },
+    { no: 11, ph: "p3", name: "资金运行指数", desc: "6 分项加权与 24 月走势", val: D.idx.toFixed(1), unit: "· " + D.idxZone, tag: "K 线",
+      file: "大屏样板间-公共资金运行指数1920.html" },
+    { no: 12, ph: "p3", name: "政府债券发行", desc: "发行节奏投向与限额进度", val: fmtDec(BOND.issued), unit: "亿元 · 进度 " + D.bondProg.toFixed(1) + "%", tag: "日历热力",
+      file: "大屏样板间-公共资金政府债券发行1920.html", drill: "全量逐笔台账" },
+    { no: 13, ph: "p3", name: "资金余额分析", desc: "保障水平排行与预警清单", val: fmtDec(KK.bal), unit: "亿元 · 资金余额", tag: "双水位",
+      file: "大屏样板间-公共资金余额分析1920.html", drill: "5 个预警地区" }
+  ];
+  const PHASE_COUNT = { p1: 0, p2: 0, p3: 0 };
+  PAGES.forEach((p) => { PHASE_COUNT[p.ph] += 1; });
+  $("gl-nav-scope").textContent = "一期 " + PHASE_COUNT.p1 + " · 二期 " + PHASE_COUNT.p2 + " · 三期 " + PHASE_COUNT.p3 + " 页 · 点击卡片进入";
+
+  const navGrid = $("gl-navgrid");
+  const navNodes = [];
+  PAGES.forEach((p) => {
+    /* 用 <a> 而非 <article>：点击直接跳到该专题页（相对路径，file:// 与 HTTP 下均可用） */
+    const card = document.createElement("a");
+    card.className = "gl-nav is-" + p.ph;
+    card.setAttribute("href", p.file);
+    card.setAttribute("title", "打开：" + p.name + "　（" + p.file + "）");
+    card.setAttribute("aria-label", "打开专题页 " + p.no + " " + p.name);
+    card.innerHTML =
+      '<div class="gl-nav-top"><span class="gl-nav-no">' + pad(p.no) + '</span>' +
+        (p.drill ? '<span class="gl-nav-drill" title="该专题可继续下钻：' + p.drill + '">下钻</span>' : '') +
+        '<span class="gl-nav-name">' + p.name + '</span></div>' +
+      '<div class="gl-nav-desc">' + p.desc + '</div>' +
+      '<div class="gl-nav-foot"><span class="gl-nav-val">' + p.val + '</span><span class="gl-nav-unit">' + p.unit + '</span>' +
+        '<span class="gl-nav-tag">' + p.tag + '</span></div>';
+    navGrid.appendChild(card);
+    navNodes.push(card);
+  });
+  /* 末行右侧 3 格：系列说明卡（图例 + 勾稽口径） */
+  const note = document.createElement("article");
+  note.className = "gl-nav gl-note";
+  note.innerHTML =
+    '<div class="gl-note-top">' +
+      '<span class="gl-note-title">系列说明</span><span class="gl-note-en">PUBLIC FUNDS SERIES</span>' +
+      '<span class="gl-note-legend">' +
+        '<span class="gl-lg"><i style="background:' + PHASE.p1.color + '"></i>' + PHASE.p1.label + ' <b>' + PHASE_COUNT.p1 + '</b> 页</span>' +
+        '<span class="gl-lg"><i style="background:' + PHASE.p2.color + '"></i>' + PHASE.p2.label + ' <b>' + PHASE_COUNT.p2 + '</b> 页</span>' +
+        '<span class="gl-lg"><i style="background:' + PHASE.p3.color + '"></i>' + PHASE.p3.label + ' <b>' + PHASE_COUNT.p3 + '</b> 页</span>' +
+      '</span>' +
+    '</div>' +
+    '<div class="gl-note-txt">' + PAGES.length + ' 页共用一套勾稽数据，逐层下钻：全国 <b>' + fmtDec(NATION.cur) + '</b> → 江苏 <b>' + fmtDec(D.jsCur) +
+      '</b> → 地方级税收 <b>' + fmtDec(JS_TAX.cur) + '</b> 亿元。各页合计、占比、增速、进度均由分项现算，跨页数字可逐笔对账。</div>';
+  navGrid.appendChild(note);
+
+  /* 每 2.5 秒轮流让一张卡呼吸高亮，13 张循环 */
+  let navIdx = -1;
+  setInterval(() => {
+    if (navIdx >= 0) navNodes[navIdx].classList.remove("is-live");
+    navIdx = (navIdx + 1) % navNodes.length;
+    navNodes[navIdx].classList.add("is-live");
+  }, 2500);
+
+  /* ===== 8. 右②：关键风险提示清单（DOM grid 表格，预警行红光呼吸） ===== */
+  const RISKS = [
+    { name: "土地出让收入", note: "占政府性基金 " + D.landDep.toFixed(1) + "% · " + fmtDec(LAND.cur) + " 亿元",
+      val: signed(D.landYoy) + "%", color: C.red, badge: "承压", cls: "is-bad", alarm: false },
+    { name: "房地产业税收", note: fmtDec(REALTY.cur) + " 亿元 · 减收最多行业",
+      val: signed(REALTY.yoy) + "%", color: C.red, badge: "减收", cls: "is-bad", alarm: false },
+    { name: "资金预警地区", note: D.kkWarn.map((k) => k.name + " " + k.v.toFixed(2)).join(" · "),
+      val: D.kkWarn.length + " 个", color: C.red, badge: "预警", cls: "is-bad", alarm: true },
+    { name: "债券限额使用", note: "限额 " + fmtDec(BOND.quota) + " 亿元 · 快于时序 " + D.bondGap.toFixed(2) + " pct",
+      val: D.bondProg.toFixed(1) + "%", color: C.orange, badge: "偏快", cls: "is-warn", alarm: false },
+    { name: "税收占比（收入质量）", note: fmtDec(JS_TAX.cur) + " / " + fmtDec(D.jsCur) + " 亿元 · 较上年 " + signed(D.taxShareGap) + " pct",
+      val: D.taxShare.toFixed(1) + "%", color: C.orange, badge: "关注", cls: "is-warn", alarm: false }
+  ];
+  const riskBox = $("gl-risk");
+  RISKS.forEach((r) => {
+    const li = document.createElement("li");
+    if (r.alarm) li.className = "is-alarm";
+    li.innerHTML =
+      '<div class="gl-risk-name"><b>' + r.name + '</b><span>' + r.note + '</span></div>' +
+      '<div class="gl-risk-val" style="color:' + r.color + '">' + r.val + '</div>' +
+      '<div class="gl-risk-badge"><span class="gl-badge ' + r.cls + '">' + r.badge + '</span></div>';
+    riskBox.appendChild(li);
+  });
+  $("gl-risk-scope").textContent = RISKS.length + " 项待关注 · " + RISKS.filter((r) => r.cls === "is-bad").length + " 项告警";
+
+  /* ===== 9. ECharts 公共构件（DOM 全部填充完毕后才 init，避免画布量错高度） ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(8, 26, 50, 0.93)",
+    borderColor: "rgba(240, 192, 96, 0.45)",
+    textStyle: { color: "#e2eeff", fontSize: 12 }
+  }, extra || {});
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: from }, { offset: 1, color: to }]);
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: from }, { offset: 1, color: to }]);
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LINE = { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } };
+  const SPLIT_LINE = { lineStyle: { color: "rgba(92, 156, 226, 0.13)" } };
+
+  /* ===== 10. 左①：四本预算全景（横向条形 + 底衬轨道 + 同比标注） ===== */
+  $("gl-books-scope").textContent = "四本合计 " + fmtDec(D.booksTotal) + " 亿元";
+  const booksChart = makeChart("gl-chart-books");
+  const BOOKS_AX = BOOKS.slice().reverse();      /* 类目轴自下而上，反转后金额自上而下递减 */
+  const BOOKS_MAX = 13000;       /* 轨道满格值：给条右侧的「金额 + 同比」标注留出空间 */
+  booksChart.setOption({
+    tooltip: tip({
+      trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(240, 192, 96, 0.08)" } },
+      formatter: (ps) => {
+        const b = BOOKS_AX[ps[0].dataIndex];
+        return '<b style="color:#ffdc8f">' + b.name + "</b><br/>本年累计 " + fmtDec(b.cur) + " 亿元<br/>上年同期 " + fmtDec(b.pre, 1) +
+          ' 亿元<br/>同比 <b style="color:' + (b.yoy >= 0 ? C.green : C.red) + '">' + signed(b.yoy) + "%</b><br/>占四本合计 " +
+          (100 * b.cur / D.booksTotal).toFixed(1) + "%";
+      }
+    }),
+    grid: { left: 8, right: 14, top: 18, bottom: 22, containLabel: true },
+    xAxis: { type: "value", max: BOOKS_MAX, show: false },
+    yAxis: {
+      type: "category", data: BOOKS_AX.map((b) => b.name),
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: "#d0e3fa", fontSize: 11.5, margin: 8 }
+    },
+    series: [
+      { name: "底衬", type: "bar", barWidth: 20, barGap: "-100%", z: 1, silent: true,
+        itemStyle: { color: "rgba(63, 120, 200, 0.12)", borderRadius: 10 },
+        data: BOOKS_AX.map(() => BOOKS_MAX) },
+      { name: "本年累计", type: "bar", barWidth: 20, z: 2,
+        data: BOOKS_AX.map((b) => ({
+          value: b.cur,
+          itemStyle: { borderRadius: 10, color: hGrad("rgba(63, 120, 200, 0.35)", b.color), shadowColor: b.color, shadowBlur: 8 }
+        })),
+        label: {
+          show: true, position: "right", distance: 8, fontSize: 10.5, fontWeight: 700,
+          formatter: (o) => {
+            const b = BOOKS_AX[o.dataIndex];
+            return "{v|" + fmtDec(b.cur) + "}{u| 亿元}  {" + (b.yoy >= 0 ? "up|" : "dn|") + signed(b.yoy) + "%}";
+          },
+          rich: {
+            v: { color: C.goldSoft, fontSize: 13, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" },
+            u: { color: "#b39a5e", fontSize: 10 },
+            up: { color: C.green, fontSize: 11, fontWeight: 700 },
+            dn: { color: C.red, fontSize: 11, fontWeight: 700 }
+          }
+        } }
+    ],
+    graphic: [{
+      type: "text", left: 12, bottom: 4,
+      style: {
+        text: "政府性基金含土地出让 " + fmtDec(LAND.cur) + " 亿元（占 " + D.landDep.toFixed(1) + "%）· 四本合计同比 " + signed(D.booksYoy) + "%",
+        fill: "#5f88b8", fontSize: 10.5
+      }
+    }]
+  });
+
+  /* ===== 11. 左②：三大板块 + 省本级收入占比环形 ===== */
+  $("gl-blocks-scope").textContent = "全省合计 " + fmtDec(D.blocksTotal) + " 亿元";
+  const blocksChart = makeChart("gl-chart-blocks");
+  blocksChart.setOption({
+    tooltip: tip({
+      formatter: (o) => {
+        const b = BLOCKS[o.dataIndex];
+        return '<b style="color:#ffdc8f">' + b.name + "</b><br/>" + fmtDec(b.val) + " 亿元<br/>占全省 " + b.share.toFixed(1) +
+          '%<br/>同比 <b style="color:' + (b.yoy >= 0 ? C.green : C.red) + '">' + signed(b.yoy) + "%</b>";
+      }
+    }),
+    series: [{
+      name: "板块收入", type: "pie", radius: ["44%", "66%"], center: ["50%", "50%"],
+      avoidLabelOverlap: true, minAngle: 8,
+      itemStyle: { borderColor: "rgba(8, 32, 63, 0.9)", borderWidth: 2 },
+      label: {
+        color: "#cfe2f8", fontSize: 11, lineHeight: 15,
+        formatter: (o) => {
+          const b = BLOCKS[o.dataIndex];
+          return "{n|" + b.name + "}\n{v|" + fmtDec(b.val) + "}{u| 亿元}\n{p|" + b.share.toFixed(1) + "%} {" + (b.yoy >= 0 ? "up|" : "dn|") + signed(b.yoy) + "%}";
+        },
+        rich: {
+          n: { color: "#e6f1ff", fontSize: 12, fontWeight: 700 },
+          v: { color: C.goldSoft, fontSize: 12.5, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" },
+          u: { color: "#b39a5e", fontSize: 9.5 },
+          p: { color: "#9fbde0", fontSize: 10.5 },
+          up: { color: C.green, fontSize: 10.5 },
+          dn: { color: C.red, fontSize: 10.5 }
+        }
+      },
+      labelLine: { length: 10, length2: 12, lineStyle: { color: "rgba(92, 156, 226, 0.5)" } },
+      emphasis: { scaleSize: 8, itemStyle: { shadowBlur: 16, shadowColor: "rgba(240, 192, 96, 0.5)" } },
+      data: BLOCKS.map((b) => ({
+        name: b.name, value: b.val,
+        itemStyle: { color: vGrad(b.color, "rgba(16, 52, 96, 0.75)") }
+      }))
+    }],
+    graphic: [{
+      type: "group", left: "center", top: "center",
+      children: [
+        { type: "text", x: 0, y: -14, style: { text: fmtDec(D.blocksTotal), fill: C.goldSoft, fontSize: 26, fontWeight: 700,
+            fontFamily: "Bahnschrift, DIN Alternate, sans-serif", textAlign: "center", textVerticalAlign: "middle" } },
+        { type: "text", x: 0, y: 10, style: { text: "全省合计 · 亿元", fill: "#7fa0c8", fontSize: 11, textAlign: "center", textVerticalAlign: "middle" } }
+      ]
+    }]
+  });
+  /* 板块轮播高亮 */
+  let blkIdx = -1;
+  setInterval(() => {
+    if (blkIdx >= 0) blocksChart.dispatchAction({ type: "downplay", seriesIndex: 0, dataIndex: blkIdx });
+    blkIdx = (blkIdx + 1) % BLOCKS.length;
+    blocksChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: blkIdx });
+  }, 3200);
+
+  /* ===== 12. 中②：全省收入月度节奏（本年 / 上年同期双柱 + 累计同比折线） ===== */
+  $("gl-month-scope").textContent = "合计 " + fmtDec(D.jsCur) + " 亿元 · 同比 " + signed(D.jsYoy, 2) + "%";
+  const monthChart = makeChart("gl-chart-month");
+  monthChart.setOption({
+    tooltip: tip({
+      trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(240, 192, 96, 0.08)" } },
+      formatter: (ps) => {
+        const i = ps[0].dataIndex;
+        const mom = i === 0 ? null : 100 * (JS_CUR[i] / JS_CUR[i - 1] - 1);
+        return '<b style="color:#ffdc8f">' + MONTHS[i] + "</b><br/>本年 " + fmtDec(JS_CUR[i]) + " 亿元<br/>上年同期 " + fmtDec(JS_PRE[i]) +
+          " 亿元<br/>当月同比 " + signed(100 * (JS_CUR[i] / JS_PRE[i] - 1)) + "%<br/>" +
+          (mom === null ? "" : "环比 " + signed(mom) + "%<br/>") +
+          '累计同比 <b style="color:#33e0a6">' + signed(D.cumYoy[i]) + "%</b>";
+      }
+    }),
+    legend: { top: 6, right: 14, itemWidth: 12, itemHeight: 8, itemGap: 16, textStyle: { color: "#c6dcf5", fontSize: 12 },
+      data: ["本年当月", "上年同期", "累计同比"] },
+    grid: { left: 14, right: 16, top: 44, bottom: 6, containLabel: true },
+    xAxis: { type: "category", data: MONTHS, axisLine: AXIS_LINE, axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 12 } },
+    yAxis: [
+      { type: "value", name: "亿元", max: 1600, nameTextStyle: { color: "#5f88b8", fontSize: 11, padding: [0, 0, 0, -22] },
+        splitLine: SPLIT_LINE, axisLabel: { color: C.muted, fontSize: 11, formatter: (v) => fmtDec(v) } },
+      { type: "value", name: "累计同比 %", nameTextStyle: { color: "#5f88b8", fontSize: 11 },
+        min: 0, max: 5, splitLine: { show: false }, axisLabel: { color: C.muted, fontSize: 11, formatter: "{value}%" } }
+    ],
+    series: [
+      { name: "上年同期", type: "bar", barWidth: 24, barGap: "-100%", z: 1,
+        itemStyle: { borderRadius: [4, 4, 0, 0], color: "rgba(92, 156, 226, 0.28)", borderColor: "rgba(92, 156, 226, 0.45)", borderWidth: 1 },
+        data: JS_PRE },
+      { name: "本年当月", type: "bar", barWidth: 24, z: 2,
+        itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad(C.goldSoft, "rgba(184, 134, 58, 0.35)"), shadowColor: "rgba(240, 192, 96, 0.4)", shadowBlur: 10 },
+        label: { show: true, position: "top", fontSize: 11, color: C.goldSoft, formatter: (o) => fmtDec(o.value) },
+        data: JS_CUR },
+      { name: "累计同比", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 8, z: 3,
+        lineStyle: { width: 3, color: C.green, shadowColor: "rgba(51, 224, 166, 0.55)", shadowBlur: 12 },
+        itemStyle: { color: C.green, borderColor: "#062a22", borderWidth: 2 },
+        areaStyle: { color: vGrad("rgba(51, 224, 166, 0.13)", "rgba(51, 224, 166, 0)") },
+        label: { show: true, position: "top", distance: 10, fontSize: 11, fontWeight: 700, color: C.green,
+          backgroundColor: "rgba(8, 26, 50, 0.78)", padding: [2, 4], borderRadius: 3,
+          formatter: (o) => signed(o.value) + "%" },
+        data: D.cumYoy }
+    ]
+  });
+
+  /* ===== 13. 右①：资金运行指数 6 分项雷达（本月 / 上月 / 基准 100） ===== */
+  $("gl-idx-scope").textContent = "综合 " + D.idx.toFixed(1) + " · " + D.idxZone;
+  const radarChart = makeChart("gl-chart-radar");
+  const IDX_BY_NAME = {};
+  INDEX_ITEMS.forEach((it) => { IDX_BY_NAME[it.name] = it; });
+  radarChart.setOption({
+    tooltip: tip({
+      trigger: "item",
+      formatter: (o) => {
+        if (!Array.isArray(o.value)) return o.name || "";
+        return '<b style="color:#ffdc8f">' + o.name + "</b><br/>" +
+          INDEX_ITEMS.map((it, i) => it.name + " <b>" + Number(o.value[i]).toFixed(1) + "</b> · 权重 " + (100 * it.w).toFixed(0) + "%").join("<br/>");
+      }
+    }),
+    legend: { top: 4, right: 10, itemWidth: 12, itemHeight: 8, itemGap: 12, textStyle: { color: "#c6dcf5", fontSize: 11 },
+      data: ["本月", "上月", "基准 100"] },
+    radar: {
+      center: ["50%", "53%"], radius: "56%", startAngle: 90, splitNumber: 4,
+      shape: "polygon",
+      /* 轴名下方直接挂本月分项值，免去看图猜数 */
+      axisName: {
+        formatter: (name) => "{n|" + name + "}\n{v|" + IDX_BY_NAME[name].cur.toFixed(1) + "}{w| ×" + IDX_BY_NAME[name].w.toFixed(2) + "}",
+        rich: {
+          n: { color: "#cfe2f8", fontSize: 11, lineHeight: 14 },
+          v: { color: C.goldSoft, fontSize: 12, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" },
+          w: { color: "#5f88b8", fontSize: 10 }
+        }
+      },
+      axisNameGap: 8,
+      splitLine: { lineStyle: { color: "rgba(92, 156, 226, 0.22)" } },
+      splitArea: { areaStyle: { color: ["rgba(63, 120, 200, 0.05)", "rgba(63, 120, 200, 0.11)"] } },
+      axisLine: { lineStyle: { color: "rgba(92, 156, 226, 0.28)" } },
+      indicator: INDEX_ITEMS.map((it) => ({ name: it.name, min: 88, max: 116 }))
+    },
+    series: [{
+      type: "radar", symbolSize: 6, z: 3,
+      emphasis: { lineStyle: { width: 4 } },
+      data: [
+        { name: "本月", value: INDEX_ITEMS.map((it) => it.cur),
+          lineStyle: { width: 3, color: C.gold, shadowColor: "rgba(240, 192, 96, 0.55)", shadowBlur: 12 },
+          itemStyle: { color: C.goldSoft },
+          areaStyle: { color: "rgba(240, 192, 96, 0.24)" } },
+        { name: "上月", value: INDEX_ITEMS.map((it) => it.prev),
+          lineStyle: { width: 2, color: C.blue, type: "dashed" },
+          itemStyle: { color: C.blue }, areaStyle: { color: "rgba(61, 156, 255, 0.08)" } },
+        { name: "基准 100", value: INDEX_ITEMS.map(() => 100), symbol: "none", silent: true,
+          lineStyle: { width: 1.4, color: "rgba(255, 255, 255, 0.45)", type: "dotted" }, areaStyle: { opacity: 0 } }
+      ]
+    }],
+    graphic: [{
+      type: "group", left: "center", bottom: 3,
+      children: [
+        { type: "text", x: 0, y: 0, style: {
+            text: "Σ(分项×权重) = " + D.idx.toFixed(2) + " → 综合 " + D.idx.toFixed(1) + "（" + D.idxZone + "，正常区间 95-105）",
+            fill: "#9fbde0", fontSize: 11, textAlign: "center", textVerticalAlign: "middle" } },
+        { type: "text", x: 0, y: 15, style: {
+            text: "权重合计 " + D.idxWeight.toFixed(2) + " · 上月综合 " + D.idxPrev.toFixed(2) + " · 环比 " + signed(D.idxDelta, 2),
+            fill: "#5f88b8", fontSize: 10.5, textAlign: "center", textVerticalAlign: "middle" } }
+      ]
+    }]
+  });
+  /* 本月 / 上月 交替强调 */
+  let radarIdx = 0;
+  setInterval(() => {
+    radarChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    radarIdx = (radarIdx + 1) % 2;
+    radarChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: radarIdx });
+  }, 3600);
+
+  /* ===== 14. 底部跑马灯：13 页系列导读（数字与上方同源现算） ===== */
+  const NEWS = [
+    "本页为公共资金 <b>" + PAGES.length + "</b> 个专题页的门户，全部页面共用一套勾稽数据、双击即可离线打开",
+    "① 全国收入总览：1-7 月全国地方一般公共预算收入 <b>" + fmtDec(NATION.cur) + " 亿元</b>，同比 <b>" + signed(D.natYoy) + "%</b>",
+    "② 分地区收入：31 省规模-增速象限，广东以 <b>" + fmtDec(GD_TOP) + " 亿元</b> 居首，6 省负增长",
+    "③ 全省地市收入：江苏 <b>" + fmtDec(D.jsCur) + " 亿元</b>，苏州 <b>" + fmtDec(SZ_TOP) + " 亿元</b> 领跑 13 设区市",
+    "④ 收入分项目：地方级税收 <b>" + fmtDec(JS_TAX.cur) + " 亿元</b>，税收占比 <b>" + D.taxShare.toFixed(1) + "%</b>，较上年回落 " + Math.abs(D.taxShareGap).toFixed(1) + " pct",
+    "⑤ 重点城市与县区：百亿县区 <b>" + CNTY100 + " 个</b>，昆山、江阴、张家港位列全国百强县前三",
+    "⑥ 税收分行业：制造业 <b>" + fmtDec(MANUF) + " 亿元</b> 稳居首位，房地产业 <b>" + signed(REALTY.yoy) + "%</b> 为减收最多行业",
+    "⑦ 新动能税收：<b>" + fmtDec(NEWKE.cur) + " 亿元</b>，同比 <b>" + signed(NEWKE.yoy) + "%</b>，跑赢全省税收 " + (NEWKE.yoy - D.taxYoy).toFixed(1) + " pct",
+    "⑧ 土地出让形势：<b>" + fmtDec(LAND.cur) + " 亿元</b>，同比 <b>" + signed(D.landYoy) + "%</b>，占政府性基金 <b>" + D.landDep.toFixed(1) + "%</b>",
+    "⑨ 国资与社保预算：社保基金收入 <b>" + fmtDec(SOCIAL) + " 亿元</b>、国有资本经营收入 <b>" + fmtDec(SOE) + " 亿元</b>",
+    "⑩ 公共资金现金管理：年内 <b>" + CASH.terms + " 期</b> 操作、累计操作量 <b>" + fmtDec(CASH.amount) + " 亿元</b>，加权中标利率高于计息基准",
+    "⑪ 资金运行指数：6 分项加权综合 <b>" + D.idx.toFixed(1) + "</b>（" + D.idxZone + "），较上月 <b>" + signed(D.idxDelta, 2) + "</b>",
+    "⑫ 政府债券发行：已发 <b>" + fmtDec(BOND.issued) + " 亿元</b>，限额使用 <b>" + D.bondProg.toFixed(1) + "%</b>，快于时序 " + D.bondGap.toFixed(1) + " pct",
+    "⑬ 资金余额分析：全省资金余额 <b>" + fmtDec(KK.bal) + " 亿元</b>，保障水平 <b>" + D.kkRatio.toFixed(2) + "</b>，预警地区 <b>" + D.kkWarn.length + " 个</b>",
+    "四本预算合计 <b>" + fmtDec(D.booksTotal) + " 亿元</b>；三大板块 + 省本级合计 <b>" + fmtDec(D.blocksTotal) + " 亿元</b>，与月度 7 项之和完全一致"
+  ];
+  const track = $("gl-marquee-track");
+  const marqueeHTML = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  track.innerHTML = marqueeHTML + marqueeHTML;
+})();
+</script>
+</body>
+</html>

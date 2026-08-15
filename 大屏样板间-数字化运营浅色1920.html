@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 数字化运营（浅色）</title>
+<style>
+  :root {
+    --dg-page: #eef2f8;
+    --dg-frame: #dfe6f0;
+    --dg-card: #ffffff;
+    --dg-border: #e3e9f4;
+    --dg-text: #22334d;
+    --dg-muted: #7d8ba3;
+    --dg-blue: #2f6bff;
+    --dg-cyan: #18b8c9;
+    --dg-violet: #7b61ff;
+    --dg-amber: #f5a623;
+    --dg-red: #e5484d;
+    --dg-green: #1a9e6c;
+    --dg-shadow: 0 6px 24px rgba(31, 58, 110, 0.08);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--dg-page); }
+  body {
+    color: var(--dg-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .dg-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    border: 1px solid var(--dg-frame);
+    background:
+      linear-gradient(rgba(47, 107, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(47, 107, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(180deg, #ffffff 0%, #f4f7fc 58%, #eef3fa 100%);
+    background-size: 48px 48px, 48px 48px, auto;
+    display: grid;
+    grid-template-columns: 424px 1fr 424px;
+    grid-template-rows: 78px 104px 1fr 60px;
+    gap: 14px;
+    padding: 14px 20px 18px;
+  }
+
+  .dg-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(229, 72, 77, 0.4); background: #fff2f3;
+    color: #b3272c; font-size: 15px; box-shadow: var(--dg-shadow);
+  }
+  .dg-error.is-visible { display: block; }
+
+  /* ===== 顶部标题栏 ===== */
+  .dg-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px;
+  }
+  .dg-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(24, 184, 201, 0.35) 20%, rgba(47, 107, 255, 0.75) 50%, rgba(24, 184, 201, 0.35) 80%, transparent);
+  }
+  .dg-title-wrap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -54%); text-align: center; white-space: nowrap; }
+  .dg-title {
+    display: flex; align-items: center; gap: 20px;
+    font-size: 33px; font-weight: 700; letter-spacing: 0.2em;
+    color: #1c2c4c;
+  }
+  .dg-title i { position: relative; flex: none; width: 118px; height: 10px; }
+  .dg-title i::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px;
+    background: linear-gradient(270deg, var(--dg-blue), rgba(47, 107, 255, 0.04));
+  }
+  .dg-title i::after {
+    content: ""; position: absolute; right: 8px; top: 1px; width: 8px; height: 8px;
+    background: linear-gradient(135deg, var(--dg-blue), var(--dg-cyan)); transform: rotate(45deg);
+    animation: dgDot 2s ease-in-out infinite;
+  }
+  .dg-title i.is-r { transform: scaleX(-1); }
+  @keyframes dgDot { 50% { opacity: 0.25; } }
+  .dg-title-sub { margin-top: 4px; font-size: 11px; letter-spacing: 0.6em; color: #9aabc7; text-indent: 0.6em; }
+  .dg-clock { display: flex; align-items: baseline; gap: 12px; font-variant-numeric: tabular-nums; }
+  .dg-clock-time {
+    font: 700 30px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #1c2c4c; letter-spacing: 0.04em;
+  }
+  .dg-clock-date { font-size: 13px; color: var(--dg-muted); letter-spacing: 0.08em; }
+  .dg-badge {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 13px; color: #2456c8; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid rgba(47, 107, 255, 0.28); background: rgba(47, 107, 255, 0.06);
+  }
+  .dg-badge i {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--dg-green);
+    box-shadow: 0 0 0 3px rgba(26, 158, 108, 0.15);
+    animation: dgBreath 2s ease-in-out infinite;
+  }
+  @keyframes dgBreath { 50% { opacity: 0.35; transform: scale(0.82); } }
+
+  /* ===== KPI 行 ===== */
+  .dg-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .dg-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--dg-border); border-radius: 14px; background: var(--dg-card);
+    box-shadow: var(--dg-shadow);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  }
+  .dg-kpi::before {
+    content: ""; position: absolute; left: 18px; top: 0; width: 44px; height: 3px; border-radius: 0 0 3px 3px;
+    background: linear-gradient(90deg, var(--dg-blue), var(--dg-cyan));
+  }
+  .dg-kpi-label { font-size: 13px; letter-spacing: 0.12em; color: var(--dg-muted); }
+  .dg-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .dg-kpi-val {
+    font: 700 30px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #162b52; letter-spacing: 0.02em;
+  }
+  .dg-kpi-unit { font-size: 12px; color: #5f7bb0; }
+  .dg-kpi-delta { font-size: 12px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .dg-kpi-delta.is-good { color: var(--dg-green); }
+  .dg-kpi-delta.is-bad { color: var(--dg-red); }
+
+  /* ===== 面板通用 ===== */
+  .dg-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .dg-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--dg-border); border-radius: 14px; background: var(--dg-card);
+    box-shadow: var(--dg-shadow);
+    display: flex; flex-direction: column;
+  }
+  .dg-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 42px; padding: 0 16px;
+    border-bottom: 1px solid #edf1f9;
+  }
+  .dg-panel-head i {
+    flex: none; width: 5px; height: 16px; border-radius: 3px;
+    background: linear-gradient(180deg, var(--dg-blue), var(--dg-cyan));
+  }
+  .dg-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.1em; color: #1c2c4c; white-space: nowrap; }
+  .dg-panel-head .dg-panel-en { font-size: 10px; letter-spacing: 0.22em; color: #a8b6cd; align-self: flex-end; padding-bottom: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dg-panel-head .dg-panel-scope {
+    margin-left: auto; font-size: 12px; color: #2456c8; white-space: nowrap;
+    padding: 3px 10px; border-radius: 999px; background: rgba(47, 107, 255, 0.07);
+  }
+  .dg-chart { flex: 1; min-height: 0; }
+
+  /* ===== 中央：漏斗与产品 ===== */
+  .dg-funnel-panel { flex: 1.02; }
+  .dg-top8-panel { flex: 1; }
+
+  /* ===== 右列：活动运营看板 ===== */
+  .dg-camps-panel { flex: 0.98; }
+  .dg-camps { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; overflow: hidden; }
+  .dg-camp {
+    flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px;
+    border: 1px solid var(--dg-border); border-radius: 12px; background: #fbfcff;
+    padding: 10px 14px;
+  }
+  .dg-camp-top { display: flex; align-items: center; gap: 8px; }
+  .dg-camp-name { font-size: 14px; font-weight: 700; color: #23355a; letter-spacing: 0.04em; }
+  .dg-camp-tag {
+    font-size: 11px; padding: 1px 8px; border-radius: 999px;
+    color: var(--dg-green); background: rgba(26, 158, 108, 0.1); border: 1px solid rgba(26, 158, 108, 0.28);
+  }
+  .dg-camp-days { margin-left: auto; font-size: 11px; color: var(--dg-muted); }
+  .dg-camp-bar { position: relative; height: 8px; border-radius: 999px; background: #e9eef7; overflow: hidden; }
+  .dg-camp-bar i {
+    position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px;
+    transition: width 0.8s ease;
+  }
+  .dg-camp-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--dg-muted); font-variant-numeric: tabular-nums; }
+  .dg-camp-meta b { font-weight: 700; color: #23355a; }
+  .dg-camp-meta .is-roi b { color: var(--dg-amber); }
+
+  /* ===== 右列：客群分层 + 智能外呼 ===== */
+  .dg-seg-panel { flex: 1.02; }
+  .dg-seg-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .dg-callrow {
+    flex: none; display: grid; grid-template-columns: repeat(3, 1fr);
+    margin: 0 14px 12px; border: 1px solid var(--dg-border); border-radius: 12px;
+    background: linear-gradient(180deg, #f7faff, #f2f6fd);
+  }
+  .dg-call {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    padding: 9px 4px;
+  }
+  .dg-call + .dg-call { border-left: 1px dashed #dde5f2; }
+  .dg-call-label { font-size: 11px; letter-spacing: 0.08em; color: var(--dg-muted); }
+  .dg-call-val {
+    font: 700 19px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #162b52; font-variant-numeric: tabular-nums;
+  }
+  .dg-call-val b { font-weight: 400; font-size: 11px; color: #5f7bb0; margin-left: 2px; }
+
+  /* ===== 底部跑马灯（浅色胶囊） ===== */
+  .dg-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--dg-border); border-radius: 14px; background: var(--dg-card);
+    box-shadow: var(--dg-shadow);
+  }
+  .dg-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #ffffff;
+    background: linear-gradient(120deg, var(--dg-blue), #5a8bff 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .dg-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #ffffff; animation: dgDot 1.6s ease-in-out infinite; }
+  .dg-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .dg-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: dgMarquee 48s linear infinite;
+  }
+  .dg-marquee-track span {
+    display: inline-flex; align-items: center; margin: 0 12px; padding: 6px 16px; border-radius: 999px;
+    background: #f1f5fc; border: 1px solid #e0e8f5;
+    font-size: 13px; letter-spacing: 0.04em; color: #3b4f73;
+  }
+  .dg-marquee-track span b { color: var(--dg-blue); font-weight: 700; margin: 0 2px; }
+  @keyframes dgMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .dg-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="dg-stage" id="dg-stage">
+    <!-- mockflag:begin --><div class="dg-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="dg-error" id="dg-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶部标题栏 -->
+    <header class="dg-header">
+      <div class="dg-clock" aria-label="实时时钟">
+        <span class="dg-clock-time" id="dg-clock-time">--:--:--</span>
+        <span class="dg-clock-date" id="dg-clock-date">----年--月--日 星期-</span>
+      </div>
+      <div class="dg-title-wrap">
+        <div class="dg-title"><i></i><span>数字化运营总览</span><i class="is-r"></i></div>
+        <div class="dg-title-sub">DIGITAL OPERATION OVERVIEW</div>
+      </div>
+      <div class="dg-badge"><i></i>数据日期 <span id="dg-badge-date">--</span> · 演示数据</div>
+    </header>
+
+    <!-- KPI 行 -->
+    <section class="dg-kpis" aria-label="核心指标" id="dg-kpis"></section>
+
+    <!-- 左列 -->
+    <div class="dg-col">
+      <section class="dg-panel">
+        <header class="dg-panel-head"><i></i><h2>渠道活跃趋势</h2><span class="dg-panel-en">ACTIVE USER TREND</span><span class="dg-panel-scope">近 30 日</span></header>
+        <div class="dg-chart" id="dg-chart-trend" role="img" aria-label="近30日手机银行MAU与DAU双线面积图"></div>
+      </section>
+      <section class="dg-panel">
+        <header class="dg-panel-head"><i></i><h2>新客来源结构</h2><span class="dg-panel-en">ACQUISITION MIX</span><span class="dg-panel-scope">本月</span></header>
+        <div class="dg-chart" id="dg-chart-source" role="img" aria-label="新客来源结构环形占比图"></div>
+      </section>
+    </div>
+
+    <!-- 中央 -->
+    <div class="dg-col">
+      <section class="dg-panel dg-funnel-panel">
+        <header class="dg-panel-head"><i></i><h2>产品转化漏斗</h2><span class="dg-panel-en">CONVERSION FUNNEL</span><span class="dg-panel-scope">本月 · 全渠道</span></header>
+        <div class="dg-chart" id="dg-chart-funnel" role="img" aria-label="曝光到动支五级产品转化漏斗图"></div>
+      </section>
+      <section class="dg-panel dg-top8-panel">
+        <header class="dg-panel-head"><i></i><h2>重点产品销量 TOP8</h2><span class="dg-panel-en">PRODUCT TOP8</span><span class="dg-panel-scope">本月累计</span></header>
+        <div class="dg-chart" id="dg-chart-top8" role="img" aria-label="重点产品销量与目标达成率横向条形图"></div>
+      </section>
+    </div>
+
+    <!-- 右列 -->
+    <div class="dg-col">
+      <section class="dg-panel dg-camps-panel">
+        <header class="dg-panel-head"><i></i><h2>活动运营看板</h2><span class="dg-panel-en">CAMPAIGN BOARD</span><span class="dg-panel-scope">在跑 3 场</span></header>
+        <div class="dg-camps" id="dg-camps"></div>
+      </section>
+      <section class="dg-panel dg-seg-panel">
+        <header class="dg-panel-head"><i></i><h2>客群分层</h2><span class="dg-panel-en">SEGMENT AUM</span><span class="dg-panel-scope">AUM 贡献</span></header>
+        <div class="dg-seg-body">
+          <div class="dg-chart" id="dg-chart-seg" role="img" aria-label="四大客群AUM贡献玫瑰图"></div>
+          <div class="dg-callrow" aria-label="智能外呼指标">
+            <div class="dg-call"><span class="dg-call-label">今日智能外呼</span><span class="dg-call-val"><span id="dg-call-total">--</span><b>万通</b></span></div>
+            <div class="dg-call"><span class="dg-call-label">接通率</span><span class="dg-call-val"><span id="dg-call-rate">--</span><b>%</b></span></div>
+            <div class="dg-call"><span class="dg-call-label">意向客户</span><span class="dg-call-val"><span id="dg-call-lead">--</span><b>户</b></span></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="dg-marquee" aria-label="运营快讯">
+      <div class="dg-marquee-tag"><i></i>运营快讯</div>
+      <div class="dg-marquee-view"><div class="dg-marquee-track" id="dg-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留浅色边） ===== */
+  const stage = document.getElementById("dg-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("dg-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  /* ===== 3. 浅色图表调色板与工具 ===== */
+  const C = {
+    blue: "#2f6bff", cyan: "#18b8c9", violet: "#7b61ff",
+    amber: "#f5a623", red: "#e5484d", green: "#1a9e6c",
+    text: "#22334d", muted: "#7d8ba3",
+    axisLine: "rgba(34, 51, 77, 0.18)", split: "rgba(34, 51, 77, 0.07)"
+  };
+  const rnd = (min, max) => Math.round(min + Math.random() * (max - min));
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 4. 静态业务数据（数字银行运营 · 演示口径） ===== */
+  const now = new Date();
+  const DAYS = [], MAU = [], DAU = [];
+  (() => {
+    let m = 482.4;
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 864e5);
+      DAYS.push(pad(d.getMonth() + 1) + "-" + pad(d.getDate()));
+      m += rndf(0.5, 1.6);
+      MAU.push(+m.toFixed(1));
+      const weekend = d.getDay() === 0 || d.getDay() === 6;
+      DAU.push(+((weekend ? 74 : 86) + rndf(-4, 5)).toFixed(1));
+    }
+  })();
+
+  const SOURCES = [
+    { name: "自然流量", value: 38.6 },
+    { name: "活动引流", value: 27.4 },
+    { name: "网点转化", value: 21.8 },
+    { name: "异业合作", value: 12.2 }
+  ];
+
+  /* 漏斗（万人）：rate 为相对上一级转化率 */
+  const FUNNEL = [
+    { name: "曝光", value: 1000, rate: null },
+    { name: "点击", value: 286, rate: 28.6 },
+    { name: "申请", value: 52.4, rate: 18.3 },
+    { name: "核准", value: 38.6, rate: 73.7 },
+    { name: "动支", value: 31.2, rate: 80.8 }
+  ];
+
+  const PRODUCTS = [
+    { name: "个人快贷", sales: 8.6, rate: 112 },
+    { name: "大额存单", sales: 6.2, rate: 96 },
+    { name: "基金定投", sales: 5.4, rate: 104 },
+    { name: "信用卡分期", sales: 4.8, rate: 88 },
+    { name: "积存贵金属", sales: 3.6, rate: 92 },
+    { name: "银保产品", sales: 3.1, rate: 78 },
+    { name: "结构性存款", sales: 2.7, rate: 85 },
+    { name: "外币理财", sales: 1.9, rate: 71 }
+  ];
+
+  const CAMPS = [
+    { name: "新客有礼 · 开户季", days: "剩 22 天", prog: 72, users: 8.6, roi: 3.8, grad: ["#2f6bff", "#6f9bff"] },
+    { name: "盛夏理财节", days: "剩 37 天", prog: 45, users: 21.4, roi: 4.6, grad: ["#18b8c9", "#5fd6e2"] },
+    { name: "邀友有赏 · 裂变计划", days: "剩 9 天", prog: 88, users: 5.2, roi: 2.9, grad: ["#7b61ff", "#a894ff"] }
+  ];
+
+  const SEGMENTS = [
+    { name: "Z 世代", value: 486 },
+    { name: "新中产", value: 1268 },
+    { name: "银发客群", value: 742 },
+    { name: "私行客户", value: 936 }
+  ];
+
+  const NEWS = [
+    "手机银行 8.0 版本灰度上线，首页改版点击率提升 <b>23.4%</b>",
+    "「盛夏理财节」累计参与 21.4 万人，带动理财销量 <b>18.6 亿元</b>",
+    "个人快贷线上核准率 <b>73.7%</b>，平均放款时长压降至 4 分 12 秒",
+    "智能外呼今日新增意向客户 <b>1,264 户</b>，获客成本较人工下降 62%",
+    "数字渠道替代率 <b>96.8%</b>，柜面高频业务分流成效持续",
+    "Z 世代客群月活渗透率 <b>41.2%</b>，较年初提升 6.8 个百分点",
+    "新客礼活动 ROI <b>3.8</b>，单户获客成本降至 86 元"
+  ];
+
+  /* ===== 5. 顶部时钟与数据日期徽章 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    document.getElementById("dg-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    document.getElementById("dg-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  document.getElementById("dg-badge-date").textContent =
+    now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate());
+
+  /* ===== 6. KPI 行（大数字缓动跳变 + 涨跌箭头） ===== */
+  const KPIS = [
+    { label: "手机银行 MAU", unit: "万", target: 512.6, dec: 1, jit: [0.02, 0.2], delta: "▲ 环比 +2.4%", good: true },
+    { label: "今日 DAU", unit: "万", target: 88.3, dec: 1, jit: [0.02, 0.16], delta: "▲ 同比 +12.8%", good: true },
+    { label: "今日交易笔数", unit: "万", target: 342.8, dec: 1, jit: [0.4, 2.2], delta: "▲ 较昨日 +5.2%", good: true },
+    { label: "线上开户", unit: "户", target: 1862, dec: 0, jit: [1, 6], delta: "▲ 较昨日 +8.9%", good: true },
+    { label: "数字渠道替代率", unit: "%", target: 96.8, dec: 1, jit: [-0.02, 0.03], delta: "▲ 同比 +0.6pct", good: true },
+    { label: "活动 ROI", unit: "倍", target: 3.42, dec: 2, jit: [-0.01, 0.012], delta: "▼ 环比 -0.08", good: false }
+  ];
+  const kpiWrap = document.getElementById("dg-kpis");
+  KPIS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "dg-kpi";
+    card.innerHTML =
+      '<div class="dg-kpi-label">' + k.label + '</div>' +
+      '<div class="dg-kpi-num"><span class="dg-kpi-val">0</span><span class="dg-kpi-unit">' + k.unit + '</span></div>' +
+      '<div class="dg-kpi-delta ' + (k.good ? "is-good" : "is-bad") + '">' + k.delta + '</div>';
+    kpiWrap.appendChild(card);
+    k.node = card.querySelector(".dg-kpi-val");
+    k.cur = 0; /* 从 0 缓动至目标值 */
+  });
+  setInterval(() => { /* 缓动逼近目标 */
+    KPIS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) { k.cur = k.target; } else { k.cur += diff * 0.12; }
+      k.node.textContent = fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+  setInterval(() => { /* 目标值微跳变 */
+    KPIS.forEach((k) => { k.target = Math.max(0, k.target + rndf(k.jit[0], k.jit[1])); });
+  }, 6000);
+
+  /* ===== 7. ECharts 公共构件（浅色 tooltip / 渐变） ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "#ffffff",
+    borderColor: "#dbe4f2",
+    extraCssText: "box-shadow: 0 8px 24px rgba(31, 58, 110, 0.14); border-radius: 8px;",
+    textStyle: { color: C.text, fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  function makeChart(id) {
+    const el = document.getElementById(id);
+    return el ? echarts.init(el) : null;
+  }
+
+  /* ===== 8. 左上：渠道活跃趋势（MAU/DAU 双线面积） ===== */
+  const trendChart = makeChart("dg-chart-trend");
+  trendChart.setOption({
+    tooltip: tip({ trigger: "axis", valueFormatter: (v) => (typeof v === "number" ? fmtDec(v, 1) + " 万" : v) }),
+    legend: { top: 8, itemWidth: 14, itemHeight: 4, itemGap: 18, icon: "roundRect", textStyle: { color: "#4a5d80", fontSize: 11 } },
+    grid: { left: 12, right: 16, top: 42, bottom: 6, containLabel: true },
+    xAxis: {
+      type: "category", boundaryGap: false, data: DAYS,
+      axisLine: { lineStyle: { color: C.axisLine } },
+      axisTick: { show: false },
+      axisLabel: { color: C.muted, fontSize: 10, interval: 4 }
+    },
+    yAxis: [
+      {
+        type: "value", name: "MAU(万)", min: 470,
+        nameTextStyle: { color: C.muted, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.split } },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      {
+        type: "value", name: "DAU(万)", min: 50, max: 110,
+        nameTextStyle: { color: C.muted, fontSize: 10 },
+        splitLine: { show: false },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      }
+    ],
+    series: [
+      {
+        name: "MAU", type: "line", smooth: true, symbol: "none", data: MAU,
+        lineStyle: { width: 2.5, color: C.blue },
+        areaStyle: { color: vGrad("rgba(47, 107, 255, 0.22)", "rgba(47, 107, 255, 0.02)") }
+      },
+      {
+        name: "DAU", type: "line", yAxisIndex: 1, smooth: true, symbol: "none", data: DAU,
+        lineStyle: { width: 2.5, color: C.cyan },
+        areaStyle: { color: vGrad("rgba(24, 184, 201, 0.18)", "rgba(24, 184, 201, 0.02)") }
+      }
+    ],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 9. 左下：新客来源结构环形饼 ===== */
+  const sourceChart = makeChart("dg-chart-source");
+  sourceChart.setOption({
+    tooltip: tip({ valueFormatter: (v) => fmtDec(v, 1) + "%" }),
+    legend: {
+      orient: "vertical", right: 14, top: "middle", itemWidth: 10, itemHeight: 10,
+      textStyle: { color: "#4a5d80", fontSize: 12 },
+      formatter: (name) => {
+        const d = SOURCES.find((x) => x.name === name);
+        return name + "  " + fmtDec(d.value, 1) + "%";
+      }
+    },
+    color: [C.blue, C.cyan, C.violet, C.amber],
+    series: [{
+      type: "pie", radius: ["54%", "76%"], center: ["34%", "52%"],
+      itemStyle: { borderColor: "#ffffff", borderWidth: 3 },
+      label: { show: false },
+      emphasis: { label: { show: true, color: "#1c2c4c", fontSize: 13, fontWeight: 700, formatter: "{b}\n{d}%" } },
+      data: SOURCES
+    }, {
+      type: "pie", radius: ["84%", "85%"], center: ["34%", "52%"], silent: true,
+      label: { show: false },
+      itemStyle: { color: "rgba(47, 107, 255, 0.18)" },
+      data: [1]
+    }],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 10. 中央上：产品转化漏斗（曝光→动支，五级标转化率） ===== */
+  const FUNNEL_COLORS = ["#2f6bff", "#4c80ff", "#18b8c9", "#7b61ff", "#f5a623"];
+  const funnelChart = makeChart("dg-chart-funnel");
+  funnelChart.setOption({
+    tooltip: tip({
+      formatter: (p) => {
+        const d = FUNNEL[p.dataIndex];
+        return "<b>" + d.name + "</b>　" + fmtDec(d.value, 1) + " 万人" +
+          (d.rate === null ? "" : "<br>上级转化率 " + fmtDec(d.rate, 1) + "%");
+      }
+    }),
+    series: [{
+      type: "funnel",
+      left: "14%", right: "26%", top: 18, bottom: 16,
+      minSize: "16%", maxSize: "94%",
+      sort: "descending", gap: 6,
+      itemStyle: { borderColor: "#ffffff", borderWidth: 2, borderRadius: 4 },
+      label: {
+        show: true, position: "inside", color: "#ffffff", fontSize: 13, fontWeight: 700,
+        formatter: (p) => p.name + "  " + fmtDec(FUNNEL[p.dataIndex].value, 1) + " 万"
+      },
+      labelLine: { show: false },
+      emphasis: { label: { fontSize: 15 } },
+      data: FUNNEL.map((f, i) => ({
+        name: f.name, value: f.value,
+        itemStyle: { color: FUNNEL_COLORS[i] }
+      }))
+    }, {
+      /* 右侧转化率标注：用透明漏斗 + 外侧 label */
+      type: "funnel",
+      left: "14%", right: "26%", top: 18, bottom: 16,
+      minSize: "16%", maxSize: "94%",
+      sort: "descending", gap: 6, silent: true,
+      itemStyle: { color: "transparent", borderWidth: 0 },
+      label: {
+        show: true, position: "right", color: "#4a5d80", fontSize: 12,
+        formatter: (p) => {
+          const d = FUNNEL[p.dataIndex];
+          return d.rate === null ? "基准 100%" : "转化率 " + fmtDec(d.rate, 1) + "%";
+        }
+      },
+      labelLine: { show: true, length: 18, lineStyle: { color: "rgba(34, 51, 77, 0.22)" } },
+      data: FUNNEL.map((f) => ({ name: f.name + " ", value: f.value }))
+    }],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 11. 中央下：重点产品销量 TOP8（销量条形 + 达成率线） ===== */
+  const top8Chart = makeChart("dg-chart-top8");
+  function top8Option() {
+    return {
+      tooltip: tip({
+        trigger: "axis",
+        axisPointer: { type: "shadow", shadowStyle: { color: "rgba(47, 107, 255, 0.05)" } },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const d = PRODUCTS[i];
+          return "<b>" + d.name + "</b><br>销量 " + fmtDec(d.sales, 1) + " 万笔<br>目标达成率 " + fmt(d.rate) + "%";
+        }
+      }),
+      legend: { top: 6, right: 12, itemWidth: 12, itemHeight: 8, itemGap: 16, textStyle: { color: "#4a5d80", fontSize: 11 } },
+      grid: { left: 12, right: 56, top: 30, bottom: 6, containLabel: true },
+      xAxis: [
+        { type: "value", show: false },
+        { type: "value", show: false, min: 0, max: 130 }
+      ],
+      yAxis: {
+        type: "category", inverse: true,
+        data: PRODUCTS.map((p) => p.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#3b4f73", fontSize: 12 }
+      },
+      series: [
+        {
+          name: "销量(万笔)", type: "bar", barWidth: 11,
+          data: PRODUCTS.map((p) => p.sales),
+          itemStyle: { borderRadius: 6, color: hGrad("#2f6bff", "#18b8c9") },
+          label: { show: true, position: "right", fontSize: 11, color: "#2456c8", formatter: (p) => fmtDec(p.value, 1) },
+          showBackground: true,
+          backgroundStyle: { color: "rgba(47, 107, 255, 0.06)", borderRadius: 6 }
+        },
+        {
+          name: "目标达成率(%)", type: "line", xAxisIndex: 1,
+          data: PRODUCTS.map((p) => p.rate),
+          symbol: "circle", symbolSize: 7,
+          lineStyle: { width: 2, color: C.amber, type: "dashed" },
+          itemStyle: { color: "#ffffff", borderColor: C.amber, borderWidth: 2 }
+        }
+      ],
+      animationDurationUpdate: 600
+    };
+  }
+  top8Chart.setOption(top8Option());
+  /* 榜单轮播：逐名高亮巡游 */
+  let top8Idx = -1;
+  setInterval(() => {
+    top8Chart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    top8Idx = (top8Idx + 1) % PRODUCTS.length;
+    top8Chart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: top8Idx });
+    top8Chart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: top8Idx });
+  }, 2600);
+
+  /* ===== 12. 右上：活动运营看板（DOM 卡片 + 进度条） ===== */
+  const campsWrap = document.getElementById("dg-camps");
+  function renderCamps() {
+    campsWrap.innerHTML = CAMPS.map((c) => {
+      const prog = Math.min(100, c.prog);
+      return '<article class="dg-camp">' +
+        '<div class="dg-camp-top"><span class="dg-camp-name">' + c.name + '</span>' +
+        '<span class="dg-camp-tag">在跑</span><span class="dg-camp-days">' + c.days + '</span></div>' +
+        '<div class="dg-camp-bar"><i style="width:' + prog.toFixed(1) + '%;background:linear-gradient(90deg,' + c.grad[0] + ',' + c.grad[1] + ')"></i></div>' +
+        '<div class="dg-camp-meta">' +
+        '<span>参与 <b>' + fmtDec(c.users, 1) + ' 万人</b></span>' +
+        '<span class="is-roi">ROI <b>' + fmtDec(c.roi, 1) + '</b></span>' +
+        '<span>进度 <b>' + prog.toFixed(0) + '%</b></span>' +
+        '</div></article>';
+    }).join("");
+  }
+  renderCamps();
+  setInterval(() => { /* 参与人数与进度缓慢爬升 */
+    CAMPS.forEach((c) => {
+      c.users += rndf(0.005, 0.04);
+      c.prog = Math.min(99, c.prog + rndf(0, 0.12));
+      c.roi = Math.max(1.5, c.roi + rndf(-0.02, 0.024));
+    });
+    renderCamps();
+  }, 5000);
+
+  /* ===== 13. 右下：客群分层玫瑰图 + 智能外呼小指标 ===== */
+  const segChart = makeChart("dg-chart-seg");
+  segChart.setOption({
+    tooltip: tip({ valueFormatter: (v) => fmt(v) + " 亿元" }),
+    color: [C.cyan, C.blue, C.amber, C.violet],
+    series: [{
+      type: "pie", roseType: "radius",
+      radius: ["18%", "72%"], center: ["50%", "52%"],
+      itemStyle: { borderColor: "#ffffff", borderWidth: 2, borderRadius: 5 },
+      label: { color: "#3b4f73", fontSize: 11, formatter: "{b}\n{c} 亿" },
+      labelLine: { length: 8, length2: 6, lineStyle: { color: "rgba(34, 51, 77, 0.22)" } },
+      data: SEGMENTS
+    }],
+    animationDurationUpdate: 600
+  });
+
+  const CALLS = { total: 4.26, rate: 38.6, lead: 1264 };
+  const callTotal = document.getElementById("dg-call-total");
+  const callRate = document.getElementById("dg-call-rate");
+  const callLead = document.getElementById("dg-call-lead");
+  function renderCalls() {
+    callTotal.textContent = fmtDec(CALLS.total, 2);
+    callRate.textContent = fmtDec(CALLS.rate, 1);
+    callLead.textContent = fmt(CALLS.lead);
+  }
+  renderCalls();
+  setInterval(() => {
+    CALLS.total += rndf(0.005, 0.03);
+    CALLS.rate = Math.min(45, Math.max(32, CALLS.rate + rndf(-0.15, 0.18)));
+    CALLS.lead += rnd(0, 4);
+    renderCalls();
+  }, 4000);
+
+  /* ===== 14. 底部跑马灯（内容 x2 无缝循环） ===== */
+  const marqueeTrack = document.getElementById("dg-marquee-track");
+  const marqueeHtml = NEWS.map((n) => "<span>" + n + "</span>").join("");
+  marqueeTrack.innerHTML = marqueeHtml + marqueeHtml;
+
+  /* ===== 15. 数据微刷新（趋势末日 / 漏斗末级 轻抖动） ===== */
+  setInterval(() => {
+    const last = DAYS.length - 1;
+    MAU[last] = +(MAU[last] + rndf(-0.15, 0.25)).toFixed(1);
+    DAU[last] = +Math.min(108, Math.max(56, DAU[last] + rndf(-0.6, 0.8))).toFixed(1);
+    trendChart.setOption({ series: [{ data: MAU }, { data: DAU }] });
+
+    FUNNEL[4].value = +Math.max(24, FUNNEL[4].value + rndf(-0.2, 0.28)).toFixed(1);
+    FUNNEL[4].rate = +(FUNNEL[4].value / FUNNEL[3].value * 100).toFixed(1);
+    funnelChart.setOption({
+      series: [
+        { data: FUNNEL.map((f, i) => ({ name: f.name, value: f.value, itemStyle: { color: FUNNEL_COLORS[i] } })) },
+        { data: FUNNEL.map((f) => ({ name: f.name + " ", value: f.value })) }
+      ]
+    });
+
+    PRODUCTS.forEach((p) => {
+      p.sales = +Math.max(0.8, p.sales + rndf(-0.04, 0.07)).toFixed(2);
+      p.rate = Math.min(130, Math.max(55, Math.round(p.rate + rndf(-1, 1.2))));
+    });
+    PRODUCTS.sort((a, b) => b.sales - a.sales);
+    top8Chart.setOption(top8Option());
+  }, 9000);
+})();
+</script>
+</body>
+</html>

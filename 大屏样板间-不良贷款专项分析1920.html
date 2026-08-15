@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 不良贷款专项分析</title>
+<style>
+  :root {
+    --np-bg: #0a1e3c;
+    --np-panel: rgba(13, 34, 64, 0.72);
+    --np-border: rgba(86, 150, 224, 0.28);
+    --np-text: #e6f1ff;
+    --np-muted: #8fa7c8;
+    --np-cyan: #3fe1ff;
+    --np-blue: #4b7dff;
+    --np-green: #38e6b0;
+    --np-gold: #ffc857;
+    --np-orange: #ff9360;
+    --np-red: #ff6680;
+    --np-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--np-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .np-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(255, 147, 96, 0.09), transparent 40%),
+      radial-gradient(circle at 90% 10%, rgba(63, 225, 255, 0.09), transparent 44%),
+      radial-gradient(ellipse at 50% 118%, rgba(35, 96, 172, 0.28), transparent 55%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--np-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 76px 88px 1fr 1fr 1fr 50px;
+    gap: 13px;
+    padding: 13px 18px 15px;
+  }
+
+  .np-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .np-error.is-visible { display: block; }
+
+  /* ===== 顶栏：内容页头（面包屑 + 主题名 + 口径徽章 | 维度切换 + 时钟） ===== */
+  .np-header {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .np-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 147, 96, 0.6) 16%, rgba(63, 225, 255, 0.85) 50%, rgba(255, 147, 96, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(255, 147, 96, 0.35);
+  }
+  .np-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .np-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--np-muted); }
+  .np-crumb b { font-weight: 400; color: #6fb9e8; }
+  .np-crumb i { font-style: normal; color: rgba(143, 167, 200, 0.55); }
+  .np-crumb em { font-style: normal; color: #d7e8ff; }
+  .np-head-title-row { display: flex; align-items: center; gap: 14px; white-space: nowrap; }
+  .np-head-title {
+    font-size: 27px; font-weight: 700; letter-spacing: 0.06em;
+    background: linear-gradient(180deg, #ffffff 30%, #ffcdb2 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(255, 147, 96, 0.28));
+  }
+  .np-tag {
+    flex: none; display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; letter-spacing: 0.06em;
+    padding: 4px 12px; border-radius: 999px;
+  }
+  .np-tag.is-caliber { color: #cfe3fa; border: 1px solid rgba(86, 150, 224, 0.4); background: rgba(24, 56, 100, 0.4); }
+  .np-tag.is-demo { color: #ffd9c4; border: 1px solid rgba(255, 147, 96, 0.5); background: rgba(255, 147, 96, 0.12); }
+  .np-tag.is-demo i {
+    font-style: normal; width: 8px; height: 8px; border-radius: 50%; background: var(--np-orange);
+    box-shadow: 0 0 0 3px rgba(255, 147, 96, 0.16), 0 0 10px var(--np-orange);
+    animation: npBreath 2s ease-in-out infinite;
+  }
+  @keyframes npBreath { 50% { opacity: 0.3; transform: scale(0.8); } }
+
+  .np-head-right { display: flex; align-items: center; gap: 24px; flex: none; }
+  .np-tabs {
+    display: flex; padding: 4px; gap: 4px; border-radius: 10px;
+    border: 1px solid rgba(86, 150, 224, 0.32); background: rgba(10, 26, 50, 0.6);
+  }
+  .np-tab {
+    appearance: none; border: 1px solid transparent; cursor: pointer;
+    padding: 7px 22px; border-radius: 7px; font-size: 14px; letter-spacing: 0.14em;
+    color: var(--np-muted); background: transparent; font-family: inherit;
+    transition: all 0.25s ease;
+  }
+  .np-tab:hover { color: #d7e8ff; }
+  .np-tab.is-active {
+    color: #ffe0cd; border-color: rgba(255, 147, 96, 0.55);
+    background: linear-gradient(180deg, rgba(255, 147, 96, 0.22), rgba(255, 147, 96, 0.08));
+    box-shadow: 0 0 12px rgba(255, 147, 96, 0.25), inset 0 0 10px rgba(255, 147, 96, 0.1);
+    font-weight: 700;
+  }
+  .np-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 24px; border-left: 1px solid rgba(86, 150, 224, 0.25); }
+  .np-clock-time { font: 700 26px/1 var(--np-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4); }
+  .np-clock-date { font-size: 12px; color: var(--np-muted); letter-spacing: 0.08em; }
+
+  /* ===== 第一行：6 枚小型 KPI ===== */
+  .np-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 13px; }
+  .np-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--np-border); border-radius: 12px; background: var(--np-panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  }
+  .np-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 42px; height: 3px;
+    background: linear-gradient(90deg, var(--np-cyan), transparent);
+  }
+  .np-kpi.is-warn::before { background: linear-gradient(90deg, var(--np-orange), transparent); }
+  .np-kpi-label { font-size: 12px; letter-spacing: 0.12em; color: var(--np-muted); }
+  .np-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .np-kpi-val {
+    font: 700 27px/1 var(--np-mono);
+    color: #f4faff; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4);
+  }
+  .np-kpi.is-warn .np-kpi-val { color: #ffe4d5; text-shadow: 0 0 12px rgba(255, 147, 96, 0.45); }
+  .np-kpi-unit { font-size: 12px; color: #6fb9e8; }
+  .np-kpi-delta { font-size: 12px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .np-kpi-delta.is-good { color: var(--np-green); }
+  .np-kpi-delta.is-bad { color: var(--np-red); }
+
+  /* ===== 行容器 ===== */
+  .np-row { display: grid; gap: 13px; min-height: 0; }
+  .np-row-structure { grid-template-columns: 1.15fr 1.05fr 0.85fr; }
+  .np-row-cause { grid-template-columns: 1.2fr 1fr; }
+  .np-row-dispose { grid-template-columns: 0.85fr 1fr 1.25fr; }
+
+  /* ===== 面板通用 ===== */
+  .np-panel {
+    position: relative; min-height: 0; min-width: 0; overflow: hidden;
+    border: 1px solid var(--np-border); border-radius: 12px; background: var(--np-panel);
+    display: flex; flex-direction: column;
+  }
+  .np-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 36px; padding: 0 28px 0 13px;
+    background: linear-gradient(90deg, rgba(63, 225, 255, 0.2), rgba(63, 225, 255, 0.04) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 100%, 0 100%);
+  }
+  .np-panel-head i { flex: none; width: 5px; height: 15px; background: var(--np-cyan); box-shadow: 0 0 8px var(--np-cyan); transform: skewX(-12deg); }
+  .np-panel-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.1em; color: #f0f8ff; white-space: nowrap; }
+  .np-panel-head .np-panel-en { font-size: 10px; letter-spacing: 0.18em; color: #5f88b8; align-self: flex-end; padding-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-panel-head .np-panel-scope { margin-left: auto; font-size: 12px; color: var(--np-orange); white-space: nowrap; padding-right: 2px; }
+  .np-chart { flex: 1; min-height: 0; }
+
+  /* ===== 重点户清单表 ===== */
+  .np-tb-head {
+    flex: none; display: grid; grid-template-columns: 1.7fr 0.85fr 0.62fr 1fr 0.62fr; gap: 8px;
+    padding: 8px 16px 6px; font-size: 12px; letter-spacing: 0.1em; color: #6fb9e8;
+    border-bottom: 1px solid rgba(86, 150, 224, 0.25);
+  }
+  .np-tb-head span:nth-child(2) { text-align: right; }
+  .np-tb-body { flex: 1; min-height: 0; overflow: hidden; }
+  .np-tb-list { margin: 0; padding: 0; list-style: none; }
+  .np-tb-list li {
+    display: grid; grid-template-columns: 1.7fr 0.85fr 0.62fr 1fr 0.62fr; gap: 8px;
+    height: 33px; align-items: center; padding: 0 16px; font-size: 13px; color: #cfe3fa;
+    border-bottom: 1px dashed rgba(86, 150, 224, 0.12); font-variant-numeric: tabular-nums;
+    transition: background 0.4s ease;
+  }
+  .np-tb-list li:nth-child(odd) { background: rgba(24, 56, 100, 0.25); }
+  .np-tb-list li.is-scan { background: rgba(255, 147, 96, 0.12); }
+  .np-tb-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-tb-amt { color: var(--np-gold); font-weight: 700; text-align: right; }
+  .np-tb-owner { color: var(--np-muted); }
+  .np-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.05em; white-space: nowrap;
+  }
+  .np-pill.is-sub { color: #ffd9c4; border: 1px solid rgba(255, 147, 96, 0.5); background: rgba(255, 147, 96, 0.12); }
+  .np-pill.is-doubt { color: #ffd3dc; border: 1px solid rgba(255, 102, 128, 0.5); background: rgba(255, 102, 128, 0.12); }
+  .np-pill.is-loss { color: #ffc4ce; border: 1px solid rgba(201, 80, 107, 0.65); background: rgba(201, 80, 107, 0.2); }
+  .np-pill.is-law { color: #ffd3dc; border: 1px solid rgba(255, 102, 128, 0.45); background: rgba(255, 102, 128, 0.1); }
+  .np-pill.is-asset { color: #ffe9bd; border: 1px solid rgba(255, 200, 87, 0.45); background: rgba(255, 200, 87, 0.1); }
+  .np-pill.is-talk { color: #c9f2ff; border: 1px solid rgba(63, 225, 255, 0.4); background: rgba(63, 225, 255, 0.08); }
+  .np-pill.is-done { color: #c9f7e6; border: 1px solid rgba(56, 230, 176, 0.45); background: rgba(56, 230, 176, 0.1); }
+
+  /* ===== 底部跑马灯 ===== */
+  .np-marquee {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--np-border); border-radius: 12px; background: var(--np-panel);
+  }
+  .np-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a1206;
+    background: linear-gradient(120deg, var(--np-orange), #e06f38 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .np-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a1206; animation: npBreath 1.6s ease-in-out infinite; }
+  .np-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .np-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: npMarquee 48s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .np-marquee-track b { color: var(--np-orange); font-weight: 700; }
+  .np-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(63, 225, 255, 0.55); }
+  @keyframes npMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .np-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="np-stage" id="np-stage">
+    <!-- mockflag:begin --><div class="np-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="np-error" id="np-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏：内容页头 -->
+    <header class="np-header">
+      <div class="np-head-left">
+        <div class="np-crumb"><b>信贷资产质量</b><i>›</i><em>不良贷款专项</em></div>
+        <div class="np-head-title-row">
+          <div class="np-head-title">不良贷款专项分析</div>
+          <span class="np-tag is-caliber">口径：集团并表 · 数据截至 2026-06-30</span>
+          <span class="np-tag is-demo"><i></i>演示数据</span>
+        </div>
+      </div>
+      <div class="np-head-right">
+        <div class="np-tabs" id="np-tabs" role="tablist" aria-label="分析维度切换">
+          <button class="np-tab is-active" data-scope="all" role="tab" aria-selected="true">全行</button>
+          <button class="np-tab" data-scope="corp" role="tab" aria-selected="false">对公</button>
+          <button class="np-tab" data-scope="retail" role="tab" aria-selected="false">零售</button>
+        </div>
+        <div class="np-clock" aria-label="实时时钟">
+          <span class="np-clock-time" id="np-clock-time">--:--:--</span>
+          <span class="np-clock-date" id="np-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 第一行：6 枚小型 KPI -->
+    <section class="np-kpis" aria-label="不良专项核心指标" id="np-kpis"></section>
+
+    <!-- 第二行：结构（五级分类演变 / 行业 TOP8 / 地区 treemap） -->
+    <div class="np-row np-row-structure">
+      <section class="np-panel">
+        <header class="np-panel-head"><i></i><h2>五级分类结构演变</h2><span class="np-panel-en">CLASSIFICATION TREND</span><span class="np-panel-scope">近 8 季 · 正常类未展示</span></header>
+        <div class="np-chart" id="np-chart-quarter" role="img" aria-label="近8季度关注次级可疑损失余额堆叠条与不良率折线"></div>
+      </section>
+      <section class="np-panel">
+        <header class="np-panel-head"><i></i><h2>行业分布 TOP8</h2><span class="np-panel-en">INDUSTRY TOP8</span><span class="np-panel-scope" id="np-cap-industry">余额 + 不良率</span></header>
+        <div class="np-chart" id="np-chart-industry" role="img" aria-label="行业不良余额横条与不良率双序列"></div>
+      </section>
+      <section class="np-panel">
+        <header class="np-panel-head"><i></i><h2>地区分布</h2><span class="np-panel-en">REGION MAP</span><span class="np-panel-scope">块=余额 · 色=不良率</span></header>
+        <div class="np-chart" id="np-chart-region" role="img" aria-label="六片区不良余额与不良率矩形树图"></div>
+      </section>
+    </div>
+
+    <!-- 第三行：成因与迁徙（迁徙桑基 / 新发生瀑布） -->
+    <div class="np-row np-row-cause">
+      <section class="np-panel">
+        <header class="np-panel-head"><i></i><h2>五级分类迁徙</h2><span class="np-panel-en">MIGRATION FLOW</span><span class="np-panel-scope">仅展示迁徙流量 · 本年上半年 · 亿元</span></header>
+        <div class="np-chart" id="np-chart-sankey" role="img" aria-label="五级分类迁徙桑基图，仅展示发生迁徙的流量"></div>
+      </section>
+      <section class="np-panel">
+        <header class="np-panel-head"><i></i><h2>不良余额变动瀑布</h2><span class="np-panel-en">NPL WATERFALL</span><span class="np-panel-scope">本年累计 · 亿元</span></header>
+        <div class="np-chart" id="np-chart-waterfall" role="img" aria-label="年初余额经新发生清收核销重组上迁至期末余额的瀑布图"></div>
+      </section>
+    </div>
+
+    <!-- 第四行：处置（清收方式环形 / 处置进度 / 重点户清单） -->
+    <div class="np-row np-row-dispose">
+      <section class="np-panel">
+        <header class="np-panel-head"><i></i><h2>清收方式构成</h2><span class="np-panel-en">RECOVERY MIX</span><span class="np-panel-scope">本年累计</span></header>
+        <div class="np-chart" id="np-chart-donut" role="img" aria-label="现金清收以物抵债核销转让构成环形图"></div>
+      </section>
+      <section class="np-panel">
+        <header class="np-panel-head"><i></i><h2>处置进度</h2><span class="np-panel-en">DISPOSAL PROGRESS</span><span class="np-panel-scope">年度目标 · 亿元</span></header>
+        <div class="np-chart" id="np-chart-progress" role="img" aria-label="分方式年度处置目标与完成进度横条"></div>
+      </section>
+      <section class="np-panel">
+        <header class="np-panel-head"><i></i><h2>重点户清单</h2><span class="np-panel-en">KEY ACCOUNTS</span><span class="np-panel-scope">余额单位：万元</span></header>
+        <div class="np-tb-head"><span>户名</span><span>余额</span><span>分类</span><span>处置阶段</span><span>责任人</span></div>
+        <div class="np-tb-body"><ul class="np-tb-list" id="np-tb-list"></ul></div>
+      </section>
+    </div>
+
+    <!-- 底部通栏：专项工作动态 -->
+    <section class="np-marquee" aria-label="专项工作动态">
+      <div class="np-marquee-tag"><i></i>专项动态</div>
+      <div class="np-marquee-view"><div class="np-marquee-track" id="np-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("np-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("np-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    gold: "#ffc857", orange: "#ff9360", red: "#ff6680", loss: "#c9506b"
+  };
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 三套维度档案（全行 / 对公 / 零售 · 演示口径，内部勾稽自洽） =====
+     瀑布勾稽：年初 + 新发生 - 清收 - 核销 - 重组上迁 = 期末（= KPI 不良余额）
+     全行 = 对公 + 零售 */
+  const QUARTERS = ["24Q3", "24Q4", "25Q1", "25Q2", "25Q3", "25Q4", "26Q1", "26Q2"];
+  const SCOPES = {
+    all: {
+      name: "全行",
+      industryCap: "全口径 · 余额 + 不良率",
+      kpis: [
+        { v: 128.4, delta: "▼ 同比 -3.2%", good: true },
+        { v: 1.08, delta: "▼ 同比 -0.07pct", good: true },
+        { v: -0.2, delta: "余额较年初 · 亿元", good: true },
+        { v: 236.5, delta: "▲ 较年初 +4.1%", good: false },
+        { v: 78.6, delta: "低于 100% · 达标", good: true },
+        { v: 186.4, delta: "▲ 环比 +2.3pct", good: true }
+      ],
+      watch: [212, 218, 224, 230, 228, 232, 235, 236.5],
+      sub:   [58, 60, 62, 63, 61, 60, 58, 56.2],
+      doubt: [44, 45, 46, 47, 46, 45, 44, 43.8],
+      loss:  [24, 25, 26, 27, 27, 28, 28, 28.4],
+      rate:  [1.16, 1.15, 1.14, 1.13, 1.11, 1.10, 1.09, 1.08],
+      industries: [
+        { name: "制造业", bal: 486, rate: 1.42 }, { name: "批发零售", bal: 352, rate: 1.86 },
+        { name: "房地产", bal: 298, rate: 2.34 }, { name: "建筑业", bal: 276, rate: 1.58 },
+        { name: "租赁商务", bal: 243, rate: 0.92 }, { name: "交通运输", bal: 218, rate: 0.74 },
+        { name: "住宿餐饮", bal: 132, rate: 2.12 }, { name: "信息技术", bal: 118, rate: 0.56 }
+      ],
+      regions: [
+        { name: "城区片区", bal: 42.6, rate: 0.92 }, { name: "滨江片区", bal: 28.3, rate: 1.06 },
+        { name: "城北片区", bal: 18.9, rate: 1.24 }, { name: "开发区片区", bal: 16.2, rate: 0.88 },
+        { name: "县域东片", bal: 12.8, rate: 1.66 }, { name: "县域西片", bal: 9.6, rate: 1.98 }
+      ],
+      sankey: [28.4, 6.8, 12.6, 5.2, 8.4, 4.6, 6.8, 16.2, 3.8, 1.6],
+      waterfall: { start: 128.6, add: 34.2, recover: 12.8, writeoff: 15.4, restruct: 6.2, end: 128.4 },
+      donut: [6.4, 2.1, 15.4, 4.3],
+      progress: [
+        { name: "现金清收", target: 14.0, done: 6.4 }, { name: "以物抵债", target: 5.0, done: 2.1 },
+        { name: "核销", target: 30.0, done: 15.4 }, { name: "转让", target: 9.0, done: 4.3 }
+      ],
+      accounts: [
+        ["**建设集团有限公司", "28,600", ["可疑", "is-doubt"], ["诉讼中", "is-law"], "王*成"],
+        ["**置业发展有限公司", "22,400", ["次级", "is-sub"], ["重组谈判", "is-talk"], "李*峰"],
+        ["**国际贸易有限公司", "16,800", ["可疑", "is-doubt"], ["已查封", "is-law"], "陈*华"],
+        ["**新能源科技有限公司", "12,300", ["次级", "is-sub"], ["资产处置", "is-asset"], "赵*芸"],
+        ["**纺织股份有限公司", "9,600", ["损失", "is-loss"], ["核销申报", "is-asset"], "周*涛"],
+        ["张*明（个人经营贷）", "3,850", ["次级", "is-sub"], ["催收中", "is-done"], "吴*丽"]
+      ]
+    },
+    corp: {
+      name: "对公",
+      industryCap: "对公行业口径 · 余额 + 不良率",
+      kpis: [
+        { v: 92.6, delta: "▼ 同比 -4.6%", good: true },
+        { v: 1.24, delta: "▼ 同比 -0.09pct", good: true },
+        { v: -1.6, delta: "余额较年初 · 亿元", good: true },
+        { v: 168.2, delta: "▲ 较年初 +3.4%", good: false },
+        { v: 82.3, delta: "低于 100% · 达标", good: true },
+        { v: 172.8, delta: "▲ 环比 +1.8pct", good: true }
+      ],
+      watch: [150, 154, 158, 162, 161, 164, 166, 168.2],
+      sub:   [42, 43, 44, 45, 44, 43, 42, 40.8],
+      doubt: [32, 33, 33, 34, 33, 33, 32, 31.6],
+      loss:  [17, 18, 18, 19, 19, 20, 20, 20.2],
+      rate:  [1.36, 1.34, 1.32, 1.30, 1.28, 1.27, 1.25, 1.24],
+      industries: [
+        { name: "制造业", bal: 452, rate: 1.38 }, { name: "批发零售", bal: 296, rate: 1.92 },
+        { name: "房地产", bal: 287, rate: 2.41 }, { name: "建筑业", bal: 262, rate: 1.62 },
+        { name: "租赁商务", bal: 231, rate: 0.95 }, { name: "交通运输", bal: 206, rate: 0.76 },
+        { name: "电力热力", bal: 156, rate: 0.42 }, { name: "住宿餐饮", bal: 104, rate: 2.28 }
+      ],
+      regions: [
+        { name: "城区片区", bal: 32.4, rate: 1.04 }, { name: "滨江片区", bal: 21.6, rate: 1.18 },
+        { name: "城北片区", bal: 13.8, rate: 1.42 }, { name: "开发区片区", bal: 12.6, rate: 0.96 },
+        { name: "县域东片", bal: 7.4, rate: 1.84 }, { name: "县域西片", bal: 4.8, rate: 2.15 }
+      ],
+      sankey: [19.8, 4.9, 9.2, 3.8, 6.1, 3.4, 4.9, 10.6, 2.6, 1.1],
+      waterfall: { start: 94.2, add: 22.6, recover: 8.4, writeoff: 11.2, restruct: 4.6, end: 92.6 },
+      donut: [4.2, 1.6, 11.2, 3.1],
+      progress: [
+        { name: "现金清收", target: 9.5, done: 4.2 }, { name: "以物抵债", target: 3.5, done: 1.6 },
+        { name: "核销", target: 22.0, done: 11.2 }, { name: "转让", target: 6.5, done: 3.1 }
+      ],
+      accounts: [
+        ["**建设集团有限公司", "28,600", ["可疑", "is-doubt"], ["诉讼中", "is-law"], "王*成"],
+        ["**置业发展有限公司", "22,400", ["次级", "is-sub"], ["重组谈判", "is-talk"], "李*峰"],
+        ["**国际贸易有限公司", "16,800", ["可疑", "is-doubt"], ["已查封", "is-law"], "陈*华"],
+        ["**新能源科技有限公司", "12,300", ["次级", "is-sub"], ["资产处置", "is-asset"], "赵*芸"],
+        ["**纺织股份有限公司", "9,600", ["损失", "is-loss"], ["核销申报", "is-asset"], "周*涛"],
+        ["**供应链管理有限公司", "7,200", ["次级", "is-sub"], ["重组谈判", "is-talk"], "郑*军"]
+      ]
+    },
+    retail: {
+      name: "零售",
+      industryCap: "零售产品口径 · 余额 + 不良率",
+      kpis: [
+        { v: 35.8, delta: "▲ 同比 +1.8%", good: false },
+        { v: 0.86, delta: "▲ 同比 +0.05pct", good: false },
+        { v: 1.4, delta: "余额较年初 · 亿元", good: false },
+        { v: 68.3, delta: "▲ 较年初 +6.2%", good: false },
+        { v: 71.2, delta: "低于 100% · 达标", good: true },
+        { v: 214.6, delta: "▲ 环比 +3.1pct", good: true }
+      ],
+      watch: [62, 64, 66, 68, 67, 68, 69, 68.3],
+      sub:   [16, 17, 18, 18, 17, 17, 16, 15.4],
+      doubt: [12, 12, 13, 13, 13, 12, 12, 12.2],
+      loss:  [7, 7, 8, 8, 8, 8, 8, 8.2],
+      rate:  [0.80, 0.81, 0.83, 0.84, 0.83, 0.84, 0.85, 0.86],
+      industries: [
+        { name: "住房按揭", bal: 986, rate: 0.42 }, { name: "个人经营贷", bal: 428, rate: 1.64 },
+        { name: "信用卡", bal: 312, rate: 1.92 }, { name: "消费贷", bal: 246, rate: 1.28 },
+        { name: "汽车贷", bal: 132, rate: 0.86 }, { name: "装修贷", bal: 86, rate: 1.05 },
+        { name: "助学贷", bal: 42, rate: 0.64 }, { name: "其他零售", bal: 38, rate: 1.12 }
+      ],
+      regions: [
+        { name: "城区片区", bal: 10.2, rate: 0.68 }, { name: "滨江片区", bal: 6.7, rate: 0.82 },
+        { name: "城北片区", bal: 5.1, rate: 0.94 }, { name: "开发区片区", bal: 3.6, rate: 0.72 },
+        { name: "县域东片", bal: 5.4, rate: 1.38 }, { name: "县域西片", bal: 4.8, rate: 1.62 }
+      ],
+      sankey: [8.6, 1.9, 3.4, 1.4, 2.3, 1.2, 1.9, 5.6, 1.2, 0.5],
+      waterfall: { start: 34.4, add: 11.6, recover: 4.4, writeoff: 4.2, restruct: 1.6, end: 35.8 },
+      donut: [2.2, 0.5, 4.2, 1.2],
+      progress: [
+        { name: "现金清收", target: 4.5, done: 2.2 }, { name: "以物抵债", target: 1.5, done: 0.5 },
+        { name: "核销", target: 8.0, done: 4.2 }, { name: "转让", target: 2.5, done: 1.2 }
+      ],
+      accounts: [
+        ["张*明（个人经营贷）", "3,850", ["次级", "is-sub"], ["催收中", "is-done"], "吴*丽"],
+        ["刘*强（个人经营贷）", "2,960", ["可疑", "is-doubt"], ["诉讼中", "is-law"], "孙*俊"],
+        ["王*芳（住房按揭）", "1,840", ["次级", "is-sub"], ["资产处置", "is-asset"], "何*静"],
+        ["李*军（信用卡）", "1,260", ["可疑", "is-doubt"], ["已查封", "is-law"], "杨*婷"],
+        ["陈*平（消费贷）", "980", ["损失", "is-loss"], ["核销申报", "is-asset"], "林*超"],
+        ["周*燕（汽车贷）", "760", ["次级", "is-sub"], ["催收中", "is-done"], "黄*磊"]
+      ]
+    }
+  };
+  let scopeKey = "all";
+
+  const NEWS = [
+    "县域西片专班本周现金清收 <b>3,240 万元</b>，完成月度计划 118%",
+    "**建设集团 <b>2.86 亿元</b> 诉讼案一审胜诉，进入财产保全执行阶段",
+    "第三批不良资产转让包（本金 <b>4.3 亿元</b>）挂牌，7 家 AMC 进场尽调",
+    "房地产行业不良率 <b>2.34%</b> 仍居首位，新增授信维持行业限额管控",
+    "零售信用卡 M3+ 迁徙率环比上升 <b>0.12pct</b>，模型阈值已同步收紧",
+    "上半年累计核销 <b>15.4 亿元</b>，核销后现金回收率 6.8%",
+    "逾期 90+ 偏离度 <b>78.6%</b>，分类准确性保持监管达标区间"
+  ];
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    document.getElementById("np-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    document.getElementById("np-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. KPI 行（6 枚小型，维度切换时缓动过渡到新档案值） ===== */
+  const KPI_META = [
+    { label: "不良余额", unit: "亿元", dec: 1, warn: true, signed: false },
+    { label: "不良率", unit: "%", dec: 2, warn: true, signed: false },
+    { label: "较年初变动", unit: "亿元", dec: 1, warn: false, signed: true },
+    { label: "关注类余额", unit: "亿元", dec: 1, warn: false, signed: false },
+    { label: "逾期90+偏离度", unit: "%", dec: 1, warn: false, signed: false },
+    { label: "拨备覆盖率", unit: "%", dec: 1, warn: false, signed: false }
+  ];
+  const kpiWrap = document.getElementById("np-kpis");
+  KPI_META.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "np-kpi" + (k.warn ? " is-warn" : "");
+    card.innerHTML =
+      '<div class="np-kpi-label">' + k.label + '</div>' +
+      '<div class="np-kpi-num"><span class="np-kpi-val">0</span><span class="np-kpi-unit">' + k.unit + '</span></div>' +
+      '<div class="np-kpi-delta">--</div>';
+    kpiWrap.appendChild(card);
+    k.valNode = card.querySelector(".np-kpi-val");
+    k.deltaNode = card.querySelector(".np-kpi-delta");
+    k.cur = 0; k.target = 0;
+  });
+  function applyKpis(profile) {
+    KPI_META.forEach((k, i) => {
+      const d = profile.kpis[i];
+      k.target = d.v;
+      k.deltaNode.textContent = d.delta;
+      k.deltaNode.className = "np-kpi-delta " + (d.good ? "is-good" : "is-bad");
+    });
+  }
+  setInterval(() => { /* 缓动逼近目标 */
+    KPI_META.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) { k.cur = k.target; } else { k.cur += diff * 0.14; }
+      const txt = fmtDec(k.cur, k.dec);
+      k.valNode.textContent = (k.signed && k.cur > 0 ? "+" : "") + txt;
+    });
+  }, 80);
+
+  /* ===== 6. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(102, 178, 255, 0.4)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  function makeChart(id) {
+    return echarts.init(document.getElementById(id));
+  }
+  /* 颜色插值：地区 treemap 用「不良率深浅」着色 */
+  const hex2rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  function lerpColor(a, b, t) {
+    const ca = hex2rgb(a), cb = hex2rgb(b);
+    return "rgb(" + ca.map((v, i) => Math.round(v + (cb[i] - v) * t)).join(",") + ")";
+  }
+  function rateColor(rate, min, max) {
+    const t = Math.max(0, Math.min(1, (rate - min) / (max - min || 1)));
+    return t < 0.5 ? lerpColor("#1d4f80", "#c96a3e", t * 2) : lerpColor("#c96a3e", "#ff7a4d", (t - 0.5) * 2);
+  }
+
+  /* ===== 7. 二行①：五级分类结构堆叠条（近 8 季，正常类不展示以免压扁其余序列） ===== */
+  const quarterChart = makeChart("np-chart-quarter");
+  function quarterOption(p) {
+    const mk = (name, color, data) => ({
+      name, type: "bar", stack: "cls", barWidth: 16, data,
+      itemStyle: { color: vGrad(color, color + "66") }
+    });
+    return {
+      tooltip: tip({ trigger: "axis", valueFormatter: (v) => (typeof v === "number" ? fmtDec(v, 1) : v) }),
+      legend: { top: 4, itemWidth: 12, itemHeight: 8, itemGap: 14, textStyle: { color: "#cfe6ff", fontSize: 11 } },
+      grid: { left: 10, right: 12, top: 34, bottom: 2, containLabel: true },
+      xAxis: {
+        type: "category", data: QUARTERS,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+        axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      yAxis: [
+        {
+          type: "value", name: "亿元", nameTextStyle: { color: C.muted, fontSize: 10 },
+          splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+          axisLabel: { color: C.muted, fontSize: 11 }
+        },
+        {
+          type: "value", name: "%", nameTextStyle: { color: C.muted, fontSize: 10 },
+          min: (v) => +(v.min * 0.96).toFixed(2), max: (v) => +(v.max * 1.04).toFixed(2),
+          splitLine: { show: false }, axisLabel: { color: C.muted, fontSize: 11 }
+        }
+      ],
+      series: [
+        mk("关注", C.gold, p.watch),
+        mk("次级", C.orange, p.sub),
+        mk("可疑", C.red, p.doubt),
+        mk("损失", C.loss, p.loss),
+        {
+          name: "不良率", type: "line", yAxisIndex: 1, smooth: true, data: p.rate,
+          symbol: "circle", symbolSize: 5,
+          lineStyle: { width: 2.5, color: C.cyan, shadowColor: "rgba(63, 225, 255, 0.6)", shadowBlur: 10 },
+          itemStyle: { color: "#eafcff", borderColor: C.cyan, borderWidth: 2 }
+        }
+      ],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 8. 二行②：行业分布 TOP8（横条余额 + 不良率双序列双轴） ===== */
+  const industryChart = makeChart("np-chart-industry");
+  function industryOption(p) {
+    const list = p.industries;
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          let s = ps[0].name;
+          ps.forEach((x) => { s += "<br/>" + x.marker + x.seriesName + "：" + fmtDec(x.value, x.seriesName === "不良率" ? 2 : 0) + (x.seriesName === "不良率" ? " %" : " 亿元"); });
+          return s;
+        }
+      }),
+      legend: { top: 4, right: 8, itemWidth: 12, itemHeight: 8, textStyle: { color: "#cfe6ff", fontSize: 11 } },
+      grid: { left: 10, right: 48, top: 28, bottom: 2, containLabel: true },
+      xAxis: [
+        { type: "value", show: false },
+        { type: "value", show: false, max: (v) => v.max * 1.15 }
+      ],
+      yAxis: {
+        type: "category", inverse: true, data: list.map((d) => d.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      series: [
+        {
+          name: "贷款余额", type: "bar", barWidth: 10, data: list.map((d) => d.bal),
+          itemStyle: { borderRadius: 5, color: hGrad("#1d5d9e", C.cyan) },
+          showBackground: true, backgroundStyle: { color: "rgba(63, 120, 200, 0.12)", borderRadius: 5 },
+          label: { show: true, position: "right", fontSize: 11, color: "#9fd8ff", formatter: (x) => fmtDec(x.value, 0) }
+        },
+        {
+          name: "不良率", type: "line", xAxisIndex: 1, data: list.map((d) => d.rate),
+          symbol: "diamond", symbolSize: 9,
+          lineStyle: { width: 2, color: C.orange, type: "dashed" },
+          itemStyle: { color: C.orange, borderColor: "#ffd9c4", borderWidth: 1 },
+          label: { show: true, position: "right", fontSize: 10, color: C.orange, formatter: (x) => fmtDec(x.value, 2) + "%" }
+        }
+      ],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 9. 二行③：地区分布 treemap（块=余额，色=不良率深浅） ===== */
+  const regionChart = makeChart("np-chart-region");
+  function regionOption(p) {
+    const rates = p.regions.map((r) => r.rate);
+    const lo = Math.min(...rates), hi = Math.max(...rates);
+    return {
+      tooltip: tip({
+        formatter: (x) => x.name + "<br/>不良余额：" + fmtDec(x.value, 1) + " 亿元<br/>不良率：" + fmtDec(x.data.rate, 2) + " %"
+      }),
+      series: [{
+        type: "treemap", left: 8, right: 8, top: 8, bottom: 8,
+        roam: false, nodeClick: false, breadcrumb: { show: false },
+        label: {
+          color: "#f4faff", fontSize: 12, lineHeight: 17,
+          formatter: (x) => x.name + "\n" + fmtDec(x.value, 1) + " 亿 · " + fmtDec(x.data.rate, 2) + "%"
+        },
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 2, gapWidth: 2 },
+        data: p.regions.map((r) => ({
+          name: r.name, value: r.bal, rate: r.rate,
+          itemStyle: { color: rateColor(r.rate, lo, hi) }
+        }))
+      }],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 10. 三行①：五级分类迁徙桑基
+     库内已知坑：绝不画「正常→正常」这类同级维持流——巨量流会把迁徙流挤成发丝，
+     故只保留发生迁徙的流量；向下迁徙橙红、回迁绿。 ===== */
+  const sankeyChart = makeChart("np-chart-sankey");
+  const CLS_COLOR = { "正常": C.green, "关注": C.gold, "次级": C.orange, "可疑": C.red, "损失": C.loss };
+  const CLS_ORDER = { "正常": 0, "关注": 1, "次级": 2, "可疑": 3, "损失": 4 };
+  /* 10 条迁徙流：与 SCOPES[*].sankey 数值一一对应 */
+  const SANKEY_PAIRS = [
+    ["正常", "关注’"], ["正常", "次级’"], ["关注", "次级’"], ["关注", "可疑’"],
+    ["次级", "可疑’"], ["次级", "损失’"], ["可疑", "损失’"],
+    ["关注", "正常’"], ["次级", "关注’"], ["可疑", "次级’"]
+  ];
+  const baseCls = (n) => n.replace("’", "");
+  function sankeyOption(p) {
+    const nodeNames = [];
+    SANKEY_PAIRS.forEach((pair) => pair.forEach((n) => { if (nodeNames.indexOf(n) < 0) nodeNames.push(n); }));
+    return {
+      tooltip: tip({
+        formatter: (x) => {
+          if (x.dataType === "edge") {
+            const down = CLS_ORDER[baseCls(x.data.target)] > CLS_ORDER[baseCls(x.data.source)];
+            return baseCls(x.data.source) + " → " + baseCls(x.data.target) +
+              "（" + (down ? "向下迁徙" : "回迁上调") + "）<br/>迁徙金额：" + fmtDec(x.data.value, 1) + " 亿元";
+          }
+          return baseCls(x.name);
+        }
+      }),
+      series: [{
+        type: "sankey", left: 14, right: 56, top: 14, bottom: 10,
+        nodeWidth: 14, nodeGap: 14, nodeAlign: "justify",
+        draggable: false,
+        emphasis: { focus: "adjacency" },
+        label: { color: "#d7e8ff", fontSize: 12, formatter: (x) => baseCls(x.name) },
+        data: nodeNames.map((n) => ({
+          name: n,
+          itemStyle: { color: CLS_COLOR[baseCls(n)], borderColor: "rgba(230, 241, 255, 0.25)", borderWidth: 1 }
+        })),
+        links: SANKEY_PAIRS.map((pair, i) => {
+          const down = CLS_ORDER[baseCls(pair[1])] > CLS_ORDER[baseCls(pair[0])];
+          const toLoss = baseCls(pair[1]) === "损失";
+          return {
+            source: pair[0], target: pair[1], value: p.sankey[i],
+            lineStyle: {
+              color: down ? (toLoss ? "rgba(255, 102, 128, 0.42)" : "rgba(255, 147, 96, 0.38)") : "rgba(56, 230, 176, 0.4)",
+              opacity: 0.9
+            }
+          };
+        })
+      }],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 11. 三行②：不良余额变动瀑布（年初 → +新发生 → -清收 → -核销 → -重组上迁 → 期末） ===== */
+  const waterfallChart = makeChart("np-chart-waterfall");
+  function waterfallOption(p) {
+    const w = p.waterfall;
+    const cats = ["年初余额", "新发生", "清收", "核销", "重组上迁", "期末余额"];
+    const afterAdd = w.start + w.add;
+    const afterRec = afterAdd - w.recover;
+    const afterWo = afterRec - w.writeoff;
+    const bases = [0, w.start, afterRec, afterWo, w.end, 0];
+    const vals = [w.start, w.add, w.recover, w.writeoff, w.restruct, w.end];
+    const colors = [
+      vGrad(C.cyan, "#155a8f"), vGrad("#ffb08a", "#c85a2c"),
+      vGrad("#7cf0cd", "#22bd8b"), vGrad("#7cf0cd", "#22bd8b"), vGrad("#7cf0cd", "#22bd8b"),
+      vGrad(C.cyan, "#155a8f")
+    ];
+    const signs = ["", "+", "-", "-", "-", ""];
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const x = ps[ps.length - 1];
+          return x.name + "：" + signs[x.dataIndex] + fmtDec(vals[x.dataIndex], 1) + " 亿元";
+        }
+      }),
+      grid: { left: 10, right: 14, top: 30, bottom: 2, containLabel: true },
+      xAxis: {
+        type: "category", data: cats,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+        axisTick: { show: false }, axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      yAxis: {
+        type: "value", name: "亿元", nameTextStyle: { color: C.muted, fontSize: 10 },
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      series: [
+        { type: "bar", stack: "wf", barWidth: 30, silent: true, itemStyle: { color: "transparent" }, data: bases },
+        {
+          type: "bar", stack: "wf", barWidth: 30,
+          data: vals.map((v, i) => ({ value: v, itemStyle: { color: colors[i], borderRadius: 3 } })),
+          label: {
+            show: true, position: "top", fontSize: 12, fontWeight: 700,
+            color: "#ffe4d5", formatter: (x) => signs[x.dataIndex] + fmtDec(x.value, 1)
+          }
+        }
+      ],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 12. 四行①：清收方式构成环形 ===== */
+  const donutChart = makeChart("np-chart-donut");
+  const DONUT_NAMES = ["现金清收", "以物抵债", "核销", "转让"];
+  function donutOption(p) {
+    const data = DONUT_NAMES.map((n, i) => ({ name: n, value: p.donut[i] }));
+    const total = p.donut.reduce((s, v) => s + v, 0);
+    return {
+      tooltip: tip({ valueFormatter: (v) => fmtDec(v, 1) + " 亿元" }),
+      legend: {
+        orient: "vertical", right: 8, top: "middle", itemWidth: 10, itemHeight: 10,
+        textStyle: { color: "#cfe6ff", fontSize: 12 },
+        formatter: (name) => {
+          const d = data.find((x) => x.name === name);
+          return name + "  " + fmtDec(d.value, 1) + " 亿";
+        }
+      },
+      color: [C.green, C.gold, C.orange, C.blue],
+      series: [{
+        type: "pie", radius: ["54%", "76%"], center: ["36%", "52%"],
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+        label: {
+          show: true, position: "center",
+          formatter: "处置合计\n{total|" + fmtDec(total, 1) + "} 亿",
+          color: C.muted, fontSize: 11, lineHeight: 18,
+          rich: { total: { color: "#ffe4d5", fontSize: 20, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" } }
+        },
+        emphasis: { label: { show: true } },
+        data
+      }, {
+        type: "pie", radius: ["84%", "85%"], center: ["36%", "52%"], silent: true,
+        label: { show: false }, itemStyle: { color: "rgba(255, 147, 96, 0.3)" }, data: [1]
+      }],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 13. 四行②：处置进度横条（本年目标 vs 已完成，分方式） ===== */
+  const progressChart = makeChart("np-chart-progress");
+  function progressOption(p) {
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex, d = p.progress[i];
+          return d.name + "<br/>年度目标：" + fmtDec(d.target, 1) + " 亿元<br/>已完成：" +
+            fmtDec(d.done, 1) + " 亿元（" + fmtDec(d.done / d.target * 100, 1) + "%）";
+        }
+      }),
+      grid: { left: 10, right: 64, top: 14, bottom: 2, containLabel: true },
+      xAxis: { type: "value", show: false, max: (v) => v.max * 1.02 },
+      yAxis: {
+        type: "category", inverse: true, data: p.progress.map((d) => d.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      series: [
+        {
+          name: "年度目标", type: "bar", barWidth: 16, silent: true, barGap: "-100%",
+          data: p.progress.map((d) => d.target),
+          itemStyle: { borderRadius: 8, color: "rgba(63, 120, 200, 0.18)", borderColor: "rgba(86, 150, 224, 0.35)", borderWidth: 1 },
+          label: { show: true, position: "right", fontSize: 11, color: C.muted, formatter: (x) => "目标 " + fmtDec(x.value, 1) }
+        },
+        {
+          name: "已完成", type: "bar", barWidth: 16,
+          data: p.progress.map((d) => d.done),
+          itemStyle: { borderRadius: 8, color: hGrad("#c85a2c", C.orange) },
+          label: {
+            show: true, position: "insideRight", fontSize: 11, fontWeight: 700, color: "#2a1206",
+            formatter: (x) => fmtDec(p.progress[x.dataIndex].done / p.progress[x.dataIndex].target * 100, 0) + "%"
+          }
+        }
+      ],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 14. 四行③：重点户清单表（DOM，行扫描高亮轮播） ===== */
+  const tbList = document.getElementById("np-tb-list");
+  function renderAccounts(p) {
+    tbList.innerHTML = p.accounts.map((r) =>
+      "<li>" +
+      '<span class="np-tb-name">' + r[0] + "</span>" +
+      '<span class="np-tb-amt">' + r[1] + "</span>" +
+      '<span><i class="np-pill ' + r[2][1] + '">' + r[2][0] + "</i></span>" +
+      '<span><i class="np-pill ' + r[3][1] + '">' + r[3][0] + "</i></span>" +
+      '<span class="np-tb-owner">' + r[4] + "</span>" +
+      "</li>"
+    ).join("");
+  }
+  let scanIdx = -1;
+  setInterval(() => {
+    const rows = tbList.children;
+    if (!rows.length) return;
+    if (scanIdx >= 0 && rows[scanIdx]) rows[scanIdx].classList.remove("is-scan");
+    scanIdx = (scanIdx + 1) % rows.length;
+    rows[scanIdx].classList.add("is-scan");
+  }, 2400);
+
+  /* ===== 15. 底部跑马灯（内容 x2 无缝循环） ===== */
+  const marqueeTrack = document.getElementById("np-marquee-track");
+  const marqueeHtml = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  marqueeTrack.innerHTML = marqueeHtml + marqueeHtml;
+
+  /* ===== 16. 维度切换：全行 / 对公 / 零售 → 全页数据过渡刷新 ===== */
+  function applyScope(key) {
+    scopeKey = key;
+    const p = SCOPES[key];
+    applyKpis(p);
+    quarterChart.setOption(quarterOption(p));
+    industryChart.setOption(industryOption(p));
+    regionChart.setOption(regionOption(p));
+    sankeyChart.setOption(sankeyOption(p));
+    waterfallChart.setOption(waterfallOption(p));
+    donutChart.setOption(donutOption(p));
+    progressChart.setOption(progressOption(p));
+    renderAccounts(p);
+    document.getElementById("np-cap-industry").textContent = p.industryCap;
+  }
+  const tabsWrap = document.getElementById("np-tabs");
+  tabsWrap.addEventListener("click", (e) => {
+    const btn = e.target.closest(".np-tab");
+    if (!btn || btn.dataset.scope === scopeKey) return;
+    tabsWrap.querySelectorAll(".np-tab").forEach((t) => {
+      t.classList.toggle("is-active", t === btn);
+      t.setAttribute("aria-selected", t === btn ? "true" : "false");
+    });
+    applyScope(btn.dataset.scope);
+  });
+  applyScope("all");
+
+  /* ===== 17. 实时感：行业榜逐名巡游高亮 ===== */
+  let tourIdx = -1;
+  setInterval(() => {
+    industryChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    tourIdx = (tourIdx + 1) % SCOPES[scopeKey].industries.length;
+    industryChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: tourIdx });
+    industryChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: tourIdx });
+  }, 2600);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 分行竞争力评估</title>
+<style>
+  :root {
+    --rd-bg: #071a34;
+    --rd-panel: rgba(12, 32, 60, 0.72);
+    --rd-border: rgba(224, 158, 46, 0.24);
+    --rd-text: #f3ecdd;
+    --rd-muted: #a9b6c8;
+    --rd-gold: #f59e0b;
+    --rd-gold-soft: #fcd34d;
+    --rd-gold-deep: #b45309;
+    --rd-orange: #fb923c;
+    --rd-cyan: #3fe1ff;
+    --rd-blue: #4b7dff;
+    --rd-green: #38e6b0;
+    --rd-violet: #9870ff;
+    --rd-red: #ff6680;
+    --rd-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--rd-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .rd-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% -2%, rgba(245, 158, 11, 0.15), transparent 42%),
+      radial-gradient(circle at 90% 6%, rgba(63, 225, 255, 0.08), transparent 44%),
+      radial-gradient(ellipse at 50% 120%, rgba(180, 83, 9, 0.24), transparent 56%),
+      linear-gradient(rgba(224, 158, 46, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(224, 158, 46, 0.05) 1px, transparent 1px),
+      var(--rd-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-rows: 84px 1fr 54px;
+    gap: 16px;
+    padding: 14px 20px 16px;
+  }
+
+  .rd-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .rd-error.is-visible { display: block; }
+
+  /* ===== 顶栏：页头 ===== */
+  .rd-header {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .rd-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.55) 16%, rgba(252, 211, 77, 0.9) 50%, rgba(245, 158, 11, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.45);
+  }
+  .rd-head-left { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .rd-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rd-muted); }
+  .rd-crumb b { font-weight: 400; color: var(--rd-gold-soft); }
+  .rd-crumb i { font-style: normal; color: rgba(169, 182, 200, 0.5); }
+  .rd-crumb em { font-style: normal; color: #f0e6d2; }
+  .rd-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .rd-head-title {
+    font-size: 31px; font-weight: 700; letter-spacing: 0.1em;
+    background: linear-gradient(180deg, #fffaf0 24%, var(--rd-gold-soft) 96%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.4));
+  }
+  .rd-head-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 12px; border-radius: 999px;
+    font-size: 12.5px; letter-spacing: 0.08em; color: var(--rd-gold-soft);
+    border: 1px solid rgba(245, 158, 11, 0.5); background: rgba(120, 78, 12, 0.28);
+    box-shadow: inset 0 0 10px rgba(245, 158, 11, 0.12);
+  }
+  .rd-head-badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--rd-gold); box-shadow: 0 0 8px var(--rd-gold); animation: rdDot 1.6s ease-in-out infinite; }
+  .rd-head-meta { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--rd-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .rd-head-meta b { font-weight: 400; color: var(--rd-gold-soft); }
+  .rd-head-meta i { font-style: normal; color: rgba(169, 182, 200, 0.35); }
+
+  .rd-head-right { display: flex; align-items: center; gap: 24px; flex: none; }
+  .rd-tabs { display: flex; align-items: stretch; gap: 8px; }
+  .rd-tab {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    min-width: 78px; padding: 0 16px; height: 38px; border-radius: 9px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(224, 158, 46, 0.4); background: rgba(40, 32, 14, 0.42);
+    color: #e8dcc4; font-size: 14px; letter-spacing: 0.08em; font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s, background 0.2s;
+  }
+  .rd-tab:hover { color: #fff; border-color: rgba(245, 158, 11, 0.7); }
+  .rd-tab.is-active {
+    color: #1c1204; font-weight: 700;
+    background: linear-gradient(160deg, var(--rd-gold-soft), var(--rd-gold) 72%);
+    border-color: rgba(252, 211, 77, 0.8);
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.45), inset 0 0 8px rgba(255, 255, 255, 0.25);
+  }
+  .rd-tab b { font-weight: inherit; font-size: 11px; opacity: 0.7; font-variant-numeric: tabular-nums; }
+  .rd-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(224, 158, 46, 0.25); }
+  .rd-clock-time { font: 700 26px/1 var(--rd-mono); color: #fdf6e8; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(245, 158, 11, 0.45); }
+  .rd-clock-date { font-size: 12px; color: var(--rd-muted); letter-spacing: 0.08em; }
+
+  /* ===== 主区：左雷达 + 右列 ===== */
+  .rd-main { display: grid; grid-template-columns: 1fr 560px; gap: 18px; min-height: 0; }
+  .rd-right { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+
+  .rd-panel {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rd-border); border-radius: 12px; background: var(--rd-panel);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .rd-panel.rd-radar-panel { min-height: 0; }
+  .rd-rank-panel { flex: 1.32; }
+  .rd-dim-panel { flex: 1; }
+
+  .rd-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.26), rgba(252, 211, 77, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .rd-panel-head i.rd-bar { flex: none; width: 5px; height: 16px; background: var(--rd-gold); box-shadow: 0 0 8px var(--rd-gold); transform: skewX(-12deg); }
+  .rd-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.1em; color: #fdf6e8; white-space: nowrap; }
+  .rd-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #7c8ba0; align-self: flex-end; padding-bottom: 7px; white-space: nowrap; }
+  .rd-panel-scope { margin-left: auto; font-size: 12px; color: var(--rd-gold-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .rd-chart { flex: 1; min-height: 0; }
+
+  /* ===== 排行表 ===== */
+  .rd-rank-head, .rd-rank-row {
+    display: grid; grid-template-columns: 44px 1fr 70px 134px 58px; align-items: center;
+    gap: 8px; padding: 0 14px;
+  }
+  .rd-rank-head {
+    flex: none; height: 30px; font-size: 11.5px; letter-spacing: 0.14em; color: #8497ab;
+    border-bottom: 1px solid rgba(224, 158, 46, 0.18);
+  }
+  .rd-rank-head span:nth-child(3), .rd-rank-head span:nth-child(4), .rd-rank-head span:nth-child(5) { text-align: center; }
+  .rd-rank-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+  .rd-rank-body::-webkit-scrollbar { display: none; }
+  .rd-rank-list { list-style: none; margin: 0; padding: 4px 0 6px; }
+  .rd-rank-row {
+    height: 39px; border-radius: 8px; margin: 2px 6px; padding: 0 8px;
+    transition: background 0.35s, box-shadow 0.35s;
+  }
+  .rd-rank-row:nth-child(odd) { background: rgba(255, 255, 255, 0.018); }
+  .rd-rank-row.is-focus {
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.22), rgba(245, 158, 11, 0.05));
+    box-shadow: inset 3px 0 0 var(--rd-gold), 0 0 16px rgba(245, 158, 11, 0.14);
+  }
+  .rd-rk-no { font: 700 15px/1 var(--rd-mono); color: var(--rd-muted); text-align: center; font-variant-numeric: tabular-nums; }
+  .rd-rank-row.is-top1 .rd-rk-no, .rd-rank-row.is-top2 .rd-rk-no, .rd-rank-row.is-top3 .rd-rk-no { color: var(--rd-gold-soft); text-shadow: 0 0 10px rgba(245, 158, 11, 0.6); }
+  .rd-rk-name { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #f0e6d2; letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rd-rk-name em { font-style: normal; font-size: 10.5px; padding: 1px 6px; border-radius: 4px; color: #9fb0c4; border: 1px solid rgba(120, 140, 170, 0.3); flex: none; }
+  .rd-rk-name em.is-county { color: #7fe0c4; border-color: rgba(56, 230, 176, 0.32); }
+  .rd-rk-score { text-align: center; font: 700 18px/1 var(--rd-mono); color: #fdf6e8; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(245, 158, 11, 0.3); }
+  .rd-mini { display: flex; align-items: flex-end; justify-content: center; gap: 4px; height: 26px; }
+  .rd-mini-b { width: 13px; border-radius: 2px 2px 0 0; opacity: 0.9; }
+  .rd-rk-badge { justify-self: center; }
+  .rd-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 42px; padding: 3px 8px; border-radius: 6px;
+    font: 700 12px/1 var(--rd-mono); letter-spacing: 0.06em;
+  }
+  .rd-badge.is-aaa { color: #1c1204; background: linear-gradient(160deg, var(--rd-gold-soft), var(--rd-gold)); box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+  .rd-badge.is-aa { color: #06283a; background: linear-gradient(160deg, #8ff0ff, var(--rd-cyan)); }
+  .rd-badge.is-a { color: #041b12; background: linear-gradient(160deg, #7cf0d0, var(--rd-green)); }
+  .rd-badge.is-b { color: #ffe0e6; border: 1px solid rgba(255, 102, 128, 0.5); background: rgba(120, 30, 48, 0.4); }
+
+  /* ===== 底部跑马灯 ===== */
+  .rd-marquee {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--rd-border); border-radius: 12px; background: var(--rd-panel);
+  }
+  .rd-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #1c1204;
+    background: linear-gradient(120deg, var(--rd-gold-soft), var(--rd-gold) 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .rd-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #1c1204; animation: rdDot 1.6s ease-in-out infinite; }
+  @keyframes rdDot { 50% { opacity: 0.3; } }
+  .rd-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .rd-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: rdMarquee 44s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #ecdfc8;
+  }
+  .rd-marquee-track b { color: var(--rd-gold-soft); font-weight: 700; }
+  .rd-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(245, 158, 11, 0.55); }
+  @keyframes rdMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .rd-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="rd-stage" id="rd-stage">
+    <!-- mockflag:begin --><div class="rd-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="rd-error" id="rd-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="rd-header">
+      <div class="rd-head-left">
+        <div class="rd-crumb"><b>战略管理</b><i>›</i><em>竞争力评估</em></div>
+        <div class="rd-head-title-row">
+          <div class="rd-head-title">分行竞争力评估</div>
+          <span class="rd-head-badge"><i></i>2026 Q2 评估期</span>
+          <div class="rd-head-meta">
+            <span>参评分行 <b id="rd-count">14</b> 家</span><i>|</i>
+            <span>六维加权 · 权重和 <b>1.00</b></span><i>|</i>
+            <span>口径 <b>T+1</b> · 模型 <b>BRC-EVAL v2.6</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="rd-head-right">
+        <div class="rd-tabs" id="rd-tabs" aria-label="口径切换">
+          <button class="rd-tab is-active" data-scope="all" type="button">综合 <b id="rd-tab-all">14</b></button>
+          <button class="rd-tab" data-scope="urban" type="button">城区行 <b id="rd-tab-urban">8</b></button>
+          <button class="rd-tab" data-scope="county" type="button">县域行 <b id="rd-tab-county">6</b></button>
+        </div>
+        <div class="rd-clock" aria-label="实时时钟">
+          <span class="rd-clock-time" id="rd-clock-time">--:--:--</span>
+          <span class="rd-clock-date" id="rd-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主区 -->
+    <div class="rd-main">
+      <!-- 左：综合竞争力雷达 -->
+      <section class="rd-panel rd-radar-panel">
+        <header class="rd-panel-head"><i class="rd-bar"></i><h2>综合竞争力雷达</h2><span class="rd-panel-en">COMPETITIVENESS RADAR</span><span class="rd-panel-scope" id="rd-radar-scope">聚焦分行 vs 全行均值</span></header>
+        <div class="rd-chart" id="rd-chart-radar" role="img" aria-label="六维综合竞争力雷达图"></div>
+      </section>
+
+      <!-- 右列 -->
+      <div class="rd-right">
+        <section class="rd-panel rd-rank-panel">
+          <header class="rd-panel-head"><i class="rd-bar"></i><h2>综合评分排行</h2><span class="rd-panel-en">OVERALL RANKING</span><span class="rd-panel-scope" id="rd-rank-scope">权重加权现算 · 降序</span></header>
+          <div class="rd-rank-head">
+            <span>排名</span><span>分行</span><span>综合分</span><span>六维标记</span><span>评级</span>
+          </div>
+          <div class="rd-rank-body" id="rd-rank-body">
+            <ul class="rd-rank-list" id="rd-rank-list"></ul>
+          </div>
+        </section>
+        <section class="rd-panel rd-dim-panel">
+          <header class="rd-panel-head"><i class="rd-bar"></i><h2>单维度对比</h2><span class="rd-panel-en">DIMENSION SPREAD</span><span class="rd-panel-scope" id="rd-dim-scope">维度：规模</span></header>
+          <div class="rd-chart" id="rd-chart-dim" role="img" aria-label="单维度各分行得分横向柱状图"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- 跑马灯 -->
+    <section class="rd-marquee" aria-label="战略评估播报">
+      <div class="rd-marquee-tag"><i></i>战略评估播报</div>
+      <div class="rd-marquee-view"><div class="rd-marquee-track" id="rd-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("rd-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("rd-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#f3ecdd", muted: "#a9b6c8",
+    gold: "#f59e0b", goldSoft: "#fcd34d", goldDeep: "#b45309", orange: "#fb923c",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0", violet: "#9870ff", red: "#ff6680",
+    deep: "#071a34"
+  };
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const rndf = (a, b) => a + Math.random() * (b - a);
+  const fmt1 = (n) => n.toFixed(1);
+
+  /* ===== 3. 评估模型：6 维 + 权重（和为 1，综合分现算不硬编） ===== */
+  const DIMS = ["规模", "盈利", "质量", "效率", "增长", "合规"];
+  const WEIGHTS = [0.2, 0.2, 0.2, 0.15, 0.15, 0.1];
+  const DIM_COLORS = [C.gold, C.orange, C.cyan, C.green, C.blue, C.violet];
+
+  /* 14 家分行：dims = [规模, 盈利, 质量, 效率, 增长, 合规]（0–100） */
+  const BRANCHES = [
+    { name: "中心支行",   scope: "urban", dims: [96, 90, 85, 88, 72, 82] },
+    { name: "高新支行",   scope: "urban", dims: [82, 84, 80, 90, 94, 86] },
+    { name: "商务区支行", scope: "urban", dims: [90, 92, 78, 84, 80, 79] },
+    { name: "开发区支行", scope: "urban", dims: [84, 80, 76, 82, 88, 84] },
+    { name: "滨江支行",   scope: "urban", dims: [78, 82, 88, 80, 70, 90] },
+    { name: "城东支行",   scope: "urban", dims: [80, 76, 82, 78, 74, 85] },
+    { name: "城西支行",   scope: "urban", dims: [74, 72, 80, 76, 68, 88] },
+    { name: "城南支行",   scope: "urban", dims: [70, 74, 84, 74, 66, 86] },
+    { name: "云溪支行",   scope: "county", dims: [64, 70, 90, 72, 78, 92] },
+    { name: "临江支行",   scope: "county", dims: [60, 66, 86, 70, 82, 94] },
+    { name: "安平支行",   scope: "county", dims: [58, 64, 88, 68, 74, 90] },
+    { name: "广宁支行",   scope: "county", dims: [54, 62, 84, 66, 70, 91] },
+    { name: "和顺支行",   scope: "county", dims: [50, 60, 82, 64, 76, 93] },
+    { name: "龙泉支行",   scope: "county", dims: [48, 58, 80, 62, 68, 95] }
+  ];
+
+  /* 综合分现算：Σ(维度分 × 权重) */
+  function composite(b) {
+    let s = 0;
+    for (let i = 0; i < DIMS.length; i++) s += b.dims[i] * WEIGHTS[i];
+    return s;
+  }
+  BRANCHES.forEach((b) => { b.score = composite(b); });
+
+  /* 评级：按分数区间映射 */
+  function rating(s) { return s >= 85 ? "AAA" : s >= 78 ? "AA" : s >= 70 ? "A" : "B"; }
+  const RATE_CLASS = { AAA: "is-aaa", AA: "is-aa", A: "is-a", B: "is-b" };
+
+  function scopedList(scope) {
+    const arr = scope === "all" ? BRANCHES.slice() : BRANCHES.filter((b) => b.scope === scope);
+    arr.sort((a, b) => b.score - a.score); /* 严格按综合分降序 */
+    return arr;
+  }
+  function meanDims(list) {
+    return DIMS.map((_, i) => list.reduce((s, b) => s + b.dims[i], 0) / list.length);
+  }
+
+  /* ===== 4. 时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("rd-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("rd-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* 顶部计数徽章 */
+  $("rd-tab-all").textContent = BRANCHES.length;
+  $("rd-tab-urban").textContent = BRANCHES.filter((b) => b.scope === "urban").length;
+  $("rd-tab-county").textContent = BRANCHES.filter((b) => b.scope === "county").length;
+  $("rd-count").textContent = BRANCHES.length;
+
+  /* ===== 5. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(14, 30, 54, 0.94)",
+    borderColor: "rgba(245, 158, 11, 0.45)",
+    textStyle: { color: "#f3ecdd", fontSize: 12 }
+  }, extra || {});
+  const rgba = (hex, a) => {
+    const n = parseInt(hex.slice(1), 16);
+    return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")";
+  };
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+
+  const radarChart = echarts.init($("rd-chart-radar"));
+  const dimChart = echarts.init($("rd-chart-dim"));
+
+  /* ===== 6. 左：综合竞争力雷达（聚焦分行 vs 全行均值） ===== */
+  function radarOption(focus, list) {
+    const mean = meanDims(list);
+    const meanScore = mean.reduce((s, v, i) => s + v * WEIGHTS[i], 0);
+    const rt = rating(focus.score);
+    return {
+      tooltip: tip({
+        trigger: "item",
+        formatter: (o) => {
+          const rows = DIMS.map((d, i) => d + "：<b style='color:#fcd34d'>" + Math.round(o.value[i]) + "</b>").join("<br/>");
+          return "<b>" + o.name + "</b><br/>" + rows;
+        }
+      }),
+      legend: {
+        top: 6, left: "center", itemWidth: 16, itemHeight: 6, itemGap: 22,
+        textStyle: { color: C.muted, fontSize: 12.5 },
+        data: [focus.name, "全行均值"]
+      },
+      radar: {
+        center: ["50%", "56%"], radius: "66%", shape: "polygon", splitNumber: 5,
+        indicator: DIMS.map((d) => ({ name: d, max: 100 })),
+        axisName: { color: C.goldSoft, fontSize: 14, fontWeight: 600 },
+        axisLine: { lineStyle: { color: rgba(C.gold, 0.2) } },
+        splitLine: { lineStyle: { color: rgba(C.gold, 0.16) } },
+        splitArea: { show: true, areaStyle: { color: [rgba(C.gold, 0.03), rgba(C.blue, 0.05)] } }
+      },
+      graphic: [{
+        type: "text", left: "center", top: "50%", z: 10,
+        style: {
+          text: fmt1(focus.score) + "\n" + rt + " 级",
+          fill: C.goldSoft, font: "700 22px " + "Bahnschrift, DIN Alternate, sans-serif",
+          textAlign: "center", lineHeight: 24,
+          shadowColor: rgba(C.gold, 0.6), shadowBlur: 12
+        }
+      }],
+      series: [{
+        type: "radar",
+        emphasis: { lineStyle: { width: 3 } },
+        data: [
+          {
+            name: focus.name, value: focus.dims.slice(),
+            symbol: "circle", symbolSize: 6,
+            lineStyle: { color: C.gold, width: 2.6, shadowBlur: 10, shadowColor: rgba(C.gold, 0.5) },
+            itemStyle: { color: C.goldSoft, borderColor: C.deep, borderWidth: 1 },
+            areaStyle: { color: rgba(C.gold, 0.24) }
+          },
+          {
+            name: "全行均值", value: mean.map((v) => Math.round(v * 10) / 10),
+            symbol: "none",
+            lineStyle: { color: C.cyan, width: 1.6, type: "dashed" },
+            itemStyle: { color: C.cyan },
+            areaStyle: { color: rgba(C.cyan, 0.05) }
+          }
+        ]
+      }],
+      animationDurationUpdate: 650, animationEasingUpdate: "cubicOut"
+    };
+  }
+
+  /* ===== 7. 右下：单维度对比（某维度各分行横向柱，聚焦分行高亮） ===== */
+  function dimOption(dimIdx, list, focusName) {
+    const rows = list.map((b) => ({ name: b.name, value: b.dims[dimIdx], focus: b.name === focusName }))
+      .sort((a, b) => a.value - b.value); /* 升序，inverse 后视觉自顶向下降序 */
+    const mean = rows.reduce((s, r) => s + r.value, 0) / rows.length;
+    return {
+      tooltip: tip({ trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: (v) => v + " 分" }),
+      grid: { left: 8, right: 52, top: 12, bottom: 6, containLabel: true },
+      xAxis: { type: "value", max: 100, show: false },
+      yAxis: {
+        type: "category", data: rows.map((r) => r.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#dcd0ba", fontSize: 12 }
+      },
+      series: [{
+        type: "bar", barWidth: 12,
+        data: rows.map((r) => ({
+          value: r.value,
+          itemStyle: {
+            borderRadius: 6,
+            color: r.focus ? hGrad(C.goldDeep, C.goldSoft) : hGrad(rgba(C.blue, 0.55), rgba(C.cyan, 0.8)),
+            shadowColor: r.focus ? rgba(C.gold, 0.6) : "transparent", shadowBlur: r.focus ? 12 : 0
+          }
+        })),
+        label: { show: true, position: "right", fontSize: 12, color: C.goldSoft, formatter: "{c}" },
+        showBackground: true, backgroundStyle: { color: "rgba(90, 120, 170, 0.1)", borderRadius: 6 },
+        markLine: {
+          silent: true, symbol: "none",
+          data: [{ xAxis: Math.round(mean * 10) / 10 }],
+          lineStyle: { color: rgba(C.goldSoft, 0.7), type: "dashed", width: 1.4 },
+          label: { formatter: "均值 " + fmt1(mean), color: C.goldSoft, fontSize: 11, position: "insideEndTop" }
+        }
+      }],
+      animationDurationUpdate: 700, animationEasingUpdate: "elasticOut", animationDelay: (i) => i * 30
+    };
+  }
+
+  /* ===== 8. 右上：综合评分排行表（DOM，六维迷你标记 + 评级 badge + 翻牌） ===== */
+  const rankNums = []; /* {node, cur, target} 供翻牌缓动 */
+  const rowMap = {};   /* name -> row 节点 */
+  function renderRanking(list) {
+    const ul = $("rd-rank-list");
+    ul.innerHTML = "";
+    rankNums.length = 0;
+    for (const k in rowMap) delete rowMap[k];
+    list.forEach((b, idx) => {
+      const li = document.createElement("li");
+      li.className = "rd-rank-row" + (idx < 3 ? " is-top" + (idx + 1) : "");
+      const rt = rating(b.score);
+      const mini = b.dims.map((v, i) =>
+        '<i class="rd-mini-b" style="height:' + (5 + v / 100 * 21).toFixed(1) + 'px;background:' + DIM_COLORS[i] + '"></i>'
+      ).join("");
+      li.innerHTML =
+        '<span class="rd-rk-no">' + (idx + 1) + '</span>' +
+        '<span class="rd-rk-name">' + b.name +
+          '<em class="' + (b.scope === "county" ? "is-county" : "") + '">' + (b.scope === "county" ? "县域" : "城区") + '</em></span>' +
+        '<span class="rd-rk-score">0.0</span>' +
+        '<span class="rd-mini">' + mini + '</span>' +
+        '<span class="rd-rk-badge"><span class="rd-badge ' + RATE_CLASS[rt] + '">' + rt + '</span></span>';
+      ul.appendChild(li);
+      rowMap[b.name] = li;
+      rankNums.push({ node: li.querySelector(".rd-rk-score"), cur: 0, target: b.score });
+    });
+  }
+  /* 翻牌缓动：综合分从 0 计数到目标 */
+  setInterval(() => {
+    rankNums.forEach((r) => {
+      const diff = r.target - r.cur;
+      if (Math.abs(diff) < 0.05) { r.cur = r.target; } else { r.cur += diff * 0.16; }
+      r.node.textContent = fmt1(r.cur);
+    });
+  }, 60);
+
+  /* ===== 9. 跑马灯（战略评估播报，含现算口径，切换后重启） ===== */
+  function buildNews() {
+    const all = scopedList("all");
+    const top = all[0], second = all[1];
+    const cnt = { AAA: 0, AA: 0, A: 0, B: 0 };
+    all.forEach((b) => { cnt[rating(b.score)]++; });
+    const countyMeanComp = meanDims(BRANCHES.filter((b) => b.scope === "county"))[5];
+    return [
+      "本期参评分行 <b>" + all.length + " 家</b>，综合竞争力六维加权评估，权重口径 规模/盈利/质量各 <b>20%</b>、效率/增长各 <b>15%</b>、合规 <b>10%</b>",
+      "综合评分 <b>" + top.name + " " + fmt1(top.score) + "</b> 蝉联榜首，" + second.name + " 以 <b>" + fmt1(second.score) + "</b> 分紧随其后",
+      "评级分布：AAA <b>" + cnt.AAA + " 家</b> · AA <b>" + cnt.AA + " 家</b> · A <b>" + cnt.A + " 家</b> · B <b>" + cnt.B + " 家</b>，梯队结构清晰",
+      "县域行合规维度均值 <b>" + fmt1(countyMeanComp) + " 分</b>，显著领先城区行，风险内控扎实",
+      "高新支行增长维度 <b>94 分</b> 列全行第一，开发区支行增长动能同步进入第一梯队",
+      "综合分低于 <b>70 分</b> 的分行列入重点帮扶，规模与效率维度为主要补短板方向"
+    ];
+  }
+  function renderMarquee() {
+    const html = buildNews().map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("rd-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+  renderMarquee();
+
+  /* ===== 10. 状态与联动（scope / 聚焦轮播 / 维度轮播） ===== */
+  let curScope = "all";
+  let curList = [];
+  let focusPos = 0;
+  let curDim = 0;
+  const SCOPE_LABEL = { all: "全行", urban: "城区行", county: "县域行" };
+
+  function setFocus(pos) {
+    focusPos = (pos + curList.length) % curList.length;
+    const focus = curList[focusPos];
+    radarChart.setOption(radarOption(focus, curList));
+    $("rd-radar-scope").textContent = "聚焦 " + focus.name + " · vs " + SCOPE_LABEL[curScope] + "均值";
+    /* 排行高亮 + 滚动 */
+    Object.keys(rowMap).forEach((n) => rowMap[n].classList.toggle("is-focus", n === focus.name));
+    const row = rowMap[focus.name];
+    if (row) row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    /* 维度柱同步聚焦高亮 */
+    dimChart.setOption(dimOption(curDim, curList, focus.name));
+  }
+
+  function applyScope(scope) {
+    curScope = scope;
+    curList = scopedList(scope);
+    focusPos = 0;
+    Array.from(document.querySelectorAll(".rd-tab")).forEach((t) =>
+      t.classList.toggle("is-active", t.dataset.scope === scope));
+    $("rd-rank-scope").textContent = SCOPE_LABEL[scope] + " · " + curList.length + " 家 · 加权降序";
+    renderRanking(curList);
+    setFocus(0);
+  }
+
+  Array.from(document.querySelectorAll(".rd-tab")).forEach((t) =>
+    t.addEventListener("click", () => applyScope(t.dataset.scope)));
+
+  applyScope("all");
+
+  /* ===== 11. 动效驱动 ===== */
+  /* 聚焦分行轮播：雷达多边形切换 + 排行行高亮滚动 */
+  setInterval(() => { setFocus(focusPos + 1); }, 4500);
+  /* 维度轮播：单维度对比柱生长 */
+  setInterval(() => {
+    curDim = (curDim + 1) % DIMS.length;
+    $("rd-dim-scope").textContent = "维度：" + DIMS[curDim];
+    dimChart.setOption(dimOption(curDim, curList, curList[focusPos].name));
+  }, 5200);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 客群画像专题</title>
+<style>
+  :root {
+    --pf-bg: #0a1e3c;
+    --pf-panel: rgba(13, 34, 64, 0.72);
+    --pf-border: rgba(86, 150, 224, 0.28);
+    --pf-text: #e6f1ff;
+    --pf-muted: #8fa7c8;
+    --pf-cyan: #3fe1ff;
+    --pf-blue: #4b7dff;
+    --pf-green: #38e6b0;
+    --pf-gold: #ffc857;
+    --pf-red: #ff6680;
+    --pf-violet: #9870ff;
+    --pf-violet-soft: #c9b3ff;
+    --pf-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--pf-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .pf-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 14% 0%, rgba(152, 112, 255, 0.14), transparent 44%),
+      radial-gradient(circle at 88% 10%, rgba(63, 225, 255, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(74, 52, 158, 0.30), transparent 56%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--pf-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 424px 1fr 424px;
+    grid-template-rows: 84px 148px 1fr 54px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .pf-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .pf-error.is-visible { display: block; }
+
+  /* ===== 顶栏：内容页头（面包屑 + 客群名 | 客群切换器 + 时钟） ===== */
+  .pf-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .pf-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(152, 112, 255, 0.6) 16%, rgba(63, 225, 255, 0.85) 50%, rgba(152, 112, 255, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(152, 112, 255, 0.45);
+  }
+  .pf-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .pf-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--pf-muted); }
+  .pf-crumb b { font-weight: 400; color: #6fb9e8; }
+  .pf-crumb i { font-style: normal; color: rgba(143, 167, 200, 0.55); }
+  .pf-crumb em { font-style: normal; color: #d7e8ff; }
+  .pf-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .pf-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--pf-violet-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(152, 112, 255, 0.35));
+  }
+  .pf-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--pf-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .pf-head-meta b { font-weight: 400; color: #c8b6f5; }
+  .pf-head-meta i { font-style: normal; color: rgba(143, 167, 200, 0.4); }
+
+  .pf-head-right { display: flex; align-items: center; gap: 24px; flex: none; }
+  .pf-switcher { display: flex; align-items: stretch; gap: 8px; }
+  .pf-switch-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 14px; border-radius: 9px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(86, 150, 224, 0.4); background: rgba(20, 48, 88, 0.55);
+    color: #cfe6ff; font-size: 13px; letter-spacing: 0.06em;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+  }
+  .pf-switch-btn:hover {
+    color: #fff; border-color: rgba(152, 112, 255, 0.8);
+    box-shadow: 0 0 12px rgba(152, 112, 255, 0.35), inset 0 0 10px rgba(152, 112, 255, 0.1);
+  }
+  .pf-switch-btn b { font-weight: 700; font-size: 16px; color: var(--pf-violet-soft); }
+  .pf-switch-box {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-width: 158px; padding: 6px 18px; border-radius: 9px;
+    border: 1px solid rgba(152, 112, 255, 0.5); background: rgba(52, 34, 96, 0.35);
+    box-shadow: inset 0 0 14px rgba(152, 112, 255, 0.1);
+  }
+  .pf-switch-name { font-size: 17px; font-weight: 700; letter-spacing: 0.14em; color: var(--pf-violet-soft); }
+  .pf-switch-idx { font-size: 11px; letter-spacing: 0.28em; color: rgba(152, 112, 255, 0.65); font-variant-numeric: tabular-nums; }
+  .pf-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 24px; border-left: 1px solid rgba(86, 150, 224, 0.25); }
+  .pf-clock-time { font: 700 26px/1 var(--pf-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4); }
+  .pf-clock-date { font-size: 12px; color: var(--pf-muted); letter-spacing: 0.08em; }
+
+  /* ===== 画像带：核心数字 5 枚 + 标签墙 ===== */
+  .pf-band { grid-column: 1 / -1; display: flex; gap: 14px; min-height: 0; }
+  .pf-stats { flex: none; width: 760px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .pf-stat {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--pf-border); border-radius: 12px; background: var(--pf-panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  }
+  .pf-stat::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 42px; height: 3px;
+    background: linear-gradient(90deg, var(--pf-violet), transparent);
+  }
+  .pf-stat-label { font-size: 13px; letter-spacing: 0.12em; color: var(--pf-muted); }
+  .pf-stat-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .pf-stat-val { font: 700 28px/1 var(--pf-mono); color: #f4faff; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(152, 112, 255, 0.45); }
+  .pf-stat-unit { font-size: 12px; color: #a48fe0; }
+  .pf-stat-delta { font-size: 11.5px; letter-spacing: 0.03em; font-variant-numeric: tabular-nums; }
+  .pf-stat-delta.is-good { color: var(--pf-green); }
+  .pf-stat-delta.is-bad { color: var(--pf-red); }
+
+  .pf-tagwall {
+    flex: 1; min-width: 0; position: relative; overflow: hidden;
+    border: 1px solid var(--pf-border); border-radius: 12px; background: var(--pf-panel);
+    display: flex; flex-direction: column;
+  }
+  .pf-tagwall-cap {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    padding: 7px 14px 0; font-size: 12px; letter-spacing: 0.16em; color: var(--pf-muted);
+  }
+  .pf-tagwall-cap i { flex: none; width: 4px; height: 12px; background: var(--pf-violet); box-shadow: 0 0 8px var(--pf-violet); transform: skewX(-12deg); }
+  .pf-tagwall-cap b { font-weight: 400; margin-left: auto; font-size: 11px; letter-spacing: 0.2em; color: #5f88b8; }
+  .pf-tags {
+    flex: 1; min-height: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+    align-content: center; gap: 8px 10px; padding: 4px 16px 10px;
+  }
+  .pf-tag {
+    display: inline-flex; align-items: center; white-space: nowrap;
+    padding: 0.22em 0.75em; border-radius: 999px; line-height: 1.35;
+    border: 1px solid rgba(94, 168, 255, 0.3); background: rgba(24, 56, 100, 0.4);
+    color: #b9d2f2; letter-spacing: 0.05em;
+    animation: pfTagIn 0.5s ease backwards;
+  }
+  .pf-tag.w1 { font-size: 12px; opacity: 0.8; }
+  .pf-tag.w2 { font-size: 13.5px; }
+  .pf-tag.w3 { font-size: 15.5px; color: #d5e6fb; }
+  .pf-tag.w4, .pf-tag.w5 {
+    color: #e4d9ff; border-color: rgba(152, 112, 255, 0.65); background: rgba(74, 52, 158, 0.32);
+    box-shadow: 0 0 12px rgba(152, 112, 255, 0.28), inset 0 0 10px rgba(152, 112, 255, 0.12);
+  }
+  .pf-tag.w4 { font-size: 18px; }
+  .pf-tag.w5 { font-size: 21px; font-weight: 700; color: #efe8ff; text-shadow: 0 0 10px rgba(152, 112, 255, 0.6); }
+  @keyframes pfTagIn { from { opacity: 0; transform: scale(0.7); } }
+
+  /* ===== 面板通用 ===== */
+  .pf-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .pf-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--pf-border); border-radius: 12px; background: var(--pf-panel);
+    display: flex; flex-direction: column;
+  }
+  .pf-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(152, 112, 255, 0.25), rgba(63, 225, 255, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .pf-panel-head i { flex: none; width: 5px; height: 16px; background: var(--pf-violet); box-shadow: 0 0 8px var(--pf-violet); transform: skewX(-12deg); }
+  .pf-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .pf-panel-head .pf-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pf-panel-head .pf-panel-scope { margin-left: auto; font-size: 12px; color: var(--pf-violet-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .pf-chart { flex: 1; min-height: 0; }
+
+  /* 左①：人口属性（柱状 + 双小环形） */
+  .pf-demo-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .pf-demo-age { flex: 1.1; min-height: 0; }
+  .pf-demo-duo { flex: 1; min-height: 0; }
+
+  /* 中①：生命周期漏斗 + 阶段流转 */
+  .pf-life { flex: 1.28; }
+  .pf-life-body { flex: 1; min-height: 0; display: flex; }
+  .pf-life-funnel { flex: 1.35; min-width: 0; }
+  .pf-flows {
+    flex: none; width: 218px; display: flex; flex-direction: column; justify-content: center; gap: 10px;
+    padding: 8px 16px 12px 4px;
+  }
+  .pf-flows-cap { font-size: 11px; letter-spacing: 0.2em; color: #5f88b8; text-align: center; margin-bottom: 2px; }
+  .pf-flow {
+    position: relative; border: 1px solid rgba(94, 168, 255, 0.22); border-radius: 9px;
+    background: rgba(18, 42, 80, 0.5); padding: 7px 10px 8px;
+  }
+  .pf-flow::before {
+    content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px;
+    background: linear-gradient(180deg, var(--pf-violet), rgba(152, 112, 255, 0.1));
+  }
+  .pf-flow-route { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #cfe3fa; letter-spacing: 0.06em; }
+  .pf-flow-route b { color: var(--pf-violet-soft); font-weight: 700; }
+  .pf-flow-nums { display: flex; align-items: baseline; justify-content: space-between; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .pf-flow-mv { font: 700 16px/1 var(--pf-mono); color: #f0f8ff; }
+  .pf-flow-mv em { font-style: normal; font-size: 11px; font-weight: 400; color: var(--pf-muted); margin-left: 2px; }
+  .pf-flow-conv { font-size: 11.5px; color: var(--pf-green); }
+  .pf-flow-conv.is-warn { color: var(--pf-red); }
+
+  /* 右②：下一步最佳动作 */
+  .pf-actions { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 10px 16px 14px; }
+  .pf-action {
+    position: relative; display: flex; align-items: center; gap: 14px;
+    border: 1px solid rgba(94, 168, 255, 0.24); border-radius: 11px;
+    background: radial-gradient(ellipse at 0% 0%, rgba(152, 112, 255, 0.12), transparent 60%), rgba(16, 38, 72, 0.55);
+    padding: 11px 14px;
+  }
+  .pf-action-no {
+    flex: none; width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font: 700 18px/1 var(--pf-mono); color: #efe8ff;
+    background: linear-gradient(160deg, rgba(152, 112, 255, 0.85), rgba(88, 56, 190, 0.65));
+    box-shadow: 0 0 14px rgba(152, 112, 255, 0.4), inset 0 0 10px rgba(255, 255, 255, 0.12);
+  }
+  .pf-action-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .pf-action-title { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #f0f8ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pf-action-why { font-size: 12px; color: var(--pf-muted); letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pf-action-resp { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .pf-action-resp b { font: 700 20px/1 var(--pf-mono); color: var(--pf-violet-soft); text-shadow: 0 0 10px rgba(152, 112, 255, 0.5); font-variant-numeric: tabular-nums; }
+  .pf-action-resp span { font-size: 10.5px; letter-spacing: 0.1em; color: #5f88b8; }
+
+  /* 右①：产品渗透（横条 + 持有N品小环） */
+  .pf-prod { flex: 1.12; }
+  .pf-prod-body { flex: 1; min-height: 0; display: flex; padding: 2px 4px 6px; }
+  .pf-prod-bars { flex: 1.32; min-width: 0; }
+  .pf-prod-hold { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .pf-prod-cap { flex: none; text-align: center; font-size: 12px; letter-spacing: 0.14em; color: var(--pf-muted); padding-top: 4px; }
+
+  /* ===== 底部跑马灯 ===== */
+  .pf-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--pf-border); border-radius: 12px; background: var(--pf-panel);
+  }
+  .pf-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #f4efff;
+    background: linear-gradient(120deg, var(--pf-violet), #5b3ac2 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .pf-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #f4efff; animation: pfDot 1.6s ease-in-out infinite; }
+  @keyframes pfDot { 50% { opacity: 0.3; } }
+  .pf-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .pf-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: pfMarquee 44s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .pf-marquee-track b { color: var(--pf-violet-soft); font-weight: 700; }
+  .pf-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(152, 112, 255, 0.55); }
+  @keyframes pfMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .pf-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="pf-stage" id="pf-stage">
+    <!-- mockflag:begin --><div class="pf-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="pf-error" id="pf-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏：内容页头 -->
+    <header class="pf-header">
+      <div class="pf-head-left">
+        <div class="pf-crumb"><b>数字化运营</b><i>›</i><em>客群画像</em></div>
+        <div class="pf-head-title-row">
+          <div class="pf-head-title" id="pf-seg-name">新中产客群</div>
+          <div class="pf-head-meta">
+            <span>客群规模 <b id="pf-seg-size">--</b> 万户</span><i>|</i>
+            <span>AUM 总量 <b id="pf-seg-aum">--</b> 亿元</span><i>|</i>
+            <span>标签口径 <b>T+1</b> · 模型版本 <b id="pf-seg-model">--</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="pf-head-right">
+        <div class="pf-switcher" aria-label="客群切换器">
+          <button class="pf-switch-btn" id="pf-btn-prev" type="button"><b>‹</b>上一群</button>
+          <div class="pf-switch-box">
+            <span class="pf-switch-name" id="pf-switch-name">新中产客群</span>
+            <span class="pf-switch-idx" id="pf-switch-idx">2 / 3</span>
+          </div>
+          <button class="pf-switch-btn" id="pf-btn-next" type="button">下一群<b>›</b></button>
+        </div>
+        <div class="pf-clock" aria-label="实时时钟">
+          <span class="pf-clock-time" id="pf-clock-time">--:--:--</span>
+          <span class="pf-clock-date" id="pf-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 画像带：核心数字 + 标签墙 -->
+    <section class="pf-band" aria-label="客群画像带">
+      <div class="pf-stats" id="pf-stats"></div>
+      <div class="pf-tagwall">
+        <div class="pf-tagwall-cap"><i></i>客群标签墙 · 按权重排布<b>TAG CLOUD</b></div>
+        <div class="pf-tags" id="pf-tags" aria-label="客群标签，字号越大权重越高"></div>
+      </div>
+    </section>
+
+    <!-- 左列 -->
+    <div class="pf-col">
+      <section class="pf-panel">
+        <header class="pf-panel-head"><i></i><h2>人口属性</h2><span class="pf-panel-en">DEMOGRAPHICS</span><span class="pf-panel-scope">这群人是谁</span></header>
+        <div class="pf-demo-body">
+          <div class="pf-demo-age pf-chart" id="pf-chart-age" role="img" aria-label="年龄段分布柱状图"></div>
+          <div class="pf-demo-duo pf-chart" id="pf-chart-demo" role="img" aria-label="性别与城市层级双环形图"></div>
+        </div>
+      </section>
+      <section class="pf-panel">
+        <header class="pf-panel-head"><i></i><h2>资产结构</h2><span class="pf-panel-en">AUM STRUCTURE</span><span class="pf-panel-scope">有什么</span></header>
+        <div class="pf-chart" id="pf-chart-asset" role="img" aria-label="户均AUM构成堆叠环形图"></div>
+      </section>
+    </div>
+
+    <!-- 中央 -->
+    <div class="pf-col">
+      <section class="pf-panel pf-life">
+        <header class="pf-panel-head"><i></i><h2>生命周期漏斗与流转</h2><span class="pf-panel-en">LIFECYCLE FUNNEL</span><span class="pf-panel-scope">处于什么阶段</span></header>
+        <div class="pf-life-body">
+          <div class="pf-life-funnel pf-chart" id="pf-chart-funnel" role="img" aria-label="获客到衰退五阶段生命周期漏斗"></div>
+          <div class="pf-flows" id="pf-flows" aria-label="阶段间月流转标注">
+            <div class="pf-flows-cap">阶段间月流转</div>
+          </div>
+        </div>
+      </section>
+      <section class="pf-panel">
+        <header class="pf-panel-head"><i></i><h2>行为特征时钟</h2><span class="pf-panel-en">24H ACTIVITY CLOCK</span><span class="pf-panel-scope">在做什么</span></header>
+        <div class="pf-chart" id="pf-chart-clock" role="img" aria-label="24小时App访问活跃度极坐标柱状图"></div>
+      </section>
+    </div>
+
+    <!-- 右列 -->
+    <div class="pf-col">
+      <section class="pf-panel pf-prod">
+        <header class="pf-panel-head"><i></i><h2>产品渗透与交叉</h2><span class="pf-panel-en">PRODUCT PENETRATION</span><span class="pf-panel-scope">TOP6 持有率</span></header>
+        <div class="pf-prod-body">
+          <div class="pf-prod-bars pf-chart" id="pf-chart-product" role="img" aria-label="产品持有率TOP6横向条形图"></div>
+          <div class="pf-prod-hold">
+            <div class="pf-prod-cap">持有 N 品构成</div>
+            <div class="pf-chart" id="pf-chart-hold" role="img" aria-label="持有产品件数构成环形图"></div>
+          </div>
+        </div>
+      </section>
+      <section class="pf-panel">
+        <header class="pf-panel-head"><i></i><h2>下一步最佳动作</h2><span class="pf-panel-en">NEXT BEST ACTION</span><span class="pf-panel-scope">该推什么</span></header>
+        <div class="pf-actions" id="pf-actions"></div>
+      </section>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="pf-marquee" aria-label="客群洞察">
+      <div class="pf-marquee-tag"><i></i>客群洞察</div>
+      <div class="pf-marquee-view"><div class="pf-marquee-track" id="pf-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("pf-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("pf-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    gold: "#ffc857", red: "#ff6680",
+    violet: "#9870ff", violetSoft: "#c9b3ff", violetDeep: "#5b3ac2"
+  };
+  const rnd = (min, max) => Math.round(min + Math.random() * (max - min));
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 三个客群档案（内容页核心：单客群全景画像，全量内嵌可切换） ===== */
+  const AGE_BUCKETS = ["18-25", "26-30", "31-35", "36-45", "46-55", "56+"];
+  const AUM_NAMES = ["存款", "理财", "基金", "保险", "贵金属"];
+  const STAGE_NAMES = ["获客", "激活", "成长", "成熟", "衰退预警"];
+  const HOLD_NAMES = ["持 1 品", "持 2 品", "持 3 品", "持 4 品及以上"];
+  const PROFILES = [
+    {
+      name: "Z 世代客群", model: "SEG-GENZ v2.4",
+      size: 86.4, aumTotal: 27.6,
+      stats: { cust: 86.4, aum: 3.2, mau: 74.6, prod: 1.8, churn: 1.24 },
+      deltas: [
+        { t: "环比 +2.8%", good: true }, { t: "环比 +4.1%", good: true },
+        { t: "环比 +1.9pct", good: true }, { t: "环比 +0.1 件", good: true },
+        { t: "环比 +0.06 万", good: false }
+      ],
+      tags: [
+        { t: "18-28 岁", w: 5 }, { t: "移动原生", w: 5 }, { t: "未婚", w: 4 },
+        { t: "消费分期偏好", w: 4 }, { t: "小额高频", w: 4 }, { t: "夜间活跃", w: 3 },
+        { t: "追新体验派", w: 3 }, { t: "基金定投尝鲜", w: 3 }, { t: "游戏娱乐", w: 2 },
+        { t: "短视频重度", w: 2 }, { t: "外卖高频", w: 2 }, { t: "宠物经济", w: 1 }
+      ],
+      age: [58, 34, 6, 2, 0, 0],
+      gender: [{ name: "男", value: 47 }, { name: "女", value: 53 }],
+      city: [{ name: "一线", value: 22 }, { name: "新一线", value: 34 }, { name: "二线", value: 28 }, { name: "三线及以下", value: 16 }],
+      asset: [1.4, 0.9, 0.6, 0.2, 0.1],
+      funnel: [86.4, 71.2, 38.6, 15.2, 3.1],
+      flows: [
+        { from: "获客", to: "激活", mv: 5.8, conv: 82.4 },
+        { from: "激活", to: "成长", mv: 3.1, conv: 54.2 },
+        { from: "成长", to: "成熟", mv: 1.2, conv: 39.4 },
+        { from: "成熟", to: "衰退", mv: 0.3, conv: 20.4, warn: true }
+      ],
+      clock: [18, 12, 7, 4, 2, 2, 3, 6, 10, 14, 16, 20, 24, 20, 18, 17, 19, 22, 26, 30, 36, 42, 46, 32],
+      products: [
+        { name: "借记卡", value: 98 }, { name: "手机银行", value: 95 }, { name: "信用卡", value: 46 },
+        { name: "基金定投", value: 28 }, { name: "理财", value: 18 }, { name: "保险", value: 8 }
+      ],
+      hold: [38, 34, 20, 8],
+      actions: [
+        { title: "基金定投首投礼", why: "移动原生 + 小额高频标签命中，适配 10 元起投轻理财", resp: 26.2 },
+        { title: "信用卡分期免息券", why: "消费分期偏好标签覆盖 41%，账单分期转化窗口期", resp: 19.4 },
+        { title: "夜间理财直播间推送", why: "22-24 点活跃占比 31%，夜间触达打开率最优", resp: 15.8 }
+      ],
+      news: [
+        "Z 世代客群月活率 <b>74.6%</b>，为全行最高活跃客群",
+        "夜间 22-24 点访问占比 <b>31%</b>，建议营销触达避开工作日白天",
+        "基金定投渗透率仅 <b>28%</b>，较同业对标低 9pct，提升空间显著",
+        "本月新获客 <b>5.8 万户</b> 中 82% 于 7 日内完成首绑卡激活",
+        "流失预警 <b>1.24 万户</b>，主因跨行 App 补贴竞争，建议权益挽留"
+      ]
+    },
+    {
+      name: "新中产客群", model: "SEG-NMC v3.1",
+      size: 128.6, aumTotal: 365.2,
+      stats: { cust: 128.6, aum: 28.4, mau: 58.2, prod: 3.4, churn: 2.86 },
+      deltas: [
+        { t: "环比 +1.2%", good: true }, { t: "环比 +2.6%", good: true },
+        { t: "环比 +0.8pct", good: true }, { t: "环比 +0.2 件", good: true },
+        { t: "环比 -0.12 万", good: true }
+      ],
+      tags: [
+        { t: "30-45 岁", w: 5 }, { t: "已婚有孩", w: 5 }, { t: "理财偏稳健", w: 4 },
+        { t: "手机银行高频", w: 4 }, { t: "房贷客户", w: 4 }, { t: "子女教育关注", w: 3 },
+        { t: "保险配置意识强", w: 3 }, { t: "有车一族", w: 3 }, { t: "工资代发", w: 2 },
+        { t: "信用卡活跃", w: 2 }, { t: "商旅出行", w: 1 }, { t: "健身运动", w: 1 }
+      ],
+      age: [2, 8, 30, 42, 15, 3],
+      gender: [{ name: "男", value: 52 }, { name: "女", value: 48 }],
+      city: [{ name: "一线", value: 28 }, { name: "新一线", value: 36 }, { name: "二线", value: 24 }, { name: "三线及以下", value: 12 }],
+      asset: [8.6, 11.2, 4.3, 3.1, 1.2],
+      funnel: [128.6, 94.2, 66.8, 42.6, 8.4],
+      flows: [
+        { from: "获客", to: "激活", mv: 4.2, conv: 73.3 },
+        { from: "激活", to: "成长", mv: 2.9, conv: 70.9 },
+        { from: "成长", to: "成熟", mv: 1.8, conv: 63.8 },
+        { from: "成熟", to: "衰退", mv: 0.5, conv: 19.7, warn: true }
+      ],
+      clock: [4, 2, 1, 1, 1, 2, 8, 18, 32, 26, 20, 24, 30, 22, 18, 16, 18, 22, 26, 30, 38, 42, 28, 12],
+      products: [
+        { name: "借记卡", value: 96 }, { name: "手机银行", value: 88 }, { name: "理财", value: 64 },
+        { name: "信用卡", value: 58 }, { name: "基金", value: 36 }, { name: "保险", value: 32 }
+      ],
+      hold: [12, 26, 34, 28],
+      actions: [
+        { title: "稳健理财升级（R2 固收+）", why: "存款占比 30% 且本月理财到期资金 6.8 亿集中承接", resp: 22.4 },
+        { title: "子女教育金专项计划", why: "已婚有孩占比 63%，教育金缺口画像命中率高", resp: 18.6 },
+        { title: "家庭保单免费检视", why: "保险持有率 32% 低于同层客群基准 41%", resp: 12.8 }
+      ],
+      news: [
+        "新中产客群 AUM 总量 <b>365.2 亿元</b>，贡献零售 AUM 的 15.4%",
+        "理财持有率 <b>64%</b>，稳健型产品复购率连续 3 个月上升",
+        "早 8-9 点与晚 20-22 点为双活跃高峰，适合早晚双波次触达",
+        "成熟期客户 <b>42.6 万户</b>，向财富客群跃迁潜力名单 5.2 万户",
+        "流失预警环比下降 <b>0.12 万户</b>，到期承接策略初见成效"
+      ]
+    },
+    {
+      name: "银发客群", model: "SEG-SLV v1.9",
+      size: 64.2, aumTotal: 138.7,
+      stats: { cust: 64.2, aum: 21.6, mau: 31.5, prod: 2.2, churn: 0.92 },
+      deltas: [
+        { t: "环比 +0.6%", good: true }, { t: "环比 +1.4%", good: true },
+        { t: "环比 +0.4pct", good: true }, { t: "环比 +0.1 件", good: true },
+        { t: "环比 -0.05 万", good: true }
+      ],
+      tags: [
+        { t: "55 岁以上", w: 5 }, { t: "退休金代发", w: 5 }, { t: "存款偏好", w: 4 },
+        { t: "网点柜面依赖", w: 4 }, { t: "保本理财", w: 4 }, { t: "医疗健康关注", w: 3 },
+        { t: "早间活跃", w: 3 }, { t: "子女代办", w: 3 }, { t: "电话银行", w: 2 },
+        { t: "广场社交", w: 2 }, { t: "旅居养老", w: 1 }, { t: "防诈提醒重点", w: 1 }
+      ],
+      age: [0, 1, 2, 5, 24, 68],
+      gender: [{ name: "男", value: 45 }, { name: "女", value: 55 }],
+      city: [{ name: "一线", value: 18 }, { name: "新一线", value: 26 }, { name: "二线", value: 30 }, { name: "三线及以下", value: 26 }],
+      asset: [12.8, 6.2, 0.7, 1.4, 0.5],
+      funnel: [64.2, 42.8, 28.6, 21.4, 5.8],
+      flows: [
+        { from: "获客", to: "激活", mv: 1.1, conv: 66.7 },
+        { from: "激活", to: "成长", mv: 0.8, conv: 66.8 },
+        { from: "成长", to: "成熟", mv: 0.6, conv: 74.8 },
+        { from: "成熟", to: "衰退", mv: 0.4, conv: 27.1, warn: true }
+      ],
+      clock: [2, 1, 1, 1, 2, 10, 26, 38, 42, 34, 24, 18, 14, 12, 10, 12, 14, 18, 20, 16, 10, 6, 4, 3],
+      products: [
+        { name: "借记卡", value: 97 }, { name: "存单存款", value: 82 }, { name: "理财", value: 52 },
+        { name: "手机银行", value: 38 }, { name: "保险", value: 24 }, { name: "贵金属", value: 12 }
+      ],
+      hold: [30, 36, 24, 10],
+      actions: [
+        { title: "大额存单优先购", why: "存款偏好显著，本月到期资金 14.8 亿元待承接", resp: 31.2 },
+        { title: "网点养老主题沙龙", why: "柜面依赖度高，线下活动到场响应历史最优", resp: 24.6 },
+        { title: "防诈守护提醒服务", why: "重点防护标签 8.6 万户，守护服务显著提升粘性", resp: 38.4 }
+      ],
+      news: [
+        "银发客群户均 AUM <b>21.6 万元</b>，存款占比近六成，稳定性最高",
+        "早 7-9 点为访问最高峰，网点开门前 App 排号功能使用率上升",
+        "手机银行渗透率仅 <b>38%</b>，适老化版本推广后月增 1.8pct",
+        "本月拦截可疑涉诈交易 <b>37 笔</b>，防诈提醒短信触达 8.6 万户",
+        "旅居养老标签客户增长 <b>12%</b>，异地用卡权益需求上升"
+      ]
+    }
+  ];
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("pf-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("pf-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. 画像带：核心数字 5 枚（缓动跳变，切换客群时目标整体过渡） ===== */
+  const STAT_DEFS = [
+    { key: "cust", label: "客户数", unit: "万户", dec: 1 },
+    { key: "aum", label: "户均 AUM", unit: "万元", dec: 1 },
+    { key: "mau", label: "月活率", unit: "%", dec: 1 },
+    { key: "prod", label: "产品持有数", unit: "件", dec: 1 },
+    { key: "churn", label: "流失预警", unit: "万户", dec: 2 }
+  ];
+  const statsWrap = $("pf-stats");
+  STAT_DEFS.forEach((s) => {
+    const card = document.createElement("article");
+    card.className = "pf-stat";
+    card.innerHTML =
+      '<div class="pf-stat-label">' + s.label + '</div>' +
+      '<div class="pf-stat-num"><span class="pf-stat-val">0</span><span class="pf-stat-unit">' + s.unit + '</span></div>' +
+      '<div class="pf-stat-delta">--</div>';
+    statsWrap.appendChild(card);
+    s.node = card.querySelector(".pf-stat-val");
+    s.deltaNode = card.querySelector(".pf-stat-delta");
+    s.cur = 0;
+    s.target = 0;
+  });
+  function setStatTargets(p) {
+    STAT_DEFS.forEach((s, i) => {
+      s.target = p.stats[s.key];
+      const d = p.deltas[i];
+      s.deltaNode.textContent = (d.good ? "▲ " : "▼ ") + d.t;
+      s.deltaNode.className = "pf-stat-delta " + (d.good ? "is-good" : "is-bad");
+    });
+  }
+  setInterval(() => {
+    STAT_DEFS.forEach((s) => {
+      const diff = s.target - s.cur;
+      if (Math.abs(diff) < Math.pow(10, -s.dec) / 2) { s.cur = s.target; } else { s.cur += diff * 0.14; }
+      s.node.textContent = fmtDec(s.cur, s.dec);
+    });
+  }, 80);
+
+  /* ===== 6. 标签墙（12 枚 chip，按权重定字号，高权重紫色高亮） ===== */
+  function renderTags(p) {
+    const box = $("pf-tags");
+    box.innerHTML = "";
+    p.tags.forEach((tag, i) => {
+      const el = document.createElement("span");
+      el.className = "pf-tag w" + tag.w;
+      el.style.animationDelay = (i * 0.04) + "s";
+      el.textContent = tag.t;
+      box.appendChild(el);
+    });
+  }
+
+  /* ===== 7. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(152, 112, 255, 0.45)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  function makeChart(id) {
+    const el = document.getElementById(id);
+    return el ? echarts.init(el) : null;
+  }
+
+  /* ===== 8. 左①上：年龄段分布柱状 ===== */
+  const ageChart = makeChart("pf-chart-age");
+  function ageOption(p) {
+    return {
+      tooltip: tip({ trigger: "axis", valueFormatter: (v) => v + "%" }),
+      grid: { left: 14, right: 16, top: 26, bottom: 4, containLabel: true },
+      xAxis: {
+        type: "category", data: AGE_BUCKETS,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+        axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      yAxis: {
+        type: "value", max: 100,
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+        axisLabel: { color: C.muted, fontSize: 10, formatter: "{value}%" }
+      },
+      series: [{
+        name: "占比", type: "bar", barWidth: 16, data: p.age,
+        itemStyle: { borderRadius: [5, 5, 0, 0], color: vGrad(C.violet, "#2c2a70") },
+        label: { show: true, position: "top", fontSize: 10.5, color: C.violetSoft, formatter: (o) => (o.value > 0 ? o.value + "%" : "") }
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 9. 左①下：性别 / 城市层级 双小环形（单实例双 pie） ===== */
+  const demoChart = makeChart("pf-chart-demo");
+  function demoOption(p) {
+    return {
+      tooltip: tip({ valueFormatter: (v) => v + "%" }),
+      title: [
+        { text: "性别", left: "24%", top: 4, textAlign: "center", textStyle: { color: C.muted, fontSize: 11, fontWeight: 400 } },
+        { text: "城市层级", left: "72%", top: 4, textAlign: "center", textStyle: { color: C.muted, fontSize: 11, fontWeight: 400 } }
+      ],
+      series: [
+        {
+          name: "性别", type: "pie", radius: ["42%", "62%"], center: ["25%", "56%"],
+          color: [C.blue, "#ff8ac2"],
+          itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+          label: { color: "#cfe6ff", fontSize: 10.5, formatter: "{b} {d}%" },
+          labelLine: { length: 4, length2: 4, lineStyle: { color: "rgba(102, 178, 255, 0.4)" } },
+          data: p.gender
+        },
+        {
+          name: "城市层级", type: "pie", radius: ["42%", "62%"], center: ["73%", "56%"],
+          color: [C.violet, "#7a8dff", C.cyan, "#3d6ea8"],
+          itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+          label: { color: "#cfe6ff", fontSize: 10.5, formatter: "{b} {d}%" },
+          labelLine: { length: 4, length2: 4, lineStyle: { color: "rgba(102, 178, 255, 0.4)" } },
+          data: p.city
+        }
+      ],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 10. 左②：户均 AUM 构成堆叠环 ===== */
+  const assetChart = makeChart("pf-chart-asset");
+  function assetOption(p) {
+    const data = AUM_NAMES.map((n, i) => ({ name: n, value: p.asset[i] }));
+    return {
+      tooltip: tip({ valueFormatter: (v) => fmtDec(v, 1) + " 万元" }),
+      title: {
+        text: "户均 AUM", subtext: fmtDec(p.stats.aum, 1) + " 万元",
+        left: "33%", top: "40%", textAlign: "center",
+        textStyle: { color: C.muted, fontSize: 12, fontWeight: 400 },
+        subtextStyle: { color: C.violetSoft, fontSize: 20, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" }
+      },
+      legend: {
+        orient: "vertical", right: 14, top: "middle", itemWidth: 10, itemHeight: 10,
+        textStyle: { color: "#cfe6ff", fontSize: 12 },
+        formatter: (name) => {
+          const d = data.find((x) => x.name === name);
+          return name + "  " + fmtDec(d.value, 1) + " 万";
+        }
+      },
+      color: [C.cyan, C.violet, C.blue, C.green, C.gold],
+      series: [{
+        type: "pie", radius: ["52%", "74%"], center: ["34%", "52%"],
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+        label: { show: false },
+        emphasis: { label: { show: true, color: "#eaf6ff", fontSize: 13, fontWeight: 700, formatter: "{b}\n{d}%" } },
+        data
+      }, {
+        type: "pie", radius: ["82%", "83%"], center: ["34%", "52%"], silent: true,
+        label: { show: false },
+        itemStyle: { color: "rgba(152, 112, 255, 0.3)" },
+        data: [1]
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 11. 中①：生命周期五阶段漏斗（主视觉） + 阶段间月流转标注 ===== */
+  const funnelChart = makeChart("pf-chart-funnel");
+  const FUNNEL_COLORS = ["#c9b3ff", "#a98cff", C.violet, "#7050d8", "#4a349e"];
+  function funnelOption(p) {
+    const data = STAGE_NAMES.map((n, i) => ({
+      name: n, value: p.funnel[i],
+      itemStyle: { color: FUNNEL_COLORS[i], borderColor: "#0a1e3c", borderWidth: 2 }
+    }));
+    return {
+      tooltip: tip({ valueFormatter: (v) => fmtDec(v, 1) + " 万户" }),
+      series: [{
+        type: "funnel", sort: "descending",
+        left: "6%", right: "24%", top: 16, bottom: 12,
+        gap: 4, minSize: "12%",
+        label: {
+          show: true, position: "inside", color: "#0c1430",
+          fontSize: 13, fontWeight: 700,
+          formatter: (o) => o.name + "  " + fmtDec(o.value, 1) + " 万"
+        },
+        labelLine: { show: false },
+        emphasis: { label: { fontSize: 15 } },
+        data
+      }],
+      animationDurationUpdate: 700
+    };
+  }
+  function renderFlows(p) {
+    const box = $("pf-flows");
+    box.innerHTML = '<div class="pf-flows-cap">阶段间月流转</div>';
+    p.flows.forEach((f) => {
+      const el = document.createElement("div");
+      el.className = "pf-flow";
+      el.innerHTML =
+        '<div class="pf-flow-route">' + f.from + ' <b>▸</b> ' + f.to + '</div>' +
+        '<div class="pf-flow-nums">' +
+          '<span class="pf-flow-mv">' + fmtDec(f.mv, 1) + '<em>万户/月</em></span>' +
+          '<span class="pf-flow-conv' + (f.warn ? " is-warn" : "") + '">' +
+            (f.warn ? "流失率 " : "转化率 ") + fmtDec(f.conv, 1) + "%</span>" +
+        '</div>';
+      box.appendChild(el);
+    });
+  }
+
+  /* ===== 12. 中②：24 小时行为时钟（极坐标柱状，紫色渐变） ===== */
+  const clockChart = makeChart("pf-chart-clock");
+  function clockOption(p) {
+    const max = Math.max.apply(null, p.clock);
+    return {
+      tooltip: tip({ formatter: (o) => o.dataIndex + ":00 - " + o.dataIndex + ':59<br/>活跃指数 <b style="color:#c9b3ff">' + o.value + "</b>" }),
+      polar: { center: ["50%", "54%"], radius: ["24%", "86%"] },
+      angleAxis: {
+        type: "category",
+        data: Array.from({ length: 24 }, (_, i) => i),
+        startAngle: 90,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.25)" } },
+        axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 9.5, formatter: (v) => (v % 3 === 0 ? v + "时" : "") }
+      },
+      radiusAxis: {
+        type: "value", max: Math.ceil(max * 1.15),
+        axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false },
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.12)" } }
+      },
+      series: [{
+        type: "bar", coordinateSystem: "polar", barWidth: "62%",
+        data: p.clock.map((v) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: 3,
+            color: vGrad("rgba(201, 179, 255, " + (0.35 + 0.65 * v / max).toFixed(2) + ")", "rgba(74, 52, 158, 0.55)"),
+            shadowColor: "rgba(152, 112, 255, 0.4)", shadowBlur: v === max ? 12 : 0
+          }
+        }))
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 13. 右①：产品持有率 TOP6 横条 + 持有 N 品小环 ===== */
+  const productChart = makeChart("pf-chart-product");
+  function productOption(p) {
+    return {
+      tooltip: tip({ valueFormatter: (v) => v + "%" }),
+      grid: { left: 10, right: 48, top: 14, bottom: 4, containLabel: true },
+      xAxis: { type: "value", max: 100, show: false },
+      yAxis: {
+        type: "category", inverse: true,
+        data: p.products.map((x) => x.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      series: [{
+        type: "bar", barWidth: 11,
+        data: p.products.map((x, i) => ({
+          value: x.value,
+          itemStyle: { borderRadius: 6, color: i < 2 ? hGrad("#3d2b8f", C.violetSoft) : hGrad("#1d5d9e", C.cyan) }
+        })),
+        label: { show: true, position: "right", fontSize: 12, color: C.violetSoft, formatter: "{c}%" },
+        showBackground: true,
+        backgroundStyle: { color: "rgba(63, 120, 200, 0.12)", borderRadius: 6 }
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+  const holdChart = makeChart("pf-chart-hold");
+  function holdOption(p) {
+    return {
+      tooltip: tip({ valueFormatter: (v) => v + "%" }),
+      color: ["#3d6ea8", C.cyan, C.violet, C.violetSoft],
+      series: [{
+        type: "pie", radius: ["44%", "68%"], center: ["50%", "50%"],
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+        label: { color: "#cfe6ff", fontSize: 10.5, formatter: "{b}\n{d}%" },
+        labelLine: { length: 5, length2: 5, lineStyle: { color: "rgba(102, 178, 255, 0.4)" } },
+        data: HOLD_NAMES.map((n, i) => ({ name: n, value: p.hold[i] }))
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 14. 右②：下一步最佳动作（DOM 卡片 3 张） ===== */
+  function renderActions(p) {
+    const box = $("pf-actions");
+    box.innerHTML = "";
+    p.actions.forEach((a, i) => {
+      const el = document.createElement("article");
+      el.className = "pf-action";
+      el.innerHTML =
+        '<div class="pf-action-no">0' + (i + 1) + '</div>' +
+        '<div class="pf-action-main">' +
+          '<div class="pf-action-title">' + a.title + '</div>' +
+          '<div class="pf-action-why">' + a.why + '</div>' +
+        '</div>' +
+        '<div class="pf-action-resp"><b>' + fmtDec(a.resp, 1) + '%</b><span>预期响应率</span></div>';
+      box.appendChild(el);
+    });
+  }
+
+  /* ===== 15. 底部：客群洞察跑马灯（切换后重启滚动） ===== */
+  function renderMarquee(p) {
+    const html = p.news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("pf-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+
+  /* ===== 16. 客群切换器：全页过渡到新客群档案 ===== */
+  let curIdx = 1; /* 默认展示 新中产客群 */
+  function applyProfile(idx) {
+    curIdx = (idx + PROFILES.length) % PROFILES.length;
+    const p = PROFILES[curIdx];
+    /* 页头对象信息 */
+    $("pf-seg-name").textContent = p.name;
+    $("pf-seg-size").textContent = fmtDec(p.size, 1);
+    $("pf-seg-aum").textContent = fmtDec(p.aumTotal, 1);
+    $("pf-seg-model").textContent = p.model;
+    $("pf-switch-name").textContent = p.name;
+    $("pf-switch-idx").textContent = (curIdx + 1) + " / " + PROFILES.length;
+    /* 画像带 */
+    setStatTargets(p);
+    renderTags(p);
+    /* 图表与 DOM 面板整体过渡 */
+    ageChart.setOption(ageOption(p));
+    demoChart.setOption(demoOption(p));
+    assetChart.setOption(assetOption(p));
+    funnelChart.setOption(funnelOption(p));
+    renderFlows(p);
+    clockChart.setOption(clockOption(p));
+    productChart.setOption(productOption(p));
+    holdChart.setOption(holdOption(p));
+    renderActions(p);
+    renderMarquee(p);
+  }
+  $("pf-btn-prev").addEventListener("click", () => applyProfile(curIdx - 1));
+  $("pf-btn-next").addEventListener("click", () => applyProfile(curIdx + 1));
+  applyProfile(curIdx);
+
+  /* ===== 17. 实时感：当前时段活跃度微抖动 + 核心数字微跳变 ===== */
+  setInterval(() => {
+    const p = PROFILES[curIdx];
+    const h = new Date().getHours();
+    p.clock[h] = Math.max(1, Math.round(p.clock[h] + rndf(-1.4, 1.8)));
+    clockChart.setOption(clockOption(p));
+  }, 5000);
+  setInterval(() => {
+    const p = PROFILES[curIdx];
+    p.stats.cust = +(p.stats.cust + rndf(0.005, 0.03)).toFixed(2);
+    p.stats.mau = +Math.min(99, Math.max(5, p.stats.mau + rndf(-0.12, 0.15))).toFixed(1);
+    p.stats.churn = +Math.max(0.1, p.stats.churn + rndf(-0.012, 0.012)).toFixed(2);
+    setStatTargets(p);
+  }, 6000);
+})();
+</script>
+</body>
+</html>

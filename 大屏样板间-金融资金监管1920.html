@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 金融资金监管</title>
+<style>
+  :root {
+    --rg-bg: #0a1e3c;
+    --rg-panel: rgba(13, 34, 64, 0.72);
+    --rg-border: rgba(86, 150, 224, 0.28);
+    --rg-text: #e6f1ff;
+    --rg-muted: #8fa7c8;
+    --rg-cyan: #3fe1ff;
+    --rg-blue: #4b7dff;
+    --rg-green: #38e6b0;
+    --rg-gold: #ffc857;
+    --rg-red: #ff6680;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--rg-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .rg-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(63, 225, 255, 0.10), transparent 42%),
+      radial-gradient(circle at 90% 10%, rgba(255, 102, 128, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(35, 96, 172, 0.28), transparent 55%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--rg-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 424px 1fr 424px;
+    grid-template-rows: 78px 108px 1fr 64px;
+    gap: 14px;
+    padding: 14px 18px 16px;
+  }
+
+  .rg-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .rg-error.is-visible { display: block; }
+
+  /* ===== 顶部标题栏 ===== */
+  .rg-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px;
+  }
+  .rg-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 200, 87, 0.55) 18%, rgba(63, 225, 255, 0.9) 50%, rgba(255, 200, 87, 0.55) 82%, transparent);
+    box-shadow: 0 0 14px rgba(63, 225, 255, 0.5);
+  }
+  .rg-title-wrap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -54%); text-align: center; white-space: nowrap; }
+  .rg-title {
+    display: flex; align-items: center; gap: 20px;
+    font-size: 34px; font-weight: 700; letter-spacing: 0.22em;
+    background: linear-gradient(180deg, #ffffff 25%, #9fe9ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(63, 225, 255, 0.32));
+  }
+  .rg-title i { position: relative; flex: none; width: 120px; height: 10px; }
+  .rg-title i::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px;
+    background: linear-gradient(270deg, var(--rg-cyan), rgba(63, 225, 255, 0.05));
+  }
+  .rg-title i::after {
+    content: ""; position: absolute; right: 8px; top: 1px; width: 8px; height: 8px;
+    background: var(--rg-gold); transform: rotate(45deg); box-shadow: 0 0 8px var(--rg-gold);
+    animation: rgDot 2s ease-in-out infinite;
+  }
+  .rg-title i.is-r { transform: scaleX(-1); }
+  @keyframes rgDot { 50% { opacity: 0.3; } }
+  .rg-title-sub { margin-top: 3px; font-size: 11px; letter-spacing: 0.62em; color: #5f88b8; text-indent: 0.62em; }
+  .rg-clock { display: flex; align-items: baseline; gap: 12px; font-variant-numeric: tabular-nums; }
+  .rg-clock-time {
+    font: 700 30px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 14px rgba(63, 225, 255, 0.45);
+  }
+  .rg-clock-date { font-size: 13px; color: var(--rg-muted); letter-spacing: 0.08em; }
+  .rg-badge {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 13px; color: #ffe3a6; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid rgba(255, 200, 87, 0.38); background: rgba(60, 46, 16, 0.4);
+  }
+  .rg-badge b { color: #fff; font-variant-numeric: tabular-nums; }
+  .rg-badge i {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--rg-green);
+    box-shadow: 0 0 0 3px rgba(56, 230, 176, 0.15), 0 0 10px var(--rg-green);
+    animation: rgBreath 2s ease-in-out infinite;
+  }
+  @keyframes rgBreath { 50% { opacity: 0.35; transform: scale(0.82); } }
+
+  /* ===== KPI 行 ===== */
+  .rg-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .rg-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rg-border); border-radius: 12px; background: var(--rg-panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  }
+  .rg-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 42px; height: 3px;
+    background: linear-gradient(90deg, var(--rg-cyan), transparent);
+  }
+  .rg-kpi.is-warn::before { background: linear-gradient(90deg, var(--rg-red), transparent); }
+  .rg-kpi.is-warn { border-color: rgba(255, 102, 128, 0.35); }
+  .rg-kpi-label { font-size: 13px; letter-spacing: 0.14em; color: var(--rg-muted); }
+  .rg-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .rg-kpi-val {
+    font: 700 30px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #f4faff; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4);
+  }
+  .rg-kpi.is-warn .rg-kpi-val { color: #ffd7de; text-shadow: 0 0 12px rgba(255, 102, 128, 0.5); }
+  .rg-kpi-unit { font-size: 12px; color: #6fb9e8; }
+  .rg-kpi-delta { font-size: 12px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .rg-kpi-delta.is-good { color: var(--rg-green); }
+  .rg-kpi-delta.is-bad { color: var(--rg-red); }
+
+  /* ===== 面板通用 ===== */
+  .rg-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .rg-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--rg-border); border-radius: 12px; background: var(--rg-panel);
+    display: flex; flex-direction: column;
+  }
+  .rg-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(63, 225, 255, 0.22), rgba(63, 225, 255, 0.04) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .rg-panel-head i { flex: none; width: 5px; height: 16px; background: var(--rg-cyan); box-shadow: 0 0 8px var(--rg-cyan); transform: skewX(-12deg); }
+  .rg-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .rg-panel-head .rg-panel-en { font-size: 10px; letter-spacing: 0.22em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rg-panel-head .rg-panel-scope { margin-left: auto; font-size: 12px; color: var(--rg-gold); white-space: nowrap; padding-right: 2px; }
+  .rg-chart { flex: 1; min-height: 0; }
+
+  /* ===== 中央：违规资金预警实时流 ===== */
+  .rg-flow { flex: 1.05; }
+  .rg-flow-head-row {
+    flex: none; display: grid; grid-template-columns: 0.72fr 1.35fr 1fr 0.92fr 0.62fr; gap: 8px;
+    padding: 9px 18px 7px; font-size: 12px; letter-spacing: 0.12em; color: #6fb9e8;
+    border-bottom: 1px solid rgba(86, 150, 224, 0.25);
+  }
+  .rg-flow-head-row span:nth-child(4) { text-align: right; }
+  .rg-flow-head-row span:nth-child(5) { text-align: center; }
+  .rg-flow-view { flex: 1; min-height: 0; overflow: hidden; }
+  .rg-flow-list { margin: 0; padding: 0; list-style: none; }
+  .rg-flow-list li {
+    display: grid; grid-template-columns: 0.72fr 1.35fr 1fr 0.92fr 0.62fr; gap: 8px;
+    height: 36px; align-items: center; padding: 0 18px; font-size: 13px; color: #cfe3fa;
+    border-bottom: 1px dashed rgba(86, 150, 224, 0.12); font-variant-numeric: tabular-nums;
+  }
+  .rg-flow-list li:nth-child(odd) { background: rgba(24, 56, 100, 0.25); }
+  .rg-flow-list li.is-severe {
+    background: rgba(96, 22, 40, 0.35);
+    box-shadow: inset 3px 0 0 var(--rg-red), inset 0 0 22px rgba(255, 102, 128, 0.12);
+  }
+  .rg-flow-time { color: var(--rg-muted); }
+  .rg-flow-type { color: #9fd6ff; }
+  .rg-flow-amt { color: var(--rg-gold); font-weight: 700; text-align: right; }
+  .rg-lv { justify-self: center; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 999px; letter-spacing: 0.08em; }
+  .rg-lv.is-s { color: #ffd7de; border: 1px solid rgba(255, 102, 128, 0.65); background: rgba(255, 102, 128, 0.16); box-shadow: 0 0 10px rgba(255, 102, 128, 0.35); }
+  .rg-lv.is-h { color: #ffe6b0; border: 1px solid rgba(255, 200, 87, 0.55); background: rgba(255, 200, 87, 0.12); }
+  .rg-lv.is-m { color: #a9ecff; border: 1px solid rgba(63, 225, 255, 0.45); background: rgba(63, 225, 255, 0.10); }
+
+  /* ===== 右上：评级分布 + 高风险 TOP5 ===== */
+  .rg-risk { flex: 1.08; }
+  .rg-risk-body { flex: 1; min-height: 0; display: flex; padding: 2px 8px 8px 0; }
+  .rg-risk-chart { flex: 0 0 47%; min-width: 0; }
+  .rg-top5 { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 6px 8px 2px 2px; }
+  .rg-top5-cap { flex: none; display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; letter-spacing: 0.14em; color: var(--rg-muted); padding: 2px 4px 8px; }
+  .rg-top5-cap b { font-weight: 400; font-size: 10px; letter-spacing: 0.18em; color: #5f88b8; }
+  .rg-top5-list { margin: 0; padding: 0; list-style: none; flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
+  .rg-top5-list li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .rg-top5-rank {
+    flex: none; width: 20px; height: 20px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #06182f;
+    background: linear-gradient(180deg, #ff8ba0, var(--rg-red));
+  }
+  .rg-top5-list li:nth-child(n+4) .rg-top5-rank { background: linear-gradient(180deg, #ffdf9a, #e0a531); }
+  .rg-top5-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #dcecff; }
+  .rg-top5-bar { flex: none; width: 74px; height: 6px; border-radius: 3px; background: rgba(63, 120, 200, 0.18); overflow: hidden; }
+  .rg-top5-bar i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #8a2438, var(--rg-red)); box-shadow: 0 0 8px rgba(255, 102, 128, 0.5); transition: width 0.8s ease; }
+  .rg-top5-score { flex: none; width: 40px; text-align: right; font-weight: 700; color: var(--rg-red); font-variant-numeric: tabular-nums; }
+
+  /* ===== 底部跑马灯 ===== */
+  .rg-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--rg-border); border-radius: 12px; background: var(--rg-panel);
+  }
+  .rg-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #06182f;
+    background: linear-gradient(120deg, var(--rg-gold), #e8a83a 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .rg-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #06182f; animation: rgDot 1.6s ease-in-out infinite; }
+  .rg-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .rg-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: rgMarquee 48s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .rg-marquee-track b { color: var(--rg-gold); font-weight: 700; }
+  .rg-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(63, 225, 255, 0.55); }
+  @keyframes rgMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .rg-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="rg-stage" id="rg-stage">
+    <!-- mockflag:begin --><div class="rg-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="rg-error" id="rg-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶部标题栏 -->
+    <header class="rg-header">
+      <div class="rg-clock" aria-label="实时时钟">
+        <span class="rg-clock-time" id="rg-clock-time">--:--:--</span>
+        <span class="rg-clock-date" id="rg-clock-date">----年--月--日 星期-</span>
+      </div>
+      <div class="rg-title-wrap">
+        <div class="rg-title"><i></i><span>金融资金监管</span><i class="is-r"></i></div>
+        <div class="rg-title-sub">FINANCIAL FUND SUPERVISION</div>
+      </div>
+      <div class="rg-badge"><i></i>监测范围 · 在管机构 <b>128</b> 家 · 演示数据</div>
+    </header>
+
+    <!-- KPI 行 -->
+    <section class="rg-kpis" aria-label="核心监管指标" id="rg-kpis"></section>
+
+    <!-- 左列 -->
+    <div class="rg-col">
+      <section class="rg-panel">
+        <header class="rg-panel-head"><i></i><h2>资本充足性监测</h2><span class="rg-panel-en">CAPITAL ADEQUACY</span><span class="rg-panel-scope">季报口径</span></header>
+        <div class="rg-chart" id="rg-chart-capital" role="img" aria-label="三类机构资本充足性分组条形图，红线为监管底线"></div>
+      </section>
+      <section class="rg-panel">
+        <header class="rg-panel-head"><i></i><h2>拨备与流动性覆盖</h2><span class="rg-panel-en">COVERAGE GAUGES</span><span class="rg-panel-scope">全辖均值</span></header>
+        <div class="rg-chart" id="rg-chart-gauge" role="img" aria-label="拨备覆盖率与流动性覆盖率双仪表盘"></div>
+      </section>
+    </div>
+
+    <!-- 中央 -->
+    <div class="rg-col">
+      <section class="rg-panel">
+        <header class="rg-panel-head"><i></i><h2>资金归集监控</h2><span class="rg-panel-en">FUND POOLING MONITOR</span><span class="rg-panel-scope" id="rg-pool-sum">--</span></header>
+        <div class="rg-chart" id="rg-chart-pool" role="img" aria-label="今日分时资金归集金额面积图与昨日对比虚线"></div>
+      </section>
+      <section class="rg-panel rg-flow">
+        <header class="rg-panel-head"><i></i><h2>违规资金预警实时流</h2><span class="rg-panel-en">VIOLATION ALERT STREAM</span><span class="rg-panel-scope" id="rg-flow-count">--</span></header>
+        <div class="rg-flow-head-row"><span>时间</span><span>机构</span><span>预警类型</span><span>金额（万元）</span><span>等级</span></div>
+        <div class="rg-flow-view"><ul class="rg-flow-list" id="rg-flow-list"></ul></div>
+      </section>
+    </div>
+
+    <!-- 右列 -->
+    <div class="rg-col">
+      <section class="rg-panel rg-risk">
+        <header class="rg-panel-head"><i></i><h2>机构风险评级分布</h2><span class="rg-panel-en">RISK RATING</span><span class="rg-panel-scope">128 家</span></header>
+        <div class="rg-risk-body">
+          <div class="rg-risk-chart rg-chart" id="rg-chart-rating" role="img" aria-label="A/B/C/D 级机构数环形分布图"></div>
+          <div class="rg-top5">
+            <div class="rg-top5-cap">高风险机构 TOP5<b>RISK SCORE</b></div>
+            <ul class="rg-top5-list" id="rg-top5-list"></ul>
+          </div>
+        </div>
+      </section>
+      <section class="rg-panel">
+        <header class="rg-panel-head"><i></i><h2>预警处置漏斗</h2><span class="rg-panel-en">DISPOSAL FUNNEL</span><span class="rg-panel-scope">本月累计</span></header>
+        <div class="rg-chart" id="rg-chart-funnel" role="img" aria-label="预警产生到处置完成的五级漏斗图"></div>
+      </section>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="rg-marquee" aria-label="监管动态">
+      <div class="rg-marquee-tag"><i></i>监管动态</div>
+      <div class="rg-marquee-view"><div class="rg-marquee-track" id="rg-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("rg-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("rg-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    gold: "#ffc857", red: "#ff6680", violet: "#9870ff"
+  };
+  const rnd = (min, max) => Math.round(min + Math.random() * (max - min));
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 静态监管数据（地方金融监管局 · 演示口径） ===== */
+  /* 资本充足性：三指标 × 三类机构（%），监管底线 10.5 / 8.5 / 7.5 */
+  const CAP_INDIC = ["资本充足率", "一级资本充足率", "核心一级资本充足率"];
+  const CAP_DATA = {
+    "城商行": [13.2, 11.4, 9.8],
+    "农商行": [12.4, 10.6, 9.1],
+    "村镇银行": [11.1, 9.2, 8.0]
+  };
+  /* 拨备覆盖率 / 流动性覆盖率仪表（阈值 150% / 100%，低于阈值变红） */
+  const GAUGES = [
+    { name: "拨备覆盖率", value: 183.6, threshold: 150, max: 320, jit: [-2.4, 2.2] },
+    { name: "流动性覆盖率", value: 126.8, threshold: 100, max: 240, jit: [-1.8, 1.7] }
+  ];
+  /* 机构风险评级分布（合计 128 家） */
+  const RATINGS = [
+    { name: "A 级（正常）", value: 58, color: C.green },
+    { name: "B 级（关注）", value: 44, color: C.cyan },
+    { name: "C 级（风险）", value: 19, color: C.gold },
+    { name: "D 级（高危）", value: 7, color: C.red }
+  ];
+  /* 高风险机构 TOP5（风险分 0-100，越高越危险） */
+  const TOP5 = [
+    { name: "汇达村镇银行", score: 92.4 },
+    { name: "鑫州农商行", score: 88.1 },
+    { name: "润泽小贷公司", score: 84.6 },
+    { name: "恒信融资担保", score: 79.3 },
+    { name: "东岭村镇银行", score: 76.8 }
+  ];
+  /* 预警处置漏斗（本月累计，笔） */
+  const FUNNEL = [
+    { name: "预警产生", value: 486 },
+    { name: "初筛", value: 352 },
+    { name: "核查", value: 218 },
+    { name: "立案", value: 96 },
+    { name: "处置完成", value: 74 }
+  ];
+  /* 预警流字典 */
+  const ORGS = [
+    "汇达村镇银行", "鑫州农商行", "城东城商行", "润泽小贷公司", "恒信融资担保",
+    "东岭村镇银行", "临江农商行", "北原城商行", "广汇金融租赁", "安泰典当行",
+    "云溪村镇银行", "华榕城商行"
+  ];
+  const ALERT_TYPES = ["大额拆分", "异常划转", "超限投资", "关联交易"];
+  const LEVELS = [
+    ["严重", "is-s"], ["高", "is-h"], ["高", "is-h"], ["中", "is-m"], ["中", "is-m"], ["中", "is-m"]
+  ];
+  const NEWS = [
+    "《辖内金融机构大额资金异动监测办法（修订稿）》今日正式发布，<b>10 月 1 日</b>起施行",
+    "第三季度现场检查计划已下达：覆盖 <b>21 家</b>机构，重点核查关联交易与股东资金占用",
+    "行政处罚公示：某村镇银行因违规办理大额拆分转账被罚 <b>280 万元</b>，两名责任人警告",
+    "全辖资金归集专线完成升级，报文时延降至 <b>1.2 秒</b>，覆盖率 100%",
+    "D 级机构风险处置进展：<b>2 家</b>已完成增资扩股，1 家进入接管评估程序",
+    "反洗钱模型新增「快进快出」识别规则，试运行以来命中可疑交易 <b>37 笔</b>",
+    "监管指令电子送达系统上线，指令平均签收时长缩短至 <b>0.6 小时</b>"
+  ];
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    document.getElementById("rg-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    document.getElementById("rg-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. KPI 行（缓动跳变 + 语义配色：告警类走红金） ===== */
+  const KPIS = [
+    { label: "在管资金总量", unit: "亿元", target: 3862.4, dec: 1, jit: [0.2, 1.6], delta: "▲ 较昨日 +0.4%", good: true },
+    { label: "今日归集金额", unit: "亿元", target: 96.8, dec: 1, jit: [0.05, 0.5], delta: "▲ 同比 +7.2%", good: true },
+    { label: "今日预警笔数", unit: "笔", target: 47, dec: 0, jit: [0, 1.4], delta: "▲ 较昨日 +6 笔", good: false, warn: true },
+    { label: "待处置预警", unit: "笔", target: 23, dec: 0, jit: [-0.8, 0.9], delta: "▼ 较昨日 -4 笔", good: true, warn: true },
+    { label: "平均处置时长", unit: "小时", target: 5.8, dec: 1, jit: [-0.05, 0.04], delta: "▼ 环比 -0.6 小时", good: true },
+    { label: "监管指令完成率", unit: "%", target: 96.4, dec: 1, jit: [-0.06, 0.08], delta: "▲ 环比 +1.2pct", good: true }
+  ];
+  const kpiWrap = document.getElementById("rg-kpis");
+  KPIS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "rg-kpi" + (k.warn ? " is-warn" : "");
+    card.innerHTML =
+      '<div class="rg-kpi-label">' + k.label + '</div>' +
+      '<div class="rg-kpi-num"><span class="rg-kpi-val">0</span><span class="rg-kpi-unit">' + k.unit + '</span></div>' +
+      '<div class="rg-kpi-delta ' + (k.good ? "is-good" : "is-bad") + '">' + k.delta + '</div>';
+    kpiWrap.appendChild(card);
+    k.node = card.querySelector(".rg-kpi-val");
+    k.cur = 0; /* 从 0 缓动至目标值 */
+  });
+  setInterval(() => { /* 缓动逼近目标 */
+    KPIS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) { k.cur = k.target; } else { k.cur += diff * 0.12; }
+      k.node.textContent = fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+  setInterval(() => { /* 目标值微跳变 */
+    KPIS.forEach((k) => { k.target = Math.max(0, k.target + rndf(k.jit[0], k.jit[1])); });
+  }, 6000);
+
+  /* ===== 6. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(102, 178, 255, 0.4)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  function makeChart(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    return echarts.init(el);
+  }
+
+  /* ===== 7. 左上：资本充足性分组条形（红线 = 10.5% 总资本底线） ===== */
+  const CAP_COLORS = { "城商行": [C.cyan, "#155a8f"], "农商行": ["#7cf0cd", "#1d7a5c"], "村镇银行": [C.gold, "#8a5f18"] };
+  const capitalChart = makeChart("rg-chart-capital");
+  capitalChart.setOption({
+    tooltip: tip({ trigger: "axis", valueFormatter: (v) => fmtDec(v, 1) + "%" }),
+    legend: {
+      top: 6, itemWidth: 12, itemHeight: 8, itemGap: 16,
+      textStyle: { color: "#cfe6ff", fontSize: 11 }
+    },
+    grid: { left: 12, right: 18, top: 40, bottom: 6, containLabel: true },
+    xAxis: {
+      type: "category", data: CAP_INDIC,
+      axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+      axisTick: { show: false },
+      axisLabel: { color: C.muted, fontSize: 11, interval: 0 }
+    },
+    yAxis: {
+      type: "value", name: "%", max: 16,
+      nameTextStyle: { color: C.muted, fontSize: 10 },
+      splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+      axisLabel: { color: C.muted, fontSize: 11 }
+    },
+    series: Object.keys(CAP_DATA).map((org, i) => ({
+      name: org, type: "bar", barWidth: 13, barGap: "40%", data: CAP_DATA[org],
+      itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad(CAP_COLORS[org][0], CAP_COLORS[org][1]) },
+      markLine: i === 0 ? {
+        symbol: "none", silent: true,
+        lineStyle: { color: C.red, type: "dashed", width: 1.6, shadowColor: "rgba(255, 102, 128, 0.6)", shadowBlur: 6 },
+        label: { color: "#ffb3c0", fontSize: 11, formatter: "监管底线 10.5%", position: "insideEndTop" },
+        data: [{ yAxis: 10.5 }]
+      } : undefined
+    })),
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 8. 左下：拨备覆盖率 / 流动性覆盖率双仪表（低于阈值变红） ===== */
+  const gaugeChart = makeChart("rg-chart-gauge");
+  function gaugeSeries(g, centerX) {
+    const ok = g.value >= g.threshold;
+    const main = ok ? C.cyan : C.red;
+    return {
+      type: "gauge", center: [centerX, "58%"], radius: "86%",
+      startAngle: 210, endAngle: -30, min: 0, max: g.max,
+      progress: { show: true, width: 10, roundCap: true, itemStyle: { color: ok ? hGrad("#155a8f", C.cyan) : hGrad("#8a2438", C.red) } },
+      axisLine: { lineStyle: { width: 10, color: [[1, "rgba(63, 120, 200, 0.16)"]] } },
+      axisTick: { show: false },
+      splitLine: { length: 6, distance: 4, lineStyle: { color: "rgba(143, 167, 200, 0.55)", width: 1 } },
+      axisLabel: { show: false },
+      pointer: { length: "58%", width: 3.6, itemStyle: { color: main } },
+      anchor: { show: true, size: 7, itemStyle: { color: main, shadowColor: main, shadowBlur: 8 } },
+      title: { offsetCenter: [0, "42%"], color: C.muted, fontSize: 12 },
+      detail: {
+        offsetCenter: [0, "68%"], fontSize: 20, fontWeight: 700,
+        color: ok ? "#f4faff" : "#ffd7de",
+        formatter: (v) => fmtDec(v, 1) + "%"
+      },
+      data: [{ value: g.value, name: g.name + "（阈值 " + g.threshold + "%）" }]
+    };
+  }
+  function gaugeOption() {
+    return { series: [gaugeSeries(GAUGES[0], "27%"), gaugeSeries(GAUGES[1], "75%")], animationDurationUpdate: 600 };
+  }
+  gaugeChart.setOption(gaugeOption());
+
+  /* ===== 9. 中央上：资金归集监控大曲线（今日面积 + 昨日虚线，逐步推进） ===== */
+  const POOL_TIMES = [];
+  for (let h = 0; h < 24; h++) { POOL_TIMES.push(pad(h) + ":00", pad(h) + ":30"); }
+  /* 昨日全天曲线：双峰形态（上午 10 点 / 下午 15 点归集高峰，单位：亿元/半小时） */
+  const POOL_YDAY = POOL_TIMES.map((t, i) => {
+    const base = 0.6
+      + 4.6 * Math.exp(-Math.pow(i - 20, 2) / 26)   /* 10:00 峰 */
+      + 3.8 * Math.exp(-Math.pow(i - 30, 2) / 30)   /* 15:00 峰 */
+      + (i > 14 && i < 38 ? 1.2 : 0.1);
+    return +(base + rndf(-0.25, 0.3)).toFixed(2);
+  });
+  /* 今日曲线铺满的桶数 = 按 new Date() 实时换算的半小时桶（含当前所在桶）：
+     如 16:10 → 16*2+0+1 = 33 桶，覆盖 00:00~16:00；16:40 → 34 桶，覆盖至 16:30 */
+  function poolBucketCount() {
+    const d = new Date();
+    return Math.min(POOL_TIMES.length, Math.max(1, d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0) + 1));
+  }
+  let poolIdx = poolBucketCount();
+  const POOL_TODAY_FULL = POOL_YDAY.map((v) => +(Math.max(0.2, v * rndf(0.92, 1.22))).toFixed(2));
+  const poolToday = () => POOL_TODAY_FULL.slice(0, poolIdx);
+  const poolChart = makeChart("rg-chart-pool");
+  const poolSumNode = document.getElementById("rg-pool-sum");
+  function updatePoolSum() {
+    const sum = poolToday().reduce((s, v) => s + v, 0);
+    poolSumNode.textContent = "今日累计 " + fmtDec(sum, 1) + " 亿元";
+  }
+  poolChart.setOption({
+    tooltip: tip({ trigger: "axis", valueFormatter: (v) => (v == null ? "—" : fmtDec(v, 2) + " 亿元") }),
+    legend: {
+      top: 6, right: 16, itemWidth: 14, itemHeight: 8, itemGap: 18,
+      textStyle: { color: "#cfe6ff", fontSize: 11 },
+      data: ["今日归集", "昨日归集"]
+    },
+    grid: { left: 14, right: 20, top: 38, bottom: 8, containLabel: true },
+    xAxis: {
+      type: "category", boundaryGap: false, data: POOL_TIMES,
+      axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+      axisTick: { show: false },
+      axisLabel: { color: C.muted, fontSize: 11, interval: 7 }
+    },
+    yAxis: {
+      type: "value", name: "亿元 / 半小时",
+      nameTextStyle: { color: C.muted, fontSize: 10, padding: [0, 0, 0, 26] },
+      splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+      axisLabel: { color: C.muted, fontSize: 11 }
+    },
+    series: [
+      {
+        /* 昨日全天 48 桶完整常显的对比虚线 */
+        name: "昨日归集", type: "line", smooth: true, symbol: "none", data: POOL_YDAY, z: 2,
+        silent: false, emphasis: { disabled: true },
+        lineStyle: { width: 2, type: [6, 5], color: "rgba(255, 200, 87, 0.85)" },
+        itemStyle: { color: C.gold }
+      },
+      {
+        name: "今日归集", type: "line", smooth: true, data: poolToday(), z: 3,
+        symbol: "circle", symbolSize: 4, showSymbol: false,
+        lineStyle: { width: 2.8, color: C.cyan, shadowColor: "rgba(63, 225, 255, 0.6)", shadowBlur: 12 },
+        itemStyle: { color: "#eafcff", borderColor: C.cyan, borderWidth: 2 },
+        areaStyle: { color: vGrad("rgba(63, 225, 255, 0.34)", "rgba(63, 225, 255, 0.02)") },
+        endLabel: {
+          show: true, color: C.cyan, fontSize: 12, fontWeight: 700,
+          formatter: (p) => fmtDec(p.value, 2)
+        }
+      }
+    ],
+    animationDurationUpdate: 600
+  });
+  updatePoolSum();
+  setInterval(() => { /* 按真实时钟推进（每跨过一个半小时桶自动 +1 格）+ 当前桶微抖动 */
+    poolIdx = Math.max(poolIdx, poolBucketCount());
+    const last = poolIdx - 1;
+    POOL_TODAY_FULL[last] = +(Math.max(0.2, POOL_TODAY_FULL[last] + rndf(-0.18, 0.24))).toFixed(2);
+    poolChart.setOption({ series: [{ data: POOL_YDAY }, { data: poolToday() }] });
+    updatePoolSum();
+  }, 4000);
+
+  /* ===== 10. 中央下：违规资金预警实时流（DOM 上滚，严重级红光） ===== */
+  const flowList = document.getElementById("rg-flow-list");
+  const flowCount = document.getElementById("rg-flow-count");
+  let flowTotal = KPIS[2].target; /* 与「今日预警笔数」联动起点 */
+  function makeFlowRow() {
+    const d = new Date();
+    const lv = LEVELS[rnd(0, LEVELS.length - 1)];
+    const li = document.createElement("li");
+    if (lv[1] === "is-s") li.className = "is-severe";
+    li.innerHTML =
+      '<span class="rg-flow-time">' + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()) + '</span>' +
+      '<span>' + ORGS[rnd(0, ORGS.length - 1)] + '</span>' +
+      '<span class="rg-flow-type">' + ALERT_TYPES[rnd(0, ALERT_TYPES.length - 1)] + '</span>' +
+      '<span class="rg-flow-amt">' + fmt(rnd(120, 12600)) + '</span>' +
+      '<span class="rg-lv ' + lv[1] + '">' + lv[0] + '</span>';
+    return li;
+  }
+  for (let i = 0; i < 9; i++) flowList.appendChild(makeFlowRow());
+  function updateFlowCount() { flowCount.textContent = "今日 " + fmt(flowTotal) + " 笔"; }
+  updateFlowCount();
+  setInterval(() => {
+    flowTotal += 1;
+    KPIS[2].target = flowTotal; /* KPI 联动 */
+    updateFlowCount();
+    flowList.insertBefore(makeFlowRow(), flowList.firstChild);
+    while (flowList.children.length > 11) flowList.removeChild(flowList.lastChild);
+  }, 3200);
+
+  /* ===== 11. 右上：机构风险评级环形分布 + 高风险 TOP5 ===== */
+  const ratingChart = makeChart("rg-chart-rating");
+  ratingChart.setOption({
+    tooltip: tip({ valueFormatter: (v) => fmt(v) + " 家" }),
+    legend: {
+      bottom: 4, left: "center", itemWidth: 10, itemHeight: 10, itemGap: 10,
+      textStyle: { color: "#cfe6ff", fontSize: 11 },
+      formatter: (name) => name.slice(0, 3)
+    },
+    series: [{
+      type: "pie", radius: ["46%", "68%"], center: ["50%", "44%"],
+      itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+      label: { show: false },
+      emphasis: { label: { show: true, color: "#eaf6ff", fontSize: 13, fontWeight: 700, formatter: "{b}\n{c} 家" } },
+      data: RATINGS.map((r) => ({ name: r.name, value: r.value, itemStyle: { color: r.color } }))
+    }, {
+      type: "pie", radius: ["76%", "77%"], center: ["50%", "44%"], silent: true,
+      label: { show: false },
+      itemStyle: { color: "rgba(255, 102, 128, 0.3)" },
+      data: [1]
+    }],
+    animationDurationUpdate: 600
+  });
+  /* 评级环巡游高亮 */
+  let ratingIdx = -1;
+  setInterval(() => {
+    ratingChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    ratingIdx = (ratingIdx + 1) % RATINGS.length;
+    ratingChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: ratingIdx });
+  }, 2600);
+
+  const top5List = document.getElementById("rg-top5-list");
+  function renderTop5() {
+    TOP5.sort((a, b) => b.score - a.score);
+    top5List.innerHTML = TOP5.map((t, i) =>
+      "<li>" +
+        '<span class="rg-top5-rank">' + (i + 1) + '</span>' +
+        '<span class="rg-top5-name">' + t.name + '</span>' +
+        '<span class="rg-top5-bar"><i style="width:' + t.score.toFixed(1) + '%"></i></span>' +
+        '<span class="rg-top5-score">' + t.score.toFixed(1) + '</span>' +
+      "</li>"
+    ).join("");
+  }
+  renderTop5();
+
+  /* ===== 12. 右下：预警处置漏斗（标层间转化率） ===== */
+  const funnelChart = makeChart("rg-chart-funnel");
+  funnelChart.setOption({
+    tooltip: tip({
+      formatter: (p) => {
+        const i = FUNNEL.findIndex((f) => f.name === p.name);
+        const conv = i <= 0 ? "—" : (FUNNEL[i].value / FUNNEL[i - 1].value * 100).toFixed(1) + "%";
+        return p.name + "：<b>" + fmt(p.value) + "</b> 笔<br/>上级转化率：" + conv;
+      }
+    }),
+    color: [C.red, C.gold, C.cyan, C.blue, C.green],
+    series: [{
+      type: "funnel", sort: "descending",
+      left: 24, right: 130, top: 16, bottom: 12,
+      min: 0, max: FUNNEL[0].value, minSize: "14%", gap: 4,
+      itemStyle: { borderColor: "#0a1e3c", borderWidth: 1, opacity: 0.92 },
+      label: { position: "inside", color: "#06182f", fontSize: 12, fontWeight: 700, formatter: (p) => p.name + " " + fmt(p.value) },
+      labelLine: { show: false },
+      emphasis: { label: { fontSize: 13 } },
+      data: FUNNEL.map((f, i) => ({
+        name: f.name, value: f.value,
+        label: i === 0 ? undefined : {
+          position: "right", color: "#cfe6ff", fontSize: 11, fontWeight: 400,
+          formatter: () => f.name + " " + fmt(f.value) + " · 转化 " + (f.value / FUNNEL[i - 1].value * 100).toFixed(0) + "%"
+        }
+      }))
+    }],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 13. 底部跑马灯（内容 x2 无缝循环） ===== */
+  const marqueeTrack = document.getElementById("rg-marquee-track");
+  const marqueeHtml = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  marqueeTrack.innerHTML = marqueeHtml + marqueeHtml;
+
+  /* ===== 14. 数据微刷新（仪表抖动 / 风险分微调 / 漏斗推进） ===== */
+  setInterval(() => {
+    GAUGES.forEach((g) => {
+      g.value = Math.min(g.max - 8, Math.max(g.threshold - 28, g.value + rndf(g.jit[0], g.jit[1])));
+    });
+    gaugeChart.setOption(gaugeOption());
+    TOP5.forEach((t) => { t.score = Math.min(98, Math.max(60, t.score + rndf(-0.6, 0.6))); });
+    renderTop5();
+  }, 7000);
+  setInterval(() => { /* 漏斗各级缓慢累加，保持单调递减形态 */
+    FUNNEL[0].value += rnd(1, 3);
+    for (let i = 1; i < FUNNEL.length; i++) {
+      if (Math.random() < 0.6) FUNNEL[i].value = Math.min(FUNNEL[i - 1].value, FUNNEL[i].value + rnd(0, 2));
+    }
+    funnelChart.setOption({ series: [{ max: FUNNEL[0].value, data: FUNNEL.map((f, i) => ({
+      name: f.name, value: f.value,
+      label: i === 0 ? undefined : {
+        position: "right", color: "#cfe6ff", fontSize: 11, fontWeight: 400,
+        formatter: () => f.name + " " + fmt(f.value) + " · 转化 " + (f.value / FUNNEL[i - 1].value * 100).toFixed(0) + "%"
+      }
+    })) }] });
+  }, 12000);
+})();
+</script>
+</body>
+</html>

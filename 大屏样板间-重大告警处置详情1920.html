@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 重大告警处置详情</title>
+<style>
+  :root {
+    --ic-bg: #081426;
+    --ic-panel: rgba(11, 26, 48, 0.78);
+    --ic-border: rgba(86, 150, 224, 0.26);
+    --ic-text: #e6f1ff;
+    --ic-muted: #8fa7c8;
+    --ic-cyan: #3fe1ff;
+    --ic-blue: #4b7dff;
+    --ic-green: #38e6b0;
+    --ic-amber: #ffb054;
+    --ic-red: #ff6680;
+    --ic-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #030b17; }
+  body {
+    color: var(--ic-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .ic-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 50% -6%, rgba(255, 102, 128, 0.10), transparent 40%),
+      radial-gradient(circle at 8% 14%, rgba(63, 225, 255, 0.07), transparent 42%),
+      radial-gradient(ellipse at 50% 118%, rgba(30, 78, 140, 0.30), transparent 55%),
+      linear-gradient(rgba(86, 150, 224, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.05) 1px, transparent 1px),
+      var(--ic-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 430px 1fr 430px;
+    grid-template-rows: 82px 92px 1fr 58px;
+    gap: 14px;
+    padding: 14px 18px 16px;
+  }
+
+  .ic-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .ic-error.is-visible { display: block; }
+
+  /* ===== 顶栏：内容页头（面包屑 + 事件标题 + 徽章 | 持续时长 + 时钟） ===== */
+  .ic-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .ic-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 102, 128, 0.55) 16%, rgba(63, 225, 255, 0.85) 50%, rgba(255, 102, 128, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(255, 102, 128, 0.35);
+  }
+  .ic-head-left { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .ic-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--ic-muted); }
+  .ic-crumb b { font-weight: 400; color: #6fb9e8; }
+  .ic-crumb i { font-style: normal; color: rgba(143, 167, 200, 0.55); }
+  .ic-crumb em { font-style: normal; color: #d7e8ff; }
+  .ic-head-title-row { display: flex; align-items: center; gap: 14px; white-space: nowrap; }
+  .ic-head-title {
+    font-size: 27px; font-weight: 700; letter-spacing: 0.04em;
+    background: linear-gradient(180deg, #ffffff 30%, #ffc9d4 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(255, 102, 128, 0.28));
+    font-variant-numeric: tabular-nums;
+  }
+  .ic-tag {
+    flex: none; display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
+    padding: 5px 13px; border-radius: 999px;
+  }
+  .ic-tag.is-p1 {
+    color: #ffdbe2; border: 1px solid rgba(255, 102, 128, 0.6);
+    background: rgba(255, 102, 128, 0.16);
+    box-shadow: 0 0 14px rgba(255, 102, 128, 0.25), inset 0 0 10px rgba(255, 102, 128, 0.12);
+  }
+  .ic-tag.is-p1 i { font-style: normal; width: 8px; height: 8px; border-radius: 2px; background: var(--ic-red); transform: rotate(45deg); box-shadow: 0 0 8px var(--ic-red); }
+  .ic-tag.is-status { color: #ffe3bd; border: 1px solid rgba(255, 176, 84, 0.55); background: rgba(255, 176, 84, 0.13); }
+  .ic-tag.is-status i {
+    font-style: normal; width: 9px; height: 9px; border-radius: 50%; background: var(--ic-amber);
+    box-shadow: 0 0 0 3px rgba(255, 176, 84, 0.16), 0 0 10px var(--ic-amber);
+    animation: icBreath 1.8s ease-in-out infinite;
+  }
+  @keyframes icBreath { 50% { opacity: 0.3; transform: scale(0.8); } }
+
+  .ic-head-right { display: flex; align-items: center; gap: 26px; flex: none; }
+  .ic-elapsed { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+  .ic-elapsed-label { font-size: 12px; letter-spacing: 0.2em; color: var(--ic-muted); }
+  .ic-elapsed-time {
+    font: 700 34px/1 var(--ic-mono); letter-spacing: 0.05em; font-variant-numeric: tabular-nums;
+    color: #ff8298; text-shadow: 0 0 16px rgba(255, 102, 128, 0.55);
+  }
+  .ic-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 24px; border-left: 1px solid rgba(86, 150, 224, 0.25); }
+  .ic-clock-time { font: 700 26px/1 var(--ic-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4); }
+  .ic-clock-date { font-size: 12px; color: var(--ic-muted); letter-spacing: 0.08em; }
+
+  /* ===== 概要带：5 枚小 KPI ===== */
+  .ic-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .ic-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--ic-border); border-radius: 12px; background: var(--ic-panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  }
+  .ic-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 42px; height: 3px;
+    background: linear-gradient(90deg, var(--ic-red), transparent);
+  }
+  .ic-kpi-label { font-size: 13px; letter-spacing: 0.14em; color: var(--ic-muted); }
+  .ic-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .ic-kpi-val { font: 700 29px/1 var(--ic-mono); color: #f4faff; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.35); }
+  .ic-kpi-unit { font-size: 12px; color: #6fb9e8; }
+  .ic-kpi.is-red .ic-kpi-val { color: #ff8298; text-shadow: 0 0 12px rgba(255, 102, 128, 0.5); }
+  .ic-kpi.is-amber .ic-kpi-val { color: #ffcf96; text-shadow: 0 0 12px rgba(255, 176, 84, 0.45); }
+  .ic-kpi.is-sla-danger .ic-kpi-val { color: #ff6680; animation: icSlaFlash 1s steps(2, start) infinite; }
+  @keyframes icSlaFlash { 50% { opacity: 0.35; } }
+
+  /* ===== 面板通用 ===== */
+  .ic-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .ic-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--ic-border); border-radius: 12px; background: var(--ic-panel);
+    display: flex; flex-direction: column;
+  }
+  .ic-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(255, 102, 128, 0.16), rgba(63, 225, 255, 0.05) 58%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .ic-panel-head i { flex: none; width: 5px; height: 16px; background: var(--ic-red); box-shadow: 0 0 8px var(--ic-red); transform: skewX(-12deg); }
+  .ic-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .ic-panel-head .ic-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ic-panel-head .ic-panel-scope { margin-left: auto; font-size: 12px; color: var(--ic-cyan); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .ic-chart { flex: 1; min-height: 0; }
+
+  /* ===== 左①：影响面评估清单 ===== */
+  .ic-impact { flex: 0.92; }
+  .ic-impact-head-row {
+    flex: none; display: grid; grid-template-columns: 1.5fr 0.8fr 0.9fr; gap: 8px;
+    padding: 9px 18px 7px; font-size: 12px; letter-spacing: 0.12em; color: #6fb9e8;
+    border-bottom: 1px solid rgba(86, 150, 224, 0.25);
+  }
+  .ic-impact-head-row span:last-child { text-align: right; }
+  .ic-impact-list { flex: 1; min-height: 0; margin: 0; padding: 0 0 4px; list-style: none; display: flex; flex-direction: column; justify-content: space-evenly; }
+  .ic-impact-list li {
+    display: grid; grid-template-columns: 1.5fr 0.8fr 0.9fr; gap: 8px; align-items: center;
+    padding: 0 18px; font-size: 13.5px; color: #d7e8ff; font-variant-numeric: tabular-nums;
+  }
+  .ic-impact-list li:nth-child(odd) { background: rgba(24, 56, 100, 0.22); }
+  .ic-impact-sys { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
+  .ic-impact-sys i { font-style: normal; flex: none; width: 6px; height: 6px; border-radius: 50%; background: #35558a; }
+  .ic-impact-list li.is-outage .ic-impact-sys i { background: var(--ic-red); box-shadow: 0 0 7px var(--ic-red); }
+  .ic-impact-list li.is-degraded .ic-impact-sys i { background: var(--ic-amber); box-shadow: 0 0 7px var(--ic-amber); }
+  .ic-impact-list li.is-delay .ic-impact-sys i { background: var(--ic-cyan); box-shadow: 0 0 7px var(--ic-cyan); }
+  .ic-impact-badge {
+    justify-self: start; font-size: 11.5px; font-weight: 700; letter-spacing: 0.12em;
+    padding: 3px 11px; border-radius: 999px;
+  }
+  li.is-outage .ic-impact-badge { color: #ffd4dc; background: rgba(255, 102, 128, 0.16); border: 1px solid rgba(255, 102, 128, 0.55); }
+  li.is-degraded .ic-impact-badge { color: #ffe3bd; background: rgba(255, 176, 84, 0.13); border: 1px solid rgba(255, 176, 84, 0.5); }
+  li.is-delay .ic-impact-badge { color: #c9f4ff; background: rgba(63, 225, 255, 0.1); border: 1px solid rgba(63, 225, 255, 0.4); }
+  .ic-impact-dur { text-align: right; color: var(--ic-muted); font-size: 12.5px; }
+  .ic-impact-dur b { font-weight: 700; color: #e8f3ff; font-family: var(--ic-mono); letter-spacing: 0.03em; }
+
+  /* ===== 中央：处置过程时间线 ===== */
+  .ic-tl-sum {
+    flex: none; display: flex; align-items: center; justify-content: center; gap: 12px;
+    padding: 11px 16px 9px; font-size: 13px; letter-spacing: 0.06em;
+    border-bottom: 1px solid rgba(86, 150, 224, 0.22);
+  }
+  .ic-tl-sum span {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 14px; border-radius: 999px; font-variant-numeric: tabular-nums;
+    border: 1px solid rgba(86, 150, 224, 0.28); background: rgba(16, 36, 66, 0.6); color: #cfe3fa;
+  }
+  .ic-tl-sum b { font-family: var(--ic-mono); font-size: 15px; }
+  .ic-tl-sum .is-done { border-color: rgba(56, 230, 176, 0.4); } .ic-tl-sum .is-done b { color: var(--ic-green); }
+  .ic-tl-sum .is-doing { border-color: rgba(255, 176, 84, 0.45); } .ic-tl-sum .is-doing b { color: var(--ic-amber); }
+  .ic-tl-sum .is-todo b { color: #9db6d8; }
+  .ic-tl-view { flex: 1; min-height: 0; overflow: hidden; position: relative; padding: 6px 26px 10px 30px; }
+  .ic-tl-view::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 46px; pointer-events: none;
+    background: linear-gradient(180deg, transparent, rgba(8, 20, 38, 0.9));
+  }
+  .ic-tl { position: relative; margin: 0; padding: 6px 0 0 26px; list-style: none; transition: transform 0.7s cubic-bezier(0.3, 0.8, 0.3, 1); }
+  .ic-tl::before {
+    content: ""; position: absolute; left: 7px; top: 10px; bottom: 6px; width: 2px;
+    background: linear-gradient(180deg, rgba(255, 102, 128, 0.75), rgba(86, 150, 224, 0.35) 55%, rgba(86, 150, 224, 0.12));
+  }
+  .ic-tl li { position: relative; display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 7px 0; }
+  .ic-tl-dot {
+    position: absolute; left: -26px; top: 50%; transform: translate(-6px, -50%);
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid #35558a; background: #0b1a30;
+  }
+  li.is-done .ic-tl-dot { border-color: var(--ic-green); background: rgba(56, 230, 176, 0.25); box-shadow: 0 0 8px rgba(56, 230, 176, 0.6); }
+  li.is-doing .ic-tl-dot {
+    border-color: var(--ic-amber); background: var(--ic-amber);
+    box-shadow: 0 0 0 4px rgba(255, 176, 84, 0.2), 0 0 14px var(--ic-amber);
+    animation: icBreath 1.4s ease-in-out infinite;
+  }
+  .ic-tl-time { flex: none; width: 76px; font: 700 15px/1.2 var(--ic-mono); color: #9db6d8; font-variant-numeric: tabular-nums; letter-spacing: 0.03em; }
+  li.is-done .ic-tl-time { color: #cfe3fa; }
+  li.is-doing .ic-tl-time { color: #ffe3bd; }
+  .ic-tl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 8px 14px; border-radius: 9px; border: 1px solid rgba(86, 150, 224, 0.16); background: rgba(15, 33, 60, 0.45); }
+  li.is-doing .ic-tl-main { border-color: rgba(255, 176, 84, 0.45); background: rgba(64, 44, 16, 0.32); box-shadow: inset 0 0 18px rgba(255, 176, 84, 0.08); }
+  li.is-todo .ic-tl-main { opacity: 0.58; }
+  .ic-tl-act { font-size: 14.5px; font-weight: 700; letter-spacing: 0.04em; color: #eaf4ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ic-tl-who { font-size: 12px; color: var(--ic-muted); letter-spacing: 0.05em; }
+  .ic-tl-who b { font-weight: 400; color: #6fb9e8; }
+  .ic-tl-state { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; padding: 4px 12px; border-radius: 999px; white-space: nowrap; }
+  li.is-done .ic-tl-state { color: #baf5df; border: 1px solid rgba(56, 230, 176, 0.45); background: rgba(56, 230, 176, 0.1); }
+  li.is-doing .ic-tl-state { color: #ffe3bd; border: 1px solid rgba(255, 176, 84, 0.55); background: rgba(255, 176, 84, 0.12); animation: icSlaFlash 1.6s ease-in-out infinite; }
+  li.is-todo .ic-tl-state { color: #8aa3c6; border: 1px solid rgba(120, 150, 190, 0.3); background: rgba(60, 84, 120, 0.18); }
+
+  /* ===== 右②：协同工单与资源 ===== */
+  .ic-coop { flex: 1.08; }
+  .ic-coop-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 10px; }
+  .ic-ticket {
+    flex: none; display: flex; align-items: center; gap: 12px;
+    padding: 8px 12px; border-radius: 9px;
+    border: 1px solid rgba(86, 150, 224, 0.2); background: rgba(16, 36, 66, 0.5);
+  }
+  .ic-ticket-no { flex: none; font: 700 13px/1 var(--ic-mono); color: var(--ic-cyan); letter-spacing: 0.04em; }
+  .ic-ticket-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .ic-ticket-title { font-size: 13.5px; font-weight: 700; color: #e6f1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ic-ticket-team { font-size: 11.5px; color: var(--ic-muted); letter-spacing: 0.05em; }
+  .ic-ticket-state { flex: none; font-size: 11.5px; font-weight: 700; letter-spacing: 0.1em; padding: 3px 10px; border-radius: 999px; }
+  .ic-ticket-state.is-doing { color: #ffe3bd; border: 1px solid rgba(255, 176, 84, 0.55); background: rgba(255, 176, 84, 0.12); }
+  .ic-ticket-state.is-done { color: #baf5df; border: 1px solid rgba(56, 230, 176, 0.45); background: rgba(56, 230, 176, 0.1); }
+  .ic-crew-cap { flex: none; display: flex; align-items: baseline; justify-content: space-between; padding: 4px 2px 0; font-size: 12px; letter-spacing: 0.16em; color: var(--ic-muted); }
+  .ic-crew-cap b { font-weight: 400; font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; }
+  .ic-crew { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ic-crew-item {
+    display: flex; align-items: center; gap: 10px; padding: 0 12px;
+    border-radius: 9px; border: 1px solid rgba(86, 150, 224, 0.18); background: rgba(16, 36, 66, 0.42);
+  }
+  .ic-crew-avatar {
+    flex: none; width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #06182f;
+    background: linear-gradient(160deg, #7deaff, #2a9cc9);
+  }
+  .ic-crew-item.is-lead .ic-crew-avatar { background: linear-gradient(160deg, #ffb9c7, #e05c77); }
+  .ic-crew-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .ic-crew-name { font-size: 13.5px; font-weight: 700; color: #eaf4ff; white-space: nowrap; }
+  .ic-crew-role { font-size: 11px; color: var(--ic-muted); letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ic-crew-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ic-green); box-shadow: 0 0 0 3px rgba(56, 230, 176, 0.14), 0 0 8px var(--ic-green); animation: icBreath 2.2s ease-in-out infinite; }
+
+  /* ===== 底部：处置指令播报跑马灯 ===== */
+  .ic-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid rgba(255, 102, 128, 0.32); border-radius: 12px; background: var(--ic-panel);
+  }
+  .ic-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a0710;
+    background: linear-gradient(120deg, #ff8298, #e04a68 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .ic-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a0710; animation: icBreath 1.4s ease-in-out infinite; }
+  .ic-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .ic-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: icMarquee 44s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .ic-marquee-track b { color: #ff8298; font-weight: 700; }
+  .ic-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(255, 102, 128, 0.5); }
+  @keyframes icMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .ic-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="ic-stage" id="ic-stage">
+    <!-- mockflag:begin --><div class="ic-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="ic-error" id="ic-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏：内容页头 -->
+    <header class="ic-header">
+      <div class="ic-head-left">
+        <div class="ic-crumb"><b>运行指挥调度</b><i>›</i><em>事件详情</em></div>
+        <div class="ic-head-title-row">
+          <div class="ic-head-title">INC-20260724-002 · 账务核心主库同步延迟</div>
+          <span class="ic-tag is-p1"><i></i>P1 重大</span>
+          <span class="ic-tag is-status"><i></i>处置中</span>
+        </div>
+      </div>
+      <div class="ic-head-right">
+        <div class="ic-elapsed">
+          <span class="ic-elapsed-label">事件持续时长</span>
+          <span class="ic-elapsed-time" id="ic-elapsed-time">--:--:--</span>
+        </div>
+        <div class="ic-clock" aria-label="实时时钟">
+          <span class="ic-clock-time" id="ic-clock-time">--:--:--</span>
+          <span class="ic-clock-date" id="ic-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 概要带：5 枚小 KPI -->
+    <section class="ic-kpis" aria-label="事件概要指标" id="ic-kpis"></section>
+
+    <!-- 左栏：影响面 -->
+    <div class="ic-col">
+      <section class="ic-panel ic-impact">
+        <header class="ic-panel-head"><i></i><h2>影响面评估</h2><span class="ic-panel-en">IMPACT SCOPE</span><span class="ic-panel-scope">6 个系统</span></header>
+        <div class="ic-impact-head-row"><span>受影响系统</span><span>影响程度</span><span>持续时长</span></div>
+        <ul class="ic-impact-list" id="ic-impact-list"></ul>
+      </section>
+      <section class="ic-panel">
+        <header class="ic-panel-head"><i></i><h2>关键指标受损曲线</h2><span class="ic-panel-en">METRIC DAMAGE</span><span class="ic-panel-scope" id="ic-recover-scope">--</span></header>
+        <div class="ic-chart" id="ic-chart-metric" role="img" aria-label="核心交易成功率跌落与恢复曲线"></div>
+      </section>
+    </div>
+
+    <!-- 中央：处置过程时间线 -->
+    <div class="ic-col">
+      <section class="ic-panel">
+        <header class="ic-panel-head"><i></i><h2>处置过程时间线</h2><span class="ic-panel-en">RESPONSE TIMELINE</span><span class="ic-panel-scope">告警触发 14:02:11</span></header>
+        <div class="ic-tl-sum" id="ic-tl-sum"></div>
+        <div class="ic-tl-view"><ul class="ic-tl" id="ic-tl"></ul></div>
+      </section>
+    </div>
+
+    <!-- 右栏：拓扑 + 协同 -->
+    <div class="ic-col">
+      <section class="ic-panel">
+        <header class="ic-panel-head"><i></i><h2>关联系统拓扑</h2><span class="ic-panel-en">SYSTEM TOPOLOGY</span><span class="ic-panel-scope">故障 1 · 波及 6</span></header>
+        <div class="ic-chart" id="ic-chart-topo" role="img" aria-label="核心库、应用与渠道关联拓扑图"></div>
+      </section>
+      <section class="ic-panel ic-coop">
+        <header class="ic-panel-head"><i></i><h2>协同工单与资源</h2><span class="ic-panel-en">COLLABORATION</span><span class="ic-panel-scope">工单 3 · 在位 4</span></header>
+        <div class="ic-coop-body">
+          <div id="ic-tickets"></div>
+          <div class="ic-crew-cap">值守人员在位<b>ON-DUTY CREW</b></div>
+          <div class="ic-crew" id="ic-crew"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部：处置指令播报 -->
+    <section class="ic-marquee" aria-label="处置指令播报">
+      <div class="ic-marquee-tag"><i></i>处置指令播报</div>
+      <div class="ic-marquee-view"><div class="ic-marquee-track" id="ic-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("ic-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("ic-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    amber: "#ffb054", red: "#ff6680"
+  };
+  const rnd = (min, max) => Math.round(min + Math.random() * (max - min));
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  /* ===== 3. 顶部时钟 + 事件持续时长计时器 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  /* 演示口径：以打开页面时刻回推 1h23m 作为事件起点，保证任何时刻打开都在"处置中" */
+  const EVENT_START = Date.now() - (1 * 3600 + 23 * 60 + 11) * 1000;
+  const elapsedNode = document.getElementById("ic-elapsed-time");
+  function fmtHms(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    return pad(Math.floor(sec / 3600)) + ":" + pad(Math.floor(sec / 60) % 60) + ":" + pad(sec % 60);
+  }
+  function tickClock() {
+    const d = new Date();
+    document.getElementById("ic-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    document.getElementById("ic-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+    elapsedNode.textContent = fmtHms((Date.now() - EVENT_START) / 1000);
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 4. 概要带：5 枚小 KPI（交易量累加 / SLA 倒计时告警） ===== */
+  const kpiWrap = document.getElementById("ic-kpis");
+  let hitTxn = 128463;                    /* 受影响交易量（笔，实时累加） */
+  let slaLeft = 33 * 60 + 42;             /* SLA 剩余（秒，低于 30 分钟红闪） */
+  const KPIS = [
+    { id: "sys",  label: "影响系统数",   unit: "个", cls: "is-red" },
+    { id: "txn",  label: "受影响交易量", unit: "笔", cls: "is-red" },
+    { id: "chan", label: "降级渠道数",   unit: "条", cls: "is-amber" },
+    { id: "crew", label: "参与处置人数", unit: "人", cls: "" },
+    { id: "sla",  label: "SLA 剩余时间", unit: "",   cls: "is-amber" }
+  ];
+  KPIS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "ic-kpi " + k.cls;
+    card.innerHTML =
+      '<div class="ic-kpi-label">' + k.label + '</div>' +
+      '<div class="ic-kpi-num"><span class="ic-kpi-val" id="ic-kpi-' + k.id + '">--</span>' +
+      (k.unit ? '<span class="ic-kpi-unit">' + k.unit + '</span>' : "") + "</div>";
+    kpiWrap.appendChild(card);
+    k.card = card;
+  });
+  const kpiNode = (id) => document.getElementById("ic-kpi-" + id);
+  function renderKpis() {
+    kpiNode("sys").textContent = "6";
+    kpiNode("txn").textContent = fmt(hitTxn);
+    kpiNode("chan").textContent = "3";
+    kpiNode("crew").textContent = "12";
+    kpiNode("sla").textContent = fmtHms(slaLeft);
+    const slaCard = KPIS[4].card;
+    slaCard.classList.toggle("is-sla-danger", slaLeft < 30 * 60);
+  }
+  renderKpis();
+  setInterval(() => { hitTxn += rnd(18, 96); kpiNode("txn").textContent = fmt(hitTxn); }, 2600);
+  setInterval(() => { slaLeft = Math.max(0, slaLeft - 1); kpiNode("sla").textContent = fmtHms(slaLeft); KPIS[4].card.classList.toggle("is-sla-danger", slaLeft < 30 * 60); }, 1000);
+
+  /* ===== 5. 左①：影响面评估清单（持续时长实时累加） ===== */
+  const IMPACTS = [
+    { sys: "账务核心主库",   lv: "中断", cls: "is-outage",   off: 0 },
+    { sys: "账务应用集群",   lv: "降级", cls: "is-degraded", off: 3 * 60 },
+    { sys: "手机银行渠道",   lv: "降级", cls: "is-degraded", off: 6 * 60 },
+    { sys: "网银渠道",       lv: "降级", cls: "is-degraded", off: 6 * 60 },
+    { sys: "支付清算前置",   lv: "延迟", cls: "is-delay",    off: 10 * 60 },
+    { sys: "对账批处理",     lv: "延迟", cls: "is-delay",    off: 13 * 60 }
+  ];
+  const impactList = document.getElementById("ic-impact-list");
+  impactList.innerHTML = IMPACTS.map((it) =>
+    '<li class="' + it.cls + '">' +
+      '<span class="ic-impact-sys"><i></i>' + it.sys + '</span>' +
+      '<span class="ic-impact-badge">' + it.lv + '</span>' +
+      '<span class="ic-impact-dur">已持续 <b>--:--</b></span>' +
+    "</li>"
+  ).join("");
+  const impactDurNodes = impactList.querySelectorAll(".ic-impact-dur b");
+  function tickImpactDur() {
+    const base = (Date.now() - EVENT_START) / 1000;
+    IMPACTS.forEach((it, i) => {
+      const s = Math.max(0, base - it.off);
+      impactDurNodes[i].textContent = pad(Math.floor(s / 3600)) + "h" + pad(Math.floor(s / 60) % 60) + "m";
+    });
+  }
+  tickImpactDur();
+  setInterval(tickImpactDur, 5000);
+
+  /* ===== 6. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(255, 130, 152, 0.4)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const charts = [];
+  function makeChart(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const c = echarts.init(el);
+    charts.push(c);
+    return c;
+  }
+
+  /* ===== 7. 左②：核心交易成功率 跌落-恢复曲线（事件前后 2 小时） ===== */
+  /* 13:00 起每 5 分钟一个点：事件 14:02 触发 → 最低 61.8% → 当前恢复到 92% 上下 */
+  const M_LABELS = [];
+  const M_DATA = [];
+  for (let i = 0; i <= 29; i++) {
+    const min = 13 * 60 + i * 5;                       /* 13:00 → 15:25 */
+    M_LABELS.push(pad(Math.floor(min / 60)) + ":" + pad(min % 60));
+    let v;
+    if (i <= 12) v = 99.85 + rndf(-0.12, 0.1);          /* 事件前平稳 */
+    else if (i === 13) v = 84.2;                        /* 14:05 开始跌落 */
+    else if (i === 14) v = 66.5;
+    else if (i <= 16) v = 61.8 + rndf(0, 1.2);          /* 谷底 */
+    else if (i <= 20) v = 64 + (i - 16) * 4.6;          /* 降级止血缓升 */
+    else v = 82.8 + (i - 20) * 1.55 + rndf(-0.3, 0.3);  /* 切换后爬升 */
+    M_DATA.push(+v.toFixed(1));
+  }
+  let recoverPct = M_DATA[M_DATA.length - 1];
+  const recoverScope = document.getElementById("ic-recover-scope");
+  const metricChart = makeChart("ic-chart-metric");
+  function metricOption() {
+    return {
+      tooltip: tip({ trigger: "axis", valueFormatter: (v) => v + " %" }),
+      grid: { left: 10, right: 16, top: 34, bottom: 6, containLabel: true },
+      xAxis: {
+        type: "category", boundaryGap: false, data: M_LABELS,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+        axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 10, interval: 5 }
+      },
+      yAxis: {
+        type: "value", min: 50, max: 105, name: "成功率 %",
+        nameTextStyle: { color: C.muted, fontSize: 10 },
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+        axisLabel: { color: C.muted, fontSize: 10 }
+      },
+      series: [{
+        name: "核心交易成功率", type: "line", smooth: 0.35, symbol: "none", data: M_DATA,
+        lineStyle: { width: 2.5, color: C.red, shadowColor: "rgba(255, 102, 128, 0.55)", shadowBlur: 12 },
+        areaStyle: { color: vGrad("rgba(255, 102, 128, 0.3)", "rgba(255, 102, 128, 0.02)") },
+        markLine: {
+          symbol: "none",
+          lineStyle: { color: C.amber, type: "dashed", width: 1.5 },
+          label: { color: "#ffe3bd", fontSize: 11, formatter: "告警触发 14:02" },
+          data: [{ xAxis: "14:00" }]
+        },
+        markPoint: {
+          symbol: "roundRect", symbolSize: [96, 26],
+          itemStyle: { color: "rgba(56, 230, 176, 0.16)", borderColor: C.green, borderWidth: 1 },
+          label: { color: "#baf5df", fontSize: 11, fontWeight: 700 },
+          data: [{ coord: [M_LABELS.length - 1, M_DATA[M_DATA.length - 1]], value: "已恢复至 " + recoverPct + "%", label: { offset: [-48, -2] } }]
+        }
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+  metricChart.setOption(metricOption());
+  function renderRecoverScope() { recoverScope.textContent = "当前恢复 " + recoverPct.toFixed(1) + "%"; }
+  renderRecoverScope();
+  setInterval(() => { /* 末点缓慢向 99% 爬升，示意持续恢复 */
+    recoverPct = Math.min(99.2, recoverPct + rndf(0.05, 0.3));
+    M_DATA[M_DATA.length - 1] = +recoverPct.toFixed(1);
+    metricChart.setOption(metricOption());
+    renderRecoverScope();
+  }, 6000);
+
+  /* ===== 8. 中央：处置过程时间线（每 6 秒推进一个节点，示范演示感） ===== */
+  const STEPS = [
+    { t: "14:02:11", act: "告警触发：主库复制延迟突破阈值",   who: "智能监控平台", role: "自动" },
+    { t: "14:03:40", act: "值班确认告警，初判影响账务链路",   who: "张伟",        role: "一线值班" },
+    { t: "14:06:22", act: "初步定界：主库复制延迟 > 300s",    who: "李静",        role: "DBA" },
+    { t: "14:10:05", act: "升级 P1 重大事件，启动应急预案",   who: "王强",        role: "值班经理" },
+    { t: "14:14:30", act: "战情通报，拉起跨组协同作战群",     who: "赵敏",        role: "指挥调度" },
+    { t: "14:20:18", act: "网银/手机银行渠道限流降级",        who: "陈涛",        role: "应用运维" },
+    { t: "14:28:47", act: "主库 IO 队列分析，定位存储坏盘",   who: "李静",        role: "DBA" },
+    { t: "14:36:12", act: "存储热备盘切换，IO 恢复正常",      who: "周琳",        role: "存储组" },
+    { t: "14:48:00", act: "同步链路重建，逐步追平复制延迟",   who: "李静",        role: "DBA" },
+    { t: "15:05:00", act: "渠道限流逐步放开，观察成功率",     who: "陈涛",        role: "应用运维" },
+    { t: "15:20:00", act: "全链路交易验证（转账/代发/清算）", who: "孙倩",        role: "测试值守" },
+    { t: "15:35:00", act: "恢复通报，事件由 P1 降级",         who: "赵敏",        role: "指挥调度" },
+    { t: "16:00:00", act: "处置复盘材料归档，转问题管理",     who: "王强",        role: "值班经理" }
+  ];
+  const TL_INIT_DOING = 8;                 /* 初始进行中节点下标（前 8 个已完成） */
+  let tlDoing = TL_INIT_DOING;
+  const tlList = document.getElementById("ic-tl");
+  const tlSum = document.getElementById("ic-tl-sum");
+  const tlView = tlList.parentElement;
+  tlList.innerHTML = STEPS.map((s) =>
+    "<li>" +
+      '<span class="ic-tl-dot"></span>' +
+      '<span class="ic-tl-time">' + s.t + '</span>' +
+      '<span class="ic-tl-main">' +
+        '<span class="ic-tl-act">' + s.act + '</span>' +
+        '<span class="ic-tl-who">执行人 ' + s.who + ' <b>· ' + s.role + '</b></span>' +
+      '</span>' +
+      '<span class="ic-tl-state">--</span>' +
+    "</li>"
+  ).join("");
+  const tlItems = tlList.children;
+  function renderTimeline() {
+    for (let i = 0; i < tlItems.length; i++) {
+      const li = tlItems[i];
+      const st = i < tlDoing ? "is-done" : (i === tlDoing ? "is-doing" : "is-todo");
+      li.className = st;
+      li.querySelector(".ic-tl-state").textContent = i < tlDoing ? "完成" : (i === tlDoing ? "进行中" : "待执行");
+    }
+    tlSum.innerHTML =
+      '<span class="is-done">已完成 <b>' + Math.min(tlDoing, STEPS.length) + "</b></span>" +
+      '<span class="is-doing">进行中 <b>' + (tlDoing < STEPS.length ? 1 : 0) + "</b></span>" +
+      '<span class="is-todo">待执行 <b>' + Math.max(0, STEPS.length - tlDoing - 1) + "</b></span>";
+    /* 让"进行中"节点保持在可视区内：整列平移 */
+    const focus = Math.min(tlDoing, STEPS.length - 1);
+    const itemH = tlItems[0].offsetHeight || 74;
+    const viewH = tlView.clientHeight - 16;
+    const want = Math.max(0, (focus + 0.6) * itemH - viewH * 0.62);
+    const maxShift = Math.max(0, STEPS.length * itemH - viewH);
+    tlList.style.transform = "translateY(-" + Math.min(want, maxShift).toFixed(0) + "px)";
+  }
+  renderTimeline();
+  setInterval(() => { /* 每 6 秒推进一个节点；走完后回卷重演 */
+    tlDoing = tlDoing >= STEPS.length - 1 ? TL_INIT_DOING : tlDoing + 1;
+    renderTimeline();
+  }, 6000);
+
+  /* ===== 9. 右①：关联系统拓扑（故障红脉动 / 波及橙 / 正常青） ===== */
+  const ST = { fault: 0, hit: 1, ok: 2 };
+  const TOPO_NODES = [
+    { name: "账务核心主库", x: 300, y: 300, st: ST.fault, size: 34 },
+    { name: "账务核心备库", x: 130, y: 220, st: ST.hit,   size: 22 },
+    { name: "缓存集群",     x: 130, y: 390, st: ST.ok,    size: 20 },
+    { name: "对账系统",     x: 300, y: 470, st: ST.hit,   size: 20 },
+    { name: "账务应用集群", x: 480, y: 300, st: ST.hit,   size: 26 },
+    { name: "总线 ESB",     x: 640, y: 300, st: ST.hit,   size: 24 },
+    { name: "支付网关",     x: 800, y: 140, st: ST.hit,   size: 20 },
+    { name: "手机银行",     x: 830, y: 300, st: ST.hit,   size: 20 },
+    { name: "网银渠道",     x: 800, y: 450, st: ST.hit,   size: 20 },
+    { name: "柜面前置",     x: 640, y: 470, st: ST.ok,    size: 20 }
+  ];
+  const TOPO_LINKS = [
+    ["账务核心主库", "账务核心备库", 1], ["账务核心主库", "缓存集群", 0],
+    ["账务核心主库", "对账系统", 1],     ["账务核心主库", "账务应用集群", 1],
+    ["账务应用集群", "总线 ESB", 1],     ["总线 ESB", "支付网关", 1],
+    ["总线 ESB", "手机银行", 1],         ["总线 ESB", "网银渠道", 1],
+    ["总线 ESB", "柜面前置", 0]
+  ];
+  const NODE_COLOR = [
+    { c: C.red,   b: "rgba(255, 102, 128, 0.95)" },
+    { c: C.amber, b: "rgba(255, 176, 84, 0.9)" },
+    { c: C.cyan,  b: "rgba(63, 225, 255, 0.85)" }
+  ];
+  const topoChart = makeChart("ic-chart-topo");
+  let topoPulse = false;
+  function topoOption() {
+    return {
+      tooltip: tip({ formatter: (p) => (p.dataType === "node" ? p.name + "（" + ["故障", "受波及", "正常"][TOPO_NODES[p.dataIndex].st] + "）" : "") }),
+      series: [{
+        type: "graph", layout: "none",
+        left: 16, right: 16, top: 26, bottom: 14,
+        roam: false, label: { show: true },
+        data: TOPO_NODES.map((n) => {
+          const isFault = n.st === ST.fault;
+          const size = isFault && topoPulse ? n.size + 8 : n.size;
+          return {
+            name: n.name, x: n.x, y: n.y, symbolSize: size,
+            itemStyle: {
+              color: NODE_COLOR[n.st].c,
+              borderColor: "rgba(230, 245, 255, 0.5)", borderWidth: 1,
+              shadowColor: NODE_COLOR[n.st].b,
+              shadowBlur: isFault ? (topoPulse ? 34 : 14) : 10
+            },
+            label: {
+              color: isFault ? "#ffd4dc" : "#cfe3fa",
+              fontSize: isFault ? 12.5 : 11, fontWeight: isFault ? 700 : 400,
+              position: "bottom", distance: 6
+            }
+          };
+        }),
+        links: TOPO_LINKS.map((l) => ({
+          source: l[0], target: l[1],
+          lineStyle: {
+            width: l[2] ? 2 : 1.2,
+            color: l[2] ? "rgba(255, 150, 110, 0.55)" : "rgba(63, 225, 255, 0.3)",
+            curveness: 0.08
+          }
+        })),
+        animationDurationUpdate: 700
+      }]
+    };
+  }
+  topoChart.setOption(topoOption());
+  setInterval(() => { topoPulse = !topoPulse; topoChart.setOption(topoOption()); }, 800);
+
+  /* ===== 10. 右②：协同工单卡 + 值守人员在位 ===== */
+  const TICKETS = [
+    { no: "CO-8841", title: "存储坏盘更换申请",       team: "数据中心硬件组", st: "处理中", cls: "is-doing" },
+    { no: "CO-8842", title: "主库同步链路重建变更",   team: "数据库运维组",   st: "处理中", cls: "is-doing" },
+    { no: "CO-8839", title: "渠道限流降级紧急审批",   team: "渠道运营组",     st: "已完成", cls: "is-done" }
+  ];
+  document.getElementById("ic-tickets").innerHTML = TICKETS.map((t) =>
+    '<div class="ic-ticket" style="margin-bottom:8px">' +
+      '<span class="ic-ticket-no">' + t.no + '</span>' +
+      '<span class="ic-ticket-main">' +
+        '<span class="ic-ticket-title">' + t.title + '</span>' +
+        '<span class="ic-ticket-team">责任组 · ' + t.team + '</span>' +
+      '</span>' +
+      '<span class="ic-ticket-state ' + t.cls + '">' + t.st + '</span>' +
+    "</div>"
+  ).join("");
+  const CREW = [
+    { name: "李静", role: "DBA · 主处置", lead: true },
+    { name: "陈涛", role: "应用运维" },
+    { name: "周琳", role: "存储组" },
+    { name: "赵敏", role: "指挥调度" }
+  ];
+  document.getElementById("ic-crew").innerHTML = CREW.map((p) =>
+    '<div class="ic-crew-item' + (p.lead ? " is-lead" : "") + '">' +
+      '<span class="ic-crew-avatar">' + p.name.charAt(0) + '</span>' +
+      '<span class="ic-crew-main">' +
+        '<span class="ic-crew-name">' + p.name + '</span>' +
+        '<span class="ic-crew-role">' + p.role + '</span>' +
+      '</span>' +
+      '<span class="ic-crew-dot"></span>' +
+    "</div>"
+  ).join("");
+
+  /* ===== 11. 底部：处置指令播报跑马灯（内容 x2 无缝循环） ===== */
+  const ORDERS = [
+    "指挥部指令：渠道限流放开节奏按 <b>20% / 10 分钟</b> 梯次执行，成功率低于 90% 立即回退",
+    "数据库组：同步链路重建完成后，复制延迟需连续 <b>10 分钟 < 5s</b> 方可申报恢复",
+    "渠道组：手机银行公告已挂出，柜面 <b>应急服务通道</b> 保持开启",
+    "监控组：对账务核心链路开启 <b>秒级巡检</b>，任何抖动即时上报作战群",
+    "值班经理：SLA 剩余不足 30 分钟时自动升级至 <b>科技条线总值班</b>",
+    "信息安全：确认本次事件为硬件故障，<b>无外部攻击特征</b>"
+  ];
+  const marqueeTrack = document.getElementById("ic-marquee-track");
+  const marqueeHtml = ORDERS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  marqueeTrack.innerHTML = marqueeHtml + marqueeHtml;
+})();
+</script>
+</body>
+</html>

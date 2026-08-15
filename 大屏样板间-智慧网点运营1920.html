@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 智慧网点运营</title>
+<style>
+  :root {
+    --wd-bg: #0a1e3c;
+    --wd-panel: rgba(13, 34, 64, 0.72);
+    --wd-border: rgba(86, 150, 224, 0.28);
+    --wd-text: #e6f1ff;
+    --wd-muted: #8fa7c8;
+    --wd-cyan: #3fe1ff;
+    --wd-violet: #9870ff;
+    --wd-green: #38e6b0;
+    --wd-gold: #ffc857;
+    --wd-red: #ff6680;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--wd-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .wd-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(152, 112, 255, 0.12), transparent 44%),
+      radial-gradient(circle at 90% 8%, rgba(63, 225, 255, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(72, 52, 168, 0.30), transparent 55%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--wd-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 78px 102px 1fr 1fr 60px;
+    gap: 14px;
+    padding: 14px 18px 16px;
+  }
+
+  .wd-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .wd-error.is-visible { display: block; }
+
+  /* ===== 顶部标题栏 ===== */
+  .wd-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px;
+  }
+  .wd-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(152, 112, 255, 0.6) 18%, rgba(63, 225, 255, 0.9) 50%, rgba(152, 112, 255, 0.6) 82%, transparent);
+    box-shadow: 0 0 14px rgba(120, 150, 255, 0.5);
+  }
+  .wd-title-wrap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -54%); text-align: center; white-space: nowrap; }
+  .wd-title {
+    display: flex; align-items: center; gap: 20px;
+    font-size: 34px; font-weight: 700; letter-spacing: 0.22em;
+    background: linear-gradient(180deg, #ffffff 25%, #c8b3ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(152, 112, 255, 0.35));
+  }
+  .wd-title i { position: relative; flex: none; width: 120px; height: 10px; }
+  .wd-title i::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px;
+    background: linear-gradient(270deg, var(--wd-cyan), rgba(63, 225, 255, 0.05));
+  }
+  .wd-title i::after {
+    content: ""; position: absolute; right: 8px; top: 1px; width: 8px; height: 8px;
+    background: var(--wd-violet); transform: rotate(45deg); box-shadow: 0 0 8px var(--wd-violet);
+    animation: wdDot 2s ease-in-out infinite;
+  }
+  .wd-title i.is-r { transform: scaleX(-1); }
+  @keyframes wdDot { 50% { opacity: 0.3; } }
+  .wd-title-sub { margin-top: 3px; font-size: 11px; letter-spacing: 0.56em; color: #5f88b8; text-indent: 0.56em; }
+  .wd-clock { display: flex; align-items: baseline; gap: 12px; font-variant-numeric: tabular-nums; }
+  .wd-clock-time {
+    font: 700 30px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 14px rgba(63, 225, 255, 0.45);
+  }
+  .wd-clock-date { font-size: 13px; color: var(--wd-muted); letter-spacing: 0.08em; }
+  .wd-badge {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 13px; color: #d9c9ff; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid rgba(152, 112, 255, 0.42); background: rgba(44, 30, 84, 0.45);
+  }
+  .wd-badge i {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--wd-green);
+    box-shadow: 0 0 0 3px rgba(56, 230, 176, 0.15), 0 0 10px var(--wd-green);
+    animation: wdBreath 2s ease-in-out infinite;
+  }
+  .wd-badge.is-closed i { background: var(--wd-gold); box-shadow: 0 0 0 3px rgba(255, 200, 87, 0.15), 0 0 10px var(--wd-gold); }
+  @keyframes wdBreath { 50% { opacity: 0.35; transform: scale(0.82); } }
+
+  /* ===== KPI 行 ===== */
+  .wd-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .wd-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--wd-border); border-radius: 12px; background: var(--wd-panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  }
+  .wd-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 42px; height: 3px;
+    background: linear-gradient(90deg, var(--wd-violet), transparent);
+  }
+  .wd-kpi-label { font-size: 13px; letter-spacing: 0.14em; color: var(--wd-muted); }
+  .wd-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .wd-kpi-val {
+    font: 700 30px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #f4faff; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(152, 112, 255, 0.45);
+  }
+  .wd-kpi-unit { font-size: 12px; color: #a58ef0; }
+  .wd-kpi-delta { font-size: 12px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .wd-kpi-delta.is-good { color: var(--wd-green); }
+  .wd-kpi-delta.is-bad { color: var(--wd-red); }
+
+  /* ===== 面板通用 ===== */
+  .wd-panel {
+    position: relative; min-height: 0; min-width: 0; overflow: hidden;
+    border: 1px solid var(--wd-border); border-radius: 12px; background: var(--wd-panel);
+    display: flex; flex-direction: column;
+  }
+  .wd-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(152, 112, 255, 0.26), rgba(63, 225, 255, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .wd-panel-head i { flex: none; width: 5px; height: 16px; background: var(--wd-cyan); box-shadow: 0 0 8px var(--wd-cyan); transform: skewX(-12deg); }
+  .wd-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .wd-panel-head .wd-panel-en { font-size: 10px; letter-spacing: 0.22em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wd-panel-head .wd-panel-scope { margin-left: auto; font-size: 12px; color: #c3aaff; white-space: nowrap; padding-right: 2px; }
+  .wd-chart { flex: 1; min-height: 0; }
+
+  /* ===== ② 排队叫号看板 ===== */
+  .wd-queue-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 12px; }
+  .wd-wins { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .wd-win {
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    border: 1px solid rgba(94, 168, 255, 0.24); border-radius: 10px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(152, 112, 255, 0.10), transparent 62%), rgba(10, 28, 54, 0.55);
+  }
+  .wd-win.is-vip { border-color: rgba(255, 200, 87, 0.32); background: radial-gradient(ellipse at 50% 0%, rgba(255, 200, 87, 0.10), transparent 62%), rgba(10, 28, 54, 0.55); }
+  .wd-win-tag {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.18em; color: #cfe3fa;
+    padding: 3px 14px; border-radius: 999px; border: 1px solid rgba(94, 168, 255, 0.3);
+    background: rgba(30, 62, 110, 0.5);
+  }
+  .wd-win.is-vip .wd-win-tag { color: #ffe3a6; border-color: rgba(255, 200, 87, 0.38); background: rgba(70, 52, 18, 0.45); }
+  .wd-win-cap { font-size: 11px; letter-spacing: 0.3em; color: #5f88b8; }
+  .wd-win-num {
+    font: 700 40px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #eaf6ff; letter-spacing: 0.06em; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 16px rgba(152, 112, 255, 0.6);
+    transition: transform 0.16s ease-out, opacity 0.16s ease-out;
+  }
+  .wd-win.is-vip .wd-win-num { text-shadow: 0 0 16px rgba(255, 200, 87, 0.55); }
+  .wd-win-num.is-turn { transform: rotateX(-84deg) scale(0.92); opacity: 0.15; }
+  .wd-win-meta { display: flex; gap: 14px; font-size: 12px; color: var(--wd-muted); font-variant-numeric: tabular-nums; }
+  .wd-win-meta b { font-weight: 700; color: var(--wd-cyan); margin-left: 3px; }
+  .wd-win-meta .is-warn b { color: var(--wd-gold); }
+  .wd-strip {
+    flex: none; display: flex; align-items: stretch; height: 40px; overflow: hidden;
+    border: 1px solid rgba(94, 168, 255, 0.22); border-radius: 8px; background: rgba(9, 24, 48, 0.6);
+  }
+  .wd-strip-tag {
+    flex: none; display: flex; align-items: center; padding: 0 16px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.16em; color: #06182f;
+    background: linear-gradient(120deg, var(--wd-violet), #6b4be0 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  }
+  .wd-strip-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .wd-strip-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: wdMarquee 30s linear infinite;
+    font-size: 13px; color: #cfe3fa; font-variant-numeric: tabular-nums;
+  }
+  .wd-strip-track b { color: var(--wd-cyan); font-weight: 700; margin-right: 5px; }
+  .wd-strip-track em { font-style: normal; margin: 0 16px; color: rgba(152, 112, 255, 0.6); }
+
+  /* ===== ③ 设备健康矩阵 ===== */
+  .wd-dev-body { flex: 1; min-height: 0; display: flex; gap: 10px; padding: 12px 14px 12px 16px; }
+  .wd-devgrid { flex: 1.5; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 9px; }
+  .wd-dev {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 4px;
+    padding: 6px 10px; border-radius: 8px;
+    border: 1px solid rgba(94, 168, 255, 0.22); background: rgba(12, 30, 58, 0.6);
+    transition: border-color 0.4s ease, background 0.4s ease;
+  }
+  .wd-dev-name { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: #dcedff; white-space: nowrap; }
+  .wd-dev-name i { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+  .wd-dev-txn { font-size: 11px; color: var(--wd-muted); font-variant-numeric: tabular-nums; }
+  .wd-dev-txn b { font-weight: 700; color: #b9d7f7; }
+  .wd-dev-state { position: absolute; right: 8px; top: 7px; font-size: 10px; letter-spacing: 0.1em; }
+  .wd-dev.is-on { border-color: rgba(56, 230, 176, 0.3); }
+  .wd-dev.is-on .wd-dev-name i { background: var(--wd-green); box-shadow: 0 0 7px var(--wd-green); }
+  .wd-dev.is-on .wd-dev-state { color: var(--wd-green); }
+  .wd-dev.is-busy { border-color: rgba(255, 200, 87, 0.38); background: rgba(52, 42, 16, 0.4); }
+  .wd-dev.is-busy .wd-dev-name i { background: var(--wd-gold); box-shadow: 0 0 7px var(--wd-gold); animation: wdBreath 1.2s ease-in-out infinite; }
+  .wd-dev.is-busy .wd-dev-state { color: var(--wd-gold); }
+  .wd-dev.is-off { border-color: rgba(255, 102, 128, 0.45); background: rgba(70, 20, 32, 0.42); }
+  .wd-dev.is-off .wd-dev-name i { background: var(--wd-red); box-shadow: 0 0 8px var(--wd-red); animation: wdBreath 0.8s ease-in-out infinite; }
+  .wd-dev.is-off .wd-dev-state { color: var(--wd-red); }
+  .wd-dev-side { flex: 0.9; min-width: 0; display: flex; flex-direction: column; }
+  .wd-dev-legend { flex: none; display: flex; justify-content: center; gap: 14px; padding-top: 2px; font-size: 11px; color: var(--wd-muted); }
+  .wd-dev-legend span { display: flex; align-items: center; gap: 5px; }
+  .wd-dev-legend em { font-style: normal; width: 8px; height: 8px; border-radius: 50%; }
+  .wd-dev-legend .is-on em { background: var(--wd-green); }
+  .wd-dev-legend .is-busy em { background: var(--wd-gold); }
+  .wd-dev-legend .is-off em { background: var(--wd-red); }
+
+  /* ===== ④ 柜员效能 + 分时客流 ===== */
+  .wd-teller-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 2px 4px 6px; }
+  .wd-teller-chart { flex: 1.25; min-height: 0; }
+  .wd-flow-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; border-top: 1px dashed rgba(86, 150, 224, 0.22); }
+  .wd-flow-cap { flex: none; display: flex; justify-content: space-between; align-items: baseline; padding: 6px 14px 0; font-size: 12px; letter-spacing: 0.14em; color: var(--wd-muted); }
+  .wd-flow-cap b { font-weight: 400; font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; }
+
+  /* ===== 底部跑马灯 ===== */
+  .wd-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--wd-border); border-radius: 12px; background: var(--wd-panel);
+  }
+  .wd-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #f4efff;
+    background: linear-gradient(120deg, var(--wd-violet), #5a3cd0 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .wd-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #f4efff; animation: wdDot 1.6s ease-in-out infinite; }
+  .wd-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .wd-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: wdMarquee 46s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .wd-marquee-track b { color: #c3aaff; font-weight: 700; }
+  .wd-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(63, 225, 255, 0.55); }
+  @keyframes wdMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .wd-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="wd-stage" id="wd-stage">
+    <!-- mockflag:begin --><div class="wd-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="wd-error" id="wd-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶部标题栏 -->
+    <header class="wd-header">
+      <div class="wd-clock" aria-label="实时时钟">
+        <span class="wd-clock-time" id="wd-clock-time">--:--:--</span>
+        <span class="wd-clock-date" id="wd-clock-date">----年--月--日 星期-</span>
+      </div>
+      <div class="wd-title-wrap">
+        <div class="wd-title"><i></i><span>智慧网点运营</span><i class="is-r"></i></div>
+        <div class="wd-title-sub">SMART BRANCH OPERATION</div>
+      </div>
+      <div class="wd-badge" id="wd-badge"><i></i><span id="wd-badge-text">营业中 · 演示数据</span></div>
+    </header>
+
+    <!-- KPI 行 -->
+    <section class="wd-kpis" aria-label="核心指标" id="wd-kpis"></section>
+
+    <!-- ① 客流热力 -->
+    <section class="wd-panel">
+      <header class="wd-panel-head"><i></i><h2>到店客流热力</h2><span class="wd-panel-en">FOOTFALL HEATMAP</span><span class="wd-panel-scope">最近 7 天 · 半小时桶</span></header>
+      <div class="wd-chart" id="wd-chart-heat" role="img" aria-label="最近7天分时段客流热力图"></div>
+    </section>
+
+    <!-- ② 排队叫号看板 -->
+    <section class="wd-panel">
+      <header class="wd-panel-head"><i></i><h2>排队叫号看板</h2><span class="wd-panel-en">QUEUE &amp; TICKETING</span><span class="wd-panel-scope" id="wd-queue-total">--</span></header>
+      <div class="wd-queue-body">
+        <div class="wd-wins" id="wd-wins"></div>
+        <div class="wd-strip" aria-label="候号滚动条">
+          <div class="wd-strip-tag">候号队列</div>
+          <div class="wd-strip-view"><div class="wd-strip-track" id="wd-strip-track"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ③ 设备健康矩阵 -->
+    <section class="wd-panel">
+      <header class="wd-panel-head"><i></i><h2>自助设备健康矩阵</h2><span class="wd-panel-en">DEVICE HEALTH MATRIX</span><span class="wd-panel-scope" id="wd-dev-scope">--</span></header>
+      <div class="wd-dev-body">
+        <div class="wd-devgrid" id="wd-devgrid" aria-label="14台自助设备状态矩阵"></div>
+        <div class="wd-dev-side">
+          <div class="wd-chart" id="wd-chart-usage" role="img" aria-label="自助设备使用率环形图"></div>
+          <div class="wd-dev-legend">
+            <span class="is-on"><em></em>在线</span>
+            <span class="is-busy"><em></em>繁忙</span>
+            <span class="is-off"><em></em>故障</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ④ 柜员效能 + 分时客流 -->
+    <section class="wd-panel">
+      <header class="wd-panel-head"><i></i><h2>柜员效能 TOP8</h2><span class="wd-panel-en">TELLER PERFORMANCE</span><span class="wd-panel-scope">今日办件量</span></header>
+      <div class="wd-teller-body">
+        <div class="wd-teller-chart" id="wd-chart-teller" role="img" aria-label="柜员办件量排行横向条形图"></div>
+        <div class="wd-flow-wrap">
+          <div class="wd-flow-cap"><span>分时到店客流（人次 / 半小时）</span><b>今日实线 · 上周同日虚线</b></div>
+          <div class="wd-chart" id="wd-chart-flow" role="img" aria-label="今日与上周同日分时客流对比曲线"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 底部跑马灯 -->
+    <section class="wd-marquee" aria-label="网点运营快讯">
+      <div class="wd-marquee-tag"><i></i>运营快讯</div>
+      <div class="wd-marquee-view"><div class="wd-marquee-track" id="wd-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("wd-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("wd-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    cyan: "#3fe1ff", violet: "#9870ff", green: "#38e6b0",
+    gold: "#ffc857", red: "#ff6680", blue: "#4b7dff"
+  };
+  const rnd = (min, max) => Math.round(min + Math.random() * (max - min));
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 静态业务数据（城区旗舰网点 · 演示口径，日客流 800~1200 人次） ===== */
+  /* 营业时段 9:00-17:00 半小时桶（16 桶，标签取桶起点） */
+  const SLOTS = [];
+  for (let h = 9; h < 17; h++) { SLOTS.push(h + ":00", h + ":30"); }
+  /* 半小时客流基线：早高峰 10:00-11:30，午间回落，午后次高峰 14:30-16:00 */
+  const SLOT_BASE = [38, 52, 78, 92, 88, 72, 46, 34, 40, 56, 70, 84, 88, 76, 58, 42];
+
+  /* 最近 7 天标签（今日在最后一行） */
+  const DAY_LABELS = [];
+  const WEEKS = ["日", "一", "二", "三", "四", "五", "六"];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    DAY_LABELS.push(i === 0 ? "今日" : (d.getMonth() + 1) + "/" + d.getDate() + " 周" + WEEKS[d.getDay()]);
+  }
+  /* 当前所处半小时桶（营业时间外取收官桶） */
+  const NOW = new Date();
+  let NOW_SLOT = NOW.getHours() * 2 + (NOW.getMinutes() >= 30 ? 1 : 0) - 18;
+  const IN_BIZ = NOW_SLOT >= 0 && NOW_SLOT < 16;
+  if (!IN_BIZ) NOW_SLOT = 15;
+
+  /* 热力数据：7 天 x 16 桶，周末（行）整体抬升 */
+  const HEAT = [];
+  for (let d = 0; d < 7; d++) {
+    const day = new Date(Date.now() - (6 - d) * 86400000).getDay();
+    const lift = (day === 0 || day === 6) ? 1.18 : 1;
+    for (let s = 0; s < 16; s++) {
+      let v = Math.round(SLOT_BASE[s] * lift * rndf(0.82, 1.16));
+      const item = { value: [s, d, v] };
+      if (d === 6 && s === NOW_SLOT) {
+        item.itemStyle = { borderColor: "#ffffff", borderWidth: 2, shadowColor: "rgba(63, 225, 255, 0.9)", shadowBlur: 12 };
+        item.label = { show: true, color: "#0a1e3c", fontWeight: 700, fontSize: 11 };
+      }
+      HEAT.push(item);
+    }
+  }
+
+  /* 柜员效能 TOP8 */
+  const TELLERS = [
+    { name: "李承峰", value: 86 }, { name: "张晓雯", value: 81 },
+    { name: "王一楠", value: 77 }, { name: "陈思远", value: 70 },
+    { name: "刘可欣", value: 66 }, { name: "赵天宇", value: 61 },
+    { name: "孙梦洁", value: 57 }, { name: "周正浩", value: 52 }
+  ];
+
+  /* 分时客流：上周同日全天 + 今日截至当前桶 */
+  const FLOW_LAST = SLOT_BASE.map((v) => Math.round(v * rndf(0.86, 1.05)));
+  const FLOW_TODAY = SLOT_BASE.map((v, i) =>
+    (i <= NOW_SLOT ? Math.round(v * rndf(0.95, 1.2)) : null));
+
+  /* 叫号窗口 */
+  const WINS = [
+    { key: "corp", name: "对公窗口", prefix: "A", num: 128, wait: 6, avg: 12.5, vip: false },
+    { key: "retail", name: "零售窗口", prefix: "B", num: 342, wait: 18, avg: 5.8, vip: false },
+    { key: "vip", name: "贵宾窗口", prefix: "V", num: 36, wait: 2, avg: 15.2, vip: true },
+    { key: "mix", name: "综合窗口", prefix: "C", num: 207, wait: 9, avg: 7.6, vip: false }
+  ];
+
+  /* 自助设备 14 台 */
+  const DEVICES = [];
+  const DEV_SPEC = [["ATM", 6], ["STM", 4], ["发卡机", 2], ["回单机", 2]];
+  DEV_SPEC.forEach((spec) => {
+    for (let i = 1; i <= spec[1]; i++) {
+      DEVICES.push({ name: spec[0] + "-" + pad(i), state: "on", txn: rnd(60, 320) });
+    }
+  });
+  DEVICES[3].state = "busy";      /* ATM-04 繁忙 */
+  DEVICES[8].state = "off";       /* STM-03 故障 */
+
+  const NEWS = [
+    "贵宾窗口平均等候时长降至 <b>4.8 分钟</b>，客户体验持续优化",
+    "今日 10:30 到店客流峰值 <b>96 人次/半小时</b>，大堂分流预案已启动",
+    "STM-03 自助柜员机出钞模块告警，运维工单 <b>GD20260724-018</b> 已派发，预计 30 分钟内恢复",
+    "手机银行预约取号占比达 <b>41.6%</b>，较上月提升 5.2 个百分点",
+    "本周厅堂营销转化 <b>73 笔</b>，理财产品签约金额 <b>1,860 万元</b>",
+    "适老服务窗口今日已服务 <b>28 位</b>老年客户，爱心座椅、老花镜配备齐全",
+    "今日对公开户平均办理时长 <b>18 分钟</b>，较流程优化前缩短 42%"
+  ];
+
+  /* ===== 4. 顶部时钟 + 营业状态徽章 ===== */
+  const WEEK_FULL = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  const badge = document.getElementById("wd-badge");
+  const badgeText = document.getElementById("wd-badge-text");
+  function tickClock() {
+    const d = new Date();
+    document.getElementById("wd-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    document.getElementById("wd-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEK_FULL[d.getDay()];
+    const open = d.getHours() >= 9 && d.getHours() < 17;
+    badge.classList.toggle("is-closed", !open);
+    badgeText.textContent = (open ? "营业中" : "非营业时段") + " · 演示数据";
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. KPI 行（缓动跳变 + 同比箭头） ===== */
+  const KPIS = [
+    { label: "今日到店客流", unit: "人次", target: 968, dec: 0, jit: [1, 6], delta: "▲ 同比 +7.8%", good: true },
+    { label: "今日开户数", unit: "户", target: 86, dec: 0, jit: [0, 1], delta: "▲ 同比 +12.4%", good: true },
+    { label: "平均等候时长", unit: "分钟", target: 8.6, dec: 1, jit: [-0.25, 0.2], delta: "▼ 同比 -1.9 分钟", good: true },
+    { label: "自助设备在线率", unit: "%", target: 92.9, dec: 1, jit: [0, 0], delta: "▲ 环比 +0.7pct", good: true },
+    { label: "客户满意度 NPS", unit: "分", target: 62, dec: 0, jit: [-0.3, 0.4], delta: "▲ 同比 +3 分", good: true }
+  ];
+  const kpiWrap = document.getElementById("wd-kpis");
+  KPIS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "wd-kpi";
+    card.innerHTML =
+      '<div class="wd-kpi-label">' + k.label + '</div>' +
+      '<div class="wd-kpi-num"><span class="wd-kpi-val">0</span><span class="wd-kpi-unit">' + k.unit + '</span></div>' +
+      '<div class="wd-kpi-delta ' + (k.good ? "is-good" : "is-bad") + '">' + k.delta + '</div>';
+    kpiWrap.appendChild(card);
+    k.node = card.querySelector(".wd-kpi-val");
+    k.cur = 0; /* 从 0 缓动至目标值 */
+  });
+  setInterval(() => { /* 缓动逼近目标 */
+    KPIS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) { k.cur = k.target; } else { k.cur += diff * 0.12; }
+      k.node.textContent = fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+  setInterval(() => { /* 目标值微跳变（在线率由设备矩阵驱动，不在此抖动） */
+    KPIS.forEach((k) => { k.target = Math.max(0, k.target + rndf(k.jit[0], k.jit[1])); });
+  }, 6000);
+
+  /* ===== 6. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(140, 120, 255, 0.4)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  function makeChart(id) {
+    const el = document.getElementById(id);
+    return el ? echarts.init(el) : null;
+  }
+
+  /* ===== 7. ① 客流热力图（蓝→紫→亮，当前时段白框高亮） ===== */
+  const heatChart = makeChart("wd-chart-heat");
+  heatChart.setOption({
+    tooltip: tip({
+      formatter: (p) => DAY_LABELS[p.value[1]] + " " + SLOTS[p.value[0]] + "－半小时到店 <b>" + p.value[2] + "</b> 人次"
+    }),
+    grid: { left: 10, right: 16, top: 14, bottom: 44, containLabel: true },
+    xAxis: {
+      type: "category", data: SLOTS, position: "top",
+      splitArea: { show: false },
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: C.muted, fontSize: 10, interval: 1 }
+    },
+    yAxis: {
+      type: "category", data: DAY_LABELS, inverse: true,
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: {
+        color: (v) => (v === "今日" ? "#c3aaff" : C.muted),
+        fontSize: 11
+      }
+    },
+    visualMap: {
+      min: 20, max: 115, calculable: false,
+      orient: "horizontal", right: 14, bottom: 6,
+      itemWidth: 10, itemHeight: 90,
+      text: ["密", "疏"], textStyle: { color: C.muted, fontSize: 11 },
+      inRange: { color: ["#10325f", "#2b53b4", "#6a56e0", "#9870ff", "#cbaeff", "#efe2ff"] }
+    },
+    series: [{
+      type: "heatmap", data: HEAT,
+      itemStyle: { borderColor: "#0a1e3c", borderWidth: 2, borderRadius: 3 },
+      emphasis: { itemStyle: { shadowColor: "rgba(152, 112, 255, 0.8)", shadowBlur: 12 } }
+    }],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 8. ② 排队叫号看板（号码翻动 + 候号滚动条） ===== */
+  const winsWrap = document.getElementById("wd-wins");
+  const ticketNo = (w) => w.prefix + String(w.num).padStart(4, "0");
+  WINS.forEach((w) => {
+    const card = document.createElement("article");
+    card.className = "wd-win" + (w.vip ? " is-vip" : "");
+    card.innerHTML =
+      '<div class="wd-win-tag">' + w.name + '</div>' +
+      '<div class="wd-win-cap">正在办理</div>' +
+      '<div class="wd-win-num">' + ticketNo(w) + '</div>' +
+      '<div class="wd-win-meta"><span>等待<b class="wd-w"></b>人</span><span class="wd-a-wrap">均耗<b class="wd-a"></b>分</span></div>';
+    winsWrap.appendChild(card);
+    w.numNode = card.querySelector(".wd-win-num");
+    w.waitNode = card.querySelector(".wd-w");
+    w.avgNode = card.querySelector(".wd-a");
+    w.avgWrap = card.querySelector(".wd-a-wrap");
+  });
+  const queueTotal = document.getElementById("wd-queue-total");
+  function paintWins() {
+    let total = 0;
+    WINS.forEach((w) => {
+      total += w.wait;
+      w.waitNode.textContent = w.wait;
+      w.avgNode.textContent = w.avg.toFixed(1);
+      w.avgWrap.classList.toggle("is-warn", w.avg >= 12);
+    });
+    queueTotal.textContent = "全厅候号 " + total + " 人";
+  }
+  paintWins();
+  setInterval(() => {
+    WINS.forEach((w) => {
+      if (Math.random() < 0.55) { /* 叫号推进，号码翻动 */
+        w.num += rnd(1, 2);
+        w.wait = Math.max(0, w.wait + rnd(-2, 1));
+        w.numNode.classList.add("is-turn");
+        setTimeout(((w) => () => {
+          w.numNode.textContent = ticketNo(w);
+          w.numNode.classList.remove("is-turn");
+        })(w), 170);
+      } else {
+        w.wait += rnd(0, 2); /* 新客取号 */
+      }
+      w.avg = Math.min(20, Math.max(3, w.avg + rndf(-0.5, 0.5)));
+    });
+    paintWins();
+  }, 3200);
+
+  /* 候号滚动条：各窗口后续票号拼接，内容 x2 无缝循环 */
+  const stripTrack = document.getElementById("wd-strip-track");
+  function renderStrip() {
+    const items = [];
+    WINS.forEach((w) => {
+      for (let i = 1; i <= Math.min(5, Math.max(1, w.wait)); i++) {
+        items.push("<span><b>" + w.prefix + String(w.num + i).padStart(4, "0") + "</b>" + w.name.slice(0, 2) + "</span><em>›</em>");
+      }
+    });
+    const html = items.join("");
+    stripTrack.innerHTML = html + html;
+  }
+  renderStrip();
+  setInterval(renderStrip, 12000);
+
+  /* ===== 9. ③ 设备健康矩阵（14 台状态灯 + 使用率环） ===== */
+  const devGrid = document.getElementById("wd-devgrid");
+  const devScope = document.getElementById("wd-dev-scope");
+  const STATE_TXT = { on: "在线", busy: "繁忙", off: "故障" };
+  const STATE_CLS = { on: "is-on", busy: "is-busy", off: "is-off" };
+  DEVICES.forEach((dv) => {
+    const cell = document.createElement("div");
+    cell.className = "wd-dev " + STATE_CLS[dv.state];
+    cell.innerHTML =
+      '<div class="wd-dev-name"><i></i>' + dv.name + '</div>' +
+      '<div class="wd-dev-state">' + STATE_TXT[dv.state] + '</div>' +
+      '<div class="wd-dev-txn">今日 <b>' + dv.txn + '</b> 笔</div>';
+    devGrid.appendChild(cell);
+    dv.node = cell;
+    dv.stateNode = cell.querySelector(".wd-dev-state");
+    dv.txnNode = cell.querySelector(".wd-dev-txn b");
+  });
+
+  const usageChart = makeChart("wd-chart-usage");
+  let devUsage = 72.4;
+  function usageOption() {
+    return {
+      title: {
+        text: devUsage.toFixed(1) + "%", subtext: "设备使用率",
+        left: "center", top: "36%",
+        textStyle: { color: "#f4faff", fontSize: 24, fontWeight: 700, fontFamily: '"Bahnschrift", "DIN Alternate", sans-serif' },
+        subtextStyle: { color: C.muted, fontSize: 11 }
+      },
+      tooltip: tip({ valueFormatter: (v) => fmtDec(v, 1) + "%" }),
+      series: [{
+        type: "pie", radius: ["66%", "82%"], center: ["50%", "50%"],
+        startAngle: 90, silent: false,
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+        label: { show: false },
+        data: [
+          { name: "使用中", value: devUsage, itemStyle: { color: vGrad(C.violet, "#4b32b0") } },
+          { name: "空闲", value: 100 - devUsage, itemStyle: { color: "rgba(63, 120, 200, 0.18)" } }
+        ]
+      }, {
+        type: "pie", radius: ["90%", "91%"], center: ["50%", "50%"], silent: true,
+        label: { show: false },
+        itemStyle: { color: "rgba(152, 112, 255, 0.3)" },
+        data: [1]
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+  usageChart.setOption(usageOption());
+
+  function paintDevScope() {
+    const onCnt = DEVICES.filter((d) => d.state !== "off").length;
+    devScope.textContent = "在线 " + onCnt + "/" + DEVICES.length + " 台";
+    KPIS[3].target = onCnt / DEVICES.length * 100; /* 在线率 KPI 联动 */
+  }
+  paintDevScope();
+  setInterval(() => { /* 状态随机翻转 + 交易笔数累加 */
+    const times = rnd(1, 2);
+    for (let t = 0; t < times; t++) {
+      const dv = DEVICES[rnd(0, DEVICES.length - 1)];
+      const r = Math.random();
+      if (dv.state === "off") { if (r < 0.55) dv.state = "on"; }
+      else if (dv.state === "busy") { if (r < 0.6) dv.state = "on"; }
+      else { if (r < 0.16) dv.state = "busy"; else if (r < 0.2) dv.state = "off"; }
+      dv.node.className = "wd-dev " + STATE_CLS[dv.state];
+      dv.stateNode.textContent = STATE_TXT[dv.state];
+    }
+    DEVICES.forEach((dv) => {
+      if (dv.state !== "off" && Math.random() < 0.6) {
+        dv.txn += rnd(1, 4);
+        dv.txnNode.textContent = dv.txn;
+      }
+    });
+    devUsage = Math.min(96, Math.max(40, devUsage + rndf(-2.4, 2.6)));
+    usageChart.setOption(usageOption());
+    paintDevScope();
+  }, 4500);
+
+  /* ===== 10. ④ 柜员效能 TOP8（前三高亮）＋ 分时客流对比 ===== */
+  const TOP_GRADS = [
+    hGrad("#4b32b0", "#c3aaff"),
+    hGrad("#3a2a8c", "#9870ff"),
+    hGrad("#2f2472", "#7e5df0")
+  ];
+  const tellerChart = makeChart("wd-chart-teller");
+  function tellerOption() {
+    return {
+      tooltip: tip({ valueFormatter: (v) => fmt(v) + " 笔" }),
+      grid: { left: 10, right: 56, top: 8, bottom: 2, containLabel: true },
+      xAxis: { type: "value", show: false },
+      yAxis: {
+        type: "category", inverse: true,
+        data: TELLERS.map((tl) => tl.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      series: [{
+        type: "bar", barWidth: 10,
+        data: TELLERS.map((tl, i) => ({
+          value: tl.value,
+          itemStyle: { borderRadius: 5, color: i < 3 ? TOP_GRADS[i] : hGrad("#1d5d9e", C.cyan) }
+        })),
+        label: {
+          show: true, position: "right", fontSize: 12, color: "#c3aaff",
+          formatter: (p) => fmt(p.value) + (p.dataIndex < 3 ? " ★" : "")
+        },
+        showBackground: true,
+        backgroundStyle: { color: "rgba(63, 120, 200, 0.12)", borderRadius: 5 }
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+  tellerChart.setOption(tellerOption());
+
+  const flowChart = makeChart("wd-chart-flow");
+  flowChart.setOption({
+    tooltip: tip({ trigger: "axis", valueFormatter: (v) => (v == null ? "—" : v + " 人次") }),
+    legend: {
+      top: 2, right: 10, itemWidth: 14, itemHeight: 8, itemGap: 14,
+      textStyle: { color: "#cfe6ff", fontSize: 11 }
+    },
+    grid: { left: 10, right: 14, top: 24, bottom: 4, containLabel: true },
+    xAxis: {
+      type: "category", boundaryGap: false, data: SLOTS,
+      axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+      axisTick: { show: false },
+      axisLabel: { color: C.muted, fontSize: 10, interval: 1 }
+    },
+    yAxis: {
+      type: "value",
+      splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+      axisLabel: { color: C.muted, fontSize: 10 }
+    },
+    series: [
+      {
+        name: "今日", type: "line", smooth: true, data: FLOW_TODAY,
+        symbol: "circle", symbolSize: 4, connectNulls: false,
+        lineStyle: { width: 2.5, color: C.violet, shadowColor: "rgba(152, 112, 255, 0.6)", shadowBlur: 10 },
+        itemStyle: { color: "#f2ecff", borderColor: C.violet, borderWidth: 2 },
+        areaStyle: { color: vGrad("rgba(152, 112, 255, 0.32)", "rgba(152, 112, 255, 0.02)") }
+      },
+      {
+        name: "上周同日", type: "line", smooth: true, data: FLOW_LAST,
+        symbol: "none",
+        lineStyle: { width: 2, type: "dashed", color: "rgba(63, 225, 255, 0.75)" },
+        itemStyle: { color: C.cyan }
+      }
+    ],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 11. 底部跑马灯（内容 x2 无缝循环） ===== */
+  const marqueeTrack = document.getElementById("wd-marquee-track");
+  const marqueeHtml = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  marqueeTrack.innerHTML = marqueeHtml + marqueeHtml;
+
+  /* ===== 12. 数据微刷新（热力今日行 / 榜单 / 今日客流曲线） ===== */
+  setInterval(() => {
+    /* 今日当前桶客流累积，热力同步 */
+    const heatIdx = 6 * 16 + NOW_SLOT;
+    HEAT[heatIdx].value[2] = Math.min(130, HEAT[heatIdx].value[2] + rnd(0, 3));
+    heatChart.setOption({ series: [{ data: HEAT }] });
+    if (FLOW_TODAY[NOW_SLOT] != null) {
+      FLOW_TODAY[NOW_SLOT] = Math.min(130, FLOW_TODAY[NOW_SLOT] + rnd(0, 3));
+      flowChart.setOption({ series: [{ data: FLOW_TODAY }, { data: FLOW_LAST }] });
+    }
+    /* 柜员办件量推进并重排 */
+    TELLERS.forEach((tl) => { tl.value += (Math.random() < 0.5 ? rnd(0, 2) : 0); });
+    TELLERS.sort((a, b) => b.value - a.value);
+    tellerChart.setOption(tellerOption());
+  }, 8000);
+
+  /* 柜员榜逐名高亮巡游 */
+  let tellerIdx = -1;
+  setInterval(() => {
+    tellerChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    tellerIdx = (tellerIdx + 1) % TELLERS.length;
+    tellerChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: tellerIdx });
+    tellerChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: tellerIdx });
+  }, 2600);
+})();
+</script>
+</body>
+</html>

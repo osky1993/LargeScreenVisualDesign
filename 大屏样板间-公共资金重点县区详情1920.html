@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 公共资金重点县区详情</title>
+<style>
+  :root {
+    --sx-bg: #08203f;
+    --sx-panel: rgba(11, 38, 72, 0.72);
+    --sx-border: rgba(92, 156, 226, 0.28);
+    --sx-text: #e8f2ff;
+    --sx-muted: #8ea9cc;
+    --sx-gold: #f0c060;
+    --sx-gold-soft: #ffdc8f;
+    --sx-blue: #3d9cff;
+    --sx-cyan: #39d0d8;
+    --sx-green: #33e0a6;
+    --sx-red: #ff5f6e;
+    --sx-orange: #ff9d4d;
+    --sx-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--sx-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1. 1920x1080 固定设计舞台 =====
+     行高：12 + 84 + 14 + 128 + 14 + [1fr=746] + 14 + 52 + 16 = 1080 */
+  .sx-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(240, 192, 96, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(57, 208, 216, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 60, 120, 0.34), transparent 56%),
+      linear-gradient(rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      var(--sx-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    grid-template-rows: 84px 128px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .sx-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .sx-error.is-visible { display: block; }
+
+  /* ===== 2. 顶栏：三级面包屑 + 县区切换器 + 返回 + 时钟 ===== */
+  .sx-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .sx-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(240, 192, 96, 0.6) 16%, rgba(57, 208, 216, 0.85) 50%, rgba(240, 192, 96, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.4);
+  }
+  .sx-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .sx-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--sx-muted); }
+  .sx-crumb b { font-weight: 400; color: var(--sx-gold); }
+  .sx-crumb i { font-style: normal; color: rgba(142, 169, 204, 0.55); }
+  .sx-crumb em { font-style: normal; color: #d7e8ff; }
+  /* 第二级是回父页的链接 */
+  .sx-crumb-up { color: #a8c2e0; text-decoration: none; transition: color 0.18s, text-shadow 0.18s; }
+  .sx-crumb-up:hover { color: var(--sx-gold-soft); text-decoration: underline; text-shadow: 0 0 10px rgba(240, 192, 96, 0.5); }
+  .sx-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .sx-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--sx-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(240, 192, 96, 0.35));
+  }
+  .sx-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--sx-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .sx-head-meta b { font-weight: 400; color: var(--sx-gold-soft); }
+  .sx-head-meta i { font-style: normal; color: rgba(142, 169, 204, 0.4); }
+
+  .sx-head-right { display: flex; align-items: center; gap: 18px; flex: none; }
+  .sx-switcher { display: flex; align-items: stretch; gap: 8px; }
+  .sx-sw-btn {
+    display: flex; align-items: center; gap: 6px; padding: 0 14px; cursor: pointer; user-select: none;
+    border-radius: 9px; font-family: inherit; font-size: 13px; letter-spacing: 0.06em;
+    border: 1px solid rgba(240, 192, 96, 0.34);
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.15), rgba(16, 46, 86, 0.6));
+    color: #ffdc8f; transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .sx-sw-btn:hover { color: #fff6e2; border-color: rgba(240, 192, 96, 0.85); box-shadow: 0 0 14px rgba(240, 192, 96, 0.4); }
+  .sx-sw-btn b { font-weight: 700; font-size: 16px; }
+  .sx-sw-box {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-width: 132px; padding: 6px 18px; border-radius: 9px;
+    border: 1px solid rgba(240, 192, 96, 0.5); background: rgba(72, 56, 24, 0.42);
+    box-shadow: inset 0 0 14px rgba(240, 192, 96, 0.1);
+  }
+  .sx-sw-name { font-size: 18px; font-weight: 700; letter-spacing: 0.14em; color: var(--sx-gold-soft); white-space: nowrap; }
+  .sx-sw-idx { font-size: 11px; letter-spacing: 0.26em; color: rgba(240, 192, 96, 0.7); font-variant-numeric: tabular-nums; }
+  .sx-back {
+    display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 14px; cursor: pointer;
+    border-radius: 10px; font-family: inherit; font-size: 13px; letter-spacing: 0.08em;
+    border: 1px solid rgba(92, 156, 226, 0.45); background: rgba(16, 46, 86, 0.6); color: #cfe6ff;
+    transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .sx-back:hover { color: #fff; border-color: rgba(57, 208, 216, 0.8); box-shadow: 0 0 14px rgba(57, 208, 216, 0.35); }
+  .sx-back svg { width: 16px; height: 16px; }
+  .sx-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 18px; border-left: 1px solid rgba(92, 156, 226, 0.25); }
+  .sx-clock-time { font: 700 24px/1 var(--sx-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(57, 208, 216, 0.4); }
+  .sx-clock-date { font-size: 12px; color: var(--sx-muted); letter-spacing: 0.08em; }
+
+  /* ===== 3. KPI 带（6 枚，下钻后指标更细） ===== */
+  .sx-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .sx-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--sx-border); border-radius: 12px; background: var(--sx-panel);
+    display: flex; align-items: center; gap: 12px; padding: 0 14px;
+  }
+  .sx-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--sx-gold), transparent); }
+  .sx-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(240, 192, 96, 0.13), transparent 68%);
+  }
+  .sx-kpi-icon {
+    flex: none; width: 40px; height: 40px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.28), rgba(57, 208, 216, 0.12));
+    border: 1px solid rgba(240, 192, 96, 0.35); box-shadow: inset 0 0 12px rgba(240, 192, 96, 0.14);
+  }
+  .sx-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .sx-kpi-label { font-size: 12.5px; letter-spacing: 0.08em; color: var(--sx-muted); white-space: nowrap; }
+  .sx-kpi-num { display: flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
+  .sx-kpi-pre { font-size: 13px; color: #b39a5e; }
+  .sx-kpi-val { font: 700 26px/1 var(--sx-mono); color: var(--sx-gold-soft); text-shadow: 0 0 14px rgba(240, 192, 96, 0.45); }
+  .sx-kpi-unit { font-size: 11.5px; color: #b39a5e; }
+  .sx-kpi-sub { font-size: 11px; color: var(--sx-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sx-kpi-sub b { font-weight: 700; }
+  .sx-up { color: var(--sx-green); }
+  .sx-down { color: var(--sx-red); }
+  .sx-mini-track { position: relative; height: 6px; border-radius: 3px; background: rgba(63, 120, 200, 0.2); }
+  .sx-mini-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, #b8863a, var(--sx-gold-soft)); box-shadow: 0 0 10px rgba(240, 192, 96, 0.5); transition: width 1.1s ease; }
+  .sx-mini-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.8); }
+
+  /* ===== 4. 面板通用 ===== */
+  .sx-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .sx-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--sx-border); border-radius: 12px; background: var(--sx-panel);
+    display: flex; flex-direction: column;
+  }
+  .sx-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(240, 192, 96, 0.22), rgba(57, 208, 216, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .sx-panel-head i { flex: none; width: 5px; height: 16px; background: var(--sx-gold); box-shadow: 0 0 8px var(--sx-gold); transform: skewX(-12deg); }
+  .sx-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.1em; color: #f4f9ff; white-space: nowrap; }
+  .sx-panel-en { font-size: 10px; letter-spacing: 0.18em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+  .sx-panel-scope { margin-left: auto; font-size: 12px; color: var(--sx-gold-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .sx-chart { flex: 1; min-height: 0; }
+
+  /* ===== 5. 左窄列①：县区概况卡（固定 330px，内容 268px 可用） ===== */
+  .sx-p-profile { flex: none; height: 330px; }
+  .sx-profile { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  .sx-pf-duo { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sx-pf-box {
+    display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 9px;
+    border: 1px solid rgba(92, 156, 226, 0.24); background: rgba(63, 120, 200, 0.1);
+  }
+  .sx-pf-k { font-size: 11px; letter-spacing: 0.08em; color: #6f93bd; white-space: nowrap; }
+  .sx-pf-v { font: 700 20px/1.1 var(--sx-mono); color: var(--sx-gold-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sx-pf-s { font-size: 10.5px; color: var(--sx-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sx-pf-block { flex: none; display: flex; flex-direction: column; gap: 6px; }
+  .sx-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sx-tag {
+    font-size: 11px; letter-spacing: 0.04em; padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+    border: 1px solid rgba(57, 208, 216, 0.34); background: rgba(57, 208, 216, 0.11); color: #9fe8ec;
+  }
+  .sx-tag:nth-child(1) { border-color: rgba(240, 192, 96, 0.4); background: rgba(240, 192, 96, 0.13); color: var(--sx-gold-soft); }
+  .sx-pf-rows { flex: none; display: flex; flex-direction: column; gap: 8px; }
+  .sx-pf-row {
+    display: flex; align-items: center; justify-content: space-between; height: 32px; padding: 0 10px;
+    border-radius: 8px; background: rgba(63, 120, 200, 0.09); border-left: 2px solid rgba(240, 192, 96, 0.42);
+    font-size: 12px; color: var(--sx-muted);
+  }
+  .sx-pf-row b { font: 700 15px/1 var(--sx-mono); color: #eaf4ff; font-variant-numeric: tabular-nums; }
+  .sx-pf-row b u { font-size: 11px; font-weight: 400; color: #b39a5e; text-decoration: none; margin-left: 3px; }
+
+  /* ===== 6. 左窄列②：9 个百亿县区排名条 ===== */
+  .sx-rank { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+  .sx-rank li {
+    flex: 1; min-height: 0; display: grid; grid-template-columns: 20px 54px 46px 44px 1fr;
+    align-items: center; gap: 6px; padding: 0 12px; cursor: pointer;
+    font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.09);
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+  }
+  .sx-rank li:nth-child(odd) { background: rgba(63, 120, 200, 0.07); }
+  .sx-rank li:hover { background: rgba(57, 208, 216, 0.12); }
+  .sx-rank li.is-active { background: rgba(240, 192, 96, 0.16); box-shadow: inset 3px 0 0 var(--sx-gold); }
+  .sx-rk-no {
+    width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font: 700 11px/1 var(--sx-mono); color: #0a1c33; background: rgba(142, 169, 204, 0.7);
+  }
+  .sx-rank li:nth-child(-n+3) .sx-rk-no { background: linear-gradient(140deg, var(--sx-gold-soft), #d8a03c); box-shadow: 0 0 9px rgba(240, 192, 96, 0.5); }
+  .sx-rk-name { font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; color: #eaf4ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sx-rank li.is-active .sx-rk-name { color: var(--sx-gold-soft); }
+  .sx-rk-val { text-align: right; font: 700 13px/1 var(--sx-mono); color: var(--sx-gold-soft); }
+  .sx-rk-yoy { text-align: right; font-size: 11px; font-weight: 700; }
+  .sx-rk-bar { position: relative; height: 8px; border-radius: 4px; background: rgba(63, 120, 200, 0.2); }
+  .sx-rk-bar u {
+    position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; width: 0; text-decoration: none;
+    background: linear-gradient(90deg, rgba(184, 134, 58, 0.85), var(--sx-gold-soft));
+    box-shadow: 0 0 8px rgba(240, 192, 96, 0.4); transition: width 1s cubic-bezier(0.22, 0.8, 0.3, 1);
+  }
+  .sx-rank li.is-active .sx-rk-bar u { background: linear-gradient(90deg, rgba(57, 208, 216, 0.7), #7ff0f6); box-shadow: 0 0 10px rgba(57, 208, 216, 0.55); }
+  .sx-rfoot {
+    flex: none; display: grid; grid-template-columns: 20px 54px 46px 44px 1fr;
+    align-items: center; gap: 6px; padding: 0 12px; height: 34px;
+    border-top: 1px solid rgba(240, 192, 96, 0.32); background: rgba(72, 56, 24, 0.34);
+    font-size: 11px; color: var(--sx-muted); font-variant-numeric: tabular-nums;
+  }
+  .sx-rfoot span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .sx-rfoot b { font: 700 14px/1 var(--sx-mono); color: var(--sx-gold-soft); }
+  .sx-rfoot span:nth-child(3), .sx-rfoot span:nth-child(4) { text-align: right; }
+  .sx-rfoot span:nth-child(5) { text-align: right; color: #9fe8ec; }
+
+  /* ===== 7. 右列：中部 55% / 下部 45% ===== */
+  .sx-main { flex: 55; }
+  .sx-sub { flex: 45; }
+
+  /* ===== 8. 底部跑马灯 ===== */
+  .sx-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--sx-border); border-radius: 12px; background: var(--sx-panel);
+  }
+  .sx-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a1c05;
+    background: linear-gradient(120deg, var(--sx-gold-soft), #d8a03c 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .sx-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a1c05; animation: sxDot 1.6s ease-in-out infinite; }
+  @keyframes sxDot { 50% { opacity: 0.25; } }
+  .sx-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .sx-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: sxMarquee 48s linear infinite; font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .sx-marquee-track b { color: var(--sx-gold-soft); font-weight: 700; }
+  .sx-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(240, 192, 96, 0.5); }
+  @keyframes sxMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .sx-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="sx-stage" id="sx-stage">
+    <!-- mockflag:begin --><div class="sx-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="sx-error" id="sx-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <header class="sx-header">
+      <div class="sx-head-left">
+        <div class="sx-crumb">
+          <b>公共资金</b><i>›</i>
+          <a class="sx-crumb-up" href="大屏样板间-公共资金重点城市县区1920.html">重点城市与县区</a><i>›</i>
+          <em id="sx-crumb-obj">--</em>
+        </div>
+        <div class="sx-head-title-row">
+          <div class="sx-head-title" id="sx-title">-- 收入详情</div>
+          <div class="sx-head-meta">
+            <span>口径 <b>地方一般公共预算收入</b></span><i>|</i>
+            <span>区间 <b>2026 年 1-7 月累计</b></span><i>|</i>
+            <span>下钻 <b>月度节奏 + 分税种</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="sx-head-right">
+        <div class="sx-switcher" id="sx-switcher" aria-label="县区切换">
+          <button class="sx-sw-btn" id="sx-sw-prev" type="button" title="上一县区（← 方向键）"><b>‹</b>上一县区</button>
+          <div class="sx-sw-box">
+            <span class="sx-sw-name" id="sx-sw-name">--</span>
+            <span class="sx-sw-idx" id="sx-sw-idx">-- / --</span>
+          </div>
+          <button class="sx-sw-btn" id="sx-sw-next" type="button" title="下一县区（→ 方向键）">下一县区<b>›</b></button>
+        </div>
+        <button class="sx-back" id="sx-back" type="button" title="返回重点城市与县区（Esc）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/><path d="M7 12 H20"/></svg>
+          返回
+        </button>
+        <div class="sx-clock" aria-label="实时时钟">
+          <span class="sx-clock-time" id="sx-clock-time">--:--:--</span>
+          <span class="sx-clock-date" id="sx-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="sx-band" id="sx-band" aria-label="当前县区核心指标"></section>
+
+    <!-- 左窄列：概况卡 + 百亿县区排名条 -->
+    <div class="sx-col">
+      <section class="sx-panel sx-p-profile">
+        <header class="sx-panel-head"><i></i><h2>县区概况</h2><span class="sx-panel-en">PROFILE</span><span class="sx-panel-scope" id="sx-pf-scope">--</span></header>
+        <div class="sx-profile">
+          <div class="sx-pf-duo">
+            <div class="sx-pf-box">
+              <span class="sx-pf-k">所属设区市</span>
+              <b class="sx-pf-v" id="sx-pf-city">--</b>
+              <span class="sx-pf-s" id="sx-pf-cityrev">--</span>
+            </div>
+            <div class="sx-pf-box">
+              <span class="sx-pf-k">全国百强县</span>
+              <b class="sx-pf-v" id="sx-pf-rank">--</b>
+              <span class="sx-pf-s" id="sx-pf-rankinfo">--</span>
+            </div>
+          </div>
+          <div class="sx-pf-block">
+            <span class="sx-pf-k">主导产业</span>
+            <div class="sx-tags" id="sx-pf-tags"></div>
+          </div>
+          <div class="sx-pf-rows">
+            <div class="sx-pf-row"><span>市场主体户数</span><b id="sx-pf-firms">--</b></div>
+            <div class="sx-pf-row"><span>规上工业企业</span><b id="sx-pf-above">--</b></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sx-panel">
+        <header class="sx-panel-head"><i></i><h2>百亿县区排名</h2><span class="sx-panel-en">RANK</span><span class="sx-panel-scope" id="sx-rank-scope">--</span></header>
+        <ul class="sx-rank" id="sx-rank" aria-label="9 个百亿县区收入排名，点击切换"></ul>
+        <div class="sx-rfoot" id="sx-rfoot"></div>
+      </section>
+    </div>
+
+    <!-- 右列：中部月度柱线混合 + 下部分税种柱线混合 -->
+    <div class="sx-col">
+      <section class="sx-panel sx-main">
+        <header class="sx-panel-head"><i></i><h2>月度收入节奏与累计增速</h2><span class="sx-panel-en">MONTHLY RHYTHM</span><span class="sx-panel-scope" id="sx-month-scope">--</span></header>
+        <div class="sx-chart" id="sx-chart-month" role="img" aria-label="该县区月度收入本年柱、上年同期宽柱与累计同比折线"></div>
+      </section>
+      <section class="sx-panel sx-sub">
+        <header class="sx-panel-head"><i></i><h2>分税种收入与增速</h2><span class="sx-panel-en">TAX BREAKDOWN</span><span class="sx-panel-scope" id="sx-tax-scope">--</span></header>
+        <div class="sx-chart" id="sx-chart-tax" role="img" aria-label="该县区六类税种收入柱与各税种同比折线"></div>
+      </section>
+    </div>
+
+    <section class="sx-marquee" aria-label="县区要情">
+      <div class="sx-marquee-tag"><i></i>县区要情</div>
+      <div class="sx-marquee-view"><div class="sx-marquee-track" id="sx-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("sx-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("sx-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e8f2ff", muted: "#8ea9cc",
+    gold: "#f0c060", goldSoft: "#ffdc8f", goldDeep: "#b8863a",
+    blue: "#3d9cff", cyan: "#39d0d8", green: "#33e0a6", red: "#ff5f6e", orange: "#ff9d4d", steel: "#6f93c4"
+  };
+  const PARENT = "大屏样板间-公共资金重点城市县区1920.html";
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = Number(n).toFixed(dec == null ? 0 : dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const signed = (v, d) => (v >= 0 ? "+" : "") + fmtDec(v, d == null ? 1 : d);
+  const r1 = (v) => +Number(v).toFixed(1);
+
+  /* ===== 3. 数据源 =====
+     父页锚点（「重点城市与县区」页，不得改动）：
+       9 个百亿县区收入 / 同比 / 所属市 / 全国百强位次 / 全年预算，合计 1,521 亿元。
+       序时进度 = 收入 ÷ 全年预算，须回到父页值
+       （昆山59.8 江阴60.4 张家港58.9 常熟58.5 太仓60.8 宜兴59.5 如皋57.9 海安58.9 溧阳61.2）。
+     本页新增的下钻维度（月度 7 期、六类税种）均为分项，合计由 JS 现算回到上述锚点。 */
+  const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月"];
+  /* 全省月度权重（系列规格 §7.2 江苏月度节奏），各县区按此权重叠加自身节奏倾角后拆分 */
+  const MW = [1280, 820, 960, 1310, 1010, 1160, 940];
+  const MW_PRE = [1236, 796, 928, 1268, 976, 1122, 908];
+
+  const DAY_OF_YEAR = 212, DAYS_IN_YEAR = 365;      /* 2026-07-31 为年内第 212 天 */
+  const TIME_PROG = 100 * DAY_OF_YEAR / DAYS_IN_YEAR;
+
+  /* 所属市收入（系列规格 §7.2，用于算「占所属市比重」） */
+  const CITY_REV = { 苏州: 1580, 无锡: 780, 南通: 520, 常州: 440 };
+
+  /* 六类税种（与「地市收入详情」页同一套口径，便于横向对照） */
+  const TAX_NAMES = ["增值税", "企业所得税", "个人所得税", "契税与土增", "财产行为税", "其他税种"];
+  /* 税种基准同比（全省形势：房地产相关的契税与土增仍在下行），各县区按 (自身同比 − 3.0) 平移 */
+  const TAX_BASE_YOY = [3.2, 1.6, 4.8, -7.6, 5.4, 3.8];
+
+  /* val/yoy/city/rank/budget 取父页原值；taxRate 税收占收入比重（76%~82%）；
+     mix 六类税种占税收收入比（和 = 100）；tilt 月度节奏倾角（相对全省权重，仅微调形态） */
+  const COUNTIES = [
+    { name: "昆山", val: 268, yoy: 4.2, city: "苏州", rank: 1, budget: 448, taxRate: 81.5,
+      mix: [38, 22, 9, 11, 11, 9], tilt: [1.03, 1.01, 0.99, 1.00, 0.99, 0.99, 0.99],
+      ind: ["电子信息", "高端装备", "新能源", "生物医药"], firms: 29.6, above: 2860 },
+    { name: "江阴", val: 232, yoy: 5.6, city: "无锡", rank: 2, budget: 384, taxRate: 80.2,
+      mix: [40, 20, 8, 11, 12, 9], tilt: [0.94, 0.96, 1.00, 1.02, 1.04, 1.04, 1.04],
+      ind: ["特钢冶金", "化纤新材", "高端纺织", "装备制造"], firms: 21.4, above: 2180 },
+    { name: "张家港", val: 205, yoy: 3.1, city: "苏州", rank: 3, budget: 348, taxRate: 79.6,
+      mix: [39, 20, 8, 12, 12, 9], tilt: [1.04, 1.02, 1.00, 1.00, 0.98, 0.98, 0.98],
+      ind: ["冶金新材", "绿色化工", "现代物流", "粮油食品"], firms: 17.8, above: 1720 },
+    { name: "常熟", val: 186, yoy: 2.8, city: "苏州", rank: 4, budget: 318, taxRate: 78.4,
+      mix: [37, 19, 8, 13, 13, 10], tilt: [1.02, 1.04, 1.02, 1.00, 0.98, 0.96, 0.96],
+      ind: ["汽车产业", "高端纺织", "声学产业", "装备制造"], firms: 16.2, above: 1560 },
+    { name: "太仓", val: 152, yoy: 6.4, city: "苏州", rank: 6, budget: 250, taxRate: 80.8,
+      mix: [38, 21, 9, 11, 12, 9], tilt: [0.92, 0.94, 0.98, 1.02, 1.06, 1.08, 1.08],
+      ind: ["高端装备", "航空航天", "生物医药", "现代物贸"], firms: 11.6, above: 1080 },
+    { name: "宜兴", val: 138, yoy: 4.8, city: "无锡", rank: 9, budget: 232, taxRate: 77.6,
+      mix: [36, 19, 8, 14, 13, 10], tilt: [1.00, 1.02, 1.02, 1.00, 1.00, 0.98, 0.98],
+      ind: ["电线电缆", "节能环保", "新能源", "陶瓷文旅"], firms: 12.4, above: 1240 },
+    { name: "如皋", val: 124, yoy: 3.4, city: "南通", rank: 18, budget: 214, taxRate: 77.2,
+      mix: [37, 18, 7, 14, 14, 10], tilt: [0.96, 0.98, 1.00, 1.00, 1.02, 1.04, 1.04],
+      ind: ["氢能装备", "船舶海工", "汽车配件", "智能装备"], firms: 10.8, above: 980 },
+    { name: "海安", val: 112, yoy: 5.2, city: "南通", rank: 22, budget: 190, taxRate: 78.8,
+      mix: [36, 18, 7, 15, 14, 10], tilt: [0.94, 0.96, 0.98, 1.02, 1.04, 1.06, 1.06],
+      ind: ["高端纺织", "装备制造", "节能新材", "电子信息"], firms: 9.6, above: 920 },
+    { name: "溧阳", val: 104, yoy: 7.1, city: "常州", rank: 26, budget: 170, taxRate: 76.4,
+      mix: [35, 20, 8, 14, 13, 10], tilt: [0.90, 0.94, 0.96, 1.02, 1.06, 1.10, 1.10],
+      ind: ["动力电池", "智能电网", "新能源车", "休闲旅游"], firms: 8.2, above: 760 }
+  ];
+
+  /* 3.1 派生量：月度分项、税种分项、上年同期、各类占比全部现算，末项吸收舍入残差回到锚点 */
+  COUNTIES.forEach((c) => {
+    c.prev = c.val / (1 + c.yoy / 100);                       /* 上年同期 = 本期 /(1+同比) */
+    c.prog = 100 * c.val / c.budget;                          /* 序时进度（回到父页值） */
+    c.gap = c.prog - TIME_PROG;
+    c.cityRev = CITY_REV[c.city];
+    c.cityShare = 100 * c.val / c.cityRev;
+
+    /* 月度：本年按 权重×倾角 拆分，上年按全省上年权重拆分；末月吸收残差 → 7 项之和 = 累计值 */
+    const w = MW.map((v, i) => v * c.tilt[i]), ws = sum(w);
+    c.cur = w.map((v) => r1(c.val * v / ws));
+    c.cur[6] = r1(c.val - sum(c.cur.slice(0, 6)));
+    const wp = MW_PRE, wps = sum(wp);
+    c.pre = wp.map((v) => r1(c.prev * v / wps));
+    c.pre[6] = r1(c.prev - sum(c.pre.slice(0, 6)));
+    c.monthTie = Math.abs(sum(c.cur) - c.val) < 0.05;
+
+    /* 税收：税收收入 = 收入 × 税收占比；六类税种末项吸收残差 → 六项之和 = 税收收入 */
+    c.taxRev = r1(c.val * c.taxRate / 100);
+    c.tax = c.mix.map((m) => r1(c.taxRev * m / 100));
+    c.tax[5] = r1(c.taxRev - sum(c.tax.slice(0, 5)));
+    c.taxSum = r1(sum(c.tax));
+    c.taxTie = Math.abs(c.taxSum - c.taxRev) < 0.05;
+    c.taxShare = 100 * c.taxSum / c.val;                      /* 实际税收占比（现算，非硬编码） */
+
+    /* 税种同比：基准平移；由分项「上年同期 = 本期/(1+同比)」反推税收收入整体同比 */
+    c.taxYoyArr = TAX_BASE_YOY.map((b) => r1(b + (c.yoy - 3.0)));
+    c.taxPrev = sum(c.tax.map((v, i) => v / (1 + c.taxYoyArr[i] / 100)));
+    c.taxYoy = 100 * (c.taxSum / c.taxPrev - 1);
+    /* 非税作为残差，保证「税收 + 非税」两年都回到收入与上年同期 → 全页同比自洽 */
+    c.nonTax = r1(c.val - c.taxSum);
+    c.nonTaxPrev = c.prev - c.taxPrev;
+    c.nonTaxYoy = 100 * (c.nonTax / c.nonTaxPrev - 1);
+  });
+
+  /* 3.2 全局派生：9 个百亿县区合计 / 加权同比 / 位次 */
+  const BILLION_TOTAL = sum(COUNTIES.map((c) => c.val));                  /* = 1521，父页锚点 */
+  const BILLION_PREV = sum(COUNTIES.map((c) => c.prev));
+  const BILLION_YOY = 100 * (BILLION_TOTAL / BILLION_PREV - 1);
+  const COUNTY_TOTAL = 2180, PROV_TOTAL = 7480;                           /* 父页：县区收入合计 / 全省 */
+  const TOP10_N = COUNTIES.filter((c) => c.rank <= 10).length;
+  const MAX_VAL = Math.max.apply(null, COUNTIES.map((c) => c.val));
+  const order = COUNTIES.slice().sort((a, b) => b.val - a.val).map((c) => c.name);
+  COUNTIES.forEach((c) => { c.pos = order.indexOf(c.name) + 1; });
+
+  /* ===== 4. 时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("sx-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("sx-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. KPI 带骨架（6 枚；★ 先建 DOM 再 init 图表） ===== */
+  const KPI_DEFS = [
+    { icon: "¥", key: "val", label: "收入累计", unit: "亿元", dec: 0 },
+    { icon: "△", key: "yoy", label: "同比增速", unit: "%", dec: 1, sign: true },
+    { icon: "◐", key: "prog", label: "序时进度", unit: "%", dec: 1, progress: true },
+    { icon: "◈", key: "cityShare", label: "占所属市比重", unit: "%", dec: 1 },
+    { icon: "★", key: "rank", label: "全国百强县位次", unit: "位", dec: 0, pre: "No." },
+    { icon: "◇", key: "taxShare", label: "税收占收入比重", unit: "%", dec: 1 }
+  ];
+  const band = $("sx-band");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "sx-kpi";
+    card.innerHTML =
+      '<div class="sx-kpi-icon">' + k.icon + '</div>' +
+      '<div class="sx-kpi-main">' +
+        '<div class="sx-kpi-label">' + k.label + '</div>' +
+        '<div class="sx-kpi-num">' + (k.pre ? '<span class="sx-kpi-pre">' + k.pre + '</span>' : '') +
+          '<span class="sx-kpi-val">0</span><span class="sx-kpi-unit">' + k.unit + '</span></div>' +
+        (k.progress
+          ? '<div class="sx-mini-track"><div class="sx-mini-fill"></div><div class="sx-mini-tick" style="left:' + TIME_PROG.toFixed(2) + '%"></div></div>'
+          : '') +
+        '<div class="sx-kpi-sub"></div>' +
+      '</div>';
+    band.appendChild(card);
+    k.node = card.querySelector(".sx-kpi-val");
+    k.subNode = card.querySelector(".sx-kpi-sub");
+    k.fill = card.querySelector(".sx-mini-fill");
+    k.cur = 0; k.target = 0;
+  });
+  /* 翻牌缓动：截图时可能停在中途值，不是数据错误 */
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) k.cur = k.target; else k.cur += diff * 0.14;
+      k.node.textContent = (k.sign && k.cur >= 0 ? "+" : "") + fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+
+  /* ===== 6. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(8, 26, 50, 0.93)", borderColor: "rgba(240, 192, 96, 0.45)",
+    textStyle: { color: "#e2eeff", fontSize: 12 }
+  }, extra || {});
+  const vGrad = (a, b) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: a }, { offset: 1, color: b }]);
+  const AXIS_LINE = { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } };
+  const SPLIT_LINE = { lineStyle: { color: "rgba(92, 156, 226, 0.13)" } };
+  /* 副轴上下界：按数据范围取整，避免折线贴顶或贴底 */
+  const bounds = (arr, padLo, padHi) => {
+    const lo = Math.min.apply(null, arr), hi = Math.max.apply(null, arr);
+    return { min: Math.floor((lo - padLo) / 2) * 2, max: Math.ceil((hi + padHi) / 2) * 2 };
+  };
+  /* ★ 图表实例只创建一次，切换县区时只 setOption，绝不重新 init */
+  const monthChart = echarts.init($("sx-chart-month"));
+  const taxChart = echarts.init($("sx-chart-tax"));
+
+  /* ===== 7. 中部主图：月度收入柱线混合 =====
+     本年当月柱 + 上年同期宽柱（宽 8px 作参照底衬）+ 累计同比副轴折线；7 项之和 = 累计值 */
+  function monthOption(c) {
+    const cum = c.cur.map((_, i) => +(100 * (sum(c.cur.slice(0, i + 1)) / sum(c.pre.slice(0, i + 1)) - 1)).toFixed(2));
+    const b = bounds(cum, 2, 3);
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(240, 192, 96, 0.08)" } },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return '<b style="color:#ffdc8f">' + c.name + " · " + MONTHS[i] + "</b><br/>本年 " + fmtDec(c.cur[i], 1) +
+            " 亿元<br/>上年同期 " + fmtDec(c.pre[i], 1) + " 亿元<br/>当月同比 " + signed(100 * (c.cur[i] / c.pre[i] - 1)) +
+            "%<br/>本年累计 " + fmtDec(sum(c.cur.slice(0, i + 1)), 1) + ' 亿元<br/>累计同比 <b style="color:#33e0a6">' +
+            signed(cum[i]) + "%</b>";
+        }
+      }),
+      legend: { top: 8, right: 16, itemWidth: 12, itemHeight: 8, itemGap: 18, textStyle: { color: "#c6dcf5", fontSize: 12 } },
+      grid: { left: 18, right: 18, top: 48, bottom: 8, containLabel: true },
+      xAxis: { type: "category", data: MONTHS, axisLine: AXIS_LINE, axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 12.5 } },
+      yAxis: [
+        { type: "value", name: "亿元", nameTextStyle: { color: "#5f88b8", fontSize: 11 }, splitLine: SPLIT_LINE,
+          axisLabel: { color: C.muted, fontSize: 11 } },
+        { type: "value", name: "累计同比 %", nameTextStyle: { color: "#5f88b8", fontSize: 11 },
+          min: b.min, max: b.max, splitLine: { show: false },
+          axisLabel: { color: C.muted, fontSize: 11, formatter: "{value}%" } }
+      ],
+      series: [
+        /* 上年柱比本年宽 8px（34 vs 26）：本年多数月份高于上年，等宽会被完全盖住，加宽后露出一圈参照边 */
+        { name: "上年同期", type: "bar", barWidth: 34, barGap: "-100%", z: 1,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: "rgba(92, 156, 226, 0.26)", borderColor: "rgba(92, 156, 226, 0.48)", borderWidth: 1 },
+          data: c.pre },
+        { name: "本年当月", type: "bar", barWidth: 26, z: 2,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad(C.goldSoft, "rgba(184, 134, 58, 0.35)"), shadowColor: "rgba(240, 192, 96, 0.4)", shadowBlur: 10 },
+          label: { show: true, position: "top", fontSize: 12, fontWeight: 700, color: C.goldSoft, formatter: (o) => fmtDec(o.value, 1) },
+          data: c.cur },
+        /* 折线 label 会被自身 line/areaStyle 压住：抬到 top + distance 并加深色底 */
+        { name: "累计同比", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 9, z: 3,
+          lineStyle: { width: 3, color: C.green, shadowColor: "rgba(51, 224, 166, 0.55)", shadowBlur: 12 },
+          itemStyle: { color: C.green, borderColor: "#062a22", borderWidth: 2 },
+          areaStyle: { color: vGrad("rgba(51, 224, 166, 0.2)", "rgba(51, 224, 166, 0)") },
+          label: { show: true, position: "top", distance: 10, fontSize: 11.5, fontWeight: 700, color: C.green,
+            backgroundColor: "rgba(8, 26, 50, 0.78)", padding: [2, 5], borderRadius: 3,
+            formatter: (o) => signed(o.value) + "%" },
+          labelLayout: { hideOverlap: true },
+          data: cum }
+      ],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 8. 下部图：分税种柱线混合 =====
+     六类税种柱（合计 = 该县区税收收入）+ 各税种同比副轴折线 */
+  function taxOption(c) {
+    const b = bounds(c.taxYoyArr, 2, 3);
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(240, 192, 96, 0.08)" } },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return '<b style="color:#ffdc8f">' + c.name + " · " + TAX_NAMES[i] + "</b><br/>收入 " + fmtDec(c.tax[i], 1) +
+            " 亿元<br/>占税收 " + (100 * c.tax[i] / c.taxSum).toFixed(1) + "%<br/>占全部收入 " +
+            (100 * c.tax[i] / c.val).toFixed(1) + "%<br/>同比 " +
+            '<b style="color:' + (c.taxYoyArr[i] >= 0 ? C.green : C.red) + '">' + signed(c.taxYoyArr[i]) + "%</b>";
+        }
+      }),
+      legend: { top: 8, right: 16, itemWidth: 12, itemHeight: 8, itemGap: 18, textStyle: { color: "#c6dcf5", fontSize: 12 } },
+      grid: { left: 18, right: 18, top: 48, bottom: 6, containLabel: true },
+      xAxis: { type: "category", data: TAX_NAMES, axisLine: AXIS_LINE, axisTick: { show: false }, axisLabel: { color: "#cfe6ff", fontSize: 12.5 } },
+      yAxis: [
+        { type: "value", name: "亿元", nameTextStyle: { color: "#5f88b8", fontSize: 11 }, splitLine: SPLIT_LINE,
+          axisLabel: { color: C.muted, fontSize: 11 } },
+        { type: "value", name: "同比 %", nameTextStyle: { color: "#5f88b8", fontSize: 11 },
+          min: b.min, max: b.max, splitLine: { show: false },
+          axisLabel: { color: C.muted, fontSize: 11, formatter: "{value}%" } }
+      ],
+      series: [
+        { name: "税种收入", type: "bar", barWidth: 34, z: 2,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad("rgba(127, 240, 246, 0.95)", "rgba(24, 96, 128, 0.35)"), shadowColor: "rgba(57, 208, 216, 0.35)", shadowBlur: 10 },
+          label: { show: true, position: "top", fontSize: 12, fontWeight: 700, color: "#9fe8ec", formatter: (o) => fmtDec(o.value, 1) },
+          data: c.tax },
+        { name: "税种同比", type: "line", yAxisIndex: 1, smooth: false, symbol: "circle", symbolSize: 9, z: 3,
+          lineStyle: { width: 2.6, color: C.gold, shadowColor: "rgba(240, 192, 96, 0.5)", shadowBlur: 12 },
+          itemStyle: { color: C.gold, borderColor: "#2a1c05", borderWidth: 2 },
+          label: { show: true, position: "top", distance: 10, fontSize: 11.5, fontWeight: 700,
+            backgroundColor: "rgba(8, 26, 50, 0.78)", padding: [2, 5], borderRadius: 3,
+            color: C.goldSoft, formatter: (o) => signed(o.value) + "%" },
+          labelLayout: { hideOverlap: true },
+          /* 负增长点单独染红并把标签甩到下方，避开该税种矮柱顶部的金色数值 */
+          data: c.taxYoyArr.map((v) => ({
+            value: v,
+            itemStyle: { color: v >= 0 ? C.gold : C.red, borderColor: "#2a1c05", borderWidth: 2 },
+            label: v >= 0 ? { position: "top", color: C.goldSoft } : { position: "bottom", color: C.red }
+          })) }
+      ],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 9. 左窄列①：县区概况卡 ===== */
+  function renderProfile(c) {
+    $("sx-pf-city").textContent = c.city + "市";
+    $("sx-pf-cityrev").textContent = "全市 " + fmtDec(c.cityRev) + " 亿元";
+    $("sx-pf-rank").textContent = "No." + c.rank;
+    $("sx-pf-rankinfo").textContent = "全部入围 · 前十 " + TOP10_N + " 席";
+    $("sx-pf-tags").innerHTML = c.ind.map((t) => '<span class="sx-tag">' + t + "</span>").join("");
+    $("sx-pf-firms").innerHTML = fmtDec(c.firms, 1) + "<u>万户</u>";
+    $("sx-pf-above").innerHTML = fmtDec(c.above) + "<u>家</u>";
+    $("sx-pf-scope").textContent = "居 9 县第 " + c.pos + " 位";
+  }
+
+  /* ===== 10. 左窄列②：9 个百亿县区排名条（点击切换对象） ===== */
+  function renderRank(activeName) {
+    const rows = COUNTIES.slice().sort((a, b) => b.val - a.val);
+    $("sx-rank").innerHTML = rows.map((c, i) =>
+      '<li data-name="' + c.name + '" class="' + (c.name === activeName ? "is-active" : "") + '" title="' + c.name +
+        " " + fmtDec(c.val) + " 亿元 · 占县区收入 " + (100 * c.val / COUNTY_TOTAL).toFixed(1) + '%">' +
+        '<span class="sx-rk-no">' + (i + 1) + '</span>' +
+        '<span class="sx-rk-name">' + c.name + '</span>' +
+        '<span class="sx-rk-val">' + fmtDec(c.val) + '</span>' +
+        '<span class="sx-rk-yoy" style="color:' + (c.yoy >= 0 ? C.green : C.red) + '">' + signed(c.yoy) + '%</span>' +
+        '<span class="sx-rk-bar"><u style="width:0"></u></span>' +
+      "</li>").join("");
+    const bars = $("sx-rank").querySelectorAll(".sx-rk-bar u");
+    setTimeout(() => { rows.forEach((c, i) => { if (bars[i]) bars[i].style.width = (100 * c.val / MAX_VAL).toFixed(1) + "%"; }); }, 60);
+    $("sx-rfoot").innerHTML =
+      "<span></span><span>合计9县</span>" +
+      "<span><b>" + fmtDec(BILLION_TOTAL) + "</b></span>" +
+      '<span style="color:' + C.green + ';font-weight:700">' + signed(BILLION_YOY) + "%</span>" +
+      "<span>占县区 " + (100 * BILLION_TOTAL / COUNTY_TOTAL).toFixed(1) + "%</span>";
+    $("sx-rank-scope").textContent = "合计 " + fmtDec(BILLION_TOTAL) + " 亿元";
+  }
+  /* 事件委托：排名条整块只绑一次，切换时重写 innerHTML 也不会丢监听 */
+  $("sx-rank").addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-name]");
+    if (!li) return;
+    const i = COUNTIES.findIndex((c) => c.name === li.getAttribute("data-name"));
+    if (i >= 0) { applyCounty(i); restart(); }
+  });
+
+  /* ===== 11. 跑马灯（数字同源现算） ===== */
+  function renderMarquee(c) {
+    const topTax = TAX_NAMES.map((n, i) => ({ n: n, v: c.tax[i], y: c.taxYoyArr[i] })).sort((a, b) => b.v - a.v)[0];
+    const peakIdx = c.cur.indexOf(Math.max.apply(null, c.cur));
+    const news = [
+      c.name + " 1-7 月地方一般公共预算收入 <b>" + fmtDec(c.val) + " 亿元</b>，同比 <b>" + signed(c.yoy) +
+        "%</b>，居 9 个百亿县区第 <b>" + c.pos + "</b> 位",
+      "占所属 " + c.city + "市 <b>" + c.cityShare.toFixed(1) + "%</b>，占全省县区收入 <b>" +
+        (100 * c.val / COUNTY_TOTAL).toFixed(1) + "%</b>，占全省 <b>" + (100 * c.val / PROV_TOTAL).toFixed(2) + "%</b>",
+      "序时进度 <b>" + c.prog.toFixed(1) + "%</b>，" + (c.gap >= 0 ? "快于" : "慢于") + "时间进度 <b>" +
+        Math.abs(c.gap).toFixed(2) + " 个百分点</b>；全年预算 <b>" + fmtDec(c.budget) + " 亿元</b>",
+      "税收收入 <b>" + fmtDec(c.taxSum, 1) + " 亿元</b>（占收入 <b>" + c.taxShare.toFixed(1) + "%</b>），同比 <b>" +
+        signed(c.taxYoy) + "%</b>；非税收入 <b>" + fmtDec(c.nonTax, 1) + " 亿元</b>，同比 <b>" + signed(c.nonTaxYoy) + "%</b>",
+      "第一大税种 <b>" + topTax.n + " " + fmtDec(topTax.v, 1) + " 亿元</b>，占税收 <b>" +
+        (100 * topTax.v / c.taxSum).toFixed(1) + "%</b>，同比 <b>" + signed(topTax.y) + "%</b>",
+      "月度高点出现在 <b>" + MONTHS[peakIdx] + "</b>（<b>" + fmtDec(c.cur[peakIdx], 1) + " 亿元</b>），7 个月合计回到累计数 <b>" +
+        fmtDec(sum(c.cur), 0) + " 亿元</b>",
+      "全国百强县第 <b>" + c.rank + "</b> 位；9 个百亿县区合计 <b>" + fmtDec(BILLION_TOTAL) + " 亿元</b>，占全省县区收入 <b>" +
+        (100 * BILLION_TOTAL / COUNTY_TOTAL).toFixed(1) + "%</b>"
+    ];
+    const html = news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("sx-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+
+  /* ===== 12. 切换县区：整页重设（图表只 setOption，不重新 init） ===== */
+  let idx = 0;
+  function applyCounty(i) {
+    idx = (i + COUNTIES.length) % COUNTIES.length;
+    const c = COUNTIES[idx];
+    $("sx-crumb-obj").textContent = c.name;
+    $("sx-title").textContent = c.name + " 收入详情";
+    $("sx-sw-name").textContent = c.name;
+    $("sx-sw-idx").textContent = (idx + 1) + " / " + COUNTIES.length;
+    document.title = "大屏样板间 · 公共资金重点县区详情 · " + c.name;
+
+    const vals = { val: c.val, yoy: c.yoy, prog: c.prog, cityShare: c.cityShare, rank: c.rank, taxShare: c.taxShare };
+    KPI_DEFS.forEach((k) => { k.target = vals[k.key]; });
+    KPI_DEFS[0].subNode.innerHTML = "9 县第 <b>" + c.pos + "</b> 位 · 占九县 <b>" + (100 * c.val / BILLION_TOTAL).toFixed(1) + "%</b>";
+    KPI_DEFS[1].subNode.innerHTML = "上年 <b>" + fmtDec(c.prev, 1) + "</b> 亿元";
+    KPI_DEFS[2].subNode.innerHTML = "时序 <b>" + TIME_PROG.toFixed(1) + '%</b> · <b class="' +
+      (c.gap >= 0 ? "sx-up" : "sx-down") + '">' + (c.gap >= 0 ? "快 " : "慢 ") + Math.abs(c.gap).toFixed(2) + " pct</b>";
+    KPI_DEFS[3].subNode.innerHTML = c.city + " <b>" + fmtDec(c.cityRev) + "</b> 亿元";
+    KPI_DEFS[4].subNode.innerHTML = "9 县全入围 · 前十 <b>" + TOP10_N + "</b> 席";
+    KPI_DEFS[5].subNode.innerHTML = "税收 <b>" + fmtDec(c.taxSum, 1) + "</b> 亿元";
+    KPI_DEFS[2].fill.style.width = "0%";
+    setTimeout(() => { KPI_DEFS[2].fill.style.width = Math.min(100, c.prog).toFixed(2) + "%"; }, 120);
+
+    renderProfile(c);
+    renderRank(c.name);
+    /* ★ 只 setOption 且走合并（类目轴不变，切换时数值平滑过渡），绝不重新 init */
+    monthChart.setOption(monthOption(c));
+    taxChart.setOption(taxOption(c));
+    $("sx-month-scope").textContent = "7 个月合计 " + fmtDec(sum(c.cur), 0) + " 亿元 · 同比 " + signed(c.yoy) + "%";
+    $("sx-tax-scope").textContent = "六项合计 " + fmtDec(c.taxSum, 1) + " 亿元 · 占收入 " + c.taxShare.toFixed(1) +
+      "% · 税收同比 " + signed(c.taxYoy) + "%";
+    renderMarquee(c);
+
+    history.replaceState(null, "", "#" + encodeURIComponent(c.name));
+  }
+
+  /* ===== 13. 交互：切换器 / 返回父页 / 键盘 / hash 定位 / kiosk 自动轮换 ===== */
+  $("sx-sw-prev").addEventListener("click", () => { applyCounty(idx - 1); restart(); });
+  $("sx-sw-next").addEventListener("click", () => { applyCounty(idx + 1); restart(); });
+  $("sx-back").addEventListener("click", () => { location.href = PARENT; });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyCounty(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyCounty(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* 打开时按 hash 定位（父页下钻传参用），未命中则取第 0 个 */
+  const hash = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+  const hit = COUNTIES.findIndex((c) => c.name === hash);
+  applyCounty(hit >= 0 ? hit : 0);
+
+  /* kiosk 常驻：每 12 秒切下一县区；鼠标停在切换器或排名条上时暂停 */
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => applyCounty(idx + 1), 12000); }
+  restart();
+  [$("sx-switcher"), $("sx-rank")].forEach((el) => {
+    el.addEventListener("mouseenter", () => clearInterval(timer));
+    el.addEventListener("mouseleave", restart);
+  });
+
+  /* ===== 14. 勾稽自检：不通过就点亮告警条 =====
+     ① 9 个县区之和 = 父页百亿县区合计 1,521
+     ② 每县区 月度 7 项之和 = 累计值
+     ③ 每县区 六类税种之和 = 税收收入，且税收占比落在 76%~82%
+     ④ 每县区 序时进度 = 收入 ÷ 全年预算，须回到父页值 */
+  const PARENT_PROG = { 昆山: 59.8, 江阴: 60.4, 张家港: 58.9, 常熟: 58.5, 太仓: 60.8, 宜兴: 59.5, 如皋: 57.9, 海安: 58.9, 溧阳: 61.2 };
+  const errs = [];
+  if (BILLION_TOTAL !== 1521) errs.push("9 县合计 " + BILLION_TOTAL + " ≠ 1521");
+  COUNTIES.forEach((c) => {
+    if (!c.monthTie) errs.push(c.name + " 月度之和 " + sum(c.cur).toFixed(1) + " ≠ " + c.val);
+    if (!c.taxTie) errs.push(c.name + " 税种之和 " + c.taxSum + " ≠ " + c.taxRev);
+    if (c.taxShare < 76 || c.taxShare > 82) errs.push(c.name + " 税收占比 " + c.taxShare.toFixed(1) + "% 越界");
+    if (Math.abs(c.prog - PARENT_PROG[c.name]) > 0.06) errs.push(c.name + " 序时 " + c.prog.toFixed(1) + " ≠ 父页 " + PARENT_PROG[c.name]);
+    if (!(c.nonTaxPrev > 0)) errs.push(c.name + " 上年非税为负");
+  });
+  if (errs.length) {
+    errorNode.textContent = "勾稽自检未通过：" + errs.slice(0, 3).join("；") + (errs.length > 3 ? " 等 " + errs.length + " 项" : "");
+    errorNode.classList.add("is-visible");
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 资金链路流向</title>
+<style>
+  :root {
+    --fl-bg: #0a1e3c;
+    --fl-panel: rgba(13, 34, 64, 0.72);
+    --fl-border: rgba(86, 150, 224, 0.28);
+    --fl-text: #e6f1ff;
+    --fl-muted: #8fa7c8;
+    --fl-sky: #0ea5e9;
+    --fl-sky-soft: #7dd3fc;
+    --fl-sky-deep: #0284c7;
+    --fl-cyan: #22d3ee;
+    --fl-teal: #2dd4bf;
+    --fl-blue: #4b7dff;
+    --fl-green: #38e6b0;
+    --fl-gold: #ffc857;
+    --fl-red: #ff6680;
+    --fl-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--fl-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .fl-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% -2%, rgba(14, 165, 233, 0.16), transparent 44%),
+      radial-gradient(circle at 90% 8%, rgba(34, 211, 238, 0.10), transparent 46%),
+      radial-gradient(ellipse at 50% 120%, rgba(2, 132, 199, 0.26), transparent 56%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--fl-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-rows: 84px 148px 1fr 54px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .fl-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .fl-error.is-visible { display: block; }
+
+  /* ===== 顶栏：页头（面包屑 + 渐变标题 + 徽章 + tabs + 时钟） ===== */
+  .fl-header {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .fl-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.6) 16%, rgba(125, 211, 252, 0.9) 50%, rgba(14, 165, 233, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(14, 165, 233, 0.5);
+  }
+  .fl-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .fl-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--fl-muted); }
+  .fl-crumb b { font-weight: 400; color: #6fb9e8; }
+  .fl-crumb i { font-style: normal; color: rgba(143, 167, 200, 0.55); }
+  .fl-crumb em { font-style: normal; color: #d7e8ff; }
+  .fl-head-title-row { display: flex; align-items: baseline; gap: 14px; white-space: nowrap; }
+  .fl-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--fl-sky-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(14, 165, 233, 0.4));
+  }
+  .fl-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 11px; border-radius: 999px;
+    border: 1px solid rgba(14, 165, 233, 0.5); background: rgba(14, 165, 233, 0.12);
+    font-size: 12px; letter-spacing: 0.12em; color: var(--fl-sky-soft);
+  }
+  .fl-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--fl-cyan); box-shadow: 0 0 8px var(--fl-cyan); animation: flDot 1.6s ease-in-out infinite; }
+  .fl-head-sub { font-size: 13px; color: var(--fl-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .fl-head-sub b { font-weight: 400; color: #86d3fc; }
+  .fl-head-sub i { font-style: normal; color: rgba(143, 167, 200, 0.4); margin: 0 4px; }
+
+  .fl-head-right { display: flex; align-items: center; gap: 24px; flex: none; }
+  .fl-tabs { display: flex; align-items: stretch; gap: 8px; }
+  .fl-tab {
+    padding: 0 18px; height: 38px; line-height: 36px; border-radius: 9px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(86, 150, 224, 0.4); background: rgba(20, 48, 88, 0.55);
+    color: #cfe6ff; font-size: 14px; letter-spacing: 0.08em; font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s, background 0.2s;
+  }
+  .fl-tab:hover { color: #fff; border-color: rgba(14, 165, 233, 0.7); }
+  .fl-tab.is-active {
+    color: #fff; border-color: rgba(14, 165, 233, 0.85);
+    background: linear-gradient(180deg, rgba(14, 165, 233, 0.32), rgba(2, 132, 199, 0.22));
+    box-shadow: 0 0 14px rgba(14, 165, 233, 0.4), inset 0 0 10px rgba(125, 211, 252, 0.14);
+  }
+  .fl-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 24px; border-left: 1px solid rgba(86, 150, 224, 0.25); }
+  .fl-clock-time { font: 700 26px/1 var(--fl-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(34, 211, 238, 0.45); }
+  .fl-clock-date { font-size: 12px; color: var(--fl-muted); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条：5 枚翻牌数字 ===== */
+  .fl-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .fl-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--fl-border); border-radius: 12px; background: var(--fl-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 7px;
+    padding: 0 22px;
+  }
+  .fl-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px;
+    background: linear-gradient(90deg, var(--fl-sky), transparent);
+  }
+  .fl-kpi::after {
+    content: ""; position: absolute; right: -30px; top: -30px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(14, 165, 233, 0.14), transparent 68%);
+  }
+  .fl-kpi-label { font-size: 13px; letter-spacing: 0.12em; color: var(--fl-muted); }
+  .fl-kpi-num { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+  .fl-kpi-val { font: 700 34px/1 var(--fl-mono); color: #f4faff; letter-spacing: 0.01em; text-shadow: 0 0 14px rgba(14, 165, 233, 0.5); }
+  .fl-kpi-unit { font-size: 13px; color: #7dd3fc; }
+  .fl-kpi-delta { display: flex; align-items: center; gap: 6px; font-size: 12px; letter-spacing: 0.03em; font-variant-numeric: tabular-nums; }
+  .fl-kpi-delta b { font-weight: 700; }
+  .fl-kpi-delta .up { color: var(--fl-green); }
+  .fl-kpi-delta .down { color: var(--fl-red); }
+  .fl-kpi-delta .flat { color: var(--fl-sky-soft); }
+  .fl-kpi-delta span { color: var(--fl-muted); }
+
+  /* ===== 主区：1fr 380px ===== */
+  .fl-main { display: grid; grid-template-columns: 1fr 380px; gap: 18px; min-height: 0; }
+  .fl-side { display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+
+  /* ===== 面板通用 ===== */
+  .fl-panel {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--fl-border); border-radius: 12px; background: var(--fl-panel);
+    display: flex; flex-direction: column;
+  }
+  .fl-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(14, 165, 233, 0.28), rgba(34, 211, 238, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .fl-panel-head i { flex: none; width: 5px; height: 16px; background: var(--fl-sky); box-shadow: 0 0 8px var(--fl-sky); transform: skewX(-12deg); }
+  .fl-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .fl-panel-head .fl-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fl-panel-head .fl-panel-scope { margin-left: auto; font-size: 12px; color: var(--fl-sky-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .fl-chart { flex: 1; min-height: 0; }
+
+  .fl-panel-sankey { flex: 1; }
+  .fl-panel-donut { flex: 1.02; }
+  .fl-panel-top { flex: 1.28; }
+
+  /* ===== 重点流向 TOP 表（CSS grid 模拟表格 + JS <li> 行） ===== */
+  .fl-table { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 6px 12px 10px; }
+  .fl-table-head, .fl-row {
+    display: grid; grid-template-columns: 1.9fr 0.95fr 0.75fr 0.7fr; align-items: center; gap: 6px;
+  }
+  .fl-table-head {
+    flex: none; padding: 5px 10px 7px; font-size: 11px; letter-spacing: 0.14em; color: #5f88b8;
+    border-bottom: 1px solid rgba(86, 150, 224, 0.22);
+  }
+  .fl-table-head span:nth-child(n+2), .fl-row span:nth-child(n+2) { text-align: right; }
+  .fl-rows { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .fl-row {
+    flex: 1; min-height: 0; padding: 0 10px; border-radius: 7px;
+    font-size: 13px; font-variant-numeric: tabular-nums;
+    animation: flRowIn 0.5s ease backwards;
+  }
+  .fl-row:nth-child(odd) { background: rgba(24, 56, 100, 0.34); }
+  @keyframes flRowIn { from { opacity: 0; transform: translateX(-8px); } }
+  .fl-route { display: flex; align-items: center; gap: 6px; color: #d7e8ff; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; }
+  .fl-route em { font-style: normal; flex: none; color: var(--fl-sky); font-weight: 700; }
+  .fl-route .fl-from { color: #b9d2f2; }
+  .fl-route .fl-to { color: #eaf6ff; }
+  .fl-amt { color: #f0f8ff; font-weight: 700; font-family: var(--fl-mono); }
+  .fl-amt em { font-style: normal; font-size: 10.5px; font-weight: 400; color: var(--fl-muted); margin-left: 2px; }
+  .fl-share { color: var(--fl-sky-soft); }
+  .fl-trend {
+    justify-self: end; display: inline-flex; align-items: center; gap: 3px;
+    padding: 1px 8px; border-radius: 999px; font-size: 11px; letter-spacing: 0.02em;
+  }
+  .fl-trend.up { color: var(--fl-green); border: 1px solid rgba(56, 230, 176, 0.4); background: rgba(56, 230, 176, 0.1); }
+  .fl-trend.down { color: var(--fl-red); border: 1px solid rgba(255, 102, 128, 0.4); background: rgba(255, 102, 128, 0.1); }
+  .fl-trend.flat { color: var(--fl-sky-soft); border: 1px solid rgba(125, 211, 252, 0.4); background: rgba(125, 211, 252, 0.1); }
+
+  /* ===== 底部跑马灯 ===== */
+  .fl-marquee {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--fl-border); border-radius: 12px; background: var(--fl-panel);
+  }
+  .fl-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #eafaff;
+    background: linear-gradient(120deg, var(--fl-sky), #0369a1 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .fl-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #eafaff; animation: flDot 1.6s ease-in-out infinite; }
+  @keyframes flDot { 50% { opacity: 0.3; } }
+  .fl-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .fl-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: flMarquee 42s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .fl-marquee-track b { color: var(--fl-sky-soft); font-weight: 700; }
+  .fl-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(14, 165, 233, 0.55); }
+  @keyframes flMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .fl-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="fl-stage" id="fl-stage">
+    <!-- mockflag:begin --><div class="fl-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="fl-error" id="fl-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏：页头 -->
+    <header class="fl-header">
+      <div class="fl-head-left">
+        <div class="fl-crumb"><b>资金运营</b><i>›</i><em>资金链路</em></div>
+        <div class="fl-head-title-row">
+          <div class="fl-head-title">资金链路流向</div>
+          <span class="fl-badge"><i></i>实时 · T+0</span>
+          <span class="fl-head-sub">来源 <b id="fl-sub-in">--</b> 亿<i>=</i>运用 <b id="fl-sub-out">--</b> 亿<i>·</i>资金池吞吐 <b id="fl-sub-pool">--</b> 亿</span>
+        </div>
+      </div>
+      <div class="fl-head-right">
+        <div class="fl-tabs" id="fl-tabs" aria-label="币种口径切换"></div>
+        <div class="fl-clock" aria-label="实时时钟">
+          <span class="fl-clock-time" id="fl-clock-time">--:--:--</span>
+          <span class="fl-clock-date" id="fl-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条 -->
+    <section class="fl-kpis" id="fl-kpis" aria-label="资金流向核心指标"></section>
+
+    <!-- 主区 -->
+    <section class="fl-main">
+      <div class="fl-panel fl-panel-sankey">
+        <header class="fl-panel-head"><i></i><h2>资金链路桑基流向</h2><span class="fl-panel-en">FUND FLOW SANKEY</span><span class="fl-panel-scope" id="fl-sankey-scope">来源 → 资金池 → 运用</span></header>
+        <div class="fl-chart" id="fl-chart-sankey" role="img" aria-label="资金来源经资金池汇入运用层的桑基流向图"></div>
+      </div>
+      <div class="fl-side">
+        <div class="fl-panel fl-panel-donut">
+          <header class="fl-panel-head"><i></i><h2>资金运用结构</h2><span class="fl-panel-en">APPLICATION MIX</span><span class="fl-panel-scope" id="fl-donut-scope">运用层占比</span></header>
+          <div class="fl-chart" id="fl-chart-donut" role="img" aria-label="资金运用五项结构占比环形图"></div>
+        </div>
+        <div class="fl-panel fl-panel-top">
+          <header class="fl-panel-head"><i></i><h2>重点流向 TOP</h2><span class="fl-panel-en">TOP ROUTES</span><span class="fl-panel-scope">按金额排序</span></header>
+          <div class="fl-table">
+            <div class="fl-table-head"><span>来源 → 去向</span><span>金额</span><span>占比</span><span>趋势</span></div>
+            <ul class="fl-rows" id="fl-rows"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 底部跑马灯 -->
+    <section class="fl-marquee" aria-label="资金运营播报">
+      <div class="fl-marquee-tag"><i></i>资金运营播报</div>
+      <div class="fl-marquee-view"><div class="fl-marquee-track" id="fl-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("fl-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("fl-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    sky: "#0ea5e9", skySoft: "#7dd3fc", skyDeep: "#0284c7",
+    cyan: "#22d3ee", teal: "#2dd4bf", blue: "#4b7dff",
+    green: "#38e6b0", gold: "#ffc857", red: "#ff6680"
+  };
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtInt = (n) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 唯一数据源：来源层 / 资金池 / 运用层（亿元），严格勾稽 in=out ===== */
+  const POOL = "资金池";
+  const FLOW = {
+    sources: [
+      { name: "对公存款", base: 11150, trend: "up" },
+      { name: "储蓄存款", base: 7500,  trend: "up" },
+      { name: "同业拆入", base: 2400,  trend: "down" },
+      { name: "发行债券", base: 1600,  trend: "up" }
+    ],
+    uses: [
+      { name: "对公贷款", base: 8900, trend: "up" },
+      { name: "零售贷款", base: 5460, trend: "up" },
+      { name: "债券投资", base: 4200, trend: "flat" },
+      { name: "同业存放", base: 2100, trend: "down" },
+      { name: "备付金",   base: 1990, trend: "up" }
+    ]
+  };
+  const CROSS_SRC = "同业拆入", CROSS_USE = "同业存放";
+  const BIG_TXN_RATE = 0.545; /* 大额笔数派生系数：笔 / 亿元吞吐 */
+
+  const SCOPES = [
+    { key: "全行", factor: 1,    delta: ["+2.6%", "+2.4%", "0.0%", "+0.4pct", "+3.1%"] },
+    { key: "本币", factor: 0.94, delta: ["+2.2%", "+2.1%", "0.0%", "-0.2pct", "+2.7%"] },
+    { key: "外币", factor: 0.06, delta: ["+5.8%", "+6.2%", "0.0%", "+1.1pct", "+4.9%"] }
+  ];
+
+  /* 从唯一数据源派生一套自洽流量：整数化后回填最大运用桶，保证 来源合计==运用合计 */
+  function buildScope(sc) {
+    const f = sc.factor;
+    const src = FLOW.sources.map((s) => ({ name: s.name, value: Math.round(s.base * f), trend: s.trend }));
+    const use = FLOW.uses.map((u) => ({ name: u.name, value: Math.round(u.base * f), trend: u.trend }));
+    const srcSum = src.reduce((a, b) => a + b.value, 0);
+    let useSum = use.reduce((a, b) => a + b.value, 0);
+    const diff = srcSum - useSum;
+    if (diff !== 0) {
+      let idx = 0;
+      use.forEach((u, i) => { if (u.value > use[idx].value) idx = i; });
+      use[idx].value += diff;
+      useSum += diff;
+    }
+    const throughput = srcSum; /* == useSum */
+    const crossVal = src.find((s) => s.name === CROSS_SRC).value + use.find((u) => u.name === CROSS_USE).value;
+    /* KPI 全部由 throughput / 结构派生，不复制数字 */
+    const kpi = {
+      inflow: throughput,
+      outflow: useSum,
+      net: throughput - useSum,          /* 收支平衡 => 0 */
+      crossPct: crossVal / throughput * 100,
+      bigTxn: Math.round(throughput * BIG_TXN_RATE)
+    };
+    /* 重点流向 TOP：直接取桑基真实边（来源→池 / 池→运用），按金额排序 */
+    const edges = src.map((s) => ({ from: s.name, to: POOL, value: s.value, trend: s.trend }))
+      .concat(use.map((u) => ({ from: POOL, to: u.name, value: u.value, trend: u.trend })));
+    edges.sort((a, b) => b.value - a.value);
+    const top = edges.slice(0, 6).map((e) => ({ from: e.from, to: e.to, value: e.value, share: e.value / throughput * 100, trend: e.trend }));
+    return { key: sc.key, delta: sc.delta, src, use, throughput, kpi, top };
+  }
+  const DATA = SCOPES.map(buildScope);
+  let curIdx = 0;
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("fl-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("fl-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. 口径 tabs ===== */
+  const tabsWrap = $("fl-tabs");
+  SCOPES.forEach((sc, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "fl-tab" + (i === 0 ? " is-active" : "");
+    b.textContent = sc.key;
+    b.addEventListener("click", () => applyScope(i));
+    tabsWrap.appendChild(b);
+  });
+  function syncTabs() {
+    [...tabsWrap.children].forEach((b, i) => b.classList.toggle("is-active", i === curIdx));
+  }
+
+  /* ===== 6. KPI 条：5 枚翻牌数字（缓动跳变 + 环比 badge） ===== */
+  const KPI_DEFS = [
+    { key: "inflow",   label: "当日资金流入", unit: "亿元", dec: 0 },
+    { key: "outflow",  label: "当日资金流出", unit: "亿元", dec: 0 },
+    { key: "net",      label: "收支净额",     unit: "亿元", dec: 0, balance: true },
+    { key: "crossPct", label: "跨行资金占比", unit: "%",    dec: 1 },
+    { key: "bigTxn",   label: "大额交易笔数", unit: "笔",   dec: 0 }
+  ];
+  const kpisWrap = $("fl-kpis");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "fl-kpi";
+    card.innerHTML =
+      '<div class="fl-kpi-label">' + k.label + '</div>' +
+      '<div class="fl-kpi-num"><span class="fl-kpi-val">0</span><span class="fl-kpi-unit">' + k.unit + '</span></div>' +
+      '<div class="fl-kpi-delta">--</div>';
+    kpisWrap.appendChild(card);
+    k.node = card.querySelector(".fl-kpi-val");
+    k.deltaNode = card.querySelector(".fl-kpi-delta");
+    k.cur = 0; k.target = 0;
+  });
+  function setKpiTargets(d) {
+    KPI_DEFS.forEach((k, i) => {
+      k.target = d.kpi[k.key];
+      if (k.balance) {
+        k.deltaNode.innerHTML = '<b class="flat">◇ 收支平衡</b><span>来源=运用</span>';
+      } else {
+        const t = d.delta[i];
+        const dir = t.charAt(0) === "-" ? "down" : (parseFloat(t) === 0 ? "flat" : "up");
+        const arrow = dir === "up" ? "▲" : (dir === "down" ? "▼" : "▬");
+        k.deltaNode.innerHTML = '<b class="' + dir + '">' + arrow + " " + t + '</b><span>环比昨日</span>';
+      }
+    });
+  }
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) { k.cur = k.target; } else { k.cur += diff * 0.16; }
+      k.node.textContent = k.dec > 0 ? fmtDec(k.cur, k.dec) : fmtInt(k.cur);
+    });
+  }, 70);
+
+  /* ===== 7. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(14, 165, 233, 0.5)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  function makeChart(id) {
+    const el = document.getElementById(id);
+    return el ? echarts.init(el) : null;
+  }
+
+  /* ===== 8. 主图：多级桑基（来源 → 资金池 → 运用），湖蓝青系渐变 ===== */
+  const sankeyChart = makeChart("fl-chart-sankey");
+  const SRC_COLORS = ["#7dd3fc", "#5bc4f5", "#38bdf8", "#0ea5e9"];
+  const USE_COLORS = ["#22d3ee", "#2dd4bf", "#5eead4", "#38bdf8", "#67e8f9"];
+  function sankeyOption(d) {
+    const valByName = {};
+    d.src.forEach((s) => { valByName[s.name] = s.value; });
+    d.use.forEach((u) => { valByName[u.name] = u.value; });
+    valByName[POOL] = d.throughput;
+
+    const nodes = [];
+    d.src.forEach((s, i) => nodes.push({
+      name: s.name, depth: 0,
+      itemStyle: { color: hGrad("#4aa8d8", SRC_COLORS[i]), borderWidth: 0 },
+      label: { position: "left" }
+    }));
+    nodes.push({
+      name: POOL, depth: 1,
+      itemStyle: { color: hGrad("#38bdf8", "#0284c7"), borderWidth: 0, shadowBlur: 18, shadowColor: "rgba(14, 165, 233, 0.7)" },
+      label: { position: "top", fontSize: 14, fontWeight: 700, color: "#eafaff" }
+    });
+    d.use.forEach((u, i) => nodes.push({
+      name: u.name, depth: 2,
+      itemStyle: { color: hGrad(USE_COLORS[i], "#0e7490"), borderWidth: 0 },
+      label: { position: "right" }
+    }));
+
+    const links = d.src.map((s) => ({ source: s.name, target: POOL, value: s.value, lineStyle: { color: "gradient", opacity: 0.42 } }))
+      .concat(d.use.map((u) => ({ source: POOL, target: u.name, value: u.value, lineStyle: { color: "gradient", opacity: 0.42 } })));
+
+    return {
+      tooltip: tip({
+        formatter: (o) => {
+          if (o.dataType === "edge") return o.data.source + " → " + o.data.target + '<br/>金额 <b style="color:#7dd3fc">' + fmtInt(o.data.value) + "</b> 亿元";
+          return o.name + '<br/>吞吐 <b style="color:#7dd3fc">' + fmtInt(valByName[o.name]) + "</b> 亿元";
+        }
+      }),
+      series: [{
+        type: "sankey",
+        left: 96, right: 108, top: 22, bottom: 22,
+        nodeWidth: 16, nodeGap: 12,
+        nodeAlign: "justify", draggable: false,
+        data: nodes, links: links,
+        label: { color: C.text, fontSize: 13, fontWeight: 600, formatter: (o) => o.name + "  " + fmtInt(valByName[o.name]) },
+        lineStyle: { color: "gradient", curveness: 0.5 },
+        emphasis: { focus: "adjacency", lineStyle: { opacity: 0.6 } }
+      }],
+      animationDuration: 800,
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* 桑基节点/边轮流 highlight + showTip */
+  let hlTimer = null, hlPtr = 0;
+  function startSankeyHighlight(d) {
+    if (hlTimer) clearInterval(hlTimer);
+    const names = d.src.map((s) => s.name).concat([POOL], d.use.map((u) => u.name));
+    hlPtr = 0;
+    hlTimer = setInterval(() => {
+      const name = names[hlPtr % names.length];
+      sankeyChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+      sankeyChart.dispatchAction({ type: "highlight", seriesIndex: 0, name: name });
+      sankeyChart.dispatchAction({ type: "showTip", seriesIndex: 0, name: name });
+      hlPtr++;
+    }, 2200);
+  }
+
+  /* ===== 9. 右上：资金运用结构 donut（运用层 5 项占比） ===== */
+  const donutChart = makeChart("fl-chart-donut");
+  function donutOption(d) {
+    const data = d.use.map((u, i) => ({
+      name: u.name, value: u.value,
+      itemStyle: { color: vGrad(USE_COLORS[i], "#0e7490") }
+    }));
+    return {
+      tooltip: tip({ formatter: (o) => o.name + "<br/>" + fmtInt(o.value) + " 亿元 · " + o.percent + "%" }),
+      title: {
+        text: "运用合计", subtext: fmtInt(d.throughput) + " 亿",
+        left: "33%", top: "40%", textAlign: "center",
+        textStyle: { color: C.muted, fontSize: 12, fontWeight: 400 },
+        subtextStyle: { color: C.skySoft, fontSize: 19, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" }
+      },
+      legend: {
+        orient: "vertical", right: 12, top: "middle", itemWidth: 10, itemHeight: 10,
+        textStyle: { color: "#cfe6ff", fontSize: 12 },
+        formatter: (name) => {
+          const t = data.find((x) => x.name === name);
+          const pct = (t.value / d.throughput * 100).toFixed(1);
+          return name + "  " + pct + "%";
+        }
+      },
+      series: [{
+        type: "pie", radius: ["52%", "74%"], center: ["34%", "52%"],
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+        label: { show: false },
+        emphasis: { label: { show: true, color: "#eaf6ff", fontSize: 13, fontWeight: 700, formatter: "{b}\n{d}%" } },
+        data: data
+      }, {
+        type: "pie", radius: ["82%", "83%"], center: ["34%", "52%"], silent: true,
+        label: { show: false }, itemStyle: { color: "rgba(14, 165, 233, 0.3)" }, data: [1]
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 10. 右下：重点流向 TOP 表（JS <li> 行 + 斑马纹 + 趋势 badge） ===== */
+  const TREND_TXT = { up: "▲ 上行", down: "▼ 回落", flat: "▬ 持平" };
+  function renderTop(d) {
+    const box = $("fl-rows");
+    box.innerHTML = "";
+    d.top.forEach((r, i) => {
+      const li = document.createElement("li");
+      li.className = "fl-row";
+      li.style.animationDelay = (i * 0.05) + "s";
+      li.innerHTML =
+        '<div class="fl-route"><span class="fl-from">' + r.from + '</span><em>→</em><span class="fl-to">' + r.to + '</span></div>' +
+        '<span class="fl-amt">' + fmtInt(r.value) + '<em>亿</em></span>' +
+        '<span class="fl-share">' + r.share.toFixed(1) + '%</span>' +
+        '<span class="fl-trend ' + r.trend + '">' + TREND_TXT[r.trend] + '</span>';
+      box.appendChild(li);
+    });
+  }
+
+  /* ===== 11. 底部：资金运营播报跑马灯 ===== */
+  function renderMarquee(d) {
+    const cross = d.kpi.crossPct.toFixed(1);
+    const news = [
+      "「" + d.key + "」口径当日资金来源与运用双向勾稽，资金池吞吐 <b>" + fmtInt(d.throughput) + " 亿元</b> 收支平衡",
+      "对公存款为第一大资金来源，占来源合计 <b>" + (d.src[0].value / d.throughput * 100).toFixed(1) + "%</b>，稳定性居前",
+      "资金运用端对公贷款投放 <b>" + fmtInt(d.use[0].value) + " 亿元</b>，占运用合计 " + (d.use[0].value / d.throughput * 100).toFixed(1) + "%",
+      "跨行资金占比 <b>" + cross + "%</b>，同业拆入与同业存放联动，流动性管理平稳",
+      "债券投资规模 <b>" + fmtInt(d.use[2].value) + " 亿元</b>，配置节奏与市场利率窗口保持一致",
+      "大额交易 <b>" + fmtInt(d.kpi.bigTxn) + " 笔</b> 全量监测，资金链路可视可溯可追"
+    ];
+    const html = news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("fl-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+
+  /* ===== 12. 口径切换：全页过渡到新流量集（各自 in=out 平衡） ===== */
+  function applyScope(idx) {
+    curIdx = (idx + DATA.length) % DATA.length;
+    const d = DATA[curIdx];
+    syncTabs();
+    /* 页头勾稽提示 */
+    $("fl-sub-in").textContent = fmtInt(d.throughput);
+    $("fl-sub-out").textContent = fmtInt(d.throughput);
+    $("fl-sub-pool").textContent = fmtInt(d.throughput);
+    $("fl-sankey-scope").textContent = "来源 → 资金池 → 运用 · " + d.key;
+    $("fl-donut-scope").textContent = "运用层占比 · " + d.key;
+    /* KPI / 桑基 / donut / 表 / 播报 同步刷新 */
+    setKpiTargets(d);
+    sankeyChart.setOption(sankeyOption(d));
+    donutChart.setOption(donutOption(d));
+    renderTop(d);
+    renderMarquee(d);
+    startSankeyHighlight(d);
+  }
+  applyScope(curIdx);
+
+  /* ===== 13. 实时感：吞吐微跳变（保持 in=out 恒等，仅整体缩放展示层数字） ===== */
+  setInterval(() => {
+    const d = DATA[curIdx];
+    /* 只微调 KPI 展示目标，勾稽结构不破坏 */
+    d.kpi.bigTxn = Math.max(1, Math.round(d.kpi.bigTxn + rndf(-6, 8)));
+    KPI_DEFS.forEach((k) => { if (k.key === "bigTxn") k.target = d.kpi.bigTxn; });
+  }, 5000);
+})();
+</script>
+</body>
+</html>

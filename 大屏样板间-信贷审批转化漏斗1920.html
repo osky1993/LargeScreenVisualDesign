@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 信贷审批转化漏斗</title>
+<style>
+  :root {
+    --fc-bg: #0a1e3c;
+    --fc-panel: rgba(13, 34, 64, 0.72);
+    --fc-border: rgba(86, 150, 224, 0.28);
+    --fc-text: #e6f1ff;
+    --fc-muted: #8fa7c8;
+    --fc-indigo: #6366f1;
+    --fc-indigo-soft: #a5b4fc;
+    --fc-cyan: #22d3ee;
+    --fc-blue: #4b7dff;
+    --fc-green: #38e6b0;
+    --fc-gold: #ffc857;
+    --fc-red: #ff6680;
+    --fc-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--fc-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .fc-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 14% 0%, rgba(99, 102, 241, 0.16), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(34, 211, 238, 0.10), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(49, 46, 129, 0.34), transparent 56%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--fc-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 460px 1fr 460px;
+    grid-template-rows: 84px 1fr 54px;
+    gap: 18px;
+    padding: 14px 20px 16px;
+  }
+
+  .fc-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .fc-error.is-visible { display: block; }
+
+  /* ===== 顶栏：页头（面包屑 + 渐变标题 + 徽章 | 页内 tabs + 走秒时钟） ===== */
+  .fc-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .fc-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.6) 16%, rgba(34, 211, 238, 0.85) 50%, rgba(99, 102, 241, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(99, 102, 241, 0.45);
+  }
+  .fc-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .fc-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--fc-muted); }
+  .fc-crumb b { font-weight: 400; color: #6fb9e8; }
+  .fc-crumb i { font-style: normal; color: rgba(143, 167, 200, 0.55); }
+  .fc-crumb em { font-style: normal; color: #d7e8ff; }
+  .fc-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .fc-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--fc-indigo-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(99, 102, 241, 0.38));
+  }
+  .fc-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 12px; border-radius: 999px; font-size: 12px; letter-spacing: 0.12em;
+    color: #dfe4ff; border: 1px solid rgba(99, 102, 241, 0.55); background: rgba(49, 46, 129, 0.35);
+    box-shadow: inset 0 0 12px rgba(99, 102, 241, 0.14);
+  }
+  .fc-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--fc-cyan); box-shadow: 0 0 8px var(--fc-cyan); animation: fcDot 1.6s ease-in-out infinite; }
+  .fc-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--fc-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .fc-head-meta b { font-weight: 400; color: var(--fc-indigo-soft); }
+  .fc-head-meta i { font-style: normal; color: rgba(143, 167, 200, 0.4); }
+
+  .fc-head-right { display: flex; align-items: center; gap: 24px; flex: none; }
+  .fc-tabs { display: flex; align-items: stretch; gap: 8px; }
+  .fc-tab {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 92px; padding: 6px 16px; border-radius: 10px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(86, 150, 224, 0.38); background: rgba(20, 48, 88, 0.5);
+    color: #cfe0ff; font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s, background 0.2s;
+  }
+  .fc-tab-name { font-size: 15px; font-weight: 700; letter-spacing: 0.1em; }
+  .fc-tab-en { font-size: 9.5px; letter-spacing: 0.2em; color: #5f88b8; }
+  .fc-tab:hover { color: #fff; border-color: rgba(99, 102, 241, 0.7); }
+  .fc-tab.is-active {
+    color: #fff; border-color: rgba(99, 102, 241, 0.85); background: rgba(49, 46, 129, 0.5);
+    box-shadow: 0 0 14px rgba(99, 102, 241, 0.4), inset 0 0 12px rgba(99, 102, 241, 0.16);
+  }
+  .fc-tab.is-active .fc-tab-name { color: var(--fc-indigo-soft); }
+  .fc-tab.is-active .fc-tab-en { color: #7c8cf0; }
+  .fc-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 24px; border-left: 1px solid rgba(86, 150, 224, 0.25); }
+  .fc-clock-time { font: 700 26px/1 var(--fc-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(34, 211, 238, 0.4); }
+  .fc-clock-date { font-size: 12px; color: var(--fc-muted); letter-spacing: 0.08em; }
+
+  /* ===== 面板通用 ===== */
+  .fc-col { display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+  .fc-panel {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--fc-border); border-radius: 12px; background: var(--fc-panel);
+    display: flex; flex-direction: column;
+  }
+  .fc-col .fc-panel { flex: 1; }
+  .fc-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.28), rgba(34, 211, 238, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .fc-panel-head i { flex: none; width: 5px; height: 16px; background: var(--fc-indigo); box-shadow: 0 0 8px var(--fc-indigo); transform: skewX(-12deg); }
+  .fc-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .fc-panel-head .fc-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fc-panel-head .fc-panel-scope { margin-left: auto; font-size: 12px; color: var(--fc-indigo-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .fc-chart { flex: 1; min-height: 0; }
+
+  /* ===== 左：环节明细表 ===== */
+  .fc-table { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px 14px 14px; }
+  .fc-thead, .fc-row {
+    display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.05fr 1fr; align-items: center;
+    padding: 0 10px; column-gap: 6px;
+  }
+  .fc-thead {
+    flex: none; height: 30px; font-size: 11.5px; letter-spacing: 0.06em; color: #7f9dc4;
+    border-bottom: 1px solid rgba(86, 150, 224, 0.22);
+  }
+  .fc-thead span:not(:first-child), .fc-row span:not(:first-child) { text-align: right; }
+  .fc-tbody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .fc-row {
+    flex: 1; min-height: 0; font-size: 13px; color: #d7e6fa; font-variant-numeric: tabular-nums;
+    border-radius: 7px; animation: fcRowIn 0.5s ease backwards;
+  }
+  .fc-row:nth-child(odd) { background: rgba(40, 74, 128, 0.22); }
+  .fc-row-name { display: flex; align-items: center; gap: 8px; color: #eaf2ff; font-weight: 600; letter-spacing: 0.02em; }
+  .fc-row-idx {
+    flex: none; width: 20px; height: 20px; border-radius: 6px; font: 700 11px/20px var(--fc-mono);
+    text-align: center; color: #dfe4ff;
+    background: linear-gradient(160deg, rgba(99, 102, 241, 0.8), rgba(49, 46, 129, 0.7));
+  }
+  .fc-row-mono { font-family: var(--fc-mono); font-weight: 700; color: #f0f8ff; font-size: 14px; }
+  .fc-row-time { color: var(--fc-indigo-soft); }
+  .fc-badge-rate {
+    justify-self: end; display: inline-flex; align-items: center; justify-content: center;
+    min-width: 58px; padding: 2px 8px; border-radius: 999px; font: 700 12.5px/1.3 var(--fc-mono);
+    border: 1px solid transparent;
+  }
+  .fc-badge-rate.is-good { color: #7cf0c8; border-color: rgba(56, 230, 176, 0.4); background: rgba(20, 74, 60, 0.4); }
+  .fc-badge-rate.is-warn { color: #ffd79a; border-color: rgba(255, 200, 87, 0.4); background: rgba(84, 62, 22, 0.38); }
+  .fc-badge-rate.is-bad { color: #ff9db0; border-color: rgba(255, 102, 128, 0.42); background: rgba(84, 26, 38, 0.4); }
+  @keyframes fcRowIn { from { opacity: 0; transform: translateX(-14px); } }
+
+  /* ===== 中央：转化漏斗（主视觉） ===== */
+  .fc-center { }
+  .fc-center-top {
+    flex: none; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px 22px 6px;
+  }
+  .fc-conv { display: flex; align-items: baseline; gap: 6px; position: relative; }
+  .fc-conv-val {
+    font: 700 52px/1 var(--fc-mono); letter-spacing: 0.01em;
+    background: linear-gradient(180deg, #ffffff 20%, var(--fc-indigo-soft) 92%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(99, 102, 241, 0.5));
+    font-variant-numeric: tabular-nums;
+  }
+  .fc-conv-unit { font: 700 24px/1 var(--fc-mono); color: var(--fc-indigo-soft); }
+  .fc-conv-label { font-size: 13px; letter-spacing: 0.14em; color: var(--fc-muted); margin-left: 12px; align-self: flex-end; padding-bottom: 6px; }
+  .fc-center-metrics { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--fc-muted); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .fc-center-metrics .fc-m { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .fc-center-metrics .fc-m b { font: 700 20px/1 var(--fc-mono); color: #f0f8ff; text-shadow: 0 0 10px rgba(99, 102, 241, 0.4); }
+  .fc-center-metrics .fc-m span { font-size: 11px; letter-spacing: 0.1em; color: #5f88b8; }
+  .fc-center-metrics i { width: 1px; height: 30px; background: rgba(86, 150, 224, 0.28); }
+
+  /* ===== 底部跑马灯 ===== */
+  .fc-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--fc-border); border-radius: 12px; background: var(--fc-panel);
+  }
+  .fc-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #eef0ff;
+    background: linear-gradient(120deg, var(--fc-indigo), #3730a3 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .fc-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #eef0ff; animation: fcDot 1.6s ease-in-out infinite; }
+  @keyframes fcDot { 50% { opacity: 0.3; } }
+  .fc-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .fc-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: fcMarquee 44s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .fc-marquee-track b { color: var(--fc-indigo-soft); font-weight: 700; }
+  .fc-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(99, 102, 241, 0.55); }
+  @keyframes fcMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .fc-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="fc-stage" id="fc-stage">
+    <!-- mockflag:begin --><div class="fc-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="fc-error" id="fc-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏：页头 -->
+    <header class="fc-header">
+      <div class="fc-head-left">
+        <div class="fc-crumb"><b>信贷管理</b><i>›</i><em>审批漏斗</em></div>
+        <div class="fc-head-title-row">
+          <div class="fc-head-title">信贷审批转化漏斗</div>
+          <span class="fc-badge"><i></i>审批中枢 · 实时</span>
+          <div class="fc-head-meta">
+            <span>统计口径 <b id="fc-scope-name">零售</b></span><i>|</i>
+            <span>数据频率 <b>T+1</b></span><i>|</i>
+            <span>模型版本 <b id="fc-model">RISK-CR v4.2</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="fc-head-right">
+        <div class="fc-tabs" id="fc-tabs" role="tablist" aria-label="业务口径切换">
+          <button class="fc-tab is-active" data-idx="0" type="button" role="tab"><span class="fc-tab-name">零售</span><span class="fc-tab-en">RETAIL</span></button>
+          <button class="fc-tab" data-idx="1" type="button" role="tab"><span class="fc-tab-name">对公</span><span class="fc-tab-en">CORPORATE</span></button>
+          <button class="fc-tab" data-idx="2" type="button" role="tab"><span class="fc-tab-name">信用卡</span><span class="fc-tab-en">CREDIT CARD</span></button>
+        </div>
+        <div class="fc-clock" aria-label="实时时钟">
+          <span class="fc-clock-time" id="fc-clock-time">--:--:--</span>
+          <span class="fc-clock-date" id="fc-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 左列：环节明细表 -->
+    <section class="fc-panel">
+      <header class="fc-panel-head"><i></i><h2>环节明细</h2><span class="fc-panel-en">STAGE DETAIL</span><span class="fc-panel-scope" id="fc-detail-scope">6 环节 · 逐层通过率</span></header>
+      <div class="fc-table">
+        <div class="fc-thead"><span>审批环节</span><span>进件量</span><span>通过量</span><span>通过率</span><span>平均时效</span></div>
+        <div class="fc-tbody" id="fc-detail"></div>
+      </div>
+    </section>
+
+    <!-- 中央：转化漏斗主视觉 -->
+    <section class="fc-panel fc-center">
+      <header class="fc-panel-head"><i></i><h2>审批转化漏斗</h2><span class="fc-panel-en">CONVERSION FUNNEL</span><span class="fc-panel-scope" id="fc-funnel-scope">申请 → 放款 全链路</span></header>
+      <div class="fc-center-top">
+        <div class="fc-conv">
+          <span class="fc-conv-val" id="fc-conv">0.0</span><span class="fc-conv-unit">%</span>
+          <span class="fc-conv-label">全流程总转化率</span>
+        </div>
+        <div class="fc-center-metrics">
+          <div class="fc-m"><b id="fc-in">0</b><span>申请提交（笔）</span></div>
+          <i></i>
+          <div class="fc-m"><b id="fc-out">0</b><span>放款完成（笔）</span></div>
+          <i></i>
+          <div class="fc-m"><b id="fc-cycle">0.0</b><span>全流程时效（天）</span></div>
+        </div>
+      </div>
+      <div class="fc-chart" id="fc-chart-funnel" role="img" aria-label="信贷审批六环节转化漏斗"></div>
+    </section>
+
+    <!-- 右列：流失原因 + 放款趋势 -->
+    <div class="fc-col">
+      <section class="fc-panel">
+        <header class="fc-panel-head"><i></i><h2>流失原因分析</h2><span class="fc-panel-en">DROP-OFF REASONS</span><span class="fc-panel-scope" id="fc-loss-scope">累计流失 --</span></header>
+        <div class="fc-chart" id="fc-chart-loss" role="img" aria-label="审批流失原因横向条形图"></div>
+      </section>
+      <section class="fc-panel">
+        <header class="fc-panel-head"><i></i><h2>近 12 月放款趋势</h2><span class="fc-panel-en">DISBURSEMENT TREND</span><span class="fc-panel-scope" id="fc-trend-scope">当月 --</span></header>
+        <div class="fc-chart" id="fc-chart-trend" role="img" aria-label="近十二个月放款笔数面积折线图"></div>
+      </section>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="fc-marquee" aria-label="审批业务播报">
+      <div class="fc-marquee-tag"><i></i>审批播报</div>
+      <div class="fc-marquee-view"><div class="fc-marquee-track" id="fc-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("fc-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("fc-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    indigo: "#6366f1", indigoSoft: "#a5b4fc", indigoDeep: "#3730a3",
+    cyan: "#22d3ee", blue: "#4b7dff", green: "#38e6b0",
+    gold: "#ffc857", red: "#ff6680",
+    mono: "Bahnschrift, DIN Alternate, sans-serif"
+  };
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const fmtInt = (n) => fmtDec(n, 0);
+
+  /* ===== 3. 三套口径审批档案（漏斗 6 值为单一数组，明细表/转化率/流失/趋势全部派生） ===== */
+  /* funnel[i] = 该环节通过量；进件量 = i===0 ? funnel[0] : funnel[i-1]；通过率 = funnel[i]/进件量 */
+  const SCOPES = [
+    {
+      key: "retail", name: "零售", model: "RISK-CR v4.2",
+      stages: ["申请提交", "资质预审", "征信审查", "风险评估", "审批决议", "放款完成"],
+      funnel: [12800, 10240, 8400, 6720, 5400, 4860],
+      times: ["0.5h", "2.4h", "6.8h", "4.2h", "1.2d", "0.8d"],
+      cycleDays: 2.6,
+      loss: [
+        { name: "资质不符", value: 2380 }, { name: "征信不良", value: 1860 },
+        { name: "收入不足", value: 1420 }, { name: "负债过高", value: 1080 },
+        { name: "资料缺失", value: 760 }, { name: "其他", value: 440 }
+      ],
+      trend: [3980, 4120, 3860, 4250, 4480, 4320, 4610, 4530, 4720, 4680, 4910, 4860],
+      news: [
+        "零售口径全流程转化率 <b>38.0%</b>，环比提升 0.6pct，处于近半年高位",
+        "征信审查环节平均时效 <b>6.8h</b>，为链路最长瓶颈，已启动自动核验提速",
+        "本月流失主因 <b>资质不符 2,380 笔</b>，建议前置准入预筛降低无效进件",
+        "放款完成环节通过率 <b>90.0%</b>，放款前撤回率持续走低",
+        "当月放款 <b>4,860 笔</b>，逼近年内峰值，审批产能利用率 92%"
+      ]
+    },
+    {
+      key: "corp", name: "对公", model: "RISK-CB v3.5",
+      stages: ["授信申请", "材料预审", "尽职调查", "风险评估", "审批决议", "放款完成"],
+      funnel: [1860, 1490, 1180, 940, 760, 648],
+      times: ["1.0h", "1.2d", "3.5d", "2.4d", "1.8d", "1.5d"],
+      cycleDays: 10.4,
+      loss: [
+        { name: "经营异常", value: 380 }, { name: "财务瑕疵", value: 300 },
+        { name: "担保不足", value: 250 }, { name: "行业受限", value: 160 },
+        { name: "材料缺失", value: 82 }, { name: "其他", value: 40 }
+      ],
+      trend: [520, 560, 540, 580, 610, 590, 620, 600, 640, 630, 660, 648],
+      news: [
+        "对公口径全流程转化率 <b>34.8%</b>，尽职调查环节耗时 <b>3.5d</b> 为主要拖累",
+        "本月流失主因 <b>经营异常 380 笔</b>，风险名单联动拦截生效",
+        "审批决议环节通过率 <b>80.9%</b>，大额授信复议占比上升",
+        "当月放款 <b>648 笔</b>，对公投放节奏稳中有进",
+        "全流程平均时效 <b>10.4 天</b>，尽调线上化改造预计压缩 2 天"
+      ]
+    },
+    {
+      key: "card", name: "信用卡", model: "RISK-CC v5.1",
+      stages: ["申卡提交", "资质初审", "征信核查", "反欺诈", "授信审批", "制卡激活"],
+      funnel: [28600, 24310, 19800, 17200, 14600, 12400],
+      times: ["0.2h", "0.5h", "2.1h", "0.8h", "1.5h", "6.5h"],
+      cycleDays: 0.6,
+      loss: [
+        { name: "征信不足", value: 4800 }, { name: "反欺诈拦截", value: 3600 },
+        { name: "收入不达标", value: 3200 }, { name: "多头借贷", value: 2400 },
+        { name: "资料不全", value: 1400 }, { name: "其他", value: 800 }
+      ],
+      trend: [9800, 10200, 10600, 11100, 11500, 11300, 11800, 12000, 12200, 12100, 12500, 12400],
+      news: [
+        "信用卡口径全流程转化率 <b>43.4%</b>，为三口径最高，线上秒批占比 78%",
+        "反欺诈环节拦截 <b>3,600 笔</b>，模型规则命中率环比 +1.2pct",
+        "征信核查平均时效 <b>2.1h</b>，自动化审批覆盖率提升至 86%",
+        "当月制卡激活 <b>12,400 笔</b>，新户首刷率 64%",
+        "多头借贷流失 <b>2,400 笔</b>，联合建模额度策略持续优化"
+      ]
+    }
+  ];
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("fc-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("fc-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* 近 12 月滚动月份标签 */
+  const MONTHS = (() => {
+    const now = new Date();
+    const arr = [];
+    for (let i = 11; i >= 0; i--) {
+      const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      arr.push((m.getMonth() + 1) + "月");
+    }
+    return arr;
+  })();
+
+  /* ===== 5. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(99, 102, 241, 0.5)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  function makeChart(id) {
+    const el = document.getElementById(id);
+    return el ? echarts.init(el) : null;
+  }
+
+  /* ===== 6. 数值缓动翻牌（转化率 / 进件 / 放款 / 时效） ===== */
+  function countUp(node, to, dec) {
+    const from = parseFloat(node.dataset.v || "0") || 0;
+    const t0 = performance.now();
+    const dur = 850;
+    function step(t) {
+      const k = Math.min(1, (t - t0) / dur);
+      const e = 1 - Math.pow(1 - k, 3);
+      node.textContent = fmtDec(from + (to - from) * e, dec);
+      if (k < 1) requestAnimationFrame(step);
+      else node.textContent = fmtDec(to, dec);
+    }
+    node.dataset.v = to;
+    requestAnimationFrame(step);
+  }
+
+  /* ===== 7. 中央：审批转化漏斗（主视觉，靛蓝→青渐变色阶） ===== */
+  const funnelChart = makeChart("fc-chart-funnel");
+  const FUNNEL_PAIRS = [
+    ["#c7d2fe", "#a5b4fc"],
+    ["#a5b4fc", "#818cf8"],
+    ["#818cf8", "#6366f1"],
+    ["#6b7cf0", "#4f74e3"],
+    ["#4f8fdc", "#33a9d6"],
+    ["#38c4d9", "#22d3ee"]
+  ];
+  function stageRate(sc, i) {
+    const inbound = i === 0 ? sc.funnel[0] : sc.funnel[i - 1];
+    return sc.funnel[i] / inbound * 100;
+  }
+  function funnelOption(sc) {
+    const top = sc.funnel[0];
+    const data = sc.stages.map((n, i) => {
+      const rate = stageRate(sc, i);
+      const share = sc.funnel[i] / top * 100;
+      const [a, b] = FUNNEL_PAIRS[i];
+      return {
+        name: n, value: sc.funnel[i], rate: rate, share: share,
+        itemStyle: {
+          color: hGrad(a, b), borderColor: "#0a1e3c", borderWidth: 2,
+          shadowBlur: 16, shadowColor: a + "66"
+        }
+      };
+    });
+    return {
+      tooltip: tip({
+        formatter: (o) => o.data.name + "<br/>通过量 <b style=\"color:#a5b4fc\">" + fmtInt(o.value) +
+          "</b> 笔<br/>" + (o.dataIndex === 0 ? "首层基准" : "较上层通过 <b style=\"color:#7cf0c8\">" + o.data.rate.toFixed(1) + "%</b>") +
+          "<br/>占首层 " + o.data.share.toFixed(1) + "%"
+      }),
+      series: [{
+        type: "funnel", sort: "descending",
+        left: "8%", right: "8%", top: 14, bottom: 14,
+        minSize: "26%", maxSize: "100%", gap: 5,
+        funnelAlign: "center",
+        label: {
+          show: true, position: "inside", color: "#0c1430",
+          fontSize: 13, fontWeight: 700, lineHeight: 16,
+          formatter: (o) => o.data.name + "  " + fmtInt(o.value) +
+            (o.dataIndex === 0 ? "  基准" : "  ↓" + o.data.rate.toFixed(1) + "%")
+        },
+        labelLine: { show: false },
+        itemStyle: { borderWidth: 2 },
+        emphasis: { label: { fontSize: 15 } },
+        data: data
+      }],
+      animationDuration: 800,
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 8. 左：环节明细表（进件量/通过量/通过率/时效，全部由 funnel 派生） ===== */
+  function rateClass(r) { return r >= 88 ? "is-good" : (r >= 80 ? "is-warn" : "is-bad"); }
+  function renderDetail(sc) {
+    const box = $("fc-detail");
+    box.innerHTML = "";
+    sc.stages.forEach((n, i) => {
+      const inbound = i === 0 ? sc.funnel[0] : sc.funnel[i - 1];
+      const pass = sc.funnel[i];
+      const rate = pass / inbound * 100;
+      const row = document.createElement("div");
+      row.className = "fc-row";
+      row.style.animationDelay = (i * 0.05) + "s";
+      row.innerHTML =
+        '<span class="fc-row-name"><i class="fc-row-idx">' + (i + 1) + '</i>' + n + '</span>' +
+        '<span class="fc-row-mono">' + fmtInt(inbound) + '</span>' +
+        '<span class="fc-row-mono">' + fmtInt(pass) + '</span>' +
+        '<span class="fc-badge-rate ' + rateClass(rate) + '">' + rate.toFixed(1) + '%</span>' +
+        '<span class="fc-row-time">' + sc.times[i] + '</span>';
+      box.appendChild(row);
+    });
+  }
+
+  /* ===== 9. 右上：流失原因分析（横向条形，轮播高亮） ===== */
+  const lossChart = makeChart("fc-chart-loss");
+  function lossOption(sc) {
+    const rows = sc.loss.slice().sort((a, b) => a.value - b.value); /* 升序：最大在顶（inverse） */
+    const maxV = rows[rows.length - 1].value;
+    return {
+      tooltip: tip({ trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: (v) => fmtInt(v) + " 笔" }),
+      grid: { left: 10, right: 62, top: 12, bottom: 6, containLabel: true },
+      xAxis: { type: "value", max: Math.ceil(maxV * 1.12), show: false },
+      yAxis: {
+        type: "category", data: rows.map((r) => r.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe0ff", fontSize: 12.5 }
+      },
+      series: [{
+        type: "bar", barWidth: 13,
+        data: rows.map((r, i) => ({
+          value: r.value,
+          itemStyle: { borderRadius: 7, color: i === rows.length - 1 ? hGrad("#3730a3", "#a5b4fc") : hGrad("#1d5d9e", C.cyan) }
+        })),
+        label: { show: true, position: "right", fontSize: 12, color: C.indigoSoft, fontFamily: C.mono, formatter: (o) => fmtInt(o.value) },
+        showBackground: true,
+        backgroundStyle: { color: "rgba(63, 120, 200, 0.1)", borderRadius: 7 }
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 10. 右下：近 12 月放款趋势（面积渐变折线，末点=当月放款=funnel[5]） ===== */
+  const trendChart = makeChart("fc-chart-trend");
+  function trendOption(sc) {
+    return {
+      tooltip: tip({ trigger: "axis", valueFormatter: (v) => fmtInt(v) + " 笔" }),
+      grid: { left: 8, right: 16, top: 22, bottom: 4, containLabel: true },
+      xAxis: {
+        type: "category", data: MONTHS, boundaryGap: false,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+        axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 10.5 }
+      },
+      yAxis: {
+        type: "value", scale: true,
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+        axisLabel: { color: C.muted, fontSize: 10, formatter: (v) => v >= 1000 ? (v / 1000).toFixed(0) + "k" : v }
+      },
+      series: [{
+        type: "line", smooth: true, symbol: "circle", symbolSize: 6, showSymbol: false,
+        data: sc.trend,
+        lineStyle: { width: 2.4, color: hGrad(C.indigoSoft, C.cyan) },
+        itemStyle: { color: C.indigo, borderColor: "#eaf2ff", borderWidth: 1.5 },
+        areaStyle: { color: vGrad("rgba(99, 102, 241, 0.4)", "rgba(99, 102, 241, 0.02)") },
+        emphasis: { focus: "series" },
+        markPoint: {
+          symbol: "pin", symbolSize: 44, data: [{ type: "max", name: "峰值" }],
+          itemStyle: { color: "rgba(99, 102, 241, 0.85)" },
+          label: { color: "#fff", fontSize: 10, fontFamily: C.mono }
+        }
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 11. 底部：审批播报跑马灯（切换后重启滚动） ===== */
+  function renderMarquee(sc) {
+    const html = sc.news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("fc-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+
+  /* ===== 12. tabs：切换口径 → 全页真实刷新 ===== */
+  let curIdx = 0;
+  const tabNodes = Array.prototype.slice.call(document.querySelectorAll(".fc-tab"));
+  function applyScope(idx) {
+    curIdx = (idx + SCOPES.length) % SCOPES.length;
+    const sc = SCOPES[curIdx];
+    const total = sc.funnel[0];
+    const out = sc.funnel[sc.funnel.length - 1];
+    const conv = out / total * 100;
+    const lost = total - out;
+
+    tabNodes.forEach((t) => t.classList.toggle("is-active", +t.dataset.idx === curIdx));
+    $("fc-scope-name").textContent = sc.name;
+    $("fc-model").textContent = sc.model;
+    $("fc-detail-scope").textContent = sc.stages.length + " 环节 · 逐层通过率";
+    $("fc-funnel-scope").textContent = sc.stages[0] + " → " + sc.stages[sc.stages.length - 1] + " 全链路";
+    $("fc-loss-scope").textContent = "累计流失 " + fmtInt(lost) + " 笔";
+    $("fc-trend-scope").textContent = "当月 " + fmtInt(out) + " 笔";
+
+    /* KPI 翻牌 */
+    countUp($("fc-conv"), conv, 1);
+    countUp($("fc-in"), total, 0);
+    countUp($("fc-out"), out, 0);
+    countUp($("fc-cycle"), sc.cycleDays, 1);
+
+    /* 图表与表格整体过渡 */
+    funnelChart.setOption(funnelOption(sc));
+    renderDetail(sc);
+    lossChart.setOption(lossOption(sc));
+    trendChart.setOption(trendOption(sc));
+    renderMarquee(sc);
+    funnelHi = 0; lossHi = 0; trendHi = 0;
+  }
+  tabNodes.forEach((t) => t.addEventListener("click", () => applyScope(+t.dataset.idx)));
+  applyScope(0);
+
+  /* ===== 13. 活性动效 ===== */
+  /* 13a. 漏斗层轮流 highlight + showTip */
+  let funnelHi = 0;
+  setInterval(() => {
+    const n = SCOPES[curIdx].funnel.length;
+    funnelChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    funnelChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: funnelHi });
+    funnelChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: funnelHi });
+    funnelHi = (funnelHi + 1) % n;
+  }, 2400);
+
+  /* 13b. 流失原因条轮播高亮 */
+  let lossHi = 0;
+  setInterval(() => {
+    const n = SCOPES[curIdx].loss.length;
+    lossChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    lossChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: lossHi });
+    lossChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: lossHi });
+    lossHi = (lossHi + 1) % n;
+  }, 2600);
+
+  /* 13c. 放款折线 tooltip 巡航 */
+  let trendHi = 0;
+  setInterval(() => {
+    const n = SCOPES[curIdx].trend.length;
+    trendChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: trendHi });
+    trendHi = (trendHi + 1) % n;
+  }, 2000);
+
+  /* 13d. 当月放款笔数微跳变（末点活性，刷新趋势与末点派生指标） */
+  setInterval(() => {
+    const sc = SCOPES[curIdx];
+    const last = sc.trend.length - 1;
+    sc.trend[last] = Math.max(1, Math.round(sc.trend[last] + rndf(-6, 8)));
+    trendChart.setOption(trendOption(sc));
+  }, 6000);
+})();
+</script>
+</body>
+</html>

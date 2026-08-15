@@ -1,0 +1,1318 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 公共资金税收分行业</title>
+<style>
+  :root {
+    --hy-bg: #08203f;
+    --hy-panel: rgba(11, 38, 72, 0.72);
+    --hy-border: rgba(92, 156, 226, 0.28);
+    --hy-text: #e8f2ff;
+    --hy-muted: #8ea9cc;
+    --hy-gold: #f0c060;
+    --hy-gold-soft: #ffdc8f;
+    --hy-blue: #3d9cff;
+    --hy-cyan: #39d0d8;
+    --hy-green: #33e0a6;
+    --hy-red: #ff5f6e;
+    --hy-orange: #ff9d4d;
+    --hy-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--hy-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .hy-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(240, 192, 96, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(57, 208, 216, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 60, 120, 0.34), transparent 56%),
+      linear-gradient(rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      var(--hy-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 430px 1fr 430px;
+    grid-template-rows: 84px 132px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .hy-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .hy-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .hy-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .hy-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(240, 192, 96, 0.6) 16%, rgba(57, 208, 216, 0.85) 50%, rgba(240, 192, 96, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.4);
+  }
+  .hy-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .hy-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--hy-muted); }
+  .hy-crumb b { font-weight: 400; color: var(--hy-gold); }
+  .hy-crumb i { font-style: normal; color: rgba(142, 169, 204, 0.55); }
+  .hy-crumb em { font-style: normal; color: #d7e8ff; }
+  .hy-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .hy-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--hy-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(240, 192, 96, 0.35));
+  }
+  .hy-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--hy-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .hy-head-meta b { font-weight: 400; color: var(--hy-gold-soft); }
+  .hy-head-meta i { font-style: normal; color: rgba(142, 169, 204, 0.4); }
+
+  .hy-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .hy-chips { display: flex; align-items: center; gap: 9px; }
+  .hy-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid rgba(92, 156, 226, 0.4); background: rgba(16, 46, 86, 0.55);
+  }
+  .hy-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f88b8; }
+  .hy-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #d6e9ff; font-variant-numeric: tabular-nums; }
+  .hy-chip.is-gold { border-color: rgba(240, 192, 96, 0.5); background: rgba(72, 56, 24, 0.42); box-shadow: inset 0 0 14px rgba(240, 192, 96, 0.1); }
+  .hy-chip.is-gold b { color: var(--hy-gold-soft); }
+  .hy-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(92, 156, 226, 0.25); }
+  .hy-clock-time { font: 700 26px/1 var(--hy-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(57, 208, 216, 0.4); }
+  .hy-clock-date { font-size: 12px; color: var(--hy-muted); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .hy-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .hy-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--hy-border); border-radius: 12px; background: var(--hy-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .hy-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--hy-gold), transparent); }
+  .hy-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(240, 192, 96, 0.13), transparent 68%);
+  }
+  .hy-kpi.is-good::before { background: linear-gradient(90deg, var(--hy-green), transparent); }
+  .hy-kpi.is-good::after { background: radial-gradient(circle, rgba(51, 224, 166, 0.14), transparent 68%); }
+  .hy-kpi.is-bad::before { background: linear-gradient(90deg, var(--hy-red), transparent); }
+  .hy-kpi.is-bad::after { background: radial-gradient(circle, rgba(255, 95, 110, 0.16), transparent 68%); }
+  .hy-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.28), rgba(57, 208, 216, 0.12));
+    border: 1px solid rgba(240, 192, 96, 0.35); box-shadow: inset 0 0 12px rgba(240, 192, 96, 0.14);
+  }
+  .hy-kpi.is-good .hy-kpi-icon {
+    background: linear-gradient(160deg, rgba(51, 224, 166, 0.3), rgba(57, 208, 216, 0.12));
+    border-color: rgba(51, 224, 166, 0.45); box-shadow: inset 0 0 12px rgba(51, 224, 166, 0.18);
+  }
+  .hy-kpi.is-bad .hy-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 95, 110, 0.3), rgba(255, 157, 77, 0.12));
+    border-color: rgba(255, 95, 110, 0.45); box-shadow: inset 0 0 12px rgba(255, 95, 110, 0.18);
+  }
+  .hy-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .hy-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--hy-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hy-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .hy-kpi-val { font: 700 30px/1 var(--hy-mono); color: var(--hy-gold-soft); letter-spacing: 0.01em; text-shadow: 0 0 14px rgba(240, 192, 96, 0.45); }
+  .hy-kpi.is-good .hy-kpi-val { color: #8ff0cd; text-shadow: 0 0 14px rgba(51, 224, 166, 0.45); }
+  .hy-kpi.is-bad .hy-kpi-val { color: #ffa3ad; text-shadow: 0 0 14px rgba(255, 95, 110, 0.45); }
+  .hy-kpi-unit { font-size: 12px; color: #b39a5e; }
+  .hy-kpi-sub { display: flex; align-items: center; gap: 8px; font-size: 11.5px; letter-spacing: 0.02em; color: var(--hy-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .hy-kpi-sub b { font-weight: 700; }
+  .hy-up { color: var(--hy-green); }
+  .hy-down { color: var(--hy-red); }
+  .hy-goldc { color: var(--hy-gold-soft); }
+  .hy-cyanc { color: var(--hy-cyan); }
+
+  /* KPI 卡内嵌占比条 */
+  .hy-mini-track { position: relative; height: 6px; border-radius: 3px; background: rgba(63, 120, 200, 0.2); }
+  .hy-mini-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; width: 0; transition: width 1.2s ease;
+    background: linear-gradient(90deg, #b8863a, var(--hy-gold-soft)); box-shadow: 0 0 10px rgba(240, 192, 96, 0.5); }
+  .hy-mini-fill.is-green { background: linear-gradient(90deg, #18765c, #7ff0c8); box-shadow: 0 0 10px rgba(51, 224, 166, 0.45); }
+  .hy-mini-fill.is-red { background: linear-gradient(90deg, #a03444, #ff9aa5); box-shadow: 0 0 10px rgba(255, 95, 110, 0.45); }
+
+  /* ===== 面板通用 ===== */
+  .hy-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .hy-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--hy-border); border-radius: 12px; background: var(--hy-panel);
+    display: flex; flex-direction: column;
+  }
+  .hy-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(240, 192, 96, 0.22), rgba(57, 208, 216, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .hy-panel-head i { flex: none; width: 5px; height: 16px; background: var(--hy-gold); box-shadow: 0 0 8px var(--hy-gold); transform: skewX(-12deg); }
+  .hy-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f4f9ff; white-space: nowrap; }
+  .hy-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hy-panel-scope { margin-left: auto; font-size: 12px; color: var(--hy-gold-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .hy-chart { flex: 1; min-height: 0; }
+
+  .hy-tree { flex: 1.7; }
+  .hy-rank { flex: 1.2; }
+  .hy-table-panel { flex: 1.15; }
+
+  /* ===== 右①：行业结构变迁（DOM 100% 堆叠条 + 变化连线） ===== */
+  .hy-mix { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 8px 14px 10px; }
+  .hy-mix-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-left: 50px; font-size: 10.5px; color: #b9d2ee; }
+  .hy-mix-legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .hy-mix-legend em { width: 9px; height: 9px; border-radius: 2px; font-style: normal; }
+  .hy-mix-row { display: flex; align-items: center; gap: 8px; }
+  .hy-mix-year { flex: none; width: 42px; font: 700 12px/1 var(--hy-mono); color: #d7e8ff; letter-spacing: 0.04em; }
+  .hy-mix-year u { display: block; text-decoration: none; font: 400 9px/1.4 "PingFang SC", sans-serif; color: #5f88b8; }
+  .hy-mix-bar { position: relative; flex: 1; height: 44px; border-radius: 5px; overflow: hidden; background: rgba(63, 120, 200, 0.12); }
+  .hy-seg {
+    position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; overflow: hidden; border-right: 1px solid rgba(4, 16, 31, 0.65);
+  }
+  .hy-seg b { font: 700 11px/1 var(--hy-mono); color: #08192e; }
+  .hy-seg span { font-size: 9px; line-height: 1; color: rgba(8, 25, 46, 0.78); white-space: nowrap; }
+  .hy-seg.is-dark b { color: #f2f8ff; }
+  .hy-seg.is-dark span { color: rgba(242, 248, 255, 0.75); }
+  .hy-mix-link { position: relative; height: 30px; padding-left: 50px; }
+  .hy-mix-link-inner { position: relative; height: 100%; }
+  .hy-mark { position: absolute; top: 0; bottom: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+  .hy-mark i { flex: 1; width: 1px; background: rgba(142, 169, 204, 0.45); }
+  .hy-mark b {
+    flex: none; font: 700 10px/1 var(--hy-mono); letter-spacing: 0.02em; white-space: nowrap;
+    padding: 3px 6px; border-radius: 999px; border: 1px solid currentColor; background: rgba(6, 22, 44, 0.92);
+  }
+  .hy-mark.is-up b { color: var(--hy-green); }
+  .hy-mark.is-down b { color: var(--hy-red); }
+  .hy-mix-foot { padding-left: 50px; font-size: 10.5px; color: #5f88b8; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+  .hy-mix-foot b { font-weight: 700; color: var(--hy-gold-soft); }
+
+  /* ===== 右②：行业明细表（CSS grid 模拟，滚动轮播） ===== */
+  .hy-table { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 10px 0; }
+  .hy-thead, .hy-tbody li {
+    display: grid; grid-template-columns: 1fr 62px 52px 58px 56px; align-items: center;
+    gap: 4px; font-variant-numeric: tabular-nums;
+  }
+  .hy-thead {
+    flex: none; height: 26px; font-size: 10.5px; letter-spacing: 0.08em; color: #7fa3cd;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.28);
+  }
+  .hy-thead span:not(:first-child), .hy-tbody li span:not(:first-child) { text-align: right; }
+  .hy-tview { flex: 1; min-height: 0; overflow: hidden; position: relative; }
+  .hy-tbody { list-style: none; margin: 0; padding: 0; animation: hyRoll 30s linear infinite; }
+  .hy-tbody li { height: 30px; font-size: 11.5px; color: #d8e8fb; padding: 0 4px; border-radius: 4px; }
+  .hy-tbody li:nth-child(odd) { background: rgba(63, 120, 200, 0.09); }
+  .hy-tbody li b { font: 700 12px/1 var(--hy-mono); color: var(--hy-gold-soft); }
+  .hy-tbody li.is-neg { background: rgba(160, 52, 68, 0.16); }
+  .hy-tbody li.is-neg .hy-yoy { color: var(--hy-red); font-weight: 700; }
+  .hy-tbody li .hy-yoy { color: var(--hy-green); font-weight: 700; }
+  .hy-tbody li .hy-name { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hy-tbody li .hy-rk { flex: none; width: 16px; height: 16px; border-radius: 4px; font: 700 9.5px/16px var(--hy-mono); text-align: center; color: #7fa3cd; background: rgba(63, 120, 200, 0.22); }
+  .hy-tbody li .hy-rk.is-top { color: #2a1c05; background: linear-gradient(120deg, var(--hy-gold-soft), #d8a03c); }
+  @keyframes hyRoll { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+  .hy-note {
+    flex: none; padding: 5px 4px 8px; font-size: 10px; line-height: 1.5; color: #5f88b8;
+    border-top: 1px solid rgba(92, 156, 226, 0.18); letter-spacing: 0.01em;
+  }
+  .hy-note b { font-weight: 700; color: #93b4d8; }
+
+  /* ===== 底部跑马灯 ===== */
+  .hy-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--hy-border); border-radius: 12px; background: var(--hy-panel);
+  }
+  .hy-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a1c05;
+    background: linear-gradient(120deg, var(--hy-gold-soft), #d8a03c 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .hy-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a1c05; animation: hyDot 1.6s ease-in-out infinite; }
+  @keyframes hyDot { 50% { opacity: 0.25; } }
+  .hy-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .hy-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: hyMarquee 54s linear infinite; font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .hy-marquee-track b { color: var(--hy-gold-soft); font-weight: 700; }
+  .hy-marquee-track u { text-decoration: none; color: #ff8f9b; font-weight: 700; }
+  .hy-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(240, 192, 96, 0.5); }
+  @keyframes hyMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* subnav:begin —— 由 tools/inject_subnav.py 注入，勿手改 */
+  .hy-subnav {
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; flex: none;
+    min-width: 176px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(92, 156, 226, 0.4); background: rgba(16, 46, 86, 0.55);
+  }
+  .hy-subnav > span { font-size: 10.5px; letter-spacing: 0.16em; color: #5f88b8; white-space: nowrap; }
+  .hy-subnav > u { display: flex; align-items: baseline; gap: 6px; text-decoration: none; white-space: nowrap; }
+  .hy-subnav b { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; color: #9fb6d4; }
+  .hy-subnav i { font-style: normal; font-size: 10.5px; color: #5f88b8; }
+  /* 有子页：转青色并可点击 */
+  .hy-subnav.is-on {
+    cursor: pointer; border-color: rgba(57, 208, 216, 0.55);
+    background: linear-gradient(160deg, rgba(57, 208, 216, 0.16), rgba(16, 46, 86, 0.6));
+    box-shadow: inset 0 0 14px rgba(57, 208, 216, 0.1);
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .hy-subnav.is-on b { color: #9fe8ec; }
+  .hy-subnav.is-on i { color: #7fb8c8; }
+  .hy-subnav.is-on:hover { border-color: rgba(57, 208, 216, 0.95); box-shadow: 0 0 16px -2px rgba(57, 208, 216, 0.7); }
+  /* subnav:end */
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .hy-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+  /* carousel:begin —— 由 tools/inject_carousel.py 注入，勿手改，改脚本后重跑 */
+  .hy-carousel {
+    display: flex; align-items: center; gap: 9px; flex: none;
+    padding-left: 18px; margin-left: 2px;
+    border-left: 1px solid rgba(92, 156, 226, 0.25);
+  }
+  .hy-cbtn {
+    width: 36px; height: 36px; flex: none; padding: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px; font-family: inherit;
+    border: 1px solid rgba(240, 192, 96, 0.34);
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.17), rgba(16, 46, 86, 0.6));
+    color: #ffdc8f;
+    transition: border-color .18s, box-shadow .18s, color .18s, transform .18s;
+  }
+  .hy-cbtn svg { width: 18px; height: 18px; display: block; }
+  .hy-cbtn:hover {
+    color: #fff6e2; border-color: rgba(240, 192, 96, 0.85);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.42), inset 0 0 12px rgba(240, 192, 96, 0.14);
+  }
+  .hy-cbtn:active { transform: scale(0.93); }
+  .hy-cmeta { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 62px; }
+  .hy-cidx { font: 700 15px/1 var(--hy-mono); color: #ffdc8f; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+  .hy-cidx i { font-style: normal; font-size: 11px; font-weight: 400; color: #8ea9cc; margin-left: 1px; }
+  .hy-cbar { width: 58px; height: 3px; border-radius: 2px; background: rgba(63, 120, 200, 0.28); overflow: hidden; }
+  .hy-cbar u {
+    display: block; height: 100%; width: 0; border-radius: 2px;
+    background: linear-gradient(90deg, #b8863a, #ffdc8f);
+    box-shadow: 0 0 8px rgba(240, 192, 96, 0.55);
+  }
+  /* 暂停态：进度条停在原地并转灰，播放键换成三角、按钮描边转青，一眼可辨 */
+  .hy-carousel.is-paused .hy-cbar u { background: linear-gradient(90deg, #4a6c96, #8ea9cc); box-shadow: none; }
+  .hy-cplay .hy-ic-play { display: none; }
+  .hy-carousel.is-paused .hy-cplay .hy-ic-pause { display: none; }
+  .hy-carousel.is-paused .hy-cplay .hy-ic-play { display: block; }
+  .hy-carousel.is-paused .hy-cplay {
+    color: #9fe8ec; border-color: rgba(57, 208, 216, 0.6);
+    background: linear-gradient(160deg, rgba(57, 208, 216, 0.2), rgba(16, 46, 86, 0.6));
+    box-shadow: 0 0 12px rgba(57, 208, 216, 0.34);
+  }
+  /* carousel:end */
+  /* drill:begin —— 由 tools/inject_drilldown.py 注入，勿手改 */
+  .hy-drill { cursor: pointer; position: relative; }
+  .hy-drill::after {
+    content: "↗"; position: absolute; right: 6px; top: 50%; transform: translateY(-50%) translateX(-3px);
+    font-size: 11px; font-weight: 700; line-height: 1; color: var(--hy-gold-soft);
+    opacity: 0; transition: opacity .2s ease, transform .2s ease; pointer-events: none; z-index: 3;
+  }
+  .hy-drill:hover::after { opacity: 0.95; transform: translateY(-50%) translateX(0); }
+  .hy-drill:hover {
+    background: rgba(240, 192, 96, 0.16) !important;
+    box-shadow: inset 0 0 0 1px rgba(240, 192, 96, 0.5), 0 0 16px -4px rgba(240, 192, 96, 0.6);
+  }
+  .hy-drill-hint {
+    margin-left: 10px; font-size: 10.5px; letter-spacing: 0.04em; color: #b39a5e;
+    padding: 1px 7px; border-radius: 999px; border: 1px dashed rgba(240, 192, 96, 0.5); white-space: nowrap;
+  }
+  /* 面板级入口：子页是全量台账、无切换对象时用它，挂在相关面板头上 */
+  .hy-drill-entry {
+    margin-left: 10px; cursor: pointer; white-space: nowrap;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; line-height: 1;
+    padding: 4px 9px; border-radius: 999px; color: #06182c;
+    background: linear-gradient(140deg, #9fe8ec, #39d0d8);
+    box-shadow: 0 0 9px -1px rgba(57, 208, 216, 0.75);
+    transition: filter .18s ease, box-shadow .18s ease;
+  }
+  .hy-drill-entry:hover { filter: brightness(1.12); box-shadow: 0 0 16px -1px rgba(57, 208, 216, 0.95); }
+  /* drill:end */
+</style>
+</head>
+<body>
+  <div class="hy-stage" id="hy-stage">
+    <!-- mockflag:begin --><div class="hy-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="hy-error" id="hy-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="hy-header">
+      <div class="hy-head-left">
+        <div class="hy-crumb"><b>公共资金</b><i>›</i><em>税收分行业</em></div>
+        <div class="hy-head-title-row">
+          <div class="hy-head-title">全省税收分行业情况</div>
+          <div class="hy-head-meta">
+            <span>口径 <b>江苏省地方级税收收入</b></span><i>|</i>
+            <span>区间 <b>2026 年 1-7 月累计</b></span><i>|</i>
+            <span>覆盖 <b>13</b> 个行业门类</span>
+          </div>
+        </div>
+      </div>
+      <div class="hy-head-right">
+<!-- subnav:begin -->
+<!--ORIG
+        <div class="hy-chips">
+          <div class="hy-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="hy-chip is-gold"><span>TIME PROGRESS</span><b id="hy-timeprog">--%</b></div>
+        </div>
+ORIG-->
+        <a class="hy-subnav is-on" href="大屏样板间-公共资金行业税收详情1920.html" title="点击进入子页：行业税收详情（页内入口：明细表行或树图）"><span>二级子页 · SUB-PAGE</span><u><b>行业税收详情</b><i>· 明细表行或树图</i></u></a><span id="hy-timeprog" hidden></span>
+        <!-- subnav:end -->
+        <div class="hy-clock" aria-label="实时时钟">
+          <span class="hy-clock-time" id="hy-clock-time">--:--:--</span>
+          <span class="hy-clock-date" id="hy-clock-date">----年--月--日 星期-</span>
+        </div>
+<!-- carousel:begin -->
+        <nav class="hy-carousel" id="hy-carousel" aria-label="专题轮播导航">
+          <button class="hy-cbtn" id="hy-c-prev" type="button" aria-label="上一页" title="上一页（← 方向键）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/></svg>
+          </button>
+          <div class="hy-cmeta">
+            <span class="hy-cidx"><b id="hy-c-cur">--</b><i>/ 13</i></span>
+            <span class="hy-cbar" aria-hidden="true"><u id="hy-c-bar"></u></span>
+          </div>
+          <button class="hy-cbtn" id="hy-c-next" type="button" aria-label="下一页" title="下一页（→ 方向键）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 L17 12 L9 20"/></svg>
+          </button>
+          <button class="hy-cbtn hy-cplay" id="hy-c-play" type="button" aria-label="暂停轮播" aria-pressed="false" title="暂停 / 继续（空格键）">
+            <svg class="hy-ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.4"/><rect x="13.5" y="5" width="4" height="14" rx="1.4"/></svg>
+            <svg class="hy-ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2 L19 12 L8 18.8 Z"/></svg>
+          </button>
+        </nav>
+        <!-- carousel:end -->
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <section class="hy-band" id="hy-band" aria-label="核心指标"></section>
+
+    <!-- 左列 -->
+    <div class="hy-col">
+      <section class="hy-panel hy-rank">
+        <header class="hy-panel-head"><i></i><h2>行业增速排行</h2><span class="hy-panel-en">YOY RANKING</span><span class="hy-panel-scope" id="hy-rank-scope">13 门类 · 按增速排序</span></header>
+        <div class="hy-chart" id="hy-chart-rank" role="img" aria-label="13 个行业门类同比增速正负条形图"></div>
+      </section>
+      <section class="hy-panel">
+        <header class="hy-panel-head"><i></i><h2>制造业细分结构</h2><span class="hy-panel-en">MANUFACTURING SUNBURST</span><span class="hy-panel-scope" id="hy-sun-scope">7 个细分行业</span></header>
+        <div class="hy-chart" id="hy-chart-sun" role="img" aria-label="制造业及其七个细分行业旭日图"></div>
+      </section>
+    </div>
+
+    <!-- 中央 -->
+    <div class="hy-col">
+      <section class="hy-panel hy-tree">
+        <header class="hy-panel-head"><i></i><h2>分行业税收规模与增速</h2><span class="hy-panel-en">TAX TREEMAP · AREA=SCALE, COLOR=YOY</span><span class="hy-panel-scope" id="hy-tree-scope">巡航中 …</span></header>
+        <div class="hy-chart" id="hy-chart-tree" role="img" aria-label="分行业税收矩形树图，面积为规模、颜色为同比增速"></div>
+      </section>
+      <section class="hy-panel">
+        <header class="hy-panel-head"><i></i><h2>四大支柱行业月度走势</h2><span class="hy-panel-en">PILLAR INDUSTRIES MONTHLY</span><span class="hy-panel-scope" id="hy-line-scope">制造 / 批零 / 房地产 / 金融</span></header>
+        <div class="hy-chart" id="hy-chart-line" role="img" aria-label="制造业批发零售房地产金融业四条月度税收折线"></div>
+      </section>
+    </div>
+
+    <!-- 右列 -->
+    <div class="hy-col">
+      <section class="hy-panel">
+        <header class="hy-panel-head"><i></i><h2>行业结构变迁</h2><span class="hy-panel-en">STRUCTURE SHIFT</span><span class="hy-panel-scope" id="hy-mix-scope">近 3 年 · 100% 堆叠</span></header>
+        <div class="hy-mix" id="hy-mix"></div>
+      </section>
+      <section class="hy-panel hy-table-panel">
+        <header class="hy-panel-head"><i></i><h2>行业税收明细</h2><span class="hy-panel-en">INDUSTRY DETAIL</span><span class="hy-panel-scope" id="hy-tb-scope">13 门类 · 按税收降序</span></header>
+        <div class="hy-table">
+          <div class="hy-thead"><span>行业门类</span><span>税收(亿元)</span><span>占比</span><span>同比</span><span>贡献度</span></div>
+          <div class="hy-tview"><ul class="hy-tbody" id="hy-tbody"></ul></div>
+          <div class="hy-note" id="hy-note">—</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="hy-marquee" aria-label="分行业要情">
+      <div class="hy-marquee-tag"><i></i>分行业要情</div>
+      <div class="hy-marquee-view"><div class="hy-marquee-track" id="hy-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("hy-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("hy-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e8f2ff", muted: "#8ea9cc",
+    gold: "#f0c060", goldSoft: "#ffdc8f", goldDeep: "#b8863a",
+    blue: "#3d9cff", cyan: "#39d0d8", cyanDeep: "#1d6e96",
+    green: "#33e0a6", red: "#ff5f6e", redDeep: "#a03444", orange: "#ff9d4d"
+  };
+  const pad2 = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = Number(n).toFixed(dec == null ? 0 : dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+
+  /* ===== 3. 数据源（模拟，口径 江苏省地方级税收收入 2026 年 1-7 月累计 · 亿元）
+         合计一律由分项求和；占比 / 增减额 / 拉动 全部现算，不复制数字 ===== */
+  const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月"];
+
+  /* 3.1 制造业 7 个细分（其和 = 制造业门类税收，见 §5 校验） */
+  const MFG_SUB = [
+    { name: "电子设备", v: 386 },
+    { name: "化工",     v: 292 },
+    { name: "装备制造", v: 268 },
+    { name: "冶金",     v: 196 },
+    { name: "汽车",     v: 178 },
+    { name: "纺织服装", v: 124 },
+    { name: "医药",     v: 116 }
+  ];
+
+  /* 3.2 四大支柱行业月度拆分（各行业 7 个月之和 = 该行业累计，见 §5 校验） */
+  const PILLAR_MONTHLY = {
+    "制造业":       [267, 171, 200, 273, 211, 242, 196],
+    "批发和零售业": [151,  96, 113, 154, 119, 137, 110],
+    "房地产业":     [128, 112, 106, 104,  96,  92,  82],
+    "金融业":       [106,  68,  80, 109,  84,  96,  77]
+  };
+
+  /* 3.3 13 个行业门类：制造业累计由细分求和；四大支柱累计由月度求和；其余为门类输入值 */
+  const IND_DEF = [
+    { name: "制造业",                         mid: "制造业",           short: "制造业",  yoy: 3.2,   base: 1560, children: MFG_SUB },
+    { name: "批发和零售业",                   mid: "批发和零售业",     short: "批发零售", yoy: 1.8,   base: 880 },
+    { name: "房地产业",                       mid: "房地产业",         short: "房地产",  yoy: -9.6,  base: 720 },
+    { name: "金融业",                         mid: "金融业",           short: "金融业",  yoy: 2.4,   base: 620 },
+    { name: "建筑业",                         mid: "建筑业",           short: "建筑业",  yoy: -3.1,  base: 480 },
+    { name: "租赁和商务服务业",               mid: "租赁和商务服务业", short: "租赁商务", yoy: 6.2,   base: 340 },
+    { name: "信息传输、软件和信息技术服务业", mid: "信息传输和软件业", short: "信息软件", yoy: 11.4,  base: 300 },
+    { name: "电力热力燃气及水生产和供应业",   mid: "电力热力燃气水",   short: "电力热力", yoy: 4.6,   base: 260 },
+    { name: "交通运输、仓储和邮政业",         mid: "交通运输仓储邮政", short: "交通运输", yoy: 2.2,   base: 200 },
+    { name: "科学研究和技术服务业",           mid: "科学研究技术服务", short: "科研技服", yoy: 9.8,   base: 150 },
+    { name: "住宿和餐饮业",                   mid: "住宿和餐饮业",     short: "住宿餐饮", yoy: 5.4,   base: 90 },
+    { name: "农、林、牧、渔业",               mid: "农林牧渔业",       short: "农林牧渔", yoy: 1.2,   base: 40 },
+    { name: "其他行业",                       mid: "其他行业",         short: "其他行业", yoy: 2.6,   base: 120 }
+  ];
+  const IND = IND_DEF.map((d) => {
+    const m = PILLAR_MONTHLY[d.name] || null;
+    /* 优先级：细分求和 > 月度求和 > 门类输入 —— 合计从不硬编码 */
+    const v = d.children ? sum(d.children.map((c) => c.v)) : (m ? sum(m) : d.base);
+    return { name: d.name, mid: d.mid, short: d.short, yoy: d.yoy, v: v, base: d.base, monthly: m, children: d.children || null };
+  });
+
+  /* 3.4 行业结构变迁（占比 %，2026 行由本期数据现算，其他 = 100 - 五大行业之和） */
+  const MIX_KEYS = ["制造业", "批发和零售业", "房地产业", "金融业", "建筑业"];
+  const MIX_LABELS = ["制造业", "批零", "房地产", "金融", "建筑", "其他"];
+  const MIX_COLORS = ["#ffdc8f", "#39d0d8", "#ff5f6e", "#3d9cff", "#ff9d4d", "#5c7fa8"];
+  const MIX_DARK = [false, false, false, true, false, true];   /* 深底段用浅色字 */
+
+  /* 3.5 全省税收口径同比（与「收入分项目」页一致，用于合计口径展示） */
+  const YOY_TAX_OFFICIAL = 2.4;
+
+  /* 3.6 时间进度（2026-07-31 为年内第 212 天） */
+  const DAY_OF_YEAR = 212, DAYS_IN_YEAR = 365;
+  const TIME_PROG = 100 * DAY_OF_YEAR / DAYS_IN_YEAR;
+
+  /* ===== 4. 派生量：全部现算 ===== */
+  const D = {};
+  D.total = sum(IND.map((i) => i.v));               /* 13 门类之和 = 税收合计 */
+  D.mfg = IND[0];
+  D.mfgTotal = sum(MFG_SUB.map((s) => s.v));        /* 7 个细分之和 */
+  IND.forEach((i) => {
+    i.share = 100 * i.v / D.total;
+    i.prev = i.v / (1 + i.yoy / 100);               /* 上年同期 = 本期 /(1+同比) */
+    i.delta = i.v - i.prev;                          /* 增减额 */
+  });
+  D.prevTotal = sum(IND.map((i) => i.prev));
+  D.delta = D.total - D.prevTotal;
+  D.yoyWeighted = 100 * (D.total / D.prevTotal - 1); /* 13 门类加权同比（分行业口径） */
+  IND.forEach((i) => { i.pull = 100 * i.delta / D.prevTotal; });  /* 贡献度：拉动 pct，合计 = 加权同比 */
+
+  D.top = IND.slice().sort((a, b) => b.v - a.v)[0];                     /* 第一大行业 */
+  D.fastest = IND.slice().sort((a, b) => b.yoy - a.yoy)[0];             /* 增长最快 */
+  D.worst = IND.slice().sort((a, b) => a.delta - b.delta)[0];           /* 减收最多（按减收额） */
+  const IND_NEG = IND.filter((i) => i.yoy < 0);
+  const IND_POS = IND.filter((i) => i.yoy >= 0);
+  D.negCount = IND_NEG.length;
+  D.posCount = IND_POS.length;
+  D.posShare = 100 * sum(IND_POS.map((i) => i.v)) / D.total;            /* 正增长行业税收占比 */
+  D.negLoss = -sum(IND_NEG.map((i) => i.delta));                        /* 负增长行业合计减收额 */
+
+  /* 结构变迁三行：2026 行现算 */
+  const MIX_2026 = MIX_KEYS.map((k) => {
+    const it = IND.filter((i) => i.name === k)[0];
+    return +(100 * it.v / D.total).toFixed(1);
+  });
+  MIX_2026.push(+(100 - sum(MIX_2026)).toFixed(1));
+  const MIX_ROWS = [
+    { year: "2024", note: "全年", v: [25.4, 15.8, 16.2, 10.4, 9.2, 23.0] },
+    { year: "2025", note: "全年", v: [26.2, 15.4, 14.6, 10.6, 8.8, 24.4] },
+    { year: "2026", note: "1-7月", v: MIX_2026 }
+  ];
+
+  /* ===== 5. 勾稽自检（控制台） ===== */
+  const CHECKS = [
+    ["13 个行业门类之和 = 税收收入 5760", Math.round(D.total) === 5760, D.total],
+    ["7 个制造业细分之和 = 制造业 1560", D.mfgTotal === 1560, D.mfgTotal],
+    ["制造业门类值 = 细分之和", D.mfg.v === D.mfgTotal, D.mfg.v]
+  ];
+  Object.keys(PILLAR_MONTHLY).forEach((k) => {
+    const it = IND.filter((i) => i.name === k)[0];
+    CHECKS.push(["月度拆分之和 = " + k + " 累计 " + it.base, sum(PILLAR_MONTHLY[k]) === it.base, sum(PILLAR_MONTHLY[k])]);
+  });
+  MIX_ROWS.forEach((r) => {
+    const s = +sum(r.v).toFixed(1);
+    CHECKS.push([r.year + " 年六段占比之和 = 100.0%", s === 100, s]);
+  });
+  CHECKS.push(["贡献度合计 = 13 门类加权同比", Math.abs(sum(IND.map((i) => i.pull)) - D.yoyWeighted) < 1e-9, sum(IND.map((i) => i.pull)).toFixed(4) + "%"]);
+  const CHECK_OK = CHECKS.every((c) => c[1]);
+  CHECKS.forEach((c) => { (c[1] ? console.log : console.warn)((c[1] ? "✓ " : "✗ ") + c[0] + " → " + c[2]); });
+  console.log(CHECK_OK ? "【勾稽自检】全部通过（" + CHECKS.length + " 项）" : "【勾稽自检】存在不一致，请检查数据源");
+
+  /* ===== 6. 顶部时钟 + 时间进度 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("hy-clock-time").textContent = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+    $("hy-clock-date").textContent = d.getFullYear() + "年" + pad2(d.getMonth() + 1) + "月" + pad2(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("hy-timeprog").textContent = TIME_PROG.toFixed(1) + "%";
+
+  /* ===== 7. KPI 带：5 枚（翻牌缓动） ===== */
+  const KPI_DEFS = [
+    { icon: "¥", label: "税收合计（13 门类之和）", val: D.total, unit: "亿元", dec: 0,
+      sub: IND.length + ' 门类求和 <b class="hy-goldc">✓</b> · 同比 <b class="hy-up">' +
+           signed(YOY_TAX_OFFICIAL) + '%</b>（全省口径）' },
+    { icon: "◆", label: "第一大行业 · " + D.top.mid, val: D.top.v, unit: "亿元", dec: 0,
+      bar: 100 * D.top.v / D.total, barClass: "",
+      sub: '占税收 <b class="hy-goldc">' + D.top.share.toFixed(1) + '%</b> · 同比 <b class="hy-up">' +
+           signed(D.top.yoy) + '%</b> · 含 <b class="hy-goldc">' + MFG_SUB.length + '</b> 细分' },
+    { icon: "▲", label: "增长最快 · " + D.fastest.mid, val: D.fastest.yoy, unit: "%", dec: 1, good: true,
+      sub: '税收 <b class="hy-goldc">' + fmtDec(D.fastest.v) + '</b> 亿元 · 增收 <b class="hy-up">' +
+           signed(D.fastest.delta, 1) + '</b> 亿元' },
+    { icon: "▼", label: "减收最多 · " + D.worst.mid, val: -D.worst.delta, unit: "亿元", dec: 1, bad: true,
+      sub: '同比 <b class="hy-down">' + signed(D.worst.yoy) + '%</b> · 税收 <b class="hy-goldc">' + fmtDec(D.worst.v) +
+           '</b> 亿元 · 占 <b class="hy-goldc">' + D.worst.share.toFixed(1) + '%</b>' },
+    { icon: "⇅", label: "增减面（正 / 负增长门类）", val: D.posCount, unit: "个正增长", dec: 0,
+      bar: D.posShare, barClass: " is-green",
+      sub: '负增长 <b class="hy-down">' + D.negCount + '</b> 个 · 减收 <b class="hy-down">' + fmtDec(D.negLoss, 0) +
+           '</b> 亿元 · 正增面 <b class="hy-up">' + D.posShare.toFixed(1) + '%</b>' }
+  ];
+  const band = $("hy-band");
+  KPI_DEFS.forEach((k, idx) => {
+    const card = document.createElement("article");
+    card.className = "hy-kpi" + (k.good ? " is-good" : "") + (k.bad ? " is-bad" : "");
+    card.innerHTML =
+      '<div class="hy-kpi-icon">' + k.icon + '</div>' +
+      '<div class="hy-kpi-main">' +
+        '<div class="hy-kpi-label">' + k.label + '</div>' +
+        '<div class="hy-kpi-num"><span class="hy-kpi-val">0</span><span class="hy-kpi-unit">' + k.unit + '</span></div>' +
+        (k.bar != null ? '<div class="hy-mini-track"><div class="hy-mini-fill' + k.barClass + '" id="hy-mini-' + idx + '"></div></div>' : "") +
+        '<div class="hy-kpi-sub">' + k.sub + '</div>' +
+      '</div>';
+    band.appendChild(card);
+    k.node = card.querySelector(".hy-kpi-val");
+    k.cur = 0;
+  });
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      const diff = k.val - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) k.cur = k.val; else k.cur += diff * 0.13;
+      k.node.textContent = fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+  setTimeout(() => {
+    KPI_DEFS.forEach((k, idx) => {
+      if (k.bar == null) return;
+      const el = $("hy-mini-" + idx);
+      if (el) el.style.width = Math.min(100, k.bar).toFixed(2) + "%";
+    });
+  }, 320);
+
+  /* ===== 8. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(8, 26, 50, 0.93)",
+    borderColor: "rgba(240, 192, 96, 0.45)",
+    textStyle: { color: "#e2eeff", fontSize: 12 }
+  }, extra || {});
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: from }, { offset: 1, color: to }]);
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: from }, { offset: 1, color: to }]);
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LINE = { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } };
+  const SPLIT_LINE = { lineStyle: { color: "rgba(92, 156, 226, 0.13)" } };
+
+  /* ===== 9. 中①主视觉：矩形树图（面积 = 税收规模，颜色 = 同比增速，双向发散） ===== */
+  const treeChart = makeChart("hy-chart-tree");
+
+  /* 9.1 双向发散色标：红（减）→ 蓝灰（零）→ 绿（增），min -12 / max +12，0 居中 */
+  const YOY_MIN = -12, YOY_MAX = 12;
+  const RAMP = [
+    [0.00, [176, 42, 58]],
+    [0.25, [206, 88, 96]],
+    [0.50, [90, 116, 148]],
+    [0.75, [46, 156, 138]],
+    [1.00, [40, 200, 150]]
+  ];
+  const RAMP_HEX = ["#b02a3a", "#ce5860", "#5a7494", "#2e9c8a", "#28c896"];
+  function yoyColor(yoy) {
+    const t = Math.max(0, Math.min(1, (yoy - YOY_MIN) / (YOY_MAX - YOY_MIN)));
+    let i = 0;
+    while (i < RAMP.length - 2 && t > RAMP[i + 1][0]) i++;
+    const a = RAMP[i], b = RAMP[i + 1];
+    const f = (t - a[0]) / (b[0] - a[0]);
+    const mix = (x, y) => Math.round(x + (y - x) * f);
+    return "rgb(" + mix(a[1][0], b[1][0]) + "," + mix(a[1][1], b[1][1]) + "," + mix(a[1][2], b[1][2]) + ")";
+  }
+
+  /* 9.2 节点构造：value = [规模, 同比]，visualDimension 指向第 2 维；focus 节点描金边巡航 */
+  const TREE_META = {};
+  IND.forEach((i) => { TREE_META[i.mid] = { full: i.name, v: i.v, yoy: i.yoy, share: i.share, parent: null, pull: i.pull }; });
+  MFG_SUB.forEach((s) => {
+    TREE_META[s.name] = { full: s.name, v: s.v, yoy: D.mfg.yoy, share: 100 * s.v / D.total, parent: D.mfg.mid, pull: null };
+  });
+  function buildTreeData(focusName) {
+    return IND.map((i) => {
+      const node = {
+        name: i.mid, value: [i.v, i.yoy], amt: i.v, yoy: i.yoy,
+        itemStyle: {
+          color: yoyColor(i.yoy),
+          borderColor: i.mid === focusName ? C.goldSoft : "rgba(4, 16, 31, 0.85)",
+          borderWidth: i.mid === focusName ? 3 : 1,
+          shadowColor: i.mid === focusName ? "rgba(240, 192, 96, 0.75)" : "transparent",
+          shadowBlur: i.mid === focusName ? 16 : 0
+        }
+      };
+      if (i.children) {
+        /* 细分无独立同比口径，颜色沿用所属门类增速，仅以间隙线区分 */
+        node.children = i.children.map((s) => ({
+          name: s.name, value: [s.v, i.yoy], amt: s.v, yoy: i.yoy,
+          itemStyle: { color: yoyColor(i.yoy), borderColor: "rgba(4, 16, 31, 0.7)", borderWidth: 1 }
+        }));
+      }
+      return node;
+    });
+  }
+  const leafLabel = {
+    show: true, overflow: "truncate", lineHeight: 14,
+    formatter: (p) => "{nm|" + p.name + "}\n{amt|" + fmtDec(p.data.amt) + " 亿}\n{" + (p.data.yoy >= 0 ? "up" : "dn") + "|" + signed(p.data.yoy) + "%}",
+    rich: {
+      nm: { color: "#f4faff", fontSize: 11.5, fontWeight: 600, lineHeight: 15 },
+      amt: { color: "rgba(244, 250, 255, 0.86)", fontSize: 10.5, lineHeight: 13, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" },
+      up: { color: "#c9ffe9", fontSize: 10, lineHeight: 13, fontWeight: 700 },
+      dn: { color: "#ffd6da", fontSize: 10, lineHeight: 13, fontWeight: 700 }
+    }
+  };
+  treeChart.setOption({
+    animationDuration: 900, animationDurationUpdate: 320, animationEasing: "cubicOut",
+    tooltip: tip({
+      formatter: (p) => {
+        const m = TREE_META[p.name];
+        if (!m) return p.name;
+        return '<b style="color:#ffdc8f">' + m.full + "</b><br/>税收 " + fmtDec(m.v) + " 亿元<br/>" +
+          (m.parent ? "占制造业 " + (100 * m.v / D.mfgTotal).toFixed(1) + "%<br/>" : "") +
+          "占税收合计 " + m.share.toFixed(2) + '%<br/>同比 <b style="color:' + (m.yoy >= 0 ? "#33e0a6" : "#ff5f6e") + '">' +
+          signed(m.yoy) + "%</b>" +
+          (m.pull == null ? "" : "<br/>贡献度 " + signed(m.pull, 2) + " pct");
+      }
+    }),
+    visualMap: {
+      type: "continuous", show: true, seriesIndex: 0, dimension: 1,
+      min: YOY_MIN, max: YOY_MAX, precision: 1,
+      calculable: false, hoverLink: false, realtime: false,
+      orient: "horizontal", left: 14, bottom: 4, itemWidth: 11, itemHeight: 150,
+      inRange: { color: RAMP_HEX },
+      text: ["同比 +12%", "-12%"], textGap: 8,
+      textStyle: { color: "#8ea9cc", fontSize: 10 }
+    },
+    series: [{
+      type: "treemap", roam: false, nodeClick: false, breadcrumb: { show: false },
+      left: 8, right: 8, top: 8, bottom: 28,
+      visualDimension: 1, visualMin: YOY_MIN, visualMax: YOY_MAX,
+      data: buildTreeData(null),
+      upperLabel: {
+        show: true, height: 22, color: "#fff4d8", fontSize: 12, fontWeight: 700,
+        /* 根节点没有 amt/yoy，直接取值会渲染出 "NaN 亿元 · NaN%"，这里兜底为空串 */
+        formatter: (p) => (p.data && p.data.amt != null
+          ? p.name + " · " + fmtDec(p.data.amt) + " 亿元 · " + signed(p.data.yoy) + "%"
+          : "")
+      },
+      label: leafLabel,
+      itemStyle: { gapWidth: 2, borderColor: "rgba(4, 16, 31, 0.85)", borderWidth: 1 },
+      levels: [
+        {},
+        { itemStyle: { gapWidth: 3, borderColor: "rgba(4, 16, 31, 0.9)", borderWidth: 2 }, upperLabel: { show: true } },
+        { itemStyle: { gapWidth: 1, borderWidth: 1 },
+          label: { formatter: (p) => "{nm|" + p.name + "}\n{amt|" + fmtDec(p.data.amt) + "}", rich: leafLabel.rich, lineHeight: 14 } }
+      ],
+      emphasis: { itemStyle: { shadowBlur: 16, shadowColor: "rgba(240, 192, 96, 0.6)" }, label: { fontWeight: 700 } },
+      /* kiosk 常驻：非焦点保持可读，避免轮播时大半屏发暗 */
+      blur: { itemStyle: { opacity: 0.55 }, label: { opacity: 0.62 }, upperLabel: { opacity: 0.62 } }
+    }]
+  });
+
+  /* ===== 10. 中②：四大支柱行业月度走势（与树图巡航联动） ===== */
+  const lineChart = makeChart("hy-chart-line");
+  const PILLARS = Object.keys(PILLAR_MONTHLY).map((k) => {
+    const it = IND.filter((i) => i.name === k)[0];
+    return { name: k, mid: it.mid, short: it.short, vals: PILLAR_MONTHLY[k].slice(), cum: sum(PILLAR_MONTHLY[k]), yoy: it.yoy };
+  });
+  const PILLAR_COLOR = { "制造业": C.goldSoft, "批发和零售业": C.cyan, "房地产业": C.red, "金融业": C.blue };
+  lineChart.setOption({
+    animationDuration: 900,
+    tooltip: tip({
+      trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(240, 192, 96, 0.08)" } },
+      formatter: (ps) => {
+        const i = ps[0].dataIndex;
+        let s = '<b style="color:#ffdc8f">' + MONTHS[i] + "</b>";
+        PILLARS.forEach((p) => {
+          s += "<br/>" + p.short + " <b style=\"color:" + PILLAR_COLOR[p.name] + '">' + fmtDec(p.vals[i]) +
+            "</b> 亿元 · 累计 " + fmtDec(sum(p.vals.slice(0, i + 1)));
+        });
+        return s;
+      }
+    }),
+    legend: {
+      top: 6, right: 12, itemWidth: 14, itemHeight: 8, itemGap: 14,
+      textStyle: { color: "#c6dcf5", fontSize: 11.5 },
+      data: PILLARS.map((p) => p.mid)
+    },
+    grid: { left: 14, right: 18, top: 40, bottom: 6, containLabel: true },
+    xAxis: {
+      type: "category", data: MONTHS, boundaryGap: false,
+      axisLine: AXIS_LINE, axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 11 }
+    },
+    yAxis: {
+      type: "value", name: "亿元", nameTextStyle: { color: "#5f88b8", fontSize: 10.5, padding: [0, 0, 0, -22] },
+      splitLine: SPLIT_LINE, axisLabel: { color: C.muted, fontSize: 10.5, formatter: (v) => fmtDec(v) }
+    },
+    series: PILLARS.map((p) => ({
+      name: p.mid, type: "line", smooth: true, symbol: "circle", symbolSize: 6,
+      data: p.vals,
+      lineStyle: { width: p.name === "房地产业" ? 3 : 2.4, color: PILLAR_COLOR[p.name],
+        shadowColor: p.name === "房地产业" ? "rgba(255, 95, 110, 0.5)" : "rgba(0, 0, 0, 0)", shadowBlur: 10 },
+      itemStyle: { color: PILLAR_COLOR[p.name], borderColor: "#0b2648", borderWidth: 1.5 },
+      areaStyle: p.name === "房地产业"
+        ? { color: vGrad("rgba(255, 95, 110, 0.3)", "rgba(255, 95, 110, 0)") }
+        : { color: vGrad("rgba(92, 156, 226, 0.13)", "rgba(92, 156, 226, 0)") },
+      emphasis: { focus: "series", lineStyle: { width: 4 } },
+      blur: { itemStyle: { opacity: 0.55 }, lineStyle: { opacity: 0.24 }, areaStyle: { opacity: 0.12 }, label: { opacity: 0.62 } }
+    }))
+  });
+  const lineScope = $("hy-line-scope");
+  function syncLine(mid) {
+    let idx = -1;
+    PILLARS.forEach((p, i) => { if (p.mid === mid) idx = i; });
+    lineChart.dispatchAction({ type: "downplay" });
+    if (idx < 0) {
+      lineScope.textContent = "四大支柱合计 " + fmtDec(sum(PILLARS.map((p) => p.cum))) + " 亿元 · 占税收 " +
+        (100 * sum(PILLARS.map((p) => p.cum)) / D.total).toFixed(1) + "%";
+      lineScope.style.color = "#ffdc8f";
+      return;
+    }
+    lineChart.dispatchAction({ type: "highlight", seriesIndex: idx });
+    const p = PILLARS[idx];
+    lineScope.textContent = p.mid + " 累计 " + fmtDec(p.cum) + " 亿元 · 月均 " + fmtDec(p.cum / MONTHS.length, 1) +
+      " 亿元 · 同比 " + signed(p.yoy) + "%";
+    lineScope.style.color = p.yoy < 0 ? "#ff8f9b" : "#ffdc8f";
+  }
+  syncLine(null);
+
+  /* ===== 11. 树图巡航：每 3 秒描金边一个行业，同步面板头与支柱走势图 ===== */
+  const treeScope = $("hy-tree-scope");
+  let treeIdx = -1;
+  function treeCruise() {
+    treeIdx = (treeIdx + 1) % IND.length;
+    const it = IND[treeIdx];
+    treeChart.setOption({ series: [{ data: buildTreeData(it.mid) }] });
+    treeScope.textContent = it.mid + " " + fmtDec(it.v) + " 亿元 · 占 " + it.share.toFixed(1) +
+      "% · 同比 " + signed(it.yoy) + "% · 贡献 " + signed(it.pull, 2) + " pct";
+    treeScope.style.color = it.yoy < 0 ? "#ff8f9b" : "#ffdc8f";
+    syncLine(it.mid);
+  }
+  treeCruise();
+  setInterval(treeCruise, 3000);
+
+  /* ===== 12. 左①：行业增速排行条形（零轴居中，负值向左染红，正值向右染绿） ===== */
+  const rankChart = makeChart("hy-chart-rank");
+  const RANK = IND.slice().sort((a, b) => a.yoy - b.yoy);
+  const RANK_MAX = Math.ceil(Math.max.apply(null, RANK.map((i) => Math.abs(i.yoy))) + 2);
+  rankChart.setOption({
+    animationDuration: 900,
+    tooltip: tip({
+      trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(240, 192, 96, 0.08)" } },
+      formatter: (ps) => {
+        const it = RANK[ps[0].dataIndex];
+        return '<b style="color:#ffdc8f">' + it.name + "</b><br/>本年累计 " + fmtDec(it.v) + " 亿元<br/>上年同期 " +
+          fmtDec(it.prev, 1) + ' 亿元<br/>增减额 <b style="color:' + (it.delta >= 0 ? "#33e0a6" : "#ff5f6e") + '">' +
+          signed(it.delta, 1) + ' 亿元</b><br/>同比 <b style="color:' + (it.yoy >= 0 ? "#33e0a6" : "#ff5f6e") + '">' +
+          signed(it.yoy) + "%</b><br/>占税收 " + it.share.toFixed(1) + "% · 贡献 " + signed(it.pull, 2) + " pct";
+      }
+    }),
+    grid: { left: 8, right: 16, top: 14, bottom: 4, containLabel: true },
+    xAxis: {
+      type: "value", min: -RANK_MAX, max: RANK_MAX,
+      axisLine: { show: false }, axisTick: { show: false },
+      splitLine: SPLIT_LINE, axisLabel: { color: C.muted, fontSize: 10, formatter: "{value}%" }
+    },
+    yAxis: {
+      type: "category", data: RANK.map((i) => i.short),
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: "#b9d2ee", fontSize: 10.5, margin: 8 }
+    },
+    series: [{
+      name: "同比增速", type: "bar", barWidth: 11,
+      data: RANK.map((it) => ({
+        value: it.yoy,
+        itemStyle: {
+          borderRadius: it.yoy >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4],
+          color: it.yoy >= 0
+            ? hGrad("rgba(51, 224, 166, 0.45)", "rgba(51, 224, 166, 0.95)")
+            : hGrad("rgba(255, 95, 110, 0.95)", "rgba(160, 52, 68, 0.45)")
+        },
+        label: {
+          show: true, position: it.yoy >= 0 ? "right" : "left", distance: 5,
+          fontSize: 10, fontWeight: 700, color: it.yoy >= 0 ? C.green : C.red,
+          formatter: signed(it.yoy) + "%"
+        }
+      })),
+      markLine: {
+        silent: true, symbol: "none",
+        lineStyle: { color: "rgba(240, 192, 96, 0.55)", width: 1.2 },
+        label: { show: false }, data: [{ xAxis: 0 }]
+      }
+    }]
+  });
+  $("hy-rank-scope").textContent = D.negCount + " 负 / " + D.posCount + " 正 · 减收 " + fmtDec(D.negLoss, 0) + " 亿元";
+
+  /* ===== 13. 左②：制造业细分旭日图（内环 = 制造业，外环 = 7 个细分） ===== */
+  const sunChart = makeChart("hy-chart-sun");
+  const SUN_COLORS = ["#ffdc8f", "#f0c060", "#39d0d8", "#3d9cff", "#33e0a6", "#ff9d4d", "#8ea9cc"];
+  function buildSunData(focusIdx) {
+    return [{
+      name: "制造业", value: D.mfgTotal,
+      itemStyle: { color: vGrad("rgba(240, 192, 96, 0.9)", "rgba(184, 134, 58, 0.75)"), borderColor: "#0a1e3c", borderWidth: 1.5 },
+      label: { rotate: 0, color: "#2a1c05", fontSize: 12, fontWeight: 700 },
+      children: MFG_SUB.map((s, i) => ({
+        name: s.name, value: s.v,
+        itemStyle: {
+          color: SUN_COLORS[i % SUN_COLORS.length],
+          borderColor: i === focusIdx ? "#ffffff" : "#0a1e3c",
+          borderWidth: i === focusIdx ? 2.5 : 1.2,
+          shadowColor: i === focusIdx ? "rgba(255, 255, 255, 0.65)" : "transparent",
+          shadowBlur: i === focusIdx ? 12 : 0
+        },
+        label: { rotate: "radial", color: "#08192e", fontSize: 9.5, fontWeight: 600, minAngle: 8 }
+      }))
+    }];
+  }
+  sunChart.setOption({
+    /* 巡航是整份替换 data，若留更新动画会让整圈从零重建、肉眼可见闪一下空白；
+       高亮切换不需要缓动，故 animationDurationUpdate 设 0，首次入场仍保留 900ms */
+    animationDuration: 900, animationDurationUpdate: 0,
+    tooltip: tip({
+      formatter: (p) => {
+        const isLeaf = p.name !== "制造业";
+        return '<b style="color:#ffdc8f">' + p.name + "</b><br/>税收 " + fmtDec(p.value) + " 亿元<br/>" +
+          (isLeaf ? "占制造业 " + (100 * p.value / D.mfgTotal).toFixed(1) + "%<br/>" : "") +
+          "占税收合计 " + (100 * p.value / D.total).toFixed(2) + "%" +
+          (isLeaf ? "" : '<br/>同比 <b style="color:#33e0a6">' + signed(D.mfg.yoy) + "%</b>");
+      }
+    }),
+    title: [{
+      text: fmtDec(D.mfgTotal),
+      subtext: "制造业合计 亿元\n占税收合计 " + (100 * D.mfgTotal / D.total).toFixed(1) + "%",
+      left: "50%", top: "44%", textAlign: "center",
+      textStyle: { color: C.goldSoft, fontSize: 20, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif", align: "center" },
+      subtextStyle: { color: C.muted, fontSize: 10, lineHeight: 13, align: "center" }
+    }],
+    series: [{
+      type: "sunburst", radius: [0, "94%"], center: ["50%", "52%"], sort: null,
+      nodeClick: false, data: buildSunData(-1),
+      /* levels[0] 为下钻返回块，levels[1] 才是第一圈（制造业），levels[2] 为细分圈 */
+      levels: [
+        {},
+        { r0: "36%", r: "54%", label: { show: true, rotate: 0, fontSize: 12 } },
+        { r0: "56%", r: "94%", label: { show: true, rotate: "radial", fontSize: 9.5 } }
+      ],
+      emphasis: { focus: "ancestor" },
+      blur: { itemStyle: { opacity: 0.55 }, label: { opacity: 0.62 } }
+    }]
+  });
+  /* 细分巡航：每 3.4 秒白描一个细分，面板头同步 */
+  const sunScope = $("hy-sun-scope");
+  let sunIdx = -1;
+  function sunCruise() {
+    sunIdx = (sunIdx + 1) % MFG_SUB.length;
+    const s = MFG_SUB[sunIdx];
+    sunChart.setOption({ series: [{ data: buildSunData(sunIdx) }] });
+    sunScope.textContent = s.name + " " + fmtDec(s.v) + " 亿元 · 占制造业 " + (100 * s.v / D.mfgTotal).toFixed(1) + "%";
+  }
+  sunCruise();
+  setInterval(sunCruise, 3400);
+
+  /* ===== 14. 右①：行业结构变迁（三根 100% 堆叠条 + 制造业↑ / 房地产↓ 变化连线） ===== */
+  const mixBox = $("hy-mix");
+  const cumAt = (arr, k) => sum(arr.slice(0, k));
+  const centerAt = (arr, k) => cumAt(arr, k) + arr[k] / 2;
+
+  let mixHTML = '<div class="hy-mix-legend">' +
+    MIX_LABELS.map((n, i) => '<span><em style="background:' + MIX_COLORS[i] + '"></em>' + n + "</span>").join("") + "</div>";
+  MIX_ROWS.forEach((r, ri) => {
+    mixHTML += '<div class="hy-mix-row"><span class="hy-mix-year">' + r.year + "<u>" + r.note + '</u></span><div class="hy-mix-bar">' +
+      r.v.map((p, i) => {
+        const left = cumAt(r.v, i), inner =
+          p >= 12 ? '<b>' + p.toFixed(1) + "%</b><span>" + MIX_LABELS[i] + "</span>"
+          : (p >= 7 ? "<b>" + p.toFixed(1) + "%</b>" : "");
+        return '<div class="hy-seg' + (MIX_DARK[i] ? " is-dark" : "") + '" style="left:' + left.toFixed(2) +
+          "%;width:" + p.toFixed(2) + "%;background:" + MIX_COLORS[i] + '">' + inner + "</div>";
+      }).join("") + "</div></div>";
+    if (ri < MIX_ROWS.length - 1) {
+      const nx = MIX_ROWS[ri + 1];
+      const marks = [
+        { i: 0, label: "制造业" },
+        { i: 2, label: "房地产" }
+      ].map((m) => {
+        const x = (centerAt(r.v, m.i) + centerAt(nx.v, m.i)) / 2;
+        const d = +(nx.v[m.i] - r.v[m.i]).toFixed(1);
+        return '<div class="hy-mark ' + (d >= 0 ? "is-up" : "is-down") + '" style="left:' + x.toFixed(2) + '%">' +
+          "<i></i><b>" + m.label + " " + (d >= 0 ? "▲" : "▼") + " " + signed(d) + "pct</b><i></i></div>";
+      }).join("");
+      mixHTML += '<div class="hy-mix-link"><div class="hy-mix-link-inner">' + marks + "</div></div>";
+    }
+  });
+  const mfgShift = +(MIX_ROWS[2].v[0] - MIX_ROWS[0].v[0]).toFixed(1);
+  const reShift = +(MIX_ROWS[2].v[2] - MIX_ROWS[0].v[2]).toFixed(1);
+  mixHTML += '<div class="hy-mix-foot">两年累计：制造业占比 <b>' + signed(mfgShift) + " pct</b>，房地产业 <b>" + signed(reShift) +
+    " pct</b>，税源结构由地产驱动转向制造与服务驱动</div>";
+  mixBox.innerHTML = mixHTML;
+  $("hy-mix-scope").textContent = "2024 → 2026 · 每年六段合计 100.0%";
+
+  /* ===== 15. 右②：行业明细表（DOM grid，按税收降序，滚动轮播，负增长行染红） ===== */
+  const TB = IND.slice().sort((a, b) => b.v - a.v);
+  const rowHTML = TB.map((it, i) =>
+    '<li class="' + (it.yoy < 0 ? "is-neg" : "") + '">' +
+      '<span class="hy-name"><i class="hy-rk' + (i < 3 ? " is-top" : "") + '">' + (i + 1) + "</i>" + it.mid + "</span>" +
+      "<span><b>" + fmtDec(it.v) + "</b></span>" +
+      "<span>" + it.share.toFixed(1) + "%</span>" +
+      '<span class="hy-yoy">' + signed(it.yoy) + "%</span>" +
+      '<span class="hy-yoy">' + signed(it.pull, 2) + "</span>" +
+    "</li>").join("");
+  $("hy-tbody").innerHTML = rowHTML + rowHTML;   /* 复制一份实现无缝滚动 */
+  $("hy-tb-scope").textContent = IND.length + " 门类 · 合计 " + fmtDec(D.total) + " 亿元";
+  $("hy-note").innerHTML =
+    "贡献度＝行业增减额 ÷ 上年同期税收合计（拉动 pct），13 门类合计 <b>" + signed(D.yoyWeighted, 2) + " pct</b>，" +
+    "即<b>分行业加权同比</b>；全省税收口径同比为 <b>" + signed(YOY_TAX_OFFICIAL) + "%</b>，差异源于行业归类调整与跨行业调库，两口径不可混用。";
+
+  /* ===== 16. 底部跑马灯：分行业要情（数字与上方图表同源现算） ===== */
+  const NEWS = [
+    "1-7 月全省地方级税收收入 <b>" + fmtDec(D.total) + " 亿元</b>，覆盖 <b>" + IND.length +
+      "</b> 个行业门类，全省税收口径同比 <b>" + signed(YOY_TAX_OFFICIAL) + "%</b>",
+    "第一大行业 " + D.top.mid + " <b>" + fmtDec(D.top.v) + " 亿元</b>，占税收 <b>" + D.top.share.toFixed(1) +
+      "%</b>，同比 <b>" + signed(D.top.yoy) + "%</b>，贡献 <b>" + signed(D.top.pull, 2) + " pct</b>",
+    "制造业 <b>" + MFG_SUB.length + "</b> 个细分中，电子设备 <b>" + fmtDec(MFG_SUB[0].v) + " 亿元</b> 居首，占制造业 <b>" +
+      (100 * MFG_SUB[0].v / D.mfgTotal).toFixed(1) + "%</b>，前三细分合计 <b>" +
+      fmtDec(sum(MFG_SUB.slice(0, 3).map((s) => s.v))) + " 亿元</b>",
+    "增长最快 " + D.fastest.mid + " 同比 <b>" + signed(D.fastest.yoy) + "%</b>，增收 <b>" + signed(D.fastest.delta, 1) +
+      " 亿元</b>；科学研究和技术服务业 <b>" + signed(IND[9].yoy) + "%</b> 紧随其后",
+    "涉房链条承压：" + IND_NEG.map((i) => i.mid + " " + signed(i.yoy) + "%").join("、") + "，合计减收 <u>" +
+      fmtDec(D.negLoss, 1) + " 亿元</u>，拖累税收增速 <u>" + signed(sum(IND_NEG.map((i) => i.pull)), 2) + " pct</u>",
+    "减收最多 " + D.worst.mid + " 减收 <u>" + fmtDec(-D.worst.delta, 1) + " 亿元</u>，占比由 2024 年 <b>" +
+      MIX_ROWS[0].v[2].toFixed(1) + "%</b> 降至 <b>" + MIX_ROWS[2].v[2].toFixed(1) + "%</b>",
+    "结构变迁：制造业占比 <b>" + MIX_ROWS[0].v[0].toFixed(1) + "% → " + MIX_ROWS[2].v[0].toFixed(1) + "%</b>（" +
+      signed(mfgShift) + " pct），税源向实体制造与现代服务业集中",
+    "四大支柱行业合计 <b>" + fmtDec(sum(PILLARS.map((p) => p.cum))) + " 亿元</b>，占税收 <b>" +
+      (100 * sum(PILLARS.map((p) => p.cum)) / D.total).toFixed(1) + "%</b>，月均入库 <b>" +
+      fmtDec(sum(PILLARS.map((p) => p.cum)) / MONTHS.length, 0) + " 亿元</b>",
+    "<b>" + D.posCount + "</b> 个门类正增长、<b>" + D.negCount + "</b> 个负增长，正增长行业税收占比 <b>" +
+      D.posShare.toFixed(1) + "%</b>，时间进度 <b>" + TIME_PROG.toFixed(1) + "%</b>"
+  ];
+  const track = $("hy-marquee-track");
+  const marqueeHTML = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  track.innerHTML = marqueeHTML + marqueeHTML;
+})();
+</script>
+<!-- carousel-js:begin -->
+<script>
+/* ===== 公共资金专题轮播导航（tools/inject_carousel.py 注入） =====
+   独立于主脚本运行：即使 echarts 加载失败，翻页仍然可用。 */
+(() => {
+  "use strict";
+
+  /* —— 可配置项 —— */
+  const SECONDS = 30;              /* ← 每页停留秒数，改这里再重跑 tools/inject_carousel.py */
+
+  /* 轮播页序 = 需求提出的 13 个专题原始顺序 */
+  const PAGES = [
+    {
+        "f": "大屏样板间-公共资金全国收入总览1920.html",
+        "t": "全国地方一般公共预算收入情况"
+    },
+    {
+        "f": "大屏样板间-公共资金分地区收入1920.html",
+        "t": "全国各地区地方一般公共预算收入情况"
+    },
+    {
+        "f": "大屏样板间-公共资金江苏地市收入1920.html",
+        "t": "全省各地市相关收入情况"
+    },
+    {
+        "f": "大屏样板间-公共资金收入分项目1920.html",
+        "t": "一般公共预算收入分项目情况"
+    },
+    {
+        "f": "大屏样板间-公共资金重点城市县区1920.html",
+        "t": "重点城市及县区相关收入"
+    },
+    {
+        "f": "大屏样板间-公共资金税收分行业1920.html",
+        "t": "全省税收分行业情况"
+    },
+    {
+        "f": "大屏样板间-公共资金新动能税收1920.html",
+        "t": "全省新动能企业税收情况"
+    },
+    {
+        "f": "大屏样板间-公共资金土地出让形势1920.html",
+        "t": "江苏省土地出让收入形势"
+    },
+    {
+        "f": "大屏样板间-公共资金国资社保预算1920.html",
+        "t": "江苏省国有资本经营预算收入及社保基金预算收入情况"
+    },
+    {
+        "f": "大屏样板间-公共资金现金管理1920.html",
+        "t": "公共资金现金管理开展情况"
+    },
+    {
+        "f": "大屏样板间-公共资金运行指数1920.html",
+        "t": "资金运行指数"
+    },
+    {
+        "f": "大屏样板间-公共资金政府债券发行1920.html",
+        "t": "地方政府债券发行情况"
+    },
+    {
+        "f": "大屏样板间-公共资金余额分析1920.html",
+        "t": "全省资金余额情况分析"
+    }
+];
+
+  const P = "hy";
+  const $ = (id) => document.getElementById(id);
+  const nav = $(P + "-carousel");
+  if (!nav) return;
+
+  /* 当前页在序列中的位置：按文件名匹配，允许带 ?query */
+  const here = decodeURIComponent((location.pathname.split("/").pop() || "")).trim();
+  let idx = PAGES.findIndex((x) => x.f === here);
+  if (idx < 0) idx = 5;      /* 直接从本地打开且路径取不到文件名时的兜底位次 */
+
+  $(P + "-c-cur").textContent = String(idx + 1).padStart(2, "0");
+  nav.title = (idx + 1) + " / " + PAGES.length + "　" + PAGES[idx].t;
+
+  function go(step) {
+    const n = (idx + step + PAGES.length) % PAGES.length;
+    location.href = PAGES[n].f;
+  }
+
+  /* —— 倒计时：累计已用时长，暂停时冻结在原地（不清零），继续时接着走 —— */
+  const bar = $(P + "-c-bar");
+  const playBtn = $(P + "-c-play");
+  let elapsed = 0;               /* 本页已停留毫秒 */
+  let last = Date.now();
+  let userPaused = false;        /* 用户点了暂停 */
+  let hidden = false;            /* 标签页被切到后台 */
+
+  function render() {
+    const pct = Math.min(100, elapsed / (SECONDS * 1000) * 100);
+    bar.style.width = pct.toFixed(2) + "%";
+  }
+  function tick() {
+    const now = Date.now();
+    if (!userPaused && !hidden) {
+      elapsed += now - last;
+      render();
+      if (elapsed >= SECONDS * 1000) go(1);
+    }
+    last = now;
+  }
+  const timer = setInterval(tick, 100);
+
+  function setPaused(v) {
+    userPaused = v;
+    nav.classList.toggle("is-paused", v);
+    playBtn.setAttribute("aria-pressed", v ? "true" : "false");
+    playBtn.setAttribute("aria-label", v ? "继续轮播" : "暂停轮播");
+    last = Date.now();           /* 避免把暂停这段时间补算进 elapsed */
+  }
+
+  playBtn.addEventListener("click", () => setPaused(!userPaused));
+  $(P + "-c-prev").addEventListener("click", () => go(-1));
+  $(P + "-c-next").addEventListener("click", () => go(1));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") go(-1);
+    else if (e.key === "ArrowRight") go(1);
+    else if (e.key === " " || e.code === "Space") { e.preventDefault(); setPaused(!userPaused); }
+  });
+
+  /* 切到后台时冻结计时，回到前台接着走（不重置，也不会补跳好几页） */
+  document.addEventListener("visibilitychange", () => {
+    hidden = document.hidden;
+    last = Date.now();
+  });
+  window.addEventListener("pagehide", () => clearInterval(timer));
+})();
+</script>
+<!-- carousel-js:end -->
+<!-- drill-js:begin -->
+<script>
+/* ===== 下钻入口（tools/inject_drilldown.py 注入） =====
+   独立于父页主脚本：父页表格/卡片由 setInterval 轮播重绘，故用 MutationObserver 持续重新标记。 */
+(() => {
+  "use strict";
+  const P = "hy";
+  /* 长名优先匹配，避免「制造业」把「电力热力燃气及水生产供应业」这类含子串的名字截胡 */
+  const TARGETS = [{"rows": ".hy-tbody li", "names": ["制造业", "批发和零售业", "房地产业", "金融业", "建筑业", "租赁和商务服务业", "信息传输软件和信息技术服务业", "电力热力燃气及水生产供应业", "交通运输仓储和邮政业", "科学研究和技术服务业", "住宿和餐饮业", "农林牧渔业", "其他行业"], "sub": "大屏样板间-公共资金行业税收详情1920.html", "hint": "点击行或树图分块下钻至行业详情", "scope": "hy-tb-scope"}].map((t) => {
+    const match = t.match || t.names;
+    return Object.assign({}, t, {
+      order: match.map((m, i) => ({ m: m, n: t.names[i] })).sort((a, b) => b.m.length - a.m.length)
+    });
+  });
+  const CHARTS = [{"chartId": "hy-chart-tree", "names": ["制造业", "批发和零售业", "房地产业", "金融业", "建筑业", "租赁和商务服务业", "信息传输软件和信息技术服务业", "电力热力燃气及水生产供应业", "交通运输仓储和邮政业", "科学研究和技术服务业", "住宿和餐饮业", "农林牧渔业", "其他行业"], "sub": "大屏样板间-公共资金行业税收详情1920.html"}];
+  const PANELS = [];
+
+  function markOne(t) {
+    document.querySelectorAll(t.rows).forEach((el) => {
+      const txt = (el.textContent || "").replace(/\s+/g, "");
+      let hit = null;
+      for (let i = 0; i < t.order.length; i++) {
+        if (txt.indexOf(t.order[i].m) >= 0) { hit = t.order[i].n; break; }
+      }
+      if (!hit) return;
+      if (el.dataset.drill === hit && el.dataset.drillSub === t.sub) return;  /* 未变则跳过 */
+      el.dataset.drill = hit;
+      el.dataset.drillSub = t.sub;
+      el.classList.add(P + "-drill");
+      el.setAttribute("title", "点击查看「" + hit + "」二级详情");
+    });
+  }
+
+  /* 面板头提示 chip 也放进重扫循环里：父页有些 scope 是被 setInterval 重写 textContent 的，
+     一旦被冲掉，下一次 DOM 变动会把它补回来。 */
+  function chipOne(t) {
+    if (!t.scope || !t.hint) return;
+    const s = document.getElementById(t.scope);
+    if (!s || s.querySelector("." + P + "-drill-hint")) return;
+    const b = document.createElement("span");
+    b.className = P + "-drill-hint";
+    b.textContent = t.hint;
+    s.appendChild(b);
+  }
+
+  function scan() { TARGETS.forEach(markOne); TARGETS.forEach(chipOne); }
+
+  /* 事件委托：行会被父页轮播重绘，委托到 document 上最稳 */
+  document.addEventListener("click", (e) => {
+    const row = e.target.closest ? e.target.closest("." + P + "-drill") : null;
+    if (!row || !row.dataset.drill || !row.dataset.drillSub) return;
+    location.href = row.dataset.drillSub + "#" + encodeURIComponent(row.dataset.drill);
+  });
+
+  /* ECharts 画布下钻：treemap / 环形图的图形块不是 DOM，只能绑图表实例的 click。
+     取 params.name 或 params.data.name 去对象名列表里反查，命中即跳子页。 */
+  CHARTS.forEach((c) => {
+    if (!window.echarts) return;
+    /* 与行级下钻一样支持 match：图上标签常是简称（桑基「国有资源有偿使用」），
+       而子页 hash 要全称（「国有资源（资产）有偿使用收入」），两者需分开。 */
+    const cm = c.match || c.names;
+    const pairs = cm.map((m, i) => ({ m: m, n: c.names[i] })).sort((a, b) => b.m.length - a.m.length);
+    const bind = () => {
+      const el = document.getElementById(c.chartId);
+      const inst = el && echarts.getInstanceByDom(el);
+      if (!inst) return false;
+      if (inst.__drillBound) return true;
+      inst.__drillBound = true;
+      el.style.cursor = "pointer";
+      inst.on("click", (pm) => {
+        /* 取名顺序：seriesName 优先于 name。小多图/折线的 params.name 是 x 轴类目
+           （"1".."7" 这种月份），只有 seriesName 才是税种名；treemap / 环形图则相反，
+           name 才是分块名而 seriesName 是整个系列名。故按配置 by 决定先取哪个。 */
+        const bySeries = c.by === "seriesName";
+        const raw = (pm && (bySeries
+          ? (pm.seriesName || pm.name)
+          : (pm.name || (pm.data && pm.data.name) || pm.seriesName))) || "";
+        if (!raw) return;
+        /* ★ 精确命中优先：行级下钻是拿整行文本去找子串，长名优先才对；但画布点击拿到的
+           就是节点名本身，此时长名优先反而有害——「增值税」是「土地增值税」的子串，
+           点增值税会被截胡跳到土地增值税去（实测 21 个节点里就这一个会错）。 */
+        const hit = pairs.filter((p) => p.m === raw)[0]
+          || pairs.filter((p) => raw.indexOf(p.m) >= 0 || p.m.indexOf(raw) >= 0)[0];
+        if (hit) location.href = c.sub + "#" + encodeURIComponent(hit.n);
+      });
+      return true;
+    };
+    /* 图表可能晚于本脚本 init，轮询几次直到拿到实例 */
+    if (!bind()) {
+      let tries = 0;
+      const iv = setInterval(() => { if (bind() || ++tries > 40) clearInterval(iv); }, 150);
+    }
+  });
+
+  /* 面板级入口：按面板标题文本定位面板头，挂一枚可点 chip（不必改父页标记） */
+  PANELS.forEach((pn) => {
+    const head = Array.prototype.slice.call(document.querySelectorAll("." + P + "-panel-head"))
+      .filter((h) => { const t = h.querySelector("h2"); return t && t.textContent.trim() === pn.panelTitle; })[0];
+    if (!head || head.querySelector("." + P + "-drill-entry")) return;
+    const b = document.createElement("span");
+    b.className = P + "-drill-entry";
+    b.textContent = pn.label + " ↗";
+    b.setAttribute("title", "查看" + pn.label + "（全量明细）");
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); location.href = pn.sub; });
+    head.appendChild(b);
+  });
+
+  if (TARGETS.length) {
+    scan();
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+<!-- drill-js:end -->
+</body>
+</html>

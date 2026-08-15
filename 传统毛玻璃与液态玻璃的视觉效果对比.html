@@ -1,0 +1,1780 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#080b18">
+  <title>毛玻璃 vs 液态玻璃 · 对照演示</title>
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem("liquid-glass-theme");
+        const preferred = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        document.documentElement.dataset.theme = saved || preferred;
+      } catch (_) {
+        document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      }
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080b18;
+      --bg-deep: #050712;
+      --text: rgba(249, 250, 255, 0.96);
+      --muted: rgba(226, 231, 255, 0.65);
+      --faint: rgba(226, 231, 255, 0.42);
+      --line: rgba(255, 255, 255, 0.17);
+      --line-strong: rgba(255, 255, 255, 0.31);
+      --glass-top: rgba(255, 255, 255, 0.18);
+      --glass-bottom: rgba(255, 255, 255, 0.055);
+      --glass-inner: rgba(255, 255, 255, 0.1);
+      --glass-fallback: rgba(18, 23, 43, 0.94);
+      --shadow: rgba(0, 0, 0, 0.38);
+      --accent: #9d8cff;
+      --accent-2: #65d8ff;
+      --accent-3: #ff81c5;
+      --success: #85f0c0;
+      --blob-a: #773cff;
+      --blob-b: #00bfea;
+      --blob-c: #ff4aa2;
+      --mx: 50%;
+      --my: 30%;
+      --rx: 0deg;
+      --ry: 0deg;
+      --lift: 0px;
+      --scale: 1;
+    }
+
+    html[data-theme="light"] {
+      color-scheme: light;
+      --bg: #edf3ff;
+      --bg-deep: #dfe9ff;
+      --text: rgba(18, 25, 47, 0.94);
+      --muted: rgba(33, 43, 74, 0.67);
+      --faint: rgba(33, 43, 74, 0.46);
+      --line: rgba(255, 255, 255, 0.57);
+      --line-strong: rgba(255, 255, 255, 0.85);
+      --glass-top: rgba(255, 255, 255, 0.58);
+      --glass-bottom: rgba(255, 255, 255, 0.22);
+      --glass-inner: rgba(255, 255, 255, 0.46);
+      --glass-fallback: rgba(242, 246, 255, 0.96);
+      --shadow: rgba(74, 92, 144, 0.2);
+      --accent: #7259ee;
+      --accent-2: #168ec2;
+      --accent-3: #df4a94;
+      --success: #0f8b63;
+      --blob-a: #a88aff;
+      --blob-b: #66dfff;
+      --blob-c: #ff95ca;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--bg-deep);
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      overflow-x: hidden;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 42%),
+        linear-gradient(150deg, var(--bg) 0%, var(--bg-deep) 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      transition: background 500ms ease, color 300ms ease;
+    }
+
+    button,
+    a {
+      font: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+      color: inherit;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    ::selection {
+      color: #fff;
+      background: color-mix(in srgb, var(--accent) 70%, transparent);
+    }
+
+    .ambient {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .ambient::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: linear-gradient(to bottom, black, transparent 72%);
+      opacity: 0.48;
+    }
+
+    html[data-theme="light"] .ambient::before {
+      background-image:
+        linear-gradient(rgba(52, 72, 126, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(52, 72, 126, 0.05) 1px, transparent 1px);
+    }
+
+    .orb {
+      position: absolute;
+      width: min(46vw, 660px);
+      aspect-ratio: 1;
+      border-radius: 44% 56% 59% 41% / 46% 42% 58% 54%;
+      filter: blur(18px) saturate(135%);
+      opacity: 0.48;
+      will-change: transform, border-radius;
+      mix-blend-mode: screen;
+    }
+
+    html[data-theme="light"] .orb {
+      opacity: 0.36;
+      mix-blend-mode: multiply;
+    }
+
+    .orb-a {
+      top: -22%;
+      left: -10%;
+      background: radial-gradient(circle at 65% 65%, var(--blob-a), transparent 67%);
+      animation: drift-a 18s ease-in-out infinite alternate;
+    }
+
+    .orb-b {
+      top: 20%;
+      right: -19%;
+      background: radial-gradient(circle at 35% 42%, var(--blob-b), transparent 67%);
+      animation: drift-b 23s ease-in-out infinite alternate;
+    }
+
+    .orb-c {
+      bottom: -35%;
+      left: 24%;
+      background: radial-gradient(circle at 50% 35%, var(--blob-c), transparent 65%);
+      animation: drift-c 20s ease-in-out infinite alternate;
+    }
+
+    @keyframes drift-a {
+      to { transform: translate3d(15vw, 10vh, 0) rotate(22deg) scale(1.08); border-radius: 59% 41% 39% 61% / 38% 58% 42% 62%; }
+    }
+
+    @keyframes drift-b {
+      to { transform: translate3d(-19vw, 13vh, 0) rotate(-18deg) scale(0.88); border-radius: 37% 63% 56% 44% / 61% 34% 66% 39%; }
+    }
+
+    @keyframes drift-c {
+      to { transform: translate3d(-9vw, -18vh, 0) rotate(15deg) scale(1.1); border-radius: 62% 38% 48% 52% / 42% 61% 39% 58%; }
+    }
+
+    .page-shell {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .glass {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(145deg, var(--glass-top), var(--glass-bottom) 54%, color-mix(in srgb, var(--accent-2) 5%, transparent));
+      -webkit-backdrop-filter: blur(26px) saturate(170%) brightness(1.06);
+      backdrop-filter: blur(26px) saturate(170%) brightness(1.06);
+      box-shadow:
+        0 28px 80px var(--shadow),
+        inset 0 1px 0 var(--line-strong),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+      contain: paint;
+    }
+
+    .glass::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset: -1px;
+      border-radius: inherit;
+      pointer-events: none;
+      background:
+        radial-gradient(260px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.09) 32%, transparent 68%),
+        linear-gradient(150deg, rgba(255, 255, 255, 0.16), transparent 36%);
+      mix-blend-mode: screen;
+      opacity: 0.72;
+      transition: opacity 220ms ease;
+    }
+
+    .glass::after {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset: 1px;
+      border-radius: inherit;
+      pointer-events: none;
+      box-shadow:
+        inset 12px 14px 30px rgba(255, 255, 255, 0.045),
+        inset -18px -20px 36px rgba(47, 42, 130, 0.085);
+    }
+
+    .tilt {
+      transform-style: preserve-3d;
+      transform: perspective(920px) rotateX(var(--rx)) rotateY(var(--ry)) translate3d(0, var(--lift), 0) scale(var(--scale));
+      transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .tilt:hover {
+      --lift: -4px;
+      --scale: 1.006;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 100;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: var(--text);
+      color: var(--bg);
+      transform: translateY(-160%);
+      transition: transform 160ms ease;
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .nav-wrap {
+      position: sticky;
+      top: 16px;
+      z-index: 20;
+      padding-top: 16px;
+    }
+
+    .nav {
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 9px 10px 9px 18px;
+      border-radius: 999px;
+      box-shadow: 0 18px 48px color-mix(in srgb, var(--shadow) 65%, transparent), inset 0 1px 0 var(--line-strong);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 680;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      border-radius: 50% 44% 54% 42%;
+      background:
+        radial-gradient(circle at 32% 28%, #fff 0 4%, transparent 16%),
+        linear-gradient(140deg, var(--accent-2), var(--accent) 54%, var(--accent-3));
+      box-shadow: inset 0 1px 4px rgba(255, 255, 255, 0.7), 0 5px 15px color-mix(in srgb, var(--accent) 45%, transparent);
+      animation: mark-morph 7s ease-in-out infinite alternate;
+    }
+
+    @keyframes mark-morph {
+      to { border-radius: 42% 58% 38% 62% / 57% 39% 61% 43%; transform: rotate(10deg); }
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: auto;
+    }
+
+    .nav-links a {
+      padding: 10px 14px;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 13px;
+      transition: color 160ms ease, background 160ms ease;
+    }
+
+    .nav-links a:hover,
+    .nav-links a:focus-visible {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.09);
+      outline: none;
+    }
+
+    .theme-toggle {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px 6px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--text);
+      background: var(--glass-inner);
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 var(--line-strong);
+      transition: transform 180ms ease, background 180ms ease;
+    }
+
+    .theme-toggle:hover {
+      transform: translateY(-1px);
+      background: color-mix(in srgb, var(--glass-inner) 70%, white 8%);
+    }
+
+    .theme-toggle:active {
+      transform: scale(0.96);
+    }
+
+    .theme-toggle:focus-visible,
+    .glass-button:focus-visible,
+    .mini-button:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--accent-2) 65%, white);
+      outline-offset: 3px;
+    }
+
+    .theme-icon {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26);
+      line-height: 1;
+    }
+
+    .theme-text {
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    main {
+      position: relative;
+    }
+
+    .hero {
+      min-height: calc(100vh - 94px);
+      display: block;
+      padding: 84px 0 72px;
+    }
+
+    .hero-copy {
+      position: relative;
+      z-index: 2;
+      max-width: 850px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .eyebrow {
+      width: max-content;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 22px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.06);
+      font-size: 12px;
+      font-weight: 620;
+      letter-spacing: 0.08em;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 0 5px color-mix(in srgb, var(--success) 14%, transparent), 0 0 16px color-mix(in srgb, var(--success) 65%, transparent);
+    }
+
+    h1 {
+      max-width: 850px;
+      margin: 0 auto;
+      font-size: clamp(48px, 7.2vw, 88px);
+      line-height: 0.98;
+      letter-spacing: -0.075em;
+      font-weight: 760;
+    }
+
+    .liquid-title {
+      display: block;
+      padding-right: 0.08em;
+      color: transparent;
+      background: linear-gradient(100deg, var(--text) 0%, color-mix(in srgb, var(--accent-2) 75%, white) 38%, color-mix(in srgb, var(--accent) 72%, white) 66%, color-mix(in srgb, var(--accent-3) 72%, white) 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      filter: drop-shadow(0 10px 32px color-mix(in srgb, var(--accent) 22%, transparent));
+    }
+
+    .hero-copy > p {
+      max-width: 680px;
+      margin: 26px auto 0;
+      color: var(--muted);
+      font-size: clamp(16px, 1.7vw, 19px);
+      line-height: 1.8;
+      letter-spacing: 0.005em;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 34px;
+    }
+
+    .glass-button {
+      min-height: 52px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 20px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      color: var(--text);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08));
+      -webkit-backdrop-filter: blur(18px) saturate(150%);
+      backdrop-filter: blur(18px) saturate(150%);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 670;
+      transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), background 180ms ease, box-shadow 180ms ease;
+    }
+
+    .glass-button.primary {
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.38);
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent-2) 72%, transparent), color-mix(in srgb, var(--accent) 74%, transparent) 52%, color-mix(in srgb, var(--accent-3) 65%, transparent));
+      box-shadow: 0 15px 34px color-mix(in srgb, var(--accent) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.48);
+    }
+
+    .glass-button:hover {
+      transform: translateY(-3px) scale(1.015);
+      background-color: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.62);
+    }
+
+    .glass-button:active {
+      transform: translateY(0) scale(0.96);
+    }
+
+    .button-arrow {
+      display: inline-block;
+      transition: transform 180ms ease;
+    }
+
+    .glass-button:hover .button-arrow {
+      transform: translateX(3px);
+    }
+
+    .micro-note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 20px;
+      color: var(--faint);
+      font-size: 12px;
+    }
+
+    .micro-note::before {
+      content: "";
+      width: 18px;
+      height: 1px;
+      background: currentColor;
+    }
+
+    .comparison-stage {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 28px;
+      margin-top: 64px;
+      padding: 28px 0;
+      isolation: isolate;
+      perspective: 1200px;
+    }
+
+    .source-art {
+      position: absolute;
+      z-index: -2;
+      inset: 7% -5%;
+      overflow: hidden;
+      border-radius: 54px;
+      pointer-events: none;
+    }
+
+    .source-art::before {
+      content: "GLASS";
+      position: absolute;
+      top: 42%;
+      left: 50%;
+      color: rgba(255, 255, 255, 0.095);
+      font-size: clamp(86px, 17vw, 210px);
+      font-weight: 800;
+      letter-spacing: -0.08em;
+      line-height: 0.8;
+      transform: translate(-50%, -50%);
+      white-space: nowrap;
+    }
+
+    html[data-theme="light"] .source-art::before {
+      color: rgba(39, 52, 104, 0.08);
+    }
+
+    .source-shape {
+      position: absolute;
+      border-radius: 50%;
+      filter: saturate(135%);
+    }
+
+    .source-shape.one {
+      width: 360px;
+      height: 360px;
+      top: -22%;
+      left: 27%;
+      background: radial-gradient(circle at 36% 34%, #fff 0 2%, var(--accent-2) 8%, var(--accent) 52%, transparent 72%);
+      opacity: 0.72;
+      animation: source-drift-one 12s ease-in-out infinite alternate;
+    }
+
+    .source-shape.two {
+      width: 420px;
+      height: 220px;
+      right: 7%;
+      bottom: -8%;
+      border-radius: 48% 52% 57% 43% / 58% 40% 60% 42%;
+      background: linear-gradient(115deg, var(--accent-3), var(--accent), var(--accent-2));
+      opacity: 0.42;
+      transform: rotate(-12deg);
+      animation: source-drift-two 15s ease-in-out infinite alternate;
+    }
+
+    .source-line {
+      position: absolute;
+      top: 47%;
+      left: -8%;
+      width: 116%;
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, transparent, var(--accent-2), #fff 48%, var(--accent-3), transparent);
+      box-shadow: 0 0 28px color-mix(in srgb, var(--accent-2) 60%, transparent);
+      opacity: 0.6;
+      transform: rotate(-7deg);
+    }
+
+    @keyframes source-drift-one {
+      to { transform: translate3d(22%, 16%, 0) scale(0.88); }
+    }
+
+    @keyframes source-drift-two {
+      to { transform: translate3d(-18%, -12%, 0) rotate(4deg) scale(1.08); }
+    }
+
+    .compare-column {
+      position: relative;
+      z-index: 1;
+      min-width: 0;
+    }
+
+    .compare-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 14px;
+      padding: 0 8px;
+    }
+
+    .compare-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .compare-index {
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+    }
+
+    .compare-title strong {
+      font-size: 15px;
+      letter-spacing: -0.015em;
+    }
+
+    .compare-tag {
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--faint);
+      background: rgba(255, 255, 255, 0.05);
+      font-size: 9px;
+      font-weight: 720;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .compare-card {
+      min-height: 520px;
+      padding: 24px;
+      transform-origin: center;
+    }
+
+    .frosted-surface {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 34px;
+      background: rgba(255, 255, 255, 0.105);
+      -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 24px 68px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.21);
+    }
+
+    html[data-theme="light"] .frosted-surface {
+      border-color: rgba(255, 255, 255, 0.62);
+      background: rgba(255, 255, 255, 0.34);
+      box-shadow: 0 24px 68px rgba(72, 91, 145, 0.17), inset 0 1px 0 rgba(255, 255, 255, 0.76);
+    }
+
+    .liquid-surface {
+      border-radius: 48px 40px 52px 42px;
+    }
+
+    .liquid-surface:hover {
+      border-radius: 40px 54px 42px 50px;
+    }
+
+    .comparison-stage .focus-display {
+      min-height: 290px;
+    }
+
+    .frosted-surface .focus-display {
+      border-radius: 25px;
+      background: rgba(255, 255, 255, 0.055);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13);
+      transform: none;
+    }
+
+    html[data-theme="light"] .frosted-surface .focus-display {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .frosted-surface .focus-display::before {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: none;
+      animation: none;
+    }
+
+    .frosted-surface .card-control {
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.065);
+      transform: none;
+    }
+
+    .frosted-surface .play-button {
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .material-spec {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 14px;
+    }
+
+    .material-spec span {
+      padding: 6px 9px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      color: var(--faint);
+      background: rgba(255, 255, 255, 0.045);
+      font-size: 10px;
+      font-weight: 620;
+    }
+
+    .liquid-surface .material-spec span {
+      border-color: color-mix(in srgb, var(--accent-2) 26%, var(--line));
+      color: color-mix(in srgb, var(--accent-2) 54%, var(--text));
+    }
+
+    .versus-pill {
+      position: absolute;
+      z-index: 4;
+      top: 50%;
+      left: 50%;
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.36);
+      border-radius: 50%;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent), var(--accent-3));
+      box-shadow: 0 12px 34px color-mix(in srgb, var(--accent) 36%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.54);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      transform: translate(-50%, -35%);
+    }
+
+    .showcase {
+      position: relative;
+      min-height: 580px;
+      display: grid;
+      place-items: center;
+      perspective: 1100px;
+    }
+
+    .showcase-halo {
+      position: absolute;
+      width: 88%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent), transparent 64%);
+      filter: blur(20px);
+      animation: breathe 6s ease-in-out infinite alternate;
+    }
+
+    @keyframes breathe {
+      to { transform: scale(1.12); opacity: 0.7; }
+    }
+
+    .main-card {
+      width: min(480px, 88vw);
+      min-height: 510px;
+      padding: 24px;
+      border-radius: 48px 42px 52px 40px;
+      transform-origin: center;
+    }
+
+    .main-card:hover {
+      border-radius: 42px 54px 40px 50px;
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .window-dots {
+      display: flex;
+      gap: 7px;
+    }
+
+    .window-dots span {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.34);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+
+    .card-label {
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .mini-pill {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.07);
+      font-size: 11px;
+    }
+
+    .focus-display {
+      position: relative;
+      min-height: 280px;
+      display: grid;
+      place-items: center;
+      margin-top: 24px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      background:
+        radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--accent-2) 22%, transparent), transparent 40%),
+        linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+      box-shadow: inset 0 1px 0 var(--line-strong);
+      transform: translateZ(26px);
+    }
+
+    .focus-display::before {
+      content: "";
+      position: absolute;
+      width: 210px;
+      height: 210px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 44% 56% 52% 48% / 46% 45% 55% 54%;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(124, 101, 255, 0.12));
+      box-shadow: inset 12px 15px 28px rgba(255, 255, 255, 0.12), inset -15px -18px 30px rgba(30, 12, 95, 0.16), 0 24px 65px rgba(8, 5, 36, 0.24);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      animation: soft-morph 8s ease-in-out infinite alternate;
+    }
+
+    @keyframes soft-morph {
+      50% { transform: rotate(8deg) scale(1.04); border-radius: 58% 42% 44% 56% / 39% 61% 39% 61%; }
+      100% { transform: rotate(-5deg) scale(0.96); border-radius: 41% 59% 61% 39% / 57% 42% 58% 43%; }
+    }
+
+    .focus-time {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
+    }
+
+    .focus-time strong {
+      display: block;
+      font-size: 58px;
+      line-height: 1;
+      letter-spacing: -0.07em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .focus-time span {
+      display: block;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+    }
+
+    .card-control {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.06);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      transform: translateZ(18px);
+    }
+
+    .play-button {
+      flex: 0 0 42px;
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      padding: 0 0 0 2px;
+      border: 1px solid rgba(255, 255, 255, 0.36);
+      border-radius: 50%;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      cursor: pointer;
+      box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+      transition: transform 170ms ease;
+    }
+
+    .play-button:hover { transform: scale(1.08); }
+    .play-button:active { transform: scale(0.92); }
+
+    .control-copy {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .control-copy strong,
+    .control-copy span {
+      display: block;
+    }
+
+    .control-copy strong {
+      font-size: 13px;
+    }
+
+    .control-copy span {
+      margin-top: 4px;
+      overflow: hidden;
+      color: var(--faint);
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .equalizer {
+      height: 22px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding-right: 2px;
+    }
+
+    .equalizer i {
+      width: 2px;
+      height: 32%;
+      border-radius: 999px;
+      background: var(--accent-2);
+      animation: equalize 900ms ease-in-out infinite alternate;
+    }
+
+    .equalizer i:nth-child(2) { animation-delay: -430ms; }
+    .equalizer i:nth-child(3) { animation-delay: -180ms; }
+    .equalizer i:nth-child(4) { animation-delay: -620ms; }
+
+    @keyframes equalize {
+      to { height: 94%; }
+    }
+
+    .floating-chip {
+      position: absolute;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 11px 14px;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+      white-space: nowrap;
+      animation: float-chip 4.8s ease-in-out infinite alternate;
+    }
+
+    .chip-one {
+      top: 11%;
+      right: -4%;
+      animation-delay: -1.2s;
+    }
+
+    .chip-two {
+      bottom: 13%;
+      left: -8%;
+    }
+
+    .chip-symbol {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+      font-size: 12px;
+    }
+
+    @keyframes float-chip {
+      to { transform: translateY(-10px) rotate(1deg); }
+    }
+
+    .features {
+      padding: 76px 0 90px;
+      scroll-margin-top: 100px;
+    }
+
+    .section-head {
+      max-width: 670px;
+      margin-bottom: 34px;
+    }
+
+    .section-kicker {
+      color: var(--accent-2);
+      font-size: 12px;
+      font-weight: 720;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 12px 0 0;
+      font-size: clamp(34px, 4.5vw, 54px);
+      line-height: 1.08;
+      letter-spacing: -0.055em;
+    }
+
+    .section-head p {
+      margin: 16px 0 0;
+      color: var(--muted);
+      line-height: 1.75;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .feature-card {
+      min-height: 270px;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      border-radius: 30px;
+    }
+
+    .feature-card:nth-child(2) { border-radius: 38px 28px 34px 31px; }
+    .feature-card:nth-child(3) { border-radius: 26px 38px 30px 36px; }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.05));
+      box-shadow: inset 0 1px 0 var(--line-strong), 0 10px 25px rgba(0, 0, 0, 0.12);
+      font-size: 20px;
+      transform: translateZ(18px);
+    }
+
+    .feature-card h3 {
+      margin: auto 0 0;
+      font-size: 19px;
+      letter-spacing: -0.025em;
+    }
+
+    .feature-card p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .lab {
+      padding: 18px 0 112px;
+      scroll-margin-top: 100px;
+    }
+
+    .lab-panel {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 34px;
+      padding: clamp(28px, 5vw, 58px);
+      border-radius: 44px 52px 46px 40px;
+    }
+
+    .lab-panel h2 {
+      max-width: 660px;
+    }
+
+    .lab-panel p {
+      max-width: 650px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      line-height: 1.75;
+    }
+
+    .lab-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 168px;
+    }
+
+    .mini-button {
+      min-height: 44px;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 650;
+      transition: transform 160ms ease, background 160ms ease;
+    }
+
+    .mini-button:hover {
+      transform: translateY(-2px);
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 0 0 34px;
+      color: var(--faint);
+      font-size: 12px;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      z-index: 60;
+      min-width: min(360px, calc(100vw - 36px));
+      padding: 14px 18px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      color: var(--text);
+      background: var(--glass-fallback);
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+      backdrop-filter: blur(24px) saturate(160%);
+      box-shadow: 0 18px 55px var(--shadow), inset 0 1px 0 var(--line-strong);
+      text-align: center;
+      font-size: 13px;
+      font-weight: 620;
+      opacity: 0;
+      transform: translate(-50%, 24px) scale(0.96);
+      transition: opacity 220ms ease, transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1);
+    }
+
+    .no-backdrop .capability-text::after {
+      content: "兼容模式";
+    }
+
+    .has-backdrop .capability-text::after {
+      content: "动态材质已启用";
+    }
+
+    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+      .glass,
+      .glass-button,
+      .toast {
+        background: var(--glass-fallback);
+      }
+
+      .focus-display::before {
+        background: color-mix(in srgb, var(--glass-fallback) 92%, var(--accent) 8%);
+      }
+    }
+
+    @media (max-width: 920px) {
+      .hero {
+        grid-template-columns: 1fr;
+        padding-top: 92px;
+      }
+
+      .hero-copy {
+        text-align: center;
+      }
+
+      .eyebrow {
+        margin-inline: auto;
+      }
+
+      .hero-copy > p {
+        margin-inline: auto;
+      }
+
+      .hero-actions,
+      .micro-note {
+        justify-content: center;
+      }
+
+      .showcase {
+        min-height: 620px;
+      }
+
+      .comparison-stage {
+        gap: 16px;
+        margin-top: 52px;
+      }
+
+      .compare-card {
+        min-height: 495px;
+        padding: 18px;
+      }
+
+      .comparison-stage .focus-display {
+        min-height: 250px;
+      }
+
+      .comparison-stage .focus-time strong {
+        font-size: 50px;
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .feature-card:last-child {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .page-shell {
+        width: min(100% - 24px, 1180px);
+      }
+
+      .nav-wrap {
+        top: 10px;
+        padding-top: 10px;
+      }
+
+      .nav {
+        min-height: 56px;
+        padding-left: 12px;
+      }
+
+      .brand-name,
+      .theme-text,
+      .nav-links {
+        display: none;
+      }
+
+      .hero {
+        min-height: auto;
+        gap: 48px;
+        padding: 88px 0 40px;
+      }
+
+      h1 {
+        font-size: clamp(45px, 15vw, 68px);
+      }
+
+      .hero-copy > p {
+        font-size: 16px;
+      }
+
+      .hero-actions {
+        flex-direction: column;
+      }
+
+      .glass-button {
+        width: 100%;
+      }
+
+      .showcase {
+        min-height: 550px;
+      }
+
+      .comparison-stage {
+        grid-template-columns: repeat(2, minmax(286px, 1fr));
+        gap: 14px;
+        margin-top: 40px;
+        padding: 16px 2px 24px;
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+      }
+
+      .comparison-stage::-webkit-scrollbar {
+        display: none;
+      }
+
+      .compare-column {
+        scroll-snap-align: start;
+      }
+
+      .compare-card {
+        min-height: 470px;
+        padding: 16px;
+      }
+
+      .comparison-stage .focus-display {
+        min-height: 235px;
+        margin-top: 18px;
+      }
+
+      .comparison-stage .focus-time strong {
+        font-size: 46px;
+      }
+
+      .versus-pill {
+        display: none;
+      }
+
+      .source-art {
+        inset: 5% -70%;
+      }
+
+      .main-card {
+        min-height: 480px;
+        padding: 18px;
+        border-radius: 38px;
+      }
+
+      .focus-display {
+        min-height: 260px;
+      }
+
+      .floating-chip {
+        transform: scale(0.92);
+      }
+
+      .chip-one {
+        top: 7%;
+        right: -2%;
+      }
+
+      .chip-two {
+        bottom: 8%;
+        left: -2%;
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .feature-card:last-child {
+        grid-column: auto;
+      }
+
+      .lab-panel {
+        grid-template-columns: 1fr;
+        border-radius: 34px;
+      }
+
+      .lab-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+
+      .mini-button {
+        flex: 1 1 150px;
+      }
+
+      footer {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    @media (pointer: coarse) {
+      .tilt:hover {
+        --lift: 0px;
+        --scale: 1;
+      }
+    }
+
+    @media (prefers-contrast: more) {
+      :root {
+        --muted: rgba(255, 255, 255, 0.88);
+        --line: rgba(255, 255, 255, 0.55);
+      }
+
+      html[data-theme="light"] {
+        --muted: rgba(12, 18, 38, 0.86);
+        --line: rgba(21, 34, 68, 0.48);
+      }
+
+      .glass {
+        background: var(--glass-fallback);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+
+      .tilt,
+      .tilt:hover {
+        --rx: 0deg !important;
+        --ry: 0deg !important;
+        --lift: 0px !important;
+        --scale: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+
+  <div class="ambient" aria-hidden="true">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="orb orb-c"></div>
+  </div>
+
+  <div class="page-shell nav-wrap">
+    <nav class="nav glass" aria-label="主导航">
+      <a class="brand" href="#main" aria-label="液态玻璃演示首页">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">玻璃材质对照实验室</span>
+      </a>
+      <div class="nav-links">
+        <a href="#experience">对照</a>
+        <a href="#details">差异</a>
+        <a href="#lab">交互</a>
+      </div>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="切换显示模式">
+        <span class="theme-icon" aria-hidden="true">☀</span>
+        <span class="theme-text">亮色</span>
+      </button>
+    </nav>
+  </div>
+
+  <main id="main" class="page-shell">
+    <section class="hero" id="experience">
+      <div class="hero-copy">
+        <div class="eyebrow">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span>同屏材质对照 · </span><span class="capability-text" aria-live="polite"></span>
+        </div>
+        <h1>
+          从一层模糊，
+          <span class="liquid-title">到流动的光。</span>
+        </h1>
+        <p>左侧是传统毛玻璃，右侧是 Apple 风格液态玻璃。两边使用完全相同的内容与背景，只改变材质处理，直观看清静态模糊与动态折射的区别。</p>
+        <div class="hero-actions">
+          <a class="glass-button primary" href="#details">
+            拆解差异 <span class="button-arrow" aria-hidden="true">↓</span>
+          </a>
+          <button class="glass-button" type="button" id="paletteButton">
+            切换光谱 <span aria-hidden="true">✦</span>
+          </button>
+        </div>
+        <div class="micro-note">移动指针到右侧卡片，左侧保持静态作为基准</div>
+      </div>
+
+      <div class="comparison-stage" aria-label="传统毛玻璃与液态玻璃左右对照">
+        <div class="source-art" aria-hidden="true">
+          <span class="source-shape one"></span>
+          <span class="source-shape two"></span>
+          <span class="source-line"></span>
+        </div>
+
+        <section class="compare-column" aria-labelledby="frostedTitle">
+          <header class="compare-header">
+            <div class="compare-title">
+              <span class="compare-index">01 · 左侧</span>
+              <strong id="frostedTitle">传统毛玻璃</strong>
+            </div>
+            <span class="compare-tag">Static blur</span>
+          </header>
+
+          <article class="compare-card frosted-surface">
+            <div class="card-top">
+              <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+              <span class="card-label">专注空间</span>
+              <span class="mini-pill">正在运行</span>
+            </div>
+
+            <div class="focus-display">
+              <div class="focus-time">
+                <strong class="compare-clock">25:00</strong>
+                <span>深度专注</span>
+              </div>
+            </div>
+
+            <div class="card-control">
+              <button class="play-button" data-play type="button" aria-label="开始专注计时" aria-pressed="false">▶</button>
+              <div class="control-copy">
+                <strong class="compare-focus-state">等待开始</strong>
+                <span>缓慢呼吸 · 保持清醒</span>
+              </div>
+              <span class="equalizer" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            </div>
+            <div class="material-spec" aria-label="传统毛玻璃材质特征">
+              <span>统一模糊</span><span>固定透明度</span><span>静态边缘</span>
+            </div>
+          </article>
+        </section>
+
+        <span class="versus-pill" aria-hidden="true">VS</span>
+
+        <section class="compare-column" aria-labelledby="liquidTitle">
+          <header class="compare-header">
+            <div class="compare-title">
+              <span class="compare-index">02 · 右侧</span>
+              <strong id="liquidTitle">液态玻璃</strong>
+            </div>
+            <span class="compare-tag">Responsive material</span>
+          </header>
+
+          <article class="compare-card liquid-surface glass tilt" data-tilt>
+            <div class="card-top">
+              <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+              <span class="card-label">专注空间</span>
+              <span class="mini-pill">正在运行</span>
+            </div>
+
+            <div class="focus-display">
+              <div class="focus-time">
+                <strong class="compare-clock">25:00</strong>
+                <span>深度专注</span>
+              </div>
+            </div>
+
+            <div class="card-control">
+              <button class="play-button" data-play type="button" aria-label="开始专注计时" aria-pressed="false">▶</button>
+              <div class="control-copy">
+                <strong class="compare-focus-state">等待开始</strong>
+                <span>缓慢呼吸 · 保持清醒</span>
+              </div>
+              <span class="equalizer" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            </div>
+            <div class="material-spec" aria-label="液态玻璃材质特征">
+              <span>局部折射</span><span>动态高光</span><span>柔性形变</span><span>3D 响应</span>
+            </div>
+          </article>
+        </section>
+      </div>
+    </section>
+
+    <section class="features" id="details">
+      <div class="section-head">
+        <span class="section-kicker">Why it feels different</span>
+        <h2>差异不在模糊强度，<br>而在材质如何回应环境。</h2>
+        <p>传统毛玻璃把背景均匀柔化；液态玻璃则叠加透射、局部高光、边缘折射、内侧阴影与形变反馈。</p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature-card glass tilt" data-tilt>
+          <span class="feature-icon" aria-hidden="true">◌</span>
+          <h3>均匀模糊 → 局部折射</h3>
+          <p>左侧所有区域使用相同模糊；右侧根据光源和指针位置产生不同的明暗层次。</p>
+        </article>
+        <article class="feature-card glass tilt" data-tilt>
+          <span class="feature-icon" aria-hidden="true">✧</span>
+          <h3>静态边缘 → 动态高光</h3>
+          <p>左侧只有固定描边；右侧边缘由高光、内阴影与色彩染色共同塑造厚度。</p>
+        </article>
+        <article class="feature-card glass tilt" data-tilt>
+          <span class="feature-icon" aria-hidden="true">≈</span>
+          <h3>固定表面 → 交互材质</h3>
+          <p>左侧始终保持平面；右侧会轻微倾斜、移动光泽并改变轮廓，回应观察角度。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="lab" id="lab">
+      <div class="lab-panel glass tilt" data-tilt>
+        <div>
+          <span class="section-kicker">Try it</span>
+          <h2>换一个背景，再看一次差异。</h2>
+          <p>切换光谱或明暗模式后重新观察左右两侧：背景越复杂，传统模糊与动态液态材质之间的层次差异越明显。</p>
+        </div>
+        <div class="lab-actions">
+          <button class="mini-button" type="button" id="labThemeButton">切换明暗</button>
+          <button class="mini-button" type="button" data-toast="玻璃反馈已被触发">触发反馈</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-shell">
+    <span>Frosted Glass vs Liquid Glass · 单文件对照演示</span>
+    <span>尊重“减少动态效果”系统偏好</span>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const themeToggle = document.querySelector("#themeToggle");
+      const labThemeButton = document.querySelector("#labThemeButton");
+      const themeIcon = themeToggle.querySelector(".theme-icon");
+      const themeText = themeToggle.querySelector(".theme-text");
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+      const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+      const finePointer = matchMedia("(hover: hover) and (pointer: fine)");
+      const backdropSupported = CSS.supports("backdrop-filter", "blur(1px)") || CSS.supports("-webkit-backdrop-filter", "blur(1px)");
+
+      document.body.classList.add(backdropSupported ? "has-backdrop" : "no-backdrop");
+
+      function persistTheme(theme) {
+        try { localStorage.setItem("liquid-glass-theme", theme); } catch (_) { /* file:// may block storage */ }
+      }
+
+      function syncThemeUI() {
+        const light = root.dataset.theme === "light";
+        themeIcon.textContent = light ? "☾" : "☀";
+        themeText.textContent = light ? "暗色" : "亮色";
+        themeToggle.setAttribute("aria-label", light ? "切换到暗色模式" : "切换到亮色模式");
+        themeToggle.setAttribute("aria-pressed", String(light));
+        themeMeta.setAttribute("content", light ? "#edf3ff" : "#080b18");
+      }
+
+      function toggleTheme() {
+        root.dataset.theme = root.dataset.theme === "light" ? "dark" : "light";
+        persistTheme(root.dataset.theme);
+        syncThemeUI();
+        showToast(root.dataset.theme === "light" ? "已切换至晨雾亮色" : "已切换至深空暗色");
+      }
+
+      themeToggle.addEventListener("click", toggleTheme);
+      labThemeButton.addEventListener("click", toggleTheme);
+      syncThemeUI();
+
+      const palettes = [
+        { a: "#773cff", b: "#00bfea", c: "#ff4aa2", name: "霓虹光谱" },
+        { a: "#ff6b77", b: "#ffb347", c: "#f05fe5", name: "日落光谱" },
+        { a: "#00b894", b: "#38d9a9", c: "#4dabf7", name: "海湾光谱" },
+        { a: "#5f6cff", b: "#75e6ff", c: "#b573ff", name: "星云光谱" }
+      ];
+      let paletteIndex = 0;
+
+      document.querySelector("#paletteButton").addEventListener("click", () => {
+        paletteIndex = (paletteIndex + 1) % palettes.length;
+        const next = palettes[paletteIndex];
+        root.style.setProperty("--blob-a", next.a);
+        root.style.setProperty("--blob-b", next.b);
+        root.style.setProperty("--blob-c", next.c);
+        root.style.setProperty("--accent", next.a);
+        root.style.setProperty("--accent-2", next.b);
+        root.style.setProperty("--accent-3", next.c);
+        showToast(`已切换：${next.name}`);
+      });
+
+      const toast = document.querySelector("#toast");
+      let toastTimer;
+
+      function showToast(message) {
+        clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add("show");
+        toastTimer = setTimeout(() => toast.classList.remove("show"), 1900);
+      }
+
+      document.querySelectorAll("[data-toast]").forEach((button) => {
+        button.addEventListener("click", () => showToast(button.dataset.toast));
+      });
+
+      const tiltElements = [...document.querySelectorAll("[data-tilt]")];
+      const frameByElement = new WeakMap();
+
+      function resetTilt(element) {
+        const pending = frameByElement.get(element);
+        if (pending) cancelAnimationFrame(pending);
+        element.style.setProperty("--mx", "50%");
+        element.style.setProperty("--my", "30%");
+        element.style.setProperty("--rx", "0deg");
+        element.style.setProperty("--ry", "0deg");
+      }
+
+      tiltElements.forEach((element) => {
+        element.addEventListener("pointermove", (event) => {
+          if (reducedMotion.matches || !finePointer.matches) return;
+          const oldFrame = frameByElement.get(element);
+          if (oldFrame) cancelAnimationFrame(oldFrame);
+          const frame = requestAnimationFrame(() => {
+            const rect = element.getBoundingClientRect();
+            const x = Math.max(0, Math.min(event.clientX - rect.left, rect.width));
+            const y = Math.max(0, Math.min(event.clientY - rect.top, rect.height));
+            const nx = x / rect.width - 0.5;
+            const ny = y / rect.height - 0.5;
+            const strength = element.classList.contains("liquid-surface") ? 5.5 : 3.2;
+            element.style.setProperty("--mx", `${x}px`);
+            element.style.setProperty("--my", `${y}px`);
+            element.style.setProperty("--rx", `${(-ny * strength).toFixed(2)}deg`);
+            element.style.setProperty("--ry", `${(nx * strength).toFixed(2)}deg`);
+          });
+          frameByElement.set(element, frame);
+        });
+        element.addEventListener("pointerleave", () => resetTilt(element));
+      });
+
+      reducedMotion.addEventListener?.("change", () => {
+        if (reducedMotion.matches) tiltElements.forEach(resetTilt);
+      });
+
+      const playButtons = [...document.querySelectorAll("[data-play]")];
+      const focusStates = [...document.querySelectorAll(".compare-focus-state")];
+      const clocks = [...document.querySelectorAll(".compare-clock")];
+      let running = false;
+      let seconds = 25 * 60;
+      let timerId;
+
+      function renderClock() {
+        const min = String(Math.floor(seconds / 60)).padStart(2, "0");
+        const sec = String(seconds % 60).padStart(2, "0");
+        clocks.forEach((clock) => { clock.textContent = `${min}:${sec}`; });
+      }
+
+      function stopTimer() {
+        running = false;
+        clearInterval(timerId);
+        playButtons.forEach((button) => {
+          button.textContent = "▶";
+          button.setAttribute("aria-label", "开始专注计时");
+          button.setAttribute("aria-pressed", "false");
+        });
+        focusStates.forEach((state) => { state.textContent = seconds === 0 ? "本轮完成" : "已暂停"; });
+      }
+
+      playButtons.forEach((playButton) => playButton.addEventListener("click", () => {
+        if (running) {
+          stopTimer();
+          return;
+        }
+        if (seconds === 0) seconds = 25 * 60;
+        running = true;
+        playButtons.forEach((button) => {
+          button.textContent = "Ⅱ";
+          button.setAttribute("aria-label", "暂停专注计时");
+          button.setAttribute("aria-pressed", "true");
+        });
+        focusStates.forEach((state) => { state.textContent = "专注进行中"; });
+        showToast("两侧计时已同步开始");
+        timerId = setInterval(() => {
+          seconds -= 1;
+          renderClock();
+          if (seconds <= 0) {
+            stopTimer();
+            showToast("完成一次深度专注");
+          }
+        }, 1000);
+      }));
+
+      renderClock();
+    })();
+  </script>
+</body>
+</html>

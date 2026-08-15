@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 分行经营详情</title>
+<style>
+  :root {
+    --br-bg: #0a1e3c;
+    --br-panel: rgba(13, 34, 64, 0.72);
+    --br-border: rgba(86, 150, 224, 0.28);
+    --br-text: #e6f1ff;
+    --br-muted: #8fa7c8;
+    --br-cyan: #3fe1ff;
+    --br-blue: #4b7dff;
+    --br-green: #38e6b0;
+    --br-gold: #ffc857;
+    --br-red: #ff6680;
+    --br-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--br-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .br-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(63, 225, 255, 0.10), transparent 42%),
+      radial-gradient(circle at 90% 10%, rgba(255, 200, 87, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(35, 96, 172, 0.28), transparent 55%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--br-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 424px 1fr 424px;
+    grid-template-rows: 86px 104px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .br-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .br-error.is-visible { display: block; }
+
+  /* ===== 顶栏：内容页头（面包屑 + 分行名 | 对象切换器 + 时钟） ===== */
+  .br-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .br-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 200, 87, 0.55) 16%, rgba(63, 225, 255, 0.85) 50%, rgba(255, 200, 87, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(63, 225, 255, 0.45);
+  }
+  .br-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .br-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--br-muted); }
+  .br-crumb b { font-weight: 400; color: #6fb9e8; }
+  .br-crumb i { font-style: normal; color: rgba(143, 167, 200, 0.55); }
+  .br-crumb em { font-style: normal; color: #d7e8ff; }
+  .br-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .br-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 28%, #ffd98a 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(255, 200, 87, 0.3));
+  }
+  .br-head-meta { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--br-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .br-head-meta b { font-weight: 400; color: #9fd7ef; }
+  .br-head-meta i { font-style: normal; color: rgba(143, 167, 200, 0.4); }
+
+  .br-head-right { display: flex; align-items: center; gap: 24px; flex: none; }
+  .br-switcher { display: flex; align-items: stretch; gap: 8px; }
+  .br-switch-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 14px; border-radius: 9px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(86, 150, 224, 0.4); background: rgba(20, 48, 88, 0.55);
+    color: #cfe6ff; font-size: 13px; letter-spacing: 0.06em;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+  }
+  .br-switch-btn:hover {
+    color: #fff; border-color: rgba(63, 225, 255, 0.75);
+    box-shadow: 0 0 12px rgba(63, 225, 255, 0.3), inset 0 0 10px rgba(63, 225, 255, 0.08);
+  }
+  .br-switch-btn b { font-weight: 700; font-size: 16px; color: var(--br-cyan); }
+  .br-switch-box {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-width: 158px; padding: 6px 18px; border-radius: 9px;
+    border: 1px solid rgba(255, 200, 87, 0.45); background: rgba(60, 46, 16, 0.35);
+    box-shadow: inset 0 0 14px rgba(255, 200, 87, 0.08);
+  }
+  .br-switch-name { font-size: 17px; font-weight: 700; letter-spacing: 0.14em; color: #ffe3a6; }
+  .br-switch-idx { font-size: 11px; letter-spacing: 0.28em; color: rgba(255, 200, 87, 0.6); font-variant-numeric: tabular-nums; }
+  .br-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 24px; border-left: 1px solid rgba(86, 150, 224, 0.25); }
+  .br-clock-time { font: 700 26px/1 var(--br-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4); }
+  .br-clock-date { font-size: 12px; color: var(--br-muted); letter-spacing: 0.08em; }
+
+  /* ===== KPI 行：6 枚 + vs 全行均值 ===== */
+  .br-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .br-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--br-border); border-radius: 12px; background: var(--br-panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  }
+  .br-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 42px; height: 3px;
+    background: linear-gradient(90deg, var(--br-gold), transparent);
+  }
+  .br-kpi-label { font-size: 13px; letter-spacing: 0.14em; color: var(--br-muted); }
+  .br-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .br-kpi-val { font: 700 28px/1 var(--br-mono); color: #f4faff; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4); }
+  .br-kpi-unit { font-size: 12px; color: #6fb9e8; }
+  .br-kpi-vs { font-size: 11.5px; letter-spacing: 0.03em; font-variant-numeric: tabular-nums; color: var(--br-muted); }
+  .br-kpi-vs b { font-weight: 700; }
+  .br-kpi-vs.is-good b { color: var(--br-green); }
+  .br-kpi-vs.is-bad b { color: var(--br-red); }
+
+  /* ===== 面板通用 ===== */
+  .br-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .br-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--br-border); border-radius: 12px; background: var(--br-panel);
+    display: flex; flex-direction: column;
+  }
+  .br-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(63, 225, 255, 0.22), rgba(63, 225, 255, 0.04) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .br-panel-head i { flex: none; width: 5px; height: 16px; background: var(--br-cyan); box-shadow: 0 0 8px var(--br-cyan); transform: skewX(-12deg); }
+  .br-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .br-panel-head .br-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .br-panel-head .br-panel-scope { margin-left: auto; font-size: 12px; color: var(--br-gold); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .br-chart { flex: 1; min-height: 0; }
+
+  /* ===== 左下：全行排名位置条 ===== */
+  .br-rank { flex: 0.72; }
+  .br-rank-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 8px 26px 14px; }
+  .br-rank-title { font-size: 14px; letter-spacing: 0.08em; color: #cfe3fa; text-align: center; }
+  .br-rank-title b { font: 700 22px/1 var(--br-mono); color: var(--br-gold); text-shadow: 0 0 12px rgba(255, 200, 87, 0.5); margin: 0 4px; }
+  .br-rank-wrap { position: relative; padding: 26px 0 22px; }
+  .br-rank-track {
+    position: relative; height: 12px; border-radius: 999px;
+    background: linear-gradient(90deg, rgba(56, 230, 176, 0.5), rgba(63, 225, 255, 0.35) 40%, rgba(75, 125, 255, 0.28) 70%, rgba(255, 102, 128, 0.4));
+    border: 1px solid rgba(94, 168, 255, 0.3);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+  .br-rank-tick { position: absolute; top: 100%; transform: translateX(-50%); margin-top: 6px; font-size: 10.5px; color: var(--br-muted); font-variant-numeric: tabular-nums; }
+  .br-rank-marker {
+    position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%);
+    width: 22px; height: 22px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #d8f8ff, var(--br-cyan) 55%, #0e6f8a);
+    border: 2px solid #eafbff;
+    box-shadow: 0 0 0 5px rgba(63, 225, 255, 0.18), 0 0 18px rgba(63, 225, 255, 0.8);
+    transition: left 0.8s cubic-bezier(0.22, 0.9, 0.3, 1);
+    z-index: 2;
+  }
+  .br-rank-marker span {
+    position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); margin-bottom: 8px;
+    padding: 3px 10px; border-radius: 6px; white-space: nowrap;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: #06182f;
+    background: linear-gradient(120deg, #7deaff, #29b6de);
+    box-shadow: 0 0 10px rgba(63, 225, 255, 0.5);
+  }
+  .br-rank-marker span::after {
+    content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+    border: 4px solid transparent; border-top-color: #29b6de;
+  }
+  .br-rank-nb {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 8px; height: 8px; border-radius: 50%; background: rgba(207, 227, 250, 0.85);
+    box-shadow: 0 0 6px rgba(207, 227, 250, 0.6);
+    transition: left 0.8s cubic-bezier(0.22, 0.9, 0.3, 1);
+    z-index: 1;
+  }
+  .br-rank-nb i {
+    position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 10px;
+    font-style: normal; white-space: nowrap; font-size: 11px; color: var(--br-muted); letter-spacing: 0.04em;
+  }
+  .br-rank-legend { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--br-muted); letter-spacing: 0.06em; }
+  .br-rank-legend em { font-style: normal; color: #9fd7ef; }
+
+  /* ===== 中央：客户结构与产品渗透双图 ===== */
+  .br-duo { flex: 1; min-height: 0; display: flex; padding: 4px 6px 8px; gap: 4px; }
+  .br-duo-item { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .br-duo-item.is-wide { flex: 1.16; }
+  .br-duo-cap { flex: none; text-align: center; font-size: 12px; letter-spacing: 0.14em; color: var(--br-muted); padding: 4px 0 0; }
+
+  /* ===== 右上：网点清单表 ===== */
+  .br-outlet { flex: 1.06; }
+  .br-outlet-head-row {
+    flex: none; display: grid; grid-template-columns: 1.35fr 0.85fr 0.85fr 1.35fr; gap: 8px;
+    padding: 9px 16px 7px; font-size: 12px; letter-spacing: 0.12em; color: #6fb9e8;
+    border-bottom: 1px solid rgba(86, 150, 224, 0.25);
+  }
+  .br-outlet-head-row span:nth-child(2), .br-outlet-head-row span:nth-child(3) { text-align: right; }
+  .br-outlet-list { flex: 1; min-height: 0; margin: 0; padding: 0 0 4px; list-style: none; display: flex; flex-direction: column; justify-content: space-around; }
+  .br-outlet-list li {
+    display: grid; grid-template-columns: 1.35fr 0.85fr 0.85fr 1.35fr; gap: 8px;
+    align-items: center; padding: 0 16px; font-size: 13px; color: #cfe3fa;
+    font-variant-numeric: tabular-nums;
+  }
+  .br-outlet-list li:nth-child(odd) { background: rgba(24, 56, 100, 0.25); }
+  .br-outlet-name { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .br-outlet-name i { font-style: normal; flex: none; width: 6px; height: 6px; border-radius: 2px; background: var(--br-cyan); box-shadow: 0 0 6px rgba(63, 225, 255, 0.7); transform: rotate(45deg); }
+  .br-outlet-num { text-align: right; color: #e8f3ff; }
+  .br-outlet-bar { display: flex; align-items: center; gap: 8px; }
+  .br-outlet-bar-track { flex: 1; height: 8px; border-radius: 999px; background: rgba(63, 120, 200, 0.16); overflow: hidden; }
+  .br-outlet-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #1d5d9e, var(--br-cyan)); transition: width 0.8s ease; }
+  .br-outlet-bar-fill.is-over { background: linear-gradient(90deg, #8a5f18, var(--br-gold)); }
+  .br-outlet-bar b { flex: none; width: 52px; text-align: right; font-size: 12px; font-weight: 700; color: #9fd7ef; }
+  .br-outlet-bar b.is-over { color: var(--br-gold); }
+
+  /* ===== 右下：大事记时间线 ===== */
+  .br-events { flex: 0.94; }
+  .br-event-list { flex: 1; min-height: 0; margin: 0; padding: 10px 16px 8px 30px; list-style: none; position: relative; display: flex; flex-direction: column; justify-content: space-around; }
+  .br-event-list::before {
+    content: ""; position: absolute; left: 16px; top: 16px; bottom: 14px; width: 1px;
+    background: linear-gradient(180deg, rgba(63, 225, 255, 0.6), rgba(63, 225, 255, 0.08));
+  }
+  .br-event-list li { position: relative; padding: 2px 0 2px 8px; }
+  .br-event-list li::before {
+    content: ""; position: absolute; left: -18px; top: 9px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--br-cyan); box-shadow: 0 0 0 3px rgba(63, 225, 255, 0.15), 0 0 8px var(--br-cyan);
+  }
+  .br-event-list li.is-gold::before { background: var(--br-gold); box-shadow: 0 0 0 3px rgba(255, 200, 87, 0.15), 0 0 8px var(--br-gold); }
+  .br-event-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--br-muted); font-variant-numeric: tabular-nums; }
+  .br-event-tag {
+    font-size: 11px; padding: 1px 8px; border-radius: 999px; letter-spacing: 0.06em;
+    color: #a9ecff; border: 1px solid rgba(63, 225, 255, 0.35); background: rgba(63, 225, 255, 0.08);
+  }
+  li.is-gold .br-event-tag { color: #ffe3a6; border-color: rgba(255, 200, 87, 0.4); background: rgba(255, 200, 87, 0.08); }
+  .br-event-text { margin-top: 3px; font-size: 13px; color: #dcebff; letter-spacing: 0.02em; }
+  .br-event-text b { color: var(--br-gold); font-weight: 700; }
+
+  /* ===== 底部跑马灯 ===== */
+  .br-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--br-border); border-radius: 12px; background: var(--br-panel);
+  }
+  .br-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #06182f;
+    background: linear-gradient(120deg, var(--br-gold), #e8a83a 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+    white-space: nowrap;
+  }
+  .br-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #06182f; animation: brDot 1.6s ease-in-out infinite; }
+  @keyframes brDot { 50% { opacity: 0.3; } }
+  .br-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .br-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: brMarquee 42s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .br-marquee-track b { color: var(--br-gold); font-weight: 700; }
+  .br-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(63, 225, 255, 0.55); }
+  @keyframes brMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .br-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="br-stage" id="br-stage">
+    <!-- mockflag:begin --><div class="br-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="br-error" id="br-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏：内容页头 -->
+    <header class="br-header">
+      <div class="br-head-left">
+        <div class="br-crumb"><b>经营总览</b><i>›</i><em>分行详情</em></div>
+        <div class="br-head-title-row">
+          <div class="br-head-title" id="br-branch-name">城中支行</div>
+          <div class="br-head-meta">
+            <span>分行编号 <b id="br-branch-code">BR-012</b></span><i>|</i>
+            <span>负责人 <b id="br-branch-owner">陈立群</b></span><i>|</i>
+            <span>员工 <b id="br-branch-staff">--</b> 人 · 下辖网点 <b id="br-branch-outlets">--</b> 个</span>
+          </div>
+        </div>
+      </div>
+      <div class="br-head-right">
+        <div class="br-switcher" aria-label="分行切换器">
+          <button class="br-switch-btn" id="br-btn-prev" type="button"><b>‹</b>上一家</button>
+          <div class="br-switch-box">
+            <span class="br-switch-name" id="br-switch-name">城中支行</span>
+            <span class="br-switch-idx" id="br-switch-idx">1 / 3</span>
+          </div>
+          <button class="br-switch-btn" id="br-btn-next" type="button">下一家<b>›</b></button>
+        </div>
+        <div class="br-clock" aria-label="实时时钟">
+          <span class="br-clock-time" id="br-clock-time">--:--:--</span>
+          <span class="br-clock-date" id="br-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 行 -->
+    <section class="br-kpis" aria-label="本行核心指标（对标全行均值）" id="br-kpis"></section>
+
+    <!-- 左列 -->
+    <div class="br-col">
+      <section class="br-panel">
+        <header class="br-panel-head"><i></i><h2>本行 vs 全行均值</h2><span class="br-panel-en">BENCHMARK RADAR</span><span class="br-panel-scope">六维对标</span></header>
+        <div class="br-chart" id="br-chart-radar" role="img" aria-label="本行与全行均值六维对标雷达图"></div>
+      </section>
+      <section class="br-panel br-rank">
+        <header class="br-panel-head"><i></i><h2>全行排名位置</h2><span class="br-panel-en">RANK POSITION</span><span class="br-panel-scope">综合经营积分</span></header>
+        <div class="br-rank-body">
+          <div class="br-rank-title">全行 <em>38</em> 家分行中列第<b id="br-rank-no">--</b>位</div>
+          <div class="br-rank-wrap">
+            <div class="br-rank-track" id="br-rank-track">
+              <span class="br-rank-nb" id="br-rank-prev"><i>--</i></span>
+              <span class="br-rank-nb" id="br-rank-next"><i>--</i></span>
+              <span class="br-rank-marker" id="br-rank-marker"><span id="br-rank-marker-name">--</span></span>
+            </div>
+          </div>
+          <div class="br-rank-legend"><em>◀ 第 1 名（领先）</em><span id="br-rank-gap">--</span><em>第 38 名（追赶） ▶</em></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中央列 -->
+    <div class="br-col">
+      <section class="br-panel" style="flex: 1.14;">
+        <header class="br-panel-head"><i></i><h2>存贷款与营收趋势</h2><span class="br-panel-en">DEPOSIT / LOAN / REVENUE</span><span class="br-panel-scope">近 24 个月</span></header>
+        <div class="br-chart" id="br-chart-trend" role="img" aria-label="近24个月存贷款余额与月营收柱线混合图"></div>
+      </section>
+      <section class="br-panel">
+        <header class="br-panel-head"><i></i><h2>客户结构与产品渗透</h2><span class="br-panel-en">CUSTOMER &amp; PRODUCT</span><span class="br-panel-scope" id="br-cust-total">--</span></header>
+        <div class="br-duo">
+          <div class="br-duo-item">
+            <div class="br-duo-cap">客群构成占比</div>
+            <div class="br-chart" id="br-chart-donut" role="img" aria-label="本行客群构成环形图"></div>
+          </div>
+          <div class="br-duo-item is-wide">
+            <div class="br-duo-cap">产品渗透率 TOP6（对标全行均值）</div>
+            <div class="br-chart" id="br-chart-product" role="img" aria-label="产品渗透率横向条形图（本行与全行均值）"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右列 -->
+    <div class="br-col">
+      <section class="br-panel br-outlet">
+        <header class="br-panel-head"><i></i><h2>下辖网点清单</h2><span class="br-panel-en">OUTLET LIST</span><span class="br-panel-scope">6 个网点 · 本月达成</span></header>
+        <div class="br-outlet-head-row"><span>网点</span><span>存款(亿)</span><span>贷款(亿)</span><span>目标达成率</span></div>
+        <ul class="br-outlet-list" id="br-outlet-list"></ul>
+      </section>
+      <section class="br-panel br-events">
+        <header class="br-panel-head"><i></i><h2>本行大事记</h2><span class="br-panel-en">BRANCH MILESTONES</span><span class="br-panel-scope">近 90 天</span></header>
+        <ul class="br-event-list" id="br-event-list"></ul>
+      </section>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="br-marquee" aria-label="本行经营快讯">
+      <div class="br-marquee-tag"><i></i><span id="br-marquee-title">本行快讯</span></div>
+      <div class="br-marquee-view"><div class="br-marquee-track" id="br-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("br-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("br-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    gold: "#ffc857", red: "#ff6680", violet: "#9870ff"
+  };
+  const $ = (id) => document.getElementById(id);
+  const rnd = (min, max) => Math.round(min + Math.random() * (max - min));
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 全行基准 + 3 家分行数据档案（内容页核心：单对象详情，全量内嵌可切换） ===== */
+  const TOTAL_BRANCHES = 38;
+  /* 近 24 个月轴标签：24-08 ~ 26-07 */
+  const MONTHS = (() => {
+    const arr = []; let y = 24, m = 8;
+    for (let i = 0; i < 24; i++) {
+      arr.push(pad(y) + "-" + pad(m));
+      if (++m > 12) { m = 1; y++; }
+    }
+    return arr;
+  })();
+  /* 确定性序列生成器：基值 + 月增长 + 双频季节波动（数据内嵌无需联网） */
+  const seq = (base, grow, amp, seed, dec) => {
+    const a = [];
+    for (let i = 0; i < 24; i++) {
+      a.push(+(base + grow * i + amp * Math.sin(i * 0.9 + seed) + amp * 0.45 * Math.sin(i * 2.3 + seed * 1.7)).toFixed(dec));
+    }
+    return a;
+  };
+
+  const RADAR_DIMS = ["存款", "贷款", "中收", "客户", "质量", "效率"];
+  const RADAR_AVG = [62, 60, 58, 61, 63, 60];               /* 全行均值得分 */
+  const PROD_NAMES = ["手机银行", "代发工资", "理财持有", "信用卡", "收单商户", "保险配置"];
+  const PROD_AVG = [58.2, 41.5, 32.8, 27.4, 18.6, 9.8];      /* 全行均值渗透率 % */
+  const CUST_SEGS = ["代发客群", "财富客群", "商户客群", "年轻客群", "老年客群"];
+
+  /* KPI 元定义：avg=全行均值；betterHigh=false 表示越低越好（不良率反向） */
+  const KPI_META = [
+    { label: "存款余额", unit: "亿元", key: "dep", avg: 112.6, dec: 1, betterHigh: true },
+    { label: "贷款余额", unit: "亿元", key: "loan", avg: 86.4, dec: 1, betterHigh: true },
+    { label: "年累计营收", unit: "亿元", key: "rev", avg: 3.42, dec: 2, betterHigh: true },
+    { label: "不良贷款率", unit: "%", key: "npl", avg: 1.24, dec: 2, betterHigh: false },
+    { label: "本月新增客户", unit: "户", key: "cust", avg: 1860, dec: 0, betterHigh: true },
+    { label: "人均产能", unit: "万元", key: "prod", avg: 386, dec: 0, betterHigh: true }
+  ];
+
+  const PROFILES = [
+    {
+      name: "城中支行", code: "BR-012", owner: "陈立群", staff: 126, outletsCount: 6,
+      kpi: { dep: 168.5, loan: 128.9, rev: 5.26, npl: 0.92, cust: 2680, prod: 512 },
+      radar: [86, 82, 78, 74, 88, 84],
+      rank: 5, prevNb: { rank: 4, name: "城南支行" }, nextNb: { rank: 6, name: "东湖支行" },
+      trend: { dep: seq(152, 0.74, 2.6, 0.6, 1), loan: seq(115, 0.62, 2.1, 2.1, 1), rev: seq(3.9, 0.028, 0.32, 1.3, 2) },
+      custTotal: "客户 18.6 万户",
+      donut: [34.2, 21.6, 18.4, 15.2, 10.6],
+      prod: [72.4, 56.8, 45.2, 36.5, 24.8, 13.6],
+      outlets: [
+        { name: "府前街网点", dep: 42.6, loan: 33.8, rate: 112.4 },
+        { name: "中心广场网点", dep: 36.2, loan: 27.5, rate: 106.8 },
+        { name: "人民路网点", dep: 30.8, loan: 23.6, rate: 98.5 },
+        { name: "文昌巷网点", dep: 24.5, loan: 18.2, rate: 94.2 },
+        { name: "北门桥网点", dep: 19.6, loan: 14.8, rate: 88.6 },
+        { name: "延安西路网点", dep: 14.8, loan: 11.0, rate: 82.3 }
+      ],
+      events: [
+        { date: "07-18", tag: "荣誉", gold: true, text: "获总行二季度<b>综合经营一等奖</b>，综合积分全行第 5" },
+        { date: "07-02", tag: "业务", gold: false, text: "落地首笔<b>2.8 亿元</b>市政基建银团贷款" },
+        { date: "06-20", tag: "客群", gold: false, text: "代发工资客群突破 <b>6.2 万户</b>，居城区第一" },
+        { date: "06-05", tag: "风控", gold: false, text: "连续 18 个月无新增不良，不良率降至 <b>0.92%</b>" },
+        { date: "05-16", tag: "渠道", gold: true, text: "府前街旗舰网点完成<b>智慧化改造</b>并重新开业" }
+      ],
+      news: [
+        "府前街网点本月存款净增 <b>3.2 亿元</b>，达成率 112.4% 领跑全行",
+        "本行零售 AUM 突破 <b>210 亿元</b>，较年初增长 14.8%",
+        "普惠小微贷款余额 <b>36.5 亿元</b>，完成年度序时进度 109%",
+        "手机银行渗透率 <b>72.4%</b>，高于全行均值 14.2 个百分点",
+        "本行不良贷款率 <b>0.92%</b>，连续 6 个月优于全行均值"
+      ]
+    },
+    {
+      name: "高新支行", code: "BR-021", owner: "周雅萍", staff: 94, outletsCount: 6,
+      kpi: { dep: 132.4, loan: 108.6, rev: 4.18, npl: 1.08, cust: 3120, prod: 445 },
+      radar: [72, 75, 70, 85, 76, 79],
+      rank: 11, prevNb: { rank: 10, name: "临港支行" }, nextNb: { rank: 12, name: "科创支行" },
+      trend: { dep: seq(118, 0.66, 2.3, 3.4, 1), loan: seq(94, 0.68, 2.0, 4.8, 1), rev: seq(3.1, 0.03, 0.28, 2.6, 2) },
+      custTotal: "客户 14.2 万户",
+      donut: [26.8, 18.5, 18.2, 26.4, 10.1],
+      prod: [78.6, 52.4, 38.6, 33.8, 21.2, 8.4],
+      outlets: [
+        { name: "软件园网点", dep: 34.5, loan: 30.2, rate: 116.8 },
+        { name: "科技城网点", dep: 28.6, loan: 24.4, rate: 104.5 },
+        { name: "创业大道网点", dep: 22.8, loan: 19.6, rate: 97.2 },
+        { name: "大学城网点", dep: 18.4, loan: 14.2, rate: 92.8 },
+        { name: "留创园网点", dep: 15.6, loan: 12.0, rate: 86.4 },
+        { name: "湖东路网点", dep: 12.5, loan: 8.2, rate: 78.5 }
+      ],
+      events: [
+        { date: "07-15", tag: "业务", gold: true, text: "科技贷余额突破 <b>40 亿元</b>，服务科创企业 386 家" },
+        { date: "07-01", tag: "客群", gold: false, text: "单月新增客户 <b>3,120 户</b>，创本行历史新高" },
+        { date: "06-16", tag: "产品", gold: false, text: "上线「园区e贷」，首月投放 <b>2.4 亿元</b>" },
+        { date: "05-28", tag: "荣誉", gold: true, text: "获评市级<b>金融服务科创示范网点</b>" },
+        { date: "05-09", tag: "渠道", gold: false, text: "大学城网点开业，覆盖高校师生 <b>8 万人</b>" }
+      ],
+      news: [
+        "科技贷余额突破 <b>40 亿元</b>，同比增长 32.6%",
+        "本月新增客户 <b>3,120 户</b>，为全行均值 1.7 倍",
+        "手机银行渗透率 <b>78.6%</b>，全行 38 家分行中列第 1",
+        "软件园网点本月目标达成率 <b>116.8%</b>，提前 12 天完成",
+        "「园区e贷」累计授信 <b>5.8 亿元</b>，不良率保持为零"
+      ]
+    },
+    {
+      name: "滨江支行", code: "BR-007", owner: "吴建国", staff: 88, outletsCount: 6,
+      kpi: { dep: 96.8, loan: 72.5, rev: 2.86, npl: 1.45, cust: 1420, prod: 328 },
+      radar: [55, 52, 48, 50, 44, 51],
+      rank: 26, prevNb: { rank: 25, name: "江北支行" }, nextNb: { rank: 27, name: "城西支行" },
+      trend: { dep: seq(90, 0.28, 2.4, 5.2, 1), loan: seq(66, 0.26, 1.8, 6.6, 1), rev: seq(2.3, 0.014, 0.24, 4.1, 2) },
+      custTotal: "客户 9.8 万户",
+      donut: [22.5, 14.8, 20.6, 12.4, 29.7],
+      prod: [51.6, 36.2, 27.5, 22.8, 16.4, 7.2],
+      outlets: [
+        { name: "滨江大道网点", dep: 24.6, loan: 19.2, rate: 96.4 },
+        { name: "码头街网点", dep: 19.8, loan: 15.4, rate: 90.2 },
+        { name: "临江花园网点", dep: 16.4, loan: 12.6, rate: 85.6 },
+        { name: "渔人湾网点", dep: 13.8, loan: 9.8, rate: 79.4 },
+        { name: "望江门网点", dep: 12.2, loan: 8.6, rate: 74.8 },
+        { name: "老船厂网点", dep: 10.0, loan: 6.9, rate: 68.2 }
+      ],
+      events: [
+        { date: "07-20", tag: "整改", gold: false, text: "启动<b>网点效能提升专项</b>，明确 6 项追赶举措" },
+        { date: "07-06", tag: "风控", gold: false, text: "完成存量风险排查，压降关注类贷款 <b>1.6 亿元</b>" },
+        { date: "06-22", tag: "客群", gold: false, text: "银发客群专属服务上线，覆盖 <b>2.9 万户</b>老年客户" },
+        { date: "06-03", tag: "业务", gold: true, text: "落地首笔<b>8,000 万元</b>航运物流供应链融资" },
+        { date: "05-12", tag: "人事", gold: false, text: "总行派驻零售条线骨干 <b>4 人</b>驻点帮扶" }
+      ],
+      news: [
+        "效能提升专项推进中，本月存款净增 <b>1.1 亿元</b> 环比转正",
+        "关注类贷款压降 <b>1.6 亿元</b>，资产质量边际改善",
+        "银发客群专属服务覆盖 <b>2.9 万户</b>，签约率 61%",
+        "航运物流供应链融资投放 <b>8,000 万元</b>，填补本行空白",
+        "滨江大道网点达成率回升至 <b>96.4%</b>，重回考核安全线"
+      ]
+    }
+  ];
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("br-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("br-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. KPI 行（缓动跳变 + vs 全行均值小字，切换分行时目标值整体过渡） ===== */
+  const kpiWrap = $("br-kpis");
+  const kpiCells = KPI_META.map((k) => {
+    const card = document.createElement("article");
+    card.className = "br-kpi";
+    card.innerHTML =
+      '<div class="br-kpi-label">' + k.label + '</div>' +
+      '<div class="br-kpi-num"><span class="br-kpi-val">0</span><span class="br-kpi-unit">' + k.unit + '</span></div>' +
+      '<div class="br-kpi-vs">--</div>';
+    kpiWrap.appendChild(card);
+    return { meta: k, val: card.querySelector(".br-kpi-val"), vs: card.querySelector(".br-kpi-vs"), cur: 0, target: 0 };
+  });
+  function setKpiTargets(p) {
+    kpiCells.forEach((cell) => {
+      const k = cell.meta;
+      const v = p.kpi[k.key];
+      cell.target = v;
+      const better = k.betterHigh ? v >= k.avg : v <= k.avg;
+      const word = v >= k.avg ? "高于均值" : "低于均值";
+      const diffPct = Math.abs((v - k.avg) / k.avg * 100);
+      cell.vs.className = "br-kpi-vs " + (better ? "is-good" : "is-bad");
+      cell.vs.innerHTML = "全行均值 " + fmtDec(k.avg, k.dec) + " · <b>" + word + " " + fmtDec(diffPct, 1) + "%</b>";
+    });
+  }
+  setInterval(() => { /* 缓动逼近目标 */
+    kpiCells.forEach((cell) => {
+      const diff = cell.target - cell.cur;
+      if (Math.abs(diff) < Math.pow(10, -cell.meta.dec) / 2) { cell.cur = cell.target; } else { cell.cur += diff * 0.14; }
+      cell.val.textContent = fmtDec(cell.cur, cell.meta.dec);
+    });
+  }, 80);
+
+  /* ===== 6. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(102, 178, 255, 0.4)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const charts = [];
+  function makeChart(id) {
+    const c = echarts.init($(id));
+    charts.push(c);
+    return c;
+  }
+  window.addEventListener("resize", () => charts.forEach((c) => c.resize()));
+
+  /* ===== 7. 左上：本行 vs 全行均值雷达（双系列对标） ===== */
+  const radarChart = makeChart("br-chart-radar");
+  function radarOption(p) {
+    return {
+      tooltip: tip({}),
+      legend: {
+        bottom: 8, itemWidth: 12, itemHeight: 8, itemGap: 22,
+        textStyle: { color: "#cfe6ff", fontSize: 12 },
+        data: [p.name, "全行均值"]
+      },
+      radar: {
+        center: ["50%", "47%"], radius: "64%",
+        indicator: RADAR_DIMS.map((d) => ({ name: d, max: 100 })),
+        axisName: { color: "#9fd7ef", fontSize: 12 },
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.25)" } },
+        splitArea: { areaStyle: { color: ["rgba(24, 56, 100, 0.12)", "rgba(24, 56, 100, 0.04)"] } },
+        axisLine: { lineStyle: { color: "rgba(86, 150, 224, 0.3)" } }
+      },
+      series: [{
+        type: "radar",
+        data: [
+          {
+            name: p.name, value: p.radar,
+            symbol: "circle", symbolSize: 4,
+            lineStyle: { width: 2.5, color: C.cyan, shadowColor: "rgba(63, 225, 255, 0.6)", shadowBlur: 10 },
+            itemStyle: { color: C.cyan },
+            areaStyle: { color: "rgba(63, 225, 255, 0.22)" }
+          },
+          {
+            name: "全行均值", value: RADAR_AVG,
+            symbol: "circle", symbolSize: 3,
+            lineStyle: { width: 2, type: "dashed", color: C.gold },
+            itemStyle: { color: C.gold },
+            areaStyle: { color: "rgba(255, 200, 87, 0.08)" }
+          }
+        ]
+      }],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 8. 左下：全行排名位置条（DOM 滑块 + 前后邻居） ===== */
+  const rankTrack = $("br-rank-track");
+  /* 刻度：1 / 10 / 19 / 28 / 38 */
+  [1, 10, 19, 28, 38].forEach((n) => {
+    const t = document.createElement("span");
+    t.className = "br-rank-tick";
+    t.style.left = ((n - 0.5) / TOTAL_BRANCHES * 100) + "%";
+    t.textContent = "第" + n + "名";
+    rankTrack.appendChild(t);
+  });
+  const rankPos = (r) => ((r - 0.5) / TOTAL_BRANCHES * 100) + "%";
+  function renderRank(p) {
+    $("br-rank-no").textContent = p.rank;
+    const marker = $("br-rank-marker");
+    marker.style.left = rankPos(p.rank);
+    $("br-rank-marker-name").textContent = p.name + " · 第" + p.rank + "名";
+    const prev = $("br-rank-prev"), next = $("br-rank-next");
+    prev.style.left = rankPos(p.prevNb.rank);
+    next.style.left = rankPos(p.nextNb.rank);
+    prev.querySelector("i").textContent = p.prevNb.name;
+    next.querySelector("i").textContent = p.nextNb.name;
+    const ahead = p.rank - 1, behind = TOTAL_BRANCHES - p.rank;
+    $("br-rank-gap").textContent = "前有 " + ahead + " 家 · 后有 " + behind + " 家";
+  }
+
+  /* ===== 9. 中上：近 24 个月存贷款余额与月营收（柱线混合 + dataZoom 滑条） ===== */
+  const trendChart = makeChart("br-chart-trend");
+  function trendOption(p) {
+    return {
+      tooltip: tip({ trigger: "axis", valueFormatter: (v) => (typeof v === "number" ? fmtDec(v, 1) : v) }),
+      legend: {
+        top: 6, itemWidth: 12, itemHeight: 8, itemGap: 18,
+        textStyle: { color: "#cfe6ff", fontSize: 11 },
+        data: ["存款余额", "贷款余额", "月营收"]
+      },
+      grid: { left: 12, right: 14, top: 38, bottom: 40, containLabel: true },
+      dataZoom: [
+        { type: "inside", start: 25, end: 100 },
+        {
+          type: "slider", start: 25, end: 100, height: 16, bottom: 6,
+          borderColor: "rgba(86, 150, 224, 0.3)",
+          backgroundColor: "rgba(13, 34, 64, 0.5)",
+          fillerColor: "rgba(63, 225, 255, 0.14)",
+          handleStyle: { color: C.cyan, borderColor: "#0a1e3c" },
+          moveHandleStyle: { color: "rgba(63, 225, 255, 0.5)" },
+          dataBackground: { lineStyle: { color: "rgba(102, 178, 255, 0.4)" }, areaStyle: { color: "rgba(63, 120, 200, 0.18)" } },
+          textStyle: { color: C.muted, fontSize: 10 }
+        }
+      ],
+      xAxis: {
+        type: "category", data: MONTHS,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+        axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 10.5 }
+      },
+      yAxis: [
+        {
+          type: "value", name: "余额·亿元", nameTextStyle: { color: C.muted, fontSize: 10 },
+          splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+          axisLabel: { color: C.muted, fontSize: 11 }
+        },
+        {
+          type: "value", name: "营收·千万元", nameTextStyle: { color: C.muted, fontSize: 10 },
+          splitLine: { show: false },
+          axisLabel: { color: C.muted, fontSize: 11 }
+        }
+      ],
+      series: [
+        {
+          name: "存款余额", type: "bar", barWidth: 8, data: p.trend.dep,
+          itemStyle: { borderRadius: [3, 3, 0, 0], color: vGrad(C.cyan, "#155a8f") }
+        },
+        {
+          name: "贷款余额", type: "bar", barWidth: 8, data: p.trend.loan,
+          itemStyle: { borderRadius: [3, 3, 0, 0], color: vGrad("#7ba6ff", "#28407f") }
+        },
+        {
+          name: "月营收", type: "line", yAxisIndex: 1, smooth: true, data: p.trend.rev,
+          symbol: "circle", symbolSize: 5,
+          lineStyle: { width: 2.5, color: C.gold, shadowColor: "rgba(255, 200, 87, 0.55)", shadowBlur: 10 },
+          itemStyle: { color: "#fff6df", borderColor: C.gold, borderWidth: 2 },
+          areaStyle: { color: vGrad("rgba(255, 200, 87, 0.18)", "rgba(255, 200, 87, 0.01)") }
+        }
+      ],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 10. 中下左：客群构成环形 ===== */
+  const donutChart = makeChart("br-chart-donut");
+  function donutOption(p) {
+    return {
+      tooltip: tip({ valueFormatter: (v) => fmtDec(v, 1) + "%" }),
+      color: [C.cyan, C.gold, C.green, C.blue, C.violet],
+      series: [{
+        type: "pie", radius: ["46%", "70%"], center: ["50%", "52%"],
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+        label: { color: "#cfe6ff", fontSize: 11, formatter: "{b}\n{d}%" },
+        labelLine: { length: 8, length2: 6, lineStyle: { color: "rgba(102, 178, 255, 0.4)" } },
+        data: CUST_SEGS.map((name, i) => ({ name, value: p.donut[i] }))
+      }],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 11. 中下右：产品渗透率 TOP6（本行粗条 vs 全行均值细条） ===== */
+  const productChart = makeChart("br-chart-product");
+  function productOption(p) {
+    return {
+      tooltip: tip({ trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: (v) => fmtDec(v, 1) + "%" }),
+      legend: {
+        top: 2, right: 8, itemWidth: 12, itemHeight: 8, itemGap: 14,
+        textStyle: { color: "#cfe6ff", fontSize: 11 },
+        data: ["本行", "全行均值"]
+      },
+      grid: { left: 8, right: 48, top: 24, bottom: 2, containLabel: true },
+      xAxis: { type: "value", show: false, max: 100 },
+      yAxis: {
+        type: "category", inverse: true, data: PROD_NAMES,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      series: [
+        {
+          name: "本行", type: "bar", barWidth: 10, barGap: "40%", data: p.prod,
+          itemStyle: { borderRadius: 5, color: hGrad("#1d5d9e", C.cyan) },
+          label: { show: true, position: "right", fontSize: 11.5, color: C.cyan, formatter: (o) => fmtDec(o.value, 1) + "%" },
+          showBackground: true,
+          backgroundStyle: { color: "rgba(63, 120, 200, 0.12)", borderRadius: 5 }
+        },
+        {
+          name: "全行均值", type: "bar", barWidth: 4, data: PROD_AVG,
+          itemStyle: { borderRadius: 3, color: "rgba(255, 200, 87, 0.75)" }
+        }
+      ],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 12. 右上：下辖网点清单（DOM 表格 + 达成率进度条） ===== */
+  function renderOutlets(p) {
+    $("br-outlet-list").innerHTML = p.outlets.map((o) => {
+      const w = Math.min(100, o.rate / 1.2);   /* 120% 满格 */
+      const over = o.rate >= 100 ? " is-over" : "";
+      return "<li>" +
+        '<span class="br-outlet-name"><i></i>' + o.name + '</span>' +
+        '<span class="br-outlet-num">' + fmtDec(o.dep, 1) + '</span>' +
+        '<span class="br-outlet-num">' + fmtDec(o.loan, 1) + '</span>' +
+        '<span class="br-outlet-bar">' +
+          '<span class="br-outlet-bar-track"><span class="br-outlet-bar-fill' + over + '" style="width:' + w.toFixed(1) + '%"></span></span>' +
+          '<b class="' + (over ? "is-over" : "") + '">' + fmtDec(o.rate, 1) + '%</b>' +
+        '</span>' +
+      "</li>";
+    }).join("");
+  }
+
+  /* ===== 13. 右下：本行大事记时间线（DOM 5 条） ===== */
+  function renderEvents(p) {
+    $("br-event-list").innerHTML = p.events.map((e) =>
+      '<li class="' + (e.gold ? "is-gold" : "") + '">' +
+        '<div class="br-event-meta"><span>' + e.date + '</span><span class="br-event-tag">' + e.tag + '</span></div>' +
+        '<div class="br-event-text">' + e.text + '</div>' +
+      "</li>"
+    ).join("");
+  }
+
+  /* ===== 14. 底部：本行经营快讯跑马灯 ===== */
+  function renderMarquee(p) {
+    $("br-marquee-title").textContent = p.name + "快讯";
+    const html = p.news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("br-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;                    /* 重启动画，切换后从头滚动 */
+    track.style.animation = "";
+  }
+
+  /* ===== 15. 分行切换器：全页面板过渡到新档案 ===== */
+  let curIdx = 0;
+  function applyBranch(idx) {
+    curIdx = (idx + PROFILES.length) % PROFILES.length;
+    const p = PROFILES[curIdx];
+    /* 页头对象信息 */
+    $("br-branch-name").textContent = p.name;
+    $("br-branch-code").textContent = p.code;
+    $("br-branch-owner").textContent = p.owner;
+    $("br-branch-staff").textContent = p.staff;
+    $("br-branch-outlets").textContent = p.outletsCount;
+    $("br-switch-name").textContent = p.name;
+    $("br-switch-idx").textContent = (curIdx + 1) + " / " + PROFILES.length;
+    /* KPI / 图表 / DOM 面板整体过渡 */
+    setKpiTargets(p);
+    radarChart.setOption(radarOption(p));
+    renderRank(p);
+    trendChart.setOption(trendOption(p));
+    donutChart.setOption(donutOption(p));
+    productChart.setOption(productOption(p));
+    $("br-cust-total").textContent = p.custTotal;
+    renderOutlets(p);
+    renderEvents(p);
+    renderMarquee(p);
+  }
+  $("br-btn-prev").addEventListener("click", () => applyBranch(curIdx - 1));
+  $("br-btn-next").addEventListener("click", () => applyBranch(curIdx + 1));
+  applyBranch(0);
+
+  /* ===== 16. 实时感：当前档案末月数据微抖动 + KPI 目标微跳变 ===== */
+  setInterval(() => {
+    const p = PROFILES[curIdx];
+    const last = 23;
+    p.trend.dep[last] = +(Math.max(10, p.trend.dep[last] + rndf(-0.5, 0.7))).toFixed(1);
+    p.trend.loan[last] = +(Math.max(8, p.trend.loan[last] + rndf(-0.4, 0.6))).toFixed(1);
+    p.trend.rev[last] = +(Math.max(0.5, p.trend.rev[last] + rndf(-0.05, 0.07))).toFixed(2);
+    trendChart.setOption({ series: [{ data: p.trend.dep }, { data: p.trend.loan }, { data: p.trend.rev }] });
+  }, 9000);
+  setInterval(() => {
+    const p = PROFILES[curIdx];
+    p.kpi.dep = +(p.kpi.dep + rndf(0.02, 0.2)).toFixed(1);
+    p.kpi.loan = +(p.kpi.loan + rndf(0.01, 0.16)).toFixed(1);
+    p.kpi.cust = Math.round(p.kpi.cust + rnd(1, 8));
+    setKpiTargets(p);
+  }, 6000);
+})();
+</script>
+</body>
+</html>

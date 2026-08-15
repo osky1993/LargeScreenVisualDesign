@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 资产负债趋势全景</title>
+<style>
+  :root {
+    --al-bg: #0a1e3c;
+    --al-panel: rgba(13, 34, 64, 0.72);
+    --al-border: rgba(86, 150, 224, 0.28);
+    --al-text: #e6f1ff;
+    --al-muted: #8fa7c8;
+    --al-cyan: #3fe1ff;
+    --al-blue: #4b7dff;
+    --al-green: #38e6b0;
+    --al-gold: #ffc857;
+    --al-red: #ff6680;
+    --al-violet: #8f7bff;
+    --al-violet-soft: #c3b6ff;
+    --al-violet-deep: #4f37b0;
+    --al-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--al-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .al-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(143, 123, 255, 0.16), transparent 44%),
+      radial-gradient(circle at 90% 8%, rgba(63, 225, 255, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(79, 55, 176, 0.32), transparent 56%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--al-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 84px 148px 1fr 54px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .al-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .al-error.is-visible { display: block; }
+
+  /* ===== 顶栏：面包屑 + 渐变大标题 + 徽章 + 口径 tabs + 时钟 ===== */
+  .al-header {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .al-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(143, 123, 255, 0.6) 16%, rgba(63, 225, 255, 0.85) 50%, rgba(143, 123, 255, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(143, 123, 255, 0.45);
+  }
+  .al-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .al-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--al-muted); }
+  .al-crumb b { font-weight: 400; color: #6fb9e8; }
+  .al-crumb i { font-style: normal; color: rgba(143, 167, 200, 0.55); }
+  .al-crumb em { font-style: normal; color: #d7e8ff; }
+  .al-head-title-row { display: flex; align-items: center; gap: 16px; white-space: nowrap; }
+  .al-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--al-violet-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(143, 123, 255, 0.35));
+  }
+  .al-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 12px; border-radius: 999px; font-size: 12px; letter-spacing: 0.08em;
+    color: var(--al-violet-soft); border: 1px solid rgba(143, 123, 255, 0.5);
+    background: rgba(79, 55, 176, 0.28); box-shadow: inset 0 0 10px rgba(143, 123, 255, 0.12);
+    font-variant-numeric: tabular-nums;
+  }
+  .al-badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--al-violet); box-shadow: 0 0 8px var(--al-violet); animation: alDot 1.8s ease-in-out infinite; }
+  .al-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--al-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .al-head-meta b { font-weight: 400; color: #c8b6f5; }
+  .al-head-meta i { font-style: normal; color: rgba(143, 167, 200, 0.4); }
+
+  .al-head-right { display: flex; align-items: center; gap: 24px; flex: none; }
+  .al-tabs { display: flex; align-items: stretch; gap: 8px; }
+  .al-tab {
+    display: flex; align-items: center; justify-content: center;
+    min-width: 84px; padding: 9px 18px; border-radius: 9px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(86, 150, 224, 0.4); background: rgba(20, 48, 88, 0.55);
+    color: #cfe6ff; font-size: 14px; letter-spacing: 0.14em;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s, background 0.2s;
+  }
+  .al-tab:hover {
+    color: #fff; border-color: rgba(143, 123, 255, 0.8);
+    box-shadow: 0 0 12px rgba(143, 123, 255, 0.35), inset 0 0 10px rgba(143, 123, 255, 0.1);
+  }
+  .al-tab.is-active {
+    color: #f2edff; font-weight: 700;
+    border-color: rgba(143, 123, 255, 0.9);
+    background: rgba(79, 55, 176, 0.42);
+    box-shadow: 0 0 14px rgba(143, 123, 255, 0.45), inset 0 0 12px rgba(143, 123, 255, 0.18);
+  }
+  .al-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 24px; border-left: 1px solid rgba(86, 150, 224, 0.25); }
+  .al-clock-time { font: 700 26px/1 var(--al-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4); }
+  .al-clock-date { font-size: 12px; color: var(--al-muted); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带：5 枚大卡（数字 + 同比 + 迷你 sparkline） ===== */
+  .al-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .al-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--al-border); border-radius: 12px; background: var(--al-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 8px;
+    padding: 12px 20px 10px;
+  }
+  .al-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 56px; height: 3px;
+    background: linear-gradient(90deg, var(--al-violet), transparent);
+  }
+  .al-kpi::after {
+    content: ""; position: absolute; right: -34px; top: -34px; width: 92px; height: 92px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(143, 123, 255, 0.14), transparent 70%);
+  }
+  .al-kpi-label { font-size: 14px; letter-spacing: 0.16em; color: var(--al-muted); }
+  .al-kpi-num { display: flex; align-items: baseline; gap: 7px; font-variant-numeric: tabular-nums; }
+  .al-kpi-val { font: 700 38px/1 var(--al-mono); color: #f4faff; letter-spacing: 0.02em; text-shadow: 0 0 14px rgba(143, 123, 255, 0.5); }
+  .al-kpi-unit { font-size: 13px; color: #a99af0; }
+  .al-kpi-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+  .al-kpi-delta { font-size: 12px; letter-spacing: 0.03em; font-variant-numeric: tabular-nums; }
+  .al-kpi-delta.is-good { color: var(--al-green); }
+  .al-kpi-delta.is-bad { color: var(--al-red); }
+  .al-spark { display: flex; align-items: flex-end; gap: 3px; height: 24px; }
+  .al-spark i {
+    width: 6px; border-radius: 2px 2px 0 0;
+    background: linear-gradient(180deg, var(--al-violet-soft), rgba(79, 55, 176, 0.55));
+    box-shadow: 0 0 6px rgba(143, 123, 255, 0.3);
+  }
+  .al-spark i:last-child { background: linear-gradient(180deg, #ffffff, var(--al-violet)); box-shadow: 0 0 8px rgba(143, 123, 255, 0.7); }
+
+  /* ===== 主图面板 ===== */
+  .al-panel {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--al-border); border-radius: 12px; background: var(--al-panel);
+    display: flex; flex-direction: column;
+  }
+  .al-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(143, 123, 255, 0.25), rgba(63, 225, 255, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .al-panel-head i { flex: none; width: 5px; height: 16px; background: var(--al-violet); box-shadow: 0 0 8px var(--al-violet); transform: skewX(-12deg); }
+  .al-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .al-panel-head .al-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .al-panel-head .al-panel-scope { margin-left: auto; font-size: 12px; color: var(--al-violet-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .al-chart { flex: 1; min-height: 0; }
+
+  /* ===== 底部跑马灯 ===== */
+  .al-marquee {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--al-border); border-radius: 12px; background: var(--al-panel);
+  }
+  .al-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #f4efff;
+    background: linear-gradient(120deg, var(--al-violet), var(--al-violet-deep) 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .al-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #f4efff; animation: alDot 1.6s ease-in-out infinite; }
+  @keyframes alDot { 50% { opacity: 0.3; } }
+  .al-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .al-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: alMarquee 44s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .al-marquee-track b { color: var(--al-violet-soft); font-weight: 700; }
+  .al-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(143, 123, 255, 0.55); }
+  @keyframes alMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .al-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="al-stage" id="al-stage">
+    <!-- mockflag:begin --><div class="al-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="al-error" id="al-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="al-header">
+      <div class="al-head-left">
+        <div class="al-crumb"><b>资产负债管理</b><i>›</i><em>趋势全景</em></div>
+        <div class="al-head-title-row">
+          <div class="al-head-title">资产负债趋势全景</div>
+          <span class="al-badge"><i></i>数据截至 2026-06 · 月末时点数</span>
+          <div class="al-head-meta">
+            <span>存贷比 <b id="al-meta-ldr">--</b>（现算）</span><i>|</i>
+            <span>净息差 <b id="al-meta-nim">--</b></span><i>|</i>
+            <span>口径 <b>月度 T+1</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="al-head-right">
+        <div class="al-tabs" id="al-tabs" aria-label="币种口径切换">
+          <button class="al-tab is-active" type="button" data-scope="all">全行</button>
+          <button class="al-tab" type="button" data-scope="cny">本币</button>
+          <button class="al-tab" type="button" data-scope="fx">外币</button>
+        </div>
+        <div class="al-clock" aria-label="实时时钟">
+          <span class="al-clock-time" id="al-clock-time">--:--:--</span>
+          <span class="al-clock-date" id="al-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带：5 枚大卡 -->
+    <section class="al-kpis" id="al-kpis" aria-label="资产负债核心指标"></section>
+
+    <!-- 主图：24 个月趋势混合大图 -->
+    <section class="al-panel">
+      <header class="al-panel-head">
+        <i></i><h2>存款 · 贷款 · 净息差 · 存贷比 联动趋势</h2>
+        <span class="al-panel-en">ASSET-LIABILITY TREND · 24M</span>
+        <span class="al-panel-scope" id="al-panel-scope">单位：亿元｜净息差 / 存贷比：%｜存贷比 = 贷款 ÷ 存款 现算</span>
+      </header>
+      <div class="al-chart" id="al-chart-main" role="img" aria-label="近24个月存款贷款柱状与净息差存贷比折线混合图"></div>
+    </section>
+
+    <!-- 底部跑马灯 -->
+    <section class="al-marquee" aria-label="资负管理播报">
+      <div class="al-marquee-tag"><i></i>资负播报</div>
+      <div class="al-marquee-view"><div class="al-marquee-track" id="al-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("al-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("al-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    bg: "#0a1e3c", text: "#e6f1ff", muted: "#8fa7c8",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    gold: "#ffc857", red: "#ff6680",
+    violet: "#8f7bff", violetSoft: "#c3b6ff", violetDeep: "#4f37b0"
+  };
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 数据：近 24 个月（2024-07 → 2026-06），三套币种口径 =====
+     口径注释：
+     - 存款/贷款为月末时点余额（亿元）；净息差为当月年化（%）。
+     - 全行 = 本币 + 外币；本币序列由「全行 − 外币」现算，三套口径天然勾稽。
+     - 总资产 ≈ 贷款 + 债券投资 + 同业资产 + 现金准备金 等（KPI 口径示意值）；
+       总负债 ≈ 存款 + 同业负债 + 应付债券 等；量级与存贷款保持合理关系。
+     - 存贷比 = 贷款 ÷ 存款，全部由 JS 现算，页面上不存在第二份手填来源。 */
+  const M = 24;
+  const LABELS = [];       /* 轴标签 24.07 … 26.06 */
+  const LABELS_FULL = [];  /* tooltip 标题 2024年07月 … */
+  for (let i = 0; i < M; i++) {
+    const y = 2024 + Math.floor((6 + i) / 12);
+    const mo = ((6 + i) % 12) + 1;
+    LABELS.push(String(y).slice(2) + "." + pad(mo));
+    LABELS_FULL.push(y + "年" + pad(mo) + "月");
+  }
+
+  /* 全行存款：季末冲高的爬坡序列，末月 = KPI 卡 18,650 */
+  const ALL_DEP = [
+    16210, 16380, 16590, 16460, 16650, 16920, 16780, 16880, 17240, 17050, 17210, 17520,
+    17330, 17480, 17820, 17640, 17830, 18160, 17980, 18140, 18470, 18310, 18490, 18650
+  ];
+  /* 全行贷款：稳步投放，末月 = KPI 卡 14,360 */
+  const ALL_LOAN = [
+    12310, 12400, 12520, 12600, 12700, 12820, 12890, 12980, 13120, 13210, 13300, 13420,
+    13500, 13590, 13720, 13800, 13890, 14010, 14080, 14150, 14240, 14280, 14320, 14360
+  ];
+  /* 全行净息差：1.62–1.85 平滑缓降后企稳回升，末点 = 1.68 */
+  const ALL_NIM = [
+    1.85, 1.84, 1.83, 1.81, 1.80, 1.78, 1.77, 1.76, 1.74, 1.73, 1.72, 1.70,
+    1.69, 1.68, 1.67, 1.66, 1.65, 1.64, 1.63, 1.62, 1.63, 1.65, 1.67, 1.68
+  ];
+  /* 外币（折人民币）：约为本币 6% 量级，随汇率小幅波动 */
+  const FX_DEP = [
+    992, 1005, 986, 1012, 998, 1024, 1010, 1032, 1018, 1041, 1026, 1048,
+    1030, 1052, 1036, 1058, 1042, 1064, 1046, 1068, 1050, 1072, 1060, 1056
+  ];
+  const FX_LOAN = [
+    668, 676, 662, 684, 671, 692, 678, 699, 685, 706, 690, 712,
+    695, 718, 700, 724, 706, 730, 710, 736, 714, 742, 726, 732
+  ];
+  const FX_NIM = [
+    1.32, 1.31, 1.30, 1.28, 1.26, 1.25, 1.24, 1.22, 1.20, 1.19, 1.18, 1.16,
+    1.15, 1.14, 1.13, 1.12, 1.13, 1.14, 1.16, 1.18, 1.20, 1.22, 1.23, 1.24
+  ];
+  const CNY_NIM = [
+    1.90, 1.89, 1.88, 1.86, 1.85, 1.83, 1.82, 1.81, 1.79, 1.78, 1.77, 1.75,
+    1.74, 1.73, 1.72, 1.71, 1.70, 1.69, 1.68, 1.67, 1.68, 1.70, 1.72, 1.73
+  ];
+  const sub = (a, b) => a.map((v, i) => v - b[i]);
+  /* 存贷比唯一计算来源 */
+  const calcLdr = (loan, dep) => loan.map((v, i) => +(v / dep[i] * 100).toFixed(2));
+
+  const SCOPES = {
+    all: { name: "全行", dep: ALL_DEP, loan: ALL_LOAN, nim: ALL_NIM, assets: 26400, liab: 24150, assetsYoy: "+7.4%", liabYoy: "+7.6%" },
+    cny: { name: "本币", dep: sub(ALL_DEP, FX_DEP), loan: sub(ALL_LOAN, FX_LOAN), nim: CNY_NIM, assets: 24820, liab: 22705, assetsYoy: "+7.6%", liabYoy: "+7.8%" },
+    fx:  { name: "外币", dep: FX_DEP, loan: FX_LOAN, nim: FX_NIM, assets: 1580, liab: 1445, assetsYoy: "+4.2%", liabYoy: "+3.9%" }
+  };
+  Object.keys(SCOPES).forEach((k) => {
+    const s = SCOPES[k];
+    s.ldr = calcLdr(s.loan, s.dep);
+  });
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("al-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("al-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. KPI 带：5 枚大卡（值取自序列末月，单一来源勾稽） ===== */
+  const yoyPct = (arr) => (arr[23] / arr[11] - 1) * 100;
+  const kpisWrap = $("al-kpis");
+  let kpiValNodes = [];      /* [总资产, 总负债] 的数字节点（供翻牌扰动） */
+  let kpiBase = [0, 0];      /* 对应基准值，扰动只作用于展示 */
+  function sparkHtml(arr) {
+    const last12 = arr.slice(12);
+    const min = Math.min.apply(null, last12);
+    const max = Math.max.apply(null, last12);
+    const span = max - min || 1;
+    return '<span class="al-spark" aria-hidden="true">' +
+      last12.map((v) => '<i style="height:' + (5 + (v - min) / span * 19).toFixed(1) + 'px"></i>').join("") +
+      "</span>";
+  }
+  function renderKpis(s) {
+    const depYoy = yoyPct(s.dep);
+    const loanYoy = yoyPct(s.loan);
+    const nimYoyBp = Math.round((s.nim[23] - s.nim[11]) * 100);
+    /* 总资产/总负债 sparkline 借存款序列形态按比例示意 */
+    const assetSpark = s.dep.map((v) => v * (s.assets / s.dep[23]));
+    const liabSpark = s.dep.map((v) => v * (s.liab / s.dep[23]));
+    const defs = [
+      { label: "总资产", val: s.assets, dec: 0, unit: "亿元", delta: "同比 " + s.assetsYoy, good: true, spark: assetSpark },
+      { label: "总负债", val: s.liab, dec: 0, unit: "亿元", delta: "同比 " + s.liabYoy, good: true, spark: liabSpark },
+      { label: "存款余额", val: s.dep[23], dec: 0, unit: "亿元", delta: "同比 " + (depYoy >= 0 ? "+" : "") + depYoy.toFixed(1) + "%", good: depYoy >= 0, spark: s.dep },
+      { label: "贷款余额", val: s.loan[23], dec: 0, unit: "亿元", delta: "同比 " + (loanYoy >= 0 ? "+" : "") + loanYoy.toFixed(1) + "%", good: loanYoy >= 0, spark: s.loan },
+      { label: "净息差", val: s.nim[23], dec: 2, unit: "%", delta: "同比 " + (nimYoyBp >= 0 ? "+" : "") + nimYoyBp + "BP", good: nimYoyBp >= 0, spark: s.nim }
+    ];
+    kpisWrap.innerHTML = defs.map((d) =>
+      '<article class="al-kpi">' +
+        '<div class="al-kpi-label">' + d.label + '</div>' +
+        '<div class="al-kpi-num"><span class="al-kpi-val">' + fmtDec(d.val, d.dec) + '</span><span class="al-kpi-unit">' + d.unit + '</span></div>' +
+        '<div class="al-kpi-foot">' +
+          '<span class="al-kpi-delta ' + (d.good ? "is-good" : "is-bad") + '">' + (d.good ? "▲ " : "▼ ") + d.delta + '</span>' +
+          sparkHtml(d.spark) +
+        '</div>' +
+      '</article>'
+    ).join("");
+    const valNodes = kpisWrap.querySelectorAll(".al-kpi-val");
+    kpiValNodes = [valNodes[0], valNodes[1]];
+    kpiBase = [s.assets, s.liab];
+  }
+
+  /* ===== 6. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(143, 123, 255, 0.45)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+
+  /* ===== 7. 主图：柱（存款/贷款，左轴亿元）+ 折线（净息差/存贷比，双右轴%） ===== */
+  const mainChart = echarts.init($("al-chart-main"));
+  const ZOOM_DEFAULT_START = 6;  /* 默认展示最近 18 个月 */
+  function mainOption(s) {
+    const nimMin = Math.min.apply(null, s.nim);
+    const nimMax = Math.max.apply(null, s.nim);
+    const ldrMin = Math.min.apply(null, s.ldr);
+    const ldrMax = Math.max.apply(null, s.ldr);
+    return {
+      tooltip: tip({
+        trigger: "axis",
+        axisPointer: { type: "shadow", shadowStyle: { color: "rgba(143, 123, 255, 0.08)" } },
+        formatter: (ps) => {
+          const rows = ps.map((p) => {
+            const unit = p.seriesIndex < 2 ? " 亿元" : " %";
+            const v = p.seriesIndex < 2 ? fmtDec(p.value, 0) : p.value.toFixed(2);
+            return p.marker + " " + p.seriesName +
+              ' <b style="float:right;margin-left:18px;color:#c3b6ff">' + v + unit + "</b>";
+          }).join("<br/>");
+          return '<b style="color:#f0f8ff">' + LABELS_FULL[ps[0].dataIndex] + "</b><br/>" + rows;
+        }
+      }),
+      legend: {
+        top: 10, left: "center", itemWidth: 14, itemHeight: 9, itemGap: 26,
+        textStyle: { color: "#cfe6ff", fontSize: 13 }
+      },
+      grid: { left: 74, right: 128, top: 52, bottom: 78 },
+      xAxis: {
+        type: "category", data: LABELS,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+        axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 11.5 }
+      },
+      yAxis: [
+        {
+          type: "value", name: "亿元",
+          nameTextStyle: { color: C.muted, fontSize: 11, padding: [0, 30, 0, 0] },
+          max: Math.ceil(Math.max.apply(null, s.dep) * 1.12 / 100) * 100,
+          splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+          axisLabel: { color: C.muted, fontSize: 11, formatter: (v) => fmtDec(v, 0) }
+        },
+        {
+          type: "value", name: "存贷比",
+          nameTextStyle: { color: "rgba(56, 230, 176, 0.8)", fontSize: 11 },
+          position: "right",
+          min: Math.floor(Math.min(ldrMin, 74) - 2),
+          max: Math.ceil(Math.max(ldrMax, 76) + 2),
+          splitLine: { show: false },
+          axisLine: { show: true, lineStyle: { color: "rgba(56, 230, 176, 0.35)" } },
+          axisLabel: { color: "rgba(56, 230, 176, 0.85)", fontSize: 11, formatter: "{value}%" }
+        },
+        {
+          type: "value", name: "净息差",
+          nameTextStyle: { color: "rgba(255, 200, 87, 0.85)", fontSize: 11 },
+          position: "right", offset: 58,
+          min: +(Math.floor((nimMin - 0.06) * 10) / 10).toFixed(1),
+          max: +(Math.ceil((nimMax + 0.06) * 10) / 10).toFixed(1),
+          splitLine: { show: false },
+          axisLine: { show: true, lineStyle: { color: "rgba(255, 200, 87, 0.35)" } },
+          axisLabel: { color: "rgba(255, 200, 87, 0.9)", fontSize: 11, formatter: (v) => v.toFixed(2) + "%" }
+        }
+      ],
+      dataZoom: [{
+        type: "slider", xAxisIndex: 0, height: 22, bottom: 10,
+        startValue: LABELS[ZOOM_DEFAULT_START], endValue: LABELS[M - 1],
+        borderColor: "rgba(143, 123, 255, 0.3)",
+        backgroundColor: "rgba(13, 34, 64, 0.6)",
+        fillerColor: "rgba(143, 123, 255, 0.16)",
+        handleStyle: { color: C.violet, borderColor: C.violetSoft },
+        moveHandleStyle: { color: C.violet },
+        emphasis: { handleStyle: { color: C.violetSoft } },
+        dataBackground: {
+          lineStyle: { color: "rgba(143, 123, 255, 0.45)" },
+          areaStyle: { color: "rgba(143, 123, 255, 0.12)" }
+        },
+        selectedDataBackground: {
+          lineStyle: { color: "rgba(195, 182, 255, 0.7)" },
+          areaStyle: { color: "rgba(143, 123, 255, 0.2)" }
+        },
+        textStyle: { color: C.muted, fontSize: 10 }
+      }],
+      series: [
+        {
+          name: "存款余额", type: "bar", yAxisIndex: 0, barMaxWidth: 26, barGap: "26%",
+          itemStyle: { borderRadius: [5, 5, 0, 0], color: vGrad(C.violetSoft, C.violetDeep) },
+          emphasis: { itemStyle: { color: vGrad("#ded6ff", C.violet), shadowColor: "rgba(143, 123, 255, 0.6)", shadowBlur: 12 } },
+          data: s.dep
+        },
+        {
+          name: "贷款余额", type: "bar", yAxisIndex: 0, barMaxWidth: 26,
+          itemStyle: { borderRadius: [5, 5, 0, 0], color: vGrad(C.cyan, "#155d86") },
+          emphasis: { itemStyle: { shadowColor: "rgba(63, 225, 255, 0.55)", shadowBlur: 12 } },
+          data: s.loan
+        },
+        {
+          name: "净息差", type: "line", yAxisIndex: 2, smooth: true,
+          symbol: "circle", symbolSize: 6, showSymbol: false,
+          lineStyle: { width: 2.5, color: C.gold, shadowColor: "rgba(255, 200, 87, 0.4)", shadowBlur: 8 },
+          itemStyle: { color: C.gold, borderColor: "#0a1e3c", borderWidth: 1 },
+          areaStyle: { color: vGrad("rgba(255, 200, 87, 0.26)", "rgba(255, 200, 87, 0)") },
+          data: s.nim
+        },
+        {
+          name: "存贷比", type: "line", yAxisIndex: 1, smooth: true,
+          symbol: "circle", symbolSize: 5, showSymbol: false,
+          lineStyle: { width: 2, type: "dashed", color: C.green },
+          itemStyle: { color: C.green, borderColor: "#0a1e3c", borderWidth: 1 },
+          data: s.ldr,
+          markLine: {
+            silent: true, symbol: "none",
+            lineStyle: { color: C.red, type: "dashed", width: 1.5 },
+            label: {
+              position: "insideEndTop", color: "#ff9db0", fontSize: 11,
+              formatter: "存贷比监管参考 75%"
+            },
+            data: [{ yAxis: 75 }]
+          }
+        }
+      ],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 8. 底部跑马灯：资负管理播报（关键数字由数据现算注入） ===== */
+  function renderMarquee(s) {
+    const ldrLast = s.ldr[23];
+    const nimMoBp = Math.round((s.nim[23] - s.nim[22]) * 100);
+    const depYoy = yoyPct(s.dep);
+    const loanYoy = yoyPct(s.loan);
+    const fxShare = (SCOPES.fx.dep[23] / SCOPES.all.dep[23] * 100).toFixed(1);
+    const liabRatio = (s.liab / s.assets * 100).toFixed(1);
+    const news = [
+      s.name + "口径总资产 <b>" + fmtDec(s.assets, 0) + " 亿元</b>，总负债 <b>" + fmtDec(s.liab, 0) + " 亿元</b>，资产负债率 <b>" + liabRatio + "%</b>",
+      "6 月末" + s.name + "存款余额 <b>" + fmtDec(s.dep[23], 0) + " 亿元</b>，同比 <b>" + (depYoy >= 0 ? "+" : "") + depYoy.toFixed(1) + "%</b>，季末揽储节奏平稳",
+      s.name + "贷款余额 <b>" + fmtDec(s.loan[23], 0) + " 亿元</b>，同比 <b>" + (loanYoy >= 0 ? "+" : "") + loanYoy.toFixed(1) + "%</b>，投放进度符合年度计划",
+      "存贷比现算值 <b>" + ldrLast.toFixed(2) + "%</b>，" + (ldrLast >= 75 ? "高于" : "低于") + "监管参考线 75%，" + (ldrLast >= 75 ? "建议关注负债端补充" : "流动性空间充裕"),
+      "净息差 <b>" + s.nim[23].toFixed(2) + "%</b>，环比 <b>" + (nimMoBp >= 0 ? "+" : "") + nimMoBp + "BP</b>，负债成本管控成效逐步显现",
+      "外币存款折人民币 <b>" + fmtDec(SCOPES.fx.dep[23], 0) + " 亿元</b>，占全行存款 <b>" + fxShare + "%</b>，汇率敞口整体可控"
+    ];
+    const html = news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("al-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+
+  /* ===== 9. 口径 tabs：全行 / 本币 / 外币 整页同步刷新 ===== */
+  let curScopeKey = "all";
+  function applyScope(key) {
+    curScopeKey = key;
+    const s = SCOPES[key];
+    document.querySelectorAll(".al-tab").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.scope === key);
+    });
+    $("al-meta-ldr").textContent = s.ldr[23].toFixed(2) + "%";
+    $("al-meta-nim").textContent = s.nim[23].toFixed(2) + "%";
+    renderKpis(s);
+    mainChart.setOption(mainOption(s));
+    renderMarquee(s);
+  }
+  $("al-tabs").addEventListener("click", (e) => {
+    const btn = e.target.closest(".al-tab");
+    if (btn && btn.dataset.scope !== curScopeKey) applyScope(btn.dataset.scope);
+  });
+  applyScope(curScopeKey);
+
+  /* ===== 10. 活性：tooltip 沿 x 轴 2s 步进巡航 ===== */
+  let cruiseStart = ZOOM_DEFAULT_START;
+  let cruiseIdx = ZOOM_DEFAULT_START - 1;
+  setInterval(() => {
+    cruiseIdx += 1;
+    if (cruiseIdx >= M || cruiseIdx < cruiseStart) cruiseIdx = cruiseStart;
+    mainChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: cruiseIdx });
+  }, 2000);
+
+  /* ===== 11. 活性：每 30s 视窗在「近12月 / 近24月」间自动切换 ===== */
+  let zoomWide = false;
+  setInterval(() => {
+    zoomWide = !zoomWide;
+    const startIdx = zoomWide ? 0 : 12;
+    cruiseStart = startIdx;
+    cruiseIdx = Math.max(cruiseIdx, startIdx);
+    mainChart.dispatchAction({
+      type: "dataZoom",
+      startValue: LABELS[startIdx],
+      endValue: LABELS[M - 1]
+    });
+  }, 30000);
+
+  /* ===== 12. 活性：KPI 每 8s 微幅翻牌（仅扰动总资产/总负债展示值 ±0.05%，
+                不触碰存贷款与净息差，避免破坏「末月柱值 == KPI 卡」勾稽） ===== */
+  setInterval(() => {
+    kpiValNodes.forEach((node, i) => {
+      if (!node) return;
+      const jittered = kpiBase[i] * (1 + rndf(-0.0005, 0.0005));
+      node.textContent = fmtDec(jittered, 0);
+    });
+  }, 8000);
+})();
+</script>
+</body>
+</html>

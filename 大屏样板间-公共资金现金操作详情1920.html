@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 公共资金现金操作详情</title>
+<style>
+  :root {
+    --sj-bg: #08203f;
+    --sj-panel: rgba(11, 38, 72, 0.72);
+    --sj-border: rgba(92, 156, 226, 0.28);
+    --sj-text: #e8f2ff;
+    --sj-muted: #8ea9cc;
+    --sj-gold: #f0c060;
+    --sj-gold-soft: #ffdc8f;
+    --sj-blue: #3d9cff;
+    --sj-cyan: #39d0d8;
+    --sj-green: #33e0a6;
+    --sj-red: #ff5f6e;
+    --sj-orange: #ff9d4d;
+    --sj-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--sj-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1. 1920x1080 固定设计舞台 ===== */
+  .sj-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(240, 192, 96, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(57, 208, 216, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 60, 120, 0.34), transparent 56%),
+      linear-gradient(rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      var(--sj-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 84px 128px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .sj-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .sj-error.is-visible { display: block; }
+
+  /* ===== 2. 顶栏：三级面包屑 + 期次切换器 + 返回 + 时钟 ===== */
+  .sj-header {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .sj-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(240, 192, 96, 0.6) 16%, rgba(57, 208, 216, 0.85) 50%, rgba(240, 192, 96, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.4);
+  }
+  .sj-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .sj-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--sj-muted); }
+  .sj-crumb b { font-weight: 400; color: var(--sj-gold); }
+  .sj-crumb i { font-style: normal; color: rgba(142, 169, 204, 0.55); }
+  .sj-crumb em { font-style: normal; color: #d7e8ff; }
+  .sj-crumb-up { color: #a8c2e0; text-decoration: none; transition: color 0.18s, text-shadow 0.18s; }
+  .sj-crumb-up:hover { color: var(--sj-gold-soft); text-decoration: underline; text-shadow: 0 0 10px rgba(240, 192, 96, 0.5); }
+  .sj-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .sj-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--sj-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(240, 192, 96, 0.35));
+  }
+  .sj-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--sj-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .sj-head-meta b { font-weight: 400; color: var(--sj-gold-soft); }
+  .sj-head-meta i { font-style: normal; color: rgba(142, 169, 204, 0.4); }
+
+  .sj-head-right { display: flex; align-items: center; gap: 18px; flex: none; }
+  .sj-switcher { display: flex; align-items: stretch; gap: 8px; }
+  .sj-sw-btn {
+    display: flex; align-items: center; gap: 6px; padding: 0 14px; cursor: pointer; user-select: none;
+    border-radius: 9px; font-family: inherit; font-size: 13px; letter-spacing: 0.06em;
+    border: 1px solid rgba(240, 192, 96, 0.34);
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.15), rgba(16, 46, 86, 0.6));
+    color: #ffdc8f; transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .sj-sw-btn:hover { color: #fff6e2; border-color: rgba(240, 192, 96, 0.85); box-shadow: 0 0 14px rgba(240, 192, 96, 0.4); }
+  .sj-sw-btn b { font-weight: 700; font-size: 16px; }
+  .sj-sw-box {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-width: 140px; padding: 6px 18px; border-radius: 9px;
+    border: 1px solid rgba(240, 192, 96, 0.5); background: rgba(72, 56, 24, 0.42);
+    box-shadow: inset 0 0 14px rgba(240, 192, 96, 0.1);
+  }
+  .sj-sw-name { font: 700 18px/1 var(--sj-mono); letter-spacing: 0.1em; color: var(--sj-gold-soft); }
+  .sj-sw-idx { font-size: 11px; letter-spacing: 0.26em; color: rgba(240, 192, 96, 0.7); font-variant-numeric: tabular-nums; }
+  .sj-back {
+    display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 14px; cursor: pointer;
+    border-radius: 10px; font-family: inherit; font-size: 13px; letter-spacing: 0.08em;
+    border: 1px solid rgba(92, 156, 226, 0.45); background: rgba(16, 46, 86, 0.6); color: #cfe6ff;
+    transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .sj-back:hover { color: #fff; border-color: rgba(57, 208, 216, 0.8); box-shadow: 0 0 14px rgba(57, 208, 216, 0.35); }
+  .sj-back svg { width: 16px; height: 16px; }
+  .sj-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 18px; border-left: 1px solid rgba(92, 156, 226, 0.25); }
+  .sj-clock-time { font: 700 24px/1 var(--sj-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(57, 208, 216, 0.4); }
+  .sj-clock-date { font-size: 12px; color: var(--sj-muted); letter-spacing: 0.08em; }
+
+  /* ===== 3. KPI 带（5 枚） ===== */
+  .sj-band { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .sj-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--sj-border); border-radius: 12px; background: var(--sj-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .sj-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--sj-gold), transparent); }
+  .sj-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(240, 192, 96, 0.13), transparent 68%);
+  }
+  .sj-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.28), rgba(57, 208, 216, 0.12));
+    border: 1px solid rgba(240, 192, 96, 0.35); box-shadow: inset 0 0 12px rgba(240, 192, 96, 0.14);
+  }
+  .sj-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .sj-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--sj-muted); white-space: nowrap; }
+  .sj-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .sj-kpi-val { font: 700 28px/1 var(--sj-mono); color: var(--sj-gold-soft); text-shadow: 0 0 14px rgba(240, 192, 96, 0.45); }
+  .sj-kpi-unit { font-size: 12px; color: #b39a5e; }
+  .sj-kpi-sub { font-size: 11.5px; color: var(--sj-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sj-kpi-sub b { font-weight: 700; }
+  .sj-up { color: var(--sj-green); }
+  .sj-down { color: var(--sj-red); }
+  .sj-mini-track { position: relative; height: 6px; border-radius: 3px; background: rgba(63, 120, 200, 0.2); }
+  .sj-mini-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, #b8863a, var(--sj-gold-soft)); box-shadow: 0 0 10px rgba(240, 192, 96, 0.5); transition: width 1.1s ease; }
+
+  /* ===== 4. 面板通用 ===== */
+  .sj-body { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .sj-panel {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--sj-border); border-radius: 12px; background: var(--sj-panel);
+    display: flex; flex-direction: column;
+  }
+  .sj-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(240, 192, 96, 0.22), rgba(57, 208, 216, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .sj-panel-head i { flex: none; width: 5px; height: 16px; background: var(--sj-gold); box-shadow: 0 0 8px var(--sj-gold); transform: skewX(-12deg); }
+  .sj-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f4f9ff; white-space: nowrap; }
+  .sj-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+  .sj-panel-scope { margin-left: auto; font-size: 12px; color: var(--sj-gold-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .sj-chart { flex: 1; min-height: 0; }
+
+  /* ===== 5. 上部：单期操作全流程时间线（纯 DOM） ===== */
+  .sj-flow { flex: 31; }
+  .sj-tl-wrap { position: relative; flex: 1; min-height: 0; margin: 8px 24px 6px; }
+  .sj-tl-line {
+    position: absolute; top: 54px; height: 3px; border-radius: 2px;
+    background: linear-gradient(90deg, rgba(184, 134, 58, 0.9), var(--sj-gold-soft));
+    box-shadow: 0 0 10px rgba(240, 192, 96, 0.45);
+  }
+  .sj-tl-line.is-doing {
+    background: none; height: 0; border-top: 3px dashed var(--sj-gold);
+    box-shadow: none; opacity: 0.9; animation: sjFlow 1.4s linear infinite;
+  }
+  .sj-tl-line.is-todo { background: none; height: 0; border-top: 3px dashed rgba(142, 169, 204, 0.42); box-shadow: none; }
+  @keyframes sjFlow { from { opacity: 0.42; } 50% { opacity: 1; } to { opacity: 0.42; } }
+
+  /* 节点层级高于今日竖标：今日线可能正好穿过某个节点列，压在下面才不挡文字 */
+  .sj-tl-node { position: absolute; z-index: 2; top: 0; width: 176px; transform: translateX(-50%); text-align: center; }
+  .sj-tl-step { font-size: 12.5px; letter-spacing: 0.08em; color: #cfe6ff; font-weight: 700; white-space: nowrap; height: 18px; line-height: 18px; }
+  .sj-tl-date { font: 700 12px/16px var(--sj-mono); color: var(--sj-gold-soft); letter-spacing: 0.06em; height: 16px; }
+  .sj-tl-dot {
+    position: relative; z-index: 2; margin: 4px auto 0; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+    border: 2px solid rgba(142, 169, 204, 0.45); background: rgba(10, 30, 58, 0.95); color: #8ea9cc;
+  }
+  .sj-tl-node.is-done .sj-tl-dot {
+    border-color: var(--sj-gold); color: #2a1c05;
+    background: linear-gradient(150deg, var(--sj-gold-soft), #cd9a37);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.6);
+  }
+  .sj-tl-node.is-doing .sj-tl-dot {
+    border-color: var(--sj-cyan); color: #9ff2f6; background: rgba(8, 48, 58, 0.95);
+    box-shadow: 0 0 0 0 rgba(57, 208, 216, 0.55); animation: sjPulse 1.8s ease-out infinite;
+  }
+  .sj-tl-node.is-todo .sj-tl-dot { border-style: dashed; }
+  @keyframes sjPulse { 0% { box-shadow: 0 0 0 0 rgba(57, 208, 216, 0.5); } 70% { box-shadow: 0 0 0 12px rgba(57, 208, 216, 0); } 100% { box-shadow: 0 0 0 0 rgba(57, 208, 216, 0); } }
+  .sj-tl-pill {
+    display: inline-block; margin-top: 5px; padding: 1px 9px; border-radius: 9px;
+    font-size: 10.5px; letter-spacing: 0.1em; border: 1px solid rgba(142, 169, 204, 0.4);
+    color: var(--sj-muted); background: rgba(63, 120, 200, 0.12);
+  }
+  .sj-tl-node.is-done .sj-tl-pill { color: #ffe6b4; border-color: rgba(240, 192, 96, 0.5); background: rgba(240, 192, 96, 0.13); }
+  .sj-tl-node.is-doing .sj-tl-pill { color: #9ff2f6; border-color: rgba(57, 208, 216, 0.55); background: rgba(57, 208, 216, 0.13); }
+  /* 固定两行高并裁切：note 若撑到三行会顶到今日标签 */
+  .sj-tl-note { margin-top: 5px; height: 30px; overflow: hidden; font-size: 11px; line-height: 15px; color: #a9c3e2; font-variant-numeric: tabular-nums; }
+  .sj-tl-note b { color: var(--sj-gold-soft); font-weight: 700; }
+  .sj-tl-note u { color: var(--sj-cyan); text-decoration: none; font-weight: 700; }
+
+  /* 今日竖标 */
+  .sj-today { position: absolute; top: 40px; z-index: 1; transform: translateX(-50%); text-align: center; }
+  .sj-today-bar { width: 2px; height: 92px; margin: 0 auto; background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.12)); box-shadow: 0 0 8px rgba(255, 255, 255, 0.5); }
+  .sj-today-chip {
+    display: inline-block; margin-top: 2px; padding: 2px 10px; border-radius: 9px; white-space: nowrap;
+    font: 700 11px/1.4 var(--sj-mono); letter-spacing: 0.08em; color: #0b1c31;
+    background: linear-gradient(120deg, #ffffff, #cfe6ff); box-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
+  }
+
+  /* ===== 6. 下部：左表 46% / 右列 54% ===== */
+  .sj-lower { flex: 69; min-height: 0; display: flex; gap: 14px; }
+  .sj-lower-left { flex: 46; min-width: 0; display: flex; }
+  .sj-lower-left > .sj-panel { flex: 1; }
+  .sj-lower-right { flex: 54; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+  .sj-rate-panel { flex: 96; }
+  .sj-yield-panel { flex: 112; }
+
+  /* 投标银行明细表（DOM grid） */
+  .sj-thead, .sj-tbody li {
+    display: grid;
+    grid-template-columns: 40px 1.45fr 1fr 1.02fr 1.02fr 1fr 0.86fr;
+    align-items: center; gap: 8px; padding: 0 14px;
+  }
+  .sj-thead {
+    flex: none; height: 32px; font-size: 11.5px; letter-spacing: 0.1em; color: #6f93bd;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.22); background: rgba(63, 120, 200, 0.08);
+  }
+  .sj-thead span:nth-child(n+4) { text-align: right; }
+  .sj-thead span:last-child { text-align: center; }
+  .sj-tbody { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+  .sj-tbody li {
+    flex: 1; min-height: 0; font-size: 13px; font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.09); transition: background 0.3s ease;
+  }
+  .sj-tbody li:nth-child(odd) { background: rgba(63, 120, 200, 0.07); }
+  .sj-tbody li.is-win { background: rgba(240, 192, 96, 0.13); box-shadow: inset 3px 0 0 var(--sj-gold); }
+  .sj-tbody li.is-lead { background: rgba(240, 192, 96, 0.2); box-shadow: inset 3px 0 0 var(--sj-gold-soft); }
+  .sj-tbody li.is-lose { color: #7f97b4; }
+  .sj-td-no {
+    width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font: 700 11px/1 var(--sj-mono); color: #0a1c33; background: rgba(142, 169, 204, 0.7);
+  }
+  .sj-tbody li.is-win .sj-td-no, .sj-tbody li.is-lead .sj-td-no { background: linear-gradient(140deg, var(--sj-gold-soft), #d8a03c); box-shadow: 0 0 9px rgba(240, 192, 96, 0.5); }
+  .sj-td-name { font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #eaf4ff; }
+  .sj-tbody li.is-lose .sj-td-name { color: #93aac6; }
+  .sj-td-type { font-size: 11.5px; color: #9fbdde; white-space: nowrap; }
+  .sj-td-num { text-align: right; font: 700 13.5px/1 var(--sj-mono); color: #cfe2f8; }
+  .sj-td-num.is-hi { color: var(--sj-gold-soft); }
+  .sj-td-num.is-dim { color: #6f8aa8; font-weight: 400; }
+  .sj-badge {
+    justify-self: center; padding: 2px 9px; border-radius: 9px; font-size: 11px; letter-spacing: 0.08em; white-space: nowrap;
+    border: 1px solid rgba(142, 169, 204, 0.35); color: var(--sj-muted); background: rgba(63, 120, 200, 0.12);
+  }
+  .sj-badge.is-good { color: #2a1c05; border-color: transparent; background: linear-gradient(120deg, var(--sj-gold-soft), #d8a03c); font-weight: 700; }
+  .sj-badge.is-lead { color: #2a1c05; border-color: transparent; background: linear-gradient(120deg, #fff3d6, #f0c060); font-weight: 700; box-shadow: 0 0 10px rgba(240, 192, 96, 0.55); }
+  .sj-tfoot {
+    flex: none; display: grid; grid-template-columns: 40px 1.45fr 1fr 1.02fr 1.02fr 1fr 0.86fr;
+    align-items: center; gap: 8px; padding: 0 14px; height: 38px;
+    border-top: 1px solid rgba(240, 192, 96, 0.32); background: rgba(72, 56, 24, 0.34);
+    font-size: 12px; color: var(--sj-muted); font-variant-numeric: tabular-nums;
+  }
+  .sj-tfoot b { font: 700 14px/1 var(--sj-mono); color: var(--sj-gold-soft); }
+  .sj-tfoot span:nth-child(n+4) { text-align: right; }
+  .sj-tfoot span:last-child { text-align: center; }
+
+  /* ===== 7. 收益测算（纯 DOM） ===== */
+  .sj-yield { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 7px; padding: 8px 16px 9px; }
+  .sj-yield-row { flex: none; }
+  .sj-yl-cap { display: flex; align-items: baseline; justify-content: space-between; font-size: 11.5px; color: var(--sj-muted); letter-spacing: 0.06em; height: 16px; }
+  .sj-yl-cap b { font: 700 14px/1 var(--sj-mono); color: var(--sj-gold-soft); }
+  .sj-yl-bar { display: flex; height: 23px; margin-top: 4px; border-radius: 6px; overflow: hidden; border: 1px solid rgba(92, 156, 226, 0.3); }
+  .sj-yl-seg { display: flex; align-items: center; justify-content: center; font: 700 11.5px/1 var(--sj-mono); white-space: nowrap; overflow: hidden; transition: width 0.9s cubic-bezier(0.22, 0.8, 0.3, 1); }
+  .sj-yl-seg.is-base { background: linear-gradient(90deg, rgba(63, 120, 200, 0.5), rgba(61, 156, 255, 0.42)); color: #d6e8ff; }
+  .sj-yl-seg.is-gain { background: linear-gradient(90deg, rgba(184, 134, 58, 0.9), var(--sj-gold-soft)); color: #2a1c05; box-shadow: 0 0 12px rgba(240, 192, 96, 0.45); }
+  .sj-yl-legend { display: flex; gap: 18px; margin-top: 4px; font-size: 10.5px; color: var(--sj-muted); letter-spacing: 0.05em; }
+  .sj-yl-legend s { text-decoration: none; display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+  .sj-tiles { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .sj-tile { border: 1px solid rgba(92, 156, 226, 0.22); border-radius: 9px; background: rgba(63, 120, 200, 0.09); padding: 4px 10px 5px; overflow: hidden; }
+  .sj-tile.is-hero { border-color: rgba(240, 192, 96, 0.45); background: rgba(72, 56, 24, 0.34); }
+  .sj-tile-k { font-size: 10.5px; line-height: 15px; letter-spacing: 0.06em; color: var(--sj-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sj-tile-v { font: 700 18px/1.2 var(--sj-mono); color: #d6e8ff; font-variant-numeric: tabular-nums; }
+  .sj-tile.is-hero .sj-tile-v { color: var(--sj-gold-soft); text-shadow: 0 0 12px rgba(240, 192, 96, 0.45); }
+  .sj-tile-s { font-size: 10px; line-height: 14px; color: #7f9cbe; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .sj-rankbox { flex: none; }
+  .sj-rank-strip { display: flex; align-items: flex-end; gap: 4px; height: 27px; margin-top: 3px; }
+  .sj-rank-strip u {
+    flex: 1; text-decoration: none; border-radius: 3px 3px 0 0; min-height: 3px;
+    background: rgba(92, 156, 226, 0.38); transition: height 0.8s cubic-bezier(0.22, 0.8, 0.3, 1);
+  }
+  .sj-rank-strip u.is-cur { background: linear-gradient(180deg, var(--sj-gold-soft), #b8863a); box-shadow: 0 0 10px rgba(240, 192, 96, 0.6); }
+  .sj-rank-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 3px; font-size: 10.5px; line-height: 14px; color: var(--sj-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sj-rank-foot b { color: var(--sj-gold-soft); font-weight: 700; }
+
+  /* ===== 8. 底部跑马灯 ===== */
+  .sj-marquee {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--sj-border); border-radius: 12px; background: var(--sj-panel);
+  }
+  .sj-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a1c05;
+    background: linear-gradient(120deg, var(--sj-gold-soft), #d8a03c 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .sj-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a1c05; animation: sjDot 1.6s ease-in-out infinite; }
+  @keyframes sjDot { 50% { opacity: 0.25; } }
+  .sj-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .sj-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: sjMarquee 48s linear infinite; font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .sj-marquee-track b { color: var(--sj-gold-soft); font-weight: 700; }
+  .sj-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(240, 192, 96, 0.5); }
+  @keyframes sjMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .sj-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="sj-stage" id="sj-stage">
+    <!-- mockflag:begin --><div class="sj-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="sj-error" id="sj-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <header class="sj-header">
+      <div class="sj-head-left">
+        <div class="sj-crumb">
+          <b>公共资金</b><i>›</i>
+          <a class="sj-crumb-up" href="大屏样板间-公共资金现金管理1920.html">公共资金现金管理</a><i>›</i>
+          <em id="sj-crumb-obj">--</em>
+        </div>
+        <div class="sj-head-title-row">
+          <div class="sj-head-title" id="sj-title">-- 操作详情</div>
+          <div class="sj-head-meta">
+            <span>口径 <b>地方公共资金现金管理商业银行定期存款</b></span><i>|</i>
+            <span>对照基准 <b>资金存放央行计息利率 1.10%</b></span><i>|</i>
+            <span>数据截至 <b>2026-07-31</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="sj-head-right">
+        <div class="sj-switcher" id="sj-switcher" aria-label="操作期次切换">
+          <button class="sj-sw-btn" id="sj-sw-prev" type="button" title="上一期（← 方向键）"><b>‹</b>上一期</button>
+          <div class="sj-sw-box">
+            <span class="sj-sw-name" id="sj-sw-name">--</span>
+            <span class="sj-sw-idx" id="sj-sw-idx">-- / --</span>
+          </div>
+          <button class="sj-sw-btn" id="sj-sw-next" type="button" title="下一期（→ 方向键）">下一期<b>›</b></button>
+        </div>
+        <button class="sj-back" id="sj-back" type="button" title="返回公共资金现金管理（Esc）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/><path d="M7 12 H20"/></svg>
+          返回
+        </button>
+        <div class="sj-clock" aria-label="实时时钟">
+          <span class="sj-clock-time" id="sj-clock-time">--:--:--</span>
+          <span class="sj-clock-date" id="sj-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="sj-band" id="sj-band" aria-label="本期操作核心指标"></section>
+
+    <div class="sj-body">
+      <!-- 上部：全流程时间线 -->
+      <section class="sj-panel sj-flow">
+        <header class="sj-panel-head"><i></i><h2>单期操作全流程</h2><span class="sj-panel-en">OPERATION LIFECYCLE</span><span class="sj-panel-scope" id="sj-flow-scope">● 已完成　◉ 进行中　◌ 未开始</span></header>
+        <div class="sj-tl-wrap" id="sj-tl" aria-label="本期操作五个环节的时间线"></div>
+      </section>
+
+      <!-- 下部 -->
+      <div class="sj-lower">
+        <div class="sj-lower-left">
+          <section class="sj-panel">
+            <header class="sj-panel-head"><i></i><h2>本期投标银行明细</h2><span class="sj-panel-en">BIDDING LEDGER</span><span class="sj-panel-scope" id="sj-tbl-scope">--</span></header>
+            <div class="sj-thead">
+              <span>序</span><span>银行</span><span>机构类型</span><span>投标量(亿)</span><span>中标量(亿)</span><span>投标利率</span><span>是否中标</span>
+            </div>
+            <ul class="sj-tbody" id="sj-tbody"></ul>
+            <div class="sj-tfoot" id="sj-tfoot"></div>
+          </section>
+        </div>
+        <div class="sj-lower-right">
+          <section class="sj-panel sj-rate-panel">
+            <header class="sj-panel-head"><i></i><h2>投标利率分布</h2><span class="sj-panel-en">BID RATE SPREAD</span><span class="sj-panel-scope" id="sj-rate-scope">--</span></header>
+            <div class="sj-chart" id="sj-chart-rate" role="img" aria-label="本期各家银行投标利率分布散点，标出中标利率线与 Shibor 线"></div>
+          </section>
+          <section class="sj-panel sj-yield-panel">
+            <header class="sj-panel-head"><i></i><h2>本期收益测算</h2><span class="sj-panel-en">YIELD BRIDGE</span><span class="sj-panel-scope" id="sj-yield-scope">--</span></header>
+            <div class="sj-yield">
+              <div class="sj-yield-row">
+                <div class="sj-yl-cap"><span>全额利息收入 = 对照基准利息 + 净增收</span><b id="sj-yl-total">--</b></div>
+                <div class="sj-yl-bar">
+                  <div class="sj-yl-seg is-base" id="sj-yl-base" style="width:0%"></div>
+                  <div class="sj-yl-seg is-gain" id="sj-yl-gain" style="width:0%"></div>
+                </div>
+                <div class="sj-yl-legend">
+                  <span><s style="background:rgba(61,156,255,0.6)"></s>对照基准利息（1.10% 存放央行）</span>
+                  <span><s style="background:#f0c060"></s>净增收（财政增量收益）</span>
+                </div>
+              </div>
+              <div class="sj-tiles" id="sj-tiles"></div>
+              <div class="sj-rankbox">
+                <div class="sj-yl-cap"><span>14 期增收对比（本期高亮）</span><b id="sj-rank-lab">--</b></div>
+                <div class="sj-rank-strip" id="sj-rank-strip"></div>
+                <div class="sj-rank-foot">
+                  <span id="sj-rank-l">--</span>
+                  <span id="sj-rank-r">--</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <section class="sj-marquee" aria-label="本期操作要情">
+      <div class="sj-marquee-tag"><i></i>本期要情</div>
+      <div class="sj-marquee-view"><div class="sj-marquee-track" id="sj-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("sj-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("sj-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e8f2ff", muted: "#8ea9cc",
+    gold: "#f0c060", goldSoft: "#ffdc8f", goldDeep: "#b8863a",
+    blue: "#3d9cff", cyan: "#39d0d8", green: "#33e0a6", red: "#ff5f6e", orange: "#ff9d4d", steel: "#6f93c4"
+  };
+  const PARENT = "大屏样板间-公共资金现金管理1920.html";
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = Number(n).toFixed(dec == null ? 0 : dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const signed = (v, d) => (v >= 0 ? "+" : "") + fmtDec(v, d == null ? 1 : d);
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const DAY_MS = 86400000;
+  const ymd = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const md = (d) => pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+
+  /* ===== 3. 数据源
+     父页锚点（大屏样板间-公共资金现金管理1920.html）：14 期操作原表六个原始字段，一字不改。
+     到期日、利差、投标结构、增收全部由 JS 现算，不硬编码任何合计。 ===== */
+  const TODAY = new Date(2026, 6, 31);      /* 数据截至 2026-07-31 */
+  const BENCH = 1.10;                       /* 对照基准：资金存放央行计息利率（%），非 Shibor */
+
+  const RAW = [
+    ["2026-01", [2026, 1, 14], 91, 260, 1.92, "江苏银行"],
+    ["2026-02", [2026, 1, 28], 91, 240, 1.90, "南京银行"],
+    ["2026-03", [2026, 2, 11], 182, 300, 1.98, "中国银行"],
+    ["2026-04", [2026, 2, 25], 91, 220, 1.86, "交通银行"],
+    ["2026-05", [2026, 3, 11], 91, 280, 1.84, "建设银行"],
+    ["2026-06", [2026, 3, 25], 182, 320, 1.94, "工商银行"],
+    ["2026-07", [2026, 4, 15], 91, 260, 1.82, "农业银行"],
+    ["2026-08", [2026, 4, 29], 273, 350, 2.04, "江苏银行"],
+    ["2026-09", [2026, 5, 13], 91, 240, 1.78, "招商银行"],
+    ["2026-10", [2026, 5, 27], 182, 300, 1.88, "兴业银行"],
+    ["2026-11", [2026, 6, 10], 91, 280, 1.76, "中国银行"],
+    ["2026-12", [2026, 6, 24], 91, 260, 1.74, "上海浦发"],
+    ["2026-13", [2026, 7, 8], 182, 320, 1.86, "江苏银行"],
+    ["2026-14", [2026, 7, 22], 91, 270, 1.72, "南京银行"]
+  ];
+  /* 同期限 Shibor（%，与期次一一对应，取自父页） */
+  const SHIBOR = [1.68, 1.66, 1.72, 1.62, 1.60, 1.70, 1.58, 1.76, 1.54, 1.64, 1.52, 1.50, 1.62, 1.48];
+  const BANK_TYPE = {
+    "中国银行": "国有大行", "工商银行": "国有大行", "农业银行": "国有大行",
+    "建设银行": "国有大行", "交通银行": "国有大行",
+    "招商银行": "股份行", "兴业银行": "股份行", "上海浦发": "股份行",
+    "江苏银行": "城商行", "南京银行": "城商行"
+  };
+  const POOL = ["江苏银行", "南京银行", "中国银行", "交通银行", "建设银行", "工商银行", "农业银行", "招商银行", "兴业银行", "上海浦发"];
+  /* 中标量分配权重（k 家中标时的名次权重，末位吸收舍入残差 → 中标量之和恒等于该期金额） */
+  const WW = { 2: [0.60, 0.40], 3: [0.45, 0.32, 0.23], 4: [0.38, 0.26, 0.20, 0.16] };
+
+  /* 3.1 逐期现算：到期日 / 剩余天数 / 利差 / 投标簿 / 认购倍数 / 增收 */
+  const DEALS = RAW.map((r, i) => {
+    const start = new Date(r[1][0], r[1][1] - 1, r[1][2]);
+    const end = new Date(start.getTime() + r[2] * DAY_MS);
+    const amt = r[3], rate = r[4], tenor = r[2], bank = r[5];
+    const rem = Math.round((end - TODAY) / DAY_MS);
+    const live = end > TODAY;
+
+    /* 参标家数 6~9、中标家数 2~4，均由期次序号派生（确定性，不用随机） */
+    const n = 6 + (i % 4), k = 2 + (i % 3), m = n - k;
+    const w = WW[k], award = [];
+    for (let j = 0; j < k - 1; j++) award.push(Math.round(amt * w[j] / 10) * 10);
+    award.push(amt - sum(award));                       /* ★ 末位吸收残差：Σ中标量 ≡ 该期金额 */
+
+    /* 参标行：父页给的中标行恒为首位中标行，其余从银行池按位移取，无重复 */
+    const others = POOL.filter((b) => b !== bank);
+    const off = (i * 3) % others.length;
+    const picks = [];
+    for (let t = 0; t < n - 1; t++) picks.push(others[(off + t) % others.length]);
+    const names = [bank].concat(picks);
+
+    /* 单一价格招标：中标利率为边际（最低中标）价，中标行按报价由高到低取量；未中标行报价低于中标利率 */
+    const bids = names.map((nm, t) => {
+      const win = t < k;
+      return win
+        ? { name: nm, type: BANK_TYPE[nm], win: true, lead: t === 0, award: award[t],
+            bid: award[t] + 20, rate: r2(rate + (k - 1 - t) * 0.02) }
+        : { name: nm, type: BANK_TYPE[nm], win: false, lead: false, award: 0,
+            bid: 40 + 10 * ((i + (t - k) * 3) % 5), rate: r2(rate - 0.02 * (t - k + 1)) };
+    }).sort((a, b) => b.rate - a.rate || b.bid - a.bid);
+
+    const bidTotal = sum(bids.map((b) => b.bid));
+    const awardTotal = sum(bids.map((b) => b.award));
+    const interest = amt * rate / 100 * tenor / 365;
+    const benchInt = amt * BENCH / 100 * tenor / 365;
+    return {
+      idx: i, no: r[0], seq: +r[0].slice(-2), start: start, end: end, tenor: tenor,
+      amt: amt, rate: rate, bank: bank, type: BANK_TYPE[bank],
+      shibor: SHIBOR[i], spread: r2((rate - SHIBOR[i]) * 100),
+      rem: rem, live: live,
+      bids: bids, n: n, k: k, m: m, bidTotal: bidTotal, awardTotal: awardTotal,
+      cover: bidTotal / amt,
+      interest: interest, benchInt: benchInt, gain: interest - benchInt,
+      principalInt: amt + interest,
+      tie: awardTotal === amt && bids[0].name === bank && bids[0].win
+    };
+  });
+
+  /* 3.2 全局合计一律由分项求和 */
+  const T = {};
+  T.periods = DEALS.length;
+  T.volume = sum(DEALS.map((d) => d.amt));                                 /* 14 期金额之和 = 3,900 */
+  T.balance = sum(DEALS.filter((d) => d.live).map((d) => d.amt));          /* 未到期金额之和 = 存放余额 */
+  T.wRate = sum(DEALS.map((d) => d.amt * d.rate)) / T.volume;              /* 加权中标利率 */
+  T.wShibor = sum(DEALS.map((d) => d.amt * d.shibor)) / T.volume;
+  T.wSpread = (T.wRate - T.wShibor) * 100;
+  T.gain = sum(DEALS.map((d) => d.gain));                                  /* 14 期增收合计（逐期求和，与父页同口径） */
+  T.interest = sum(DEALS.map((d) => d.interest));
+  T.gainMax = Math.max.apply(null, DEALS.map((d) => d.gain));
+  const gainOrder = DEALS.slice().sort((a, b) => b.gain - a.gain).map((d) => d.no);
+  const amtOrder = DEALS.slice().sort((a, b) => b.amt - a.amt).map((d) => d.no);
+  DEALS.forEach((d) => { d.gainRank = gainOrder.indexOf(d.no) + 1; d.amtRank = amtOrder.indexOf(d.no) + 1; });
+
+  /* ===== 4. 时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("sj-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("sj-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. KPI 带骨架（★ 先建同级 DOM，再 echarts.init） ===== */
+  const KPI_DEFS = [
+    { icon: "¥", key: "amt", label: "操作金额", unit: "亿元", dec: 0 },
+    { icon: "◷", key: "tenor", label: "期限天数", unit: "天", dec: 0, progress: true },
+    { icon: "%", key: "rate", label: "中标利率", unit: "%", dec: 2 },
+    { icon: "△", key: "spread", label: "较同期限 Shibor 利差", unit: "BP", dec: 1, sign: true },
+    { icon: "◆", key: "gain", label: "本期增收收益", unit: "亿元", dec: 3 }
+  ];
+  const band = $("sj-band");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "sj-kpi";
+    card.innerHTML =
+      '<div class="sj-kpi-icon">' + k.icon + '</div>' +
+      '<div class="sj-kpi-main">' +
+        '<div class="sj-kpi-label">' + k.label + '</div>' +
+        '<div class="sj-kpi-num"><span class="sj-kpi-val">0</span><span class="sj-kpi-unit">' + k.unit + '</span></div>' +
+        (k.progress ? '<div class="sj-mini-track"><div class="sj-mini-fill"></div></div>' : '') +
+        '<div class="sj-kpi-sub"></div>' +
+      '</div>';
+    band.appendChild(card);
+    k.node = card.querySelector(".sj-kpi-val");
+    k.subNode = card.querySelector(".sj-kpi-sub");
+    k.fill = card.querySelector(".sj-mini-fill");
+    k.cur = 0; k.target = 0;
+  });
+  /* 翻牌缓动：截图时可能落在中途值，收敛后才是终值 */
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) k.cur = k.target; else k.cur += diff * 0.14;
+      k.node.textContent = (k.sign && k.cur >= 0 ? "+" : "") + fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+
+  /* ===== 6. 时间线（纯 DOM，5 节点等距，今日位置按日期插值） ===== */
+  const STEPS = ["发布招标公告", "银行投标", "确定中标", "资金起息", "到期回笼"];
+  const ICONS = ["◈", "◎", "✓", "¥", "⇱"];
+  const POS = [10, 30, 50, 70, 90];
+  function renderTimeline(d) {
+    const dates = [
+      new Date(d.start.getTime() - 7 * DAY_MS),
+      new Date(d.start.getTime() - 3 * DAY_MS),
+      new Date(d.start.getTime() - 2 * DAY_MS),
+      d.start, d.end
+    ];
+    /* 状态三态：已完成 = 日期已过；进行中 = 首个未来节点且回笼在途（≤30 天）；其余未开始 */
+    const done = dates.map((x) => x.getTime() <= TODAY.getTime());
+    const state = dates.map((x, j) => {
+      if (done[j]) return "is-done";
+      if ((j === 0 || done[j - 1]) && d.rem <= 30) return "is-doing";
+      return "is-todo";
+    });
+    const pillTxt = { "is-done": "已完成", "is-doing": "进行中", "is-todo": "未开始" };
+    const notes = [
+      "招标量 <b>" + fmtDec(d.amt) + "</b> 亿 · 期限 <b>" + d.tenor + "</b> 天",
+      "<b>" + d.n + "</b> 家投标 · 投标量 <b>" + fmtDec(d.bidTotal) + "</b> 亿",
+      "<b>" + d.k + "</b> 家中标 · 认购倍数 <b>" + d.cover.toFixed(2) + "</b> 倍",
+      "中标利率 <b>" + d.rate.toFixed(2) + "%</b> · 利差 <u>" + signed(d.spread, 1) + " BP</u>",
+      "到期本息 <b>" + d.principalInt.toFixed(2) + "</b> 亿 · " +
+        (d.live ? "<u>余 " + d.rem + " 天</u>" : "已回笼 <b>" + Math.abs(d.rem) + "</b> 天")
+    ];
+
+    let html = "";
+    for (let j = 0; j < 4; j++) {
+      const cls = done[j + 1] ? "" : (done[j] ? " is-doing" : " is-todo");
+      html += '<div class="sj-tl-line' + cls + '" style="left:' + POS[j] + '%;right:' + (100 - POS[j + 1]) + '%"></div>';
+    }
+    for (let j = 0; j < 5; j++) {
+      html += '<div class="sj-tl-node ' + state[j] + '" style="left:' + POS[j] + '%">' +
+        '<div class="sj-tl-step">' + STEPS[j] + '</div>' +
+        '<div class="sj-tl-date">' + ymd(dates[j]) + '</div>' +
+        '<div class="sj-tl-dot">' + ICONS[j] + '</div>' +
+        '<div><span class="sj-tl-pill">' + pillTxt[state[j]] + '</span></div>' +
+        '<div class="sj-tl-note">' + notes[j] + '</div>' +
+      '</div>';
+    }
+    /* 今日竖标：落在哪个区段就按该区段的天数比例插值，越界则贴边 */
+    let p, tip;
+    const tms = TODAY.getTime();
+    if (tms <= dates[0].getTime()) { p = POS[0]; tip = "今日 " + md(TODAY) + " · 尚未发标"; }
+    else if (tms >= dates[4].getTime()) { p = POS[4]; tip = "今日 " + md(TODAY) + " · 已回笼"; }
+    else {
+      let s = 0;
+      while (s < 4 && tms > dates[s + 1].getTime()) s++;
+      const span = dates[s + 1].getTime() - dates[s].getTime();
+      const f = span > 0 ? (tms - dates[s].getTime()) / span : 0;
+      p = POS[s] + f * (POS[s + 1] - POS[s]);
+      tip = "今日 " + md(TODAY) + (s === 3 ? " · 存续第 " + Math.round((tms - d.start.getTime()) / DAY_MS) + " 天" : " · " + STEPS[s + 1] + "在途");
+    }
+    p = Math.max(4, Math.min(96, p));
+    html += '<div class="sj-today" style="left:' + p.toFixed(2) + '%"><div class="sj-today-bar"></div><div class="sj-today-chip">' + tip + '</div></div>';
+    $("sj-tl").innerHTML = html;
+    $("sj-flow-scope").textContent = "公告 T-7 · 投标 T-3 · 中标 T-2 · 起息 T · 到期 T+" + d.tenor;
+  }
+
+  /* ===== 7. 投标银行明细表（切换期次时整体重写） ===== */
+  function renderTable(d) {
+    $("sj-tbody").innerHTML = d.bids.map((b, i) =>
+      '<li class="' + (b.lead ? "is-lead" : (b.win ? "is-win" : "is-lose")) + '">' +
+        '<span class="sj-td-no">' + (i + 1) + '</span>' +
+        '<span class="sj-td-name">' + b.name + '</span>' +
+        '<span class="sj-td-type">' + b.type + '</span>' +
+        '<span class="sj-td-num">' + fmtDec(b.bid) + '</span>' +
+        '<span class="sj-td-num ' + (b.win ? "is-hi" : "is-dim") + '">' + (b.win ? fmtDec(b.award) : "—") + '</span>' +
+        '<span class="sj-td-num ' + (b.win ? "is-hi" : "is-dim") + '">' + b.rate.toFixed(2) + '%</span>' +
+        '<span class="sj-badge ' + (b.lead ? "is-lead" : (b.win ? "is-good" : "")) + '">' + (b.lead ? "首位中标" : (b.win ? "中标" : "未中标")) + '</span>' +
+      '</li>').join("");
+
+    $("sj-tfoot").innerHTML =
+      '<span></span><span>合计（' + d.n + ' 家参标）</span>' +
+      '<span>' + d.k + ' 家中标</span>' +
+      '<span><b>' + fmtDec(d.bidTotal) + '</b></span>' +
+      '<span><b>' + fmtDec(d.awardTotal) + '</b></span>' +
+      '<span>倍数 ' + d.cover.toFixed(2) + '</span>' +
+      '<span>' + (d.tie ? "对账一致 ✓" : "口径不符 ✗") + '</span>';
+    $("sj-tbl-scope").textContent = d.n + " 家参标 · 中标量合计 " + fmtDec(d.awardTotal) + " 亿元（= 本期操作金额）";
+  }
+
+  /* ===== 8. ECharts：投标利率分布（★ 实例只创建一次，切换期次只 setOption） ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(8, 26, 50, 0.93)", borderColor: "rgba(240, 192, 96, 0.45)",
+    textStyle: { color: "#e2eeff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (a, b) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: a }, { offset: 1, color: b }]);
+  const AXIS_LINE = { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } };
+  const SPLIT_LINE = { lineStyle: { color: "rgba(92, 156, 226, 0.13)" } };
+  const rateChart = echarts.init($("sj-chart-rate"));
+
+  function rateOption(d) {
+    const rows = d.bids.slice().reverse();          /* 类目轴自下而上：反转后最高报价在最上 */
+    const cats = rows.map((b) => b.name);
+    const rates = d.bids.map((b) => b.rate);
+    const lo = Math.min.apply(null, rates.concat([d.shibor]));
+    const hi = Math.max.apply(null, rates);
+    const xMin = r2(Math.floor((lo - 0.06) * 100) / 100);
+    const xMax = r2(Math.ceil((hi + 0.06) * 100) / 100);
+    const maxBid = Math.max.apply(null, d.bids.map((b) => b.bid));
+    return {
+      tooltip: tip({
+        formatter: (p) => {
+          const b = rows[p.dataIndex];
+          return '<b style="color:#ffdc8f">' + b.name + "</b>（" + b.type + "）<br/>投标利率 " + b.rate.toFixed(2) +
+            "%<br/>投标量 " + fmtDec(b.bid) + " 亿元<br/>" +
+            (b.win ? "中标量 " + fmtDec(b.award) + " 亿元" + (b.lead ? "（首位中标行）" : "")
+                   : "未中标（低于中标利率 " + ((d.rate - b.rate) * 100).toFixed(0) + " BP）");
+        }
+      }),
+      grid: { left: 10, right: 92, top: 14, bottom: 4, containLabel: true },
+      xAxis: {
+        type: "value", min: xMin, max: xMax, axisLine: AXIS_LINE, splitLine: SPLIT_LINE,
+        axisLabel: { color: C.muted, fontSize: 10.5, formatter: (v) => v.toFixed(2) + "%" }
+      },
+      yAxis: {
+        type: "category", data: cats, axisLine: AXIS_LINE, axisTick: { show: false },
+        splitLine: { show: true, lineStyle: { color: "rgba(92, 156, 226, 0.08)" } },
+        axisLabel: { color: "#cfe6ff", fontSize: 11, width: 68, overflow: "truncate" }
+      },
+      series: [{
+        type: "scatter", symbol: "circle",
+        symbolSize: (v, p) => 10 + 14 * rows[p.dataIndex].bid / maxBid,
+        data: rows.map((b, i) => ({
+          value: [b.rate, i],
+          itemStyle: b.win
+            ? { color: hGrad("rgba(184, 134, 58, 0.95)", C.goldSoft), borderColor: "#fff2d2", borderWidth: b.lead ? 2 : 1, shadowBlur: 12, shadowColor: "rgba(240, 192, 96, 0.6)" }
+            : { color: "rgba(111, 147, 196, 0.75)", borderColor: "rgba(180, 205, 235, 0.6)", borderWidth: 1 }
+        })),
+        label: {
+          show: true, position: "right", distance: 8, fontSize: 10.5, fontWeight: 700,
+          color: "#dcebff", formatter: (o) => rows[o.dataIndex].rate.toFixed(2) + "% · " + fmtDec(rows[o.dataIndex].bid) + "亿"
+        },
+        /* 中标区间：报价 ≥ 中标利率者中标，右侧整片染金 */
+        markArea: {
+          silent: true,
+          itemStyle: { color: "rgba(240, 192, 96, 0.11)", borderColor: "rgba(240, 192, 96, 0.3)", borderWidth: 1 },
+          data: [[{ xAxis: d.rate }, { xAxis: xMax }]]
+        },
+        /* 竖直 markLine 不挂 label（会旋成竖排压住数据），口径写在面板头 scope */
+        markLine: {
+          silent: true, symbol: "none", label: { show: false },
+          data: [
+            { xAxis: d.rate, lineStyle: { color: C.gold, width: 2, type: "solid" } },
+            { xAxis: d.shibor, lineStyle: { color: C.cyan, width: 1.8, type: [6, 4] } }
+          ]
+        }
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 9. 收益测算（纯 DOM）：全额利息 = 对照基准利息 + 净增收 ===== */
+  const strip = $("sj-rank-strip");
+  strip.innerHTML = DEALS.map(() => "<u></u>").join("");
+  const stripBars = strip.querySelectorAll("u");
+  function renderYield(d) {
+    $("sj-yl-total").textContent = d.interest.toFixed(3) + " 亿元";
+    const bw = 100 * d.benchInt / d.interest;
+    $("sj-yl-base").style.width = bw.toFixed(2) + "%";
+    $("sj-yl-gain").style.width = (100 - bw).toFixed(2) + "%";
+    $("sj-yl-base").textContent = d.benchInt.toFixed(3) + " 亿 · " + bw.toFixed(1) + "%";
+    $("sj-yl-gain").textContent = d.gain.toFixed(3) + " 亿 · " + (100 - bw).toFixed(1) + "%";
+
+    $("sj-tiles").innerHTML =
+      '<div class="sj-tile"><div class="sj-tile-k">全额利息收入</div><div class="sj-tile-v">' + d.interest.toFixed(3) + '</div>' +
+        '<div class="sj-tile-s">' + fmtDec(d.amt) + ' × ' + d.rate.toFixed(2) + '% × ' + d.tenor + '/365</div></div>' +
+      '<div class="sj-tile"><div class="sj-tile-k">对照基准利息（1.10%）</div><div class="sj-tile-v">' + d.benchInt.toFixed(3) + '</div>' +
+        '<div class="sj-tile-s">' + fmtDec(d.amt) + ' × 1.10% × ' + d.tenor + '/365</div></div>' +
+      '<div class="sj-tile is-hero"><div class="sj-tile-k">净增收（财政增量）</div><div class="sj-tile-v">' + d.gain.toFixed(3) + '</div>' +
+        '<div class="sj-tile-s">利差 ' + ((d.rate - BENCH) * 100).toFixed(0) + ' BP · 折合 ' + fmtDec(d.gain * 10000) + ' 万元</div></div>';
+
+    DEALS.forEach((x, i) => {
+      stripBars[i].className = x.no === d.no ? "is-cur" : "";
+      stripBars[i].style.height = (12 + 88 * x.gain / T.gainMax).toFixed(1) + "%";
+      stripBars[i].title = x.no + " · " + x.gain.toFixed(3) + " 亿元";
+    });
+    $("sj-rank-lab").textContent = "第 " + d.gainRank + " / " + T.periods + " 位";
+    $("sj-rank-l").innerHTML = "本期增收 <b>" + d.gain.toFixed(3) + " 亿元</b>，占 14 期合计 <b>" + (100 * d.gain / T.gain).toFixed(1) + "%</b>";
+    $("sj-rank-r").innerHTML = "14 期增收合计 <b>" + T.gain.toFixed(2) + " 亿元</b> · 全额利息 <b>" + T.interest.toFixed(2) + " 亿元</b>";
+    $("sj-yield-scope").textContent = "基准 1.10% · 单利 · 实际天数/365";
+  }
+
+  /* ===== 10. 跑马灯 ===== */
+  function renderMarquee(d) {
+    const lead = d.bids[0];
+    const news = [
+      "第 <b>" + d.no + "</b> 期公共资金现金定存：起息 <b>" + ymd(d.start) + "</b>，期限 <b>" + d.tenor + " 天</b>，操作金额 <b>" +
+        fmtDec(d.amt) + " 亿元</b>，居 14 期第 <b>" + d.amtRank + "</b> 位，占年内累计 " + fmtDec(T.volume) + " 亿元的 <b>" + (100 * d.amt / T.volume).toFixed(1) + "%</b>",
+      "中标利率 <b>" + d.rate.toFixed(2) + "%</b>，较同期限 Shibor <b>" + d.shibor.toFixed(2) + "%</b> 高 <b>" + signed(d.spread, 1) +
+        " BP</b>；14 期加权中标利率 <b>" + T.wRate.toFixed(2) + "%</b>，加权利差 <b>" + signed(T.wSpread, 1) + " BP</b>",
+      "本期 <b>" + d.n + "</b> 家银行参标，投标总量 <b>" + fmtDec(d.bidTotal) + " 亿元</b>，认购倍数 <b>" + d.cover.toFixed(2) +
+        " 倍</b>，<b>" + d.k + "</b> 家中标，中标量合计 <b>" + fmtDec(d.awardTotal) + " 亿元</b>",
+      "首位中标行 <b>" + lead.name + "</b>（" + lead.type + "），中标 <b>" + fmtDec(lead.award) + " 亿元</b>，占本期 <b>" +
+        (100 * lead.award / d.amt).toFixed(1) + "%</b>，报价 <b>" + lead.rate.toFixed(2) + "%</b>",
+      "按对照基准 <b>1.10%</b>（资金存放央行计息利率）测算，本期增收 <b>" + d.gain.toFixed(3) + " 亿元</b>，居 14 期第 <b>" +
+        d.gainRank + "</b> 位；14 期增收合计 <b>" + T.gain.toFixed(2) + " 亿元</b>",
+      "到期日 <b>" + ymd(d.end) + "</b>，" + (d.live ? "余 <b>" + d.rem + " 天</b>待回笼" : "已回笼 <b>" + Math.abs(d.rem) + " 天</b>") +
+        "，到期本息 <b>" + d.principalInt.toFixed(2) + " 亿元</b>；当前存放余额 <b>" + fmtDec(T.balance) + " 亿元</b>"
+    ];
+    const html = news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("sj-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+
+  /* ===== 11. 切换期次：整页重设（图表只 setOption，绝不重新 init） ===== */
+  let idx = 0;
+  function applyDeal(i) {
+    idx = (i + DEALS.length) % DEALS.length;
+    const d = DEALS[idx];
+    $("sj-crumb-obj").textContent = d.no;
+    $("sj-title").textContent = d.no + " 期操作详情";
+    $("sj-sw-name").textContent = d.no;
+    $("sj-sw-idx").textContent = (idx + 1) + " / " + DEALS.length;
+    document.title = "大屏样板间 · 公共资金现金操作详情 · " + d.no;
+
+    const vals = { amt: d.amt, tenor: d.tenor, rate: d.rate, spread: d.spread, gain: d.gain };
+    KPI_DEFS.forEach((k) => { k.target = vals[k.key]; });
+    KPI_DEFS[0].subNode.innerHTML = "居 14 期第 <b>" + d.amtRank + "</b> 位 · 占年内累计 <b>" + (100 * d.amt / T.volume).toFixed(1) + "%</b>";
+    const elapsed = Math.max(0, Math.min(d.tenor, Math.round((TODAY - d.start) / DAY_MS)));
+    KPI_DEFS[1].subNode.innerHTML = "起息 <b>" + md(d.start) + "</b> · 到期 <b>" + ymd(d.end) + "</b> · " +
+      (d.live ? '<b class="sj-up">已存续 ' + elapsed + " 天</b>" : '<b class="sj-down">已回笼</b>');
+    KPI_DEFS[1].fill.style.width = "0%";
+    setTimeout(() => { KPI_DEFS[1].fill.style.width = (100 * elapsed / d.tenor).toFixed(2) + "%"; }, 120);
+    KPI_DEFS[2].subNode.innerHTML = "14 期加权 <b>" + T.wRate.toFixed(2) + "%</b> · 本期 " +
+      (d.rate >= T.wRate ? '<b class="sj-up">高 ' : '<b class="sj-down">低 ') + Math.abs((d.rate - T.wRate) * 100).toFixed(1) + " BP</b>";
+    KPI_DEFS[3].subNode.innerHTML = "同期限 Shibor <b>" + d.shibor.toFixed(2) + "%</b> · 14 期加权利差 <b>" + signed(T.wSpread, 1) + " BP</b>";
+    KPI_DEFS[4].subNode.innerHTML = "基准 <b>1.10%</b> · 居 14 期第 <b>" + d.gainRank + "</b> 位 · 合计 <b>" + T.gain.toFixed(2) + " 亿元</b>";
+
+    renderTimeline(d);
+    renderTable(d);
+    renderYield(d);
+    rateChart.setOption(rateOption(d));
+    $("sj-rate-scope").textContent = "金线 中标利率 " + d.rate.toFixed(2) + "% · 青线 Shibor " + d.shibor.toFixed(2) + "% · 金区为中标区间";
+    renderMarquee(d);
+
+    history.replaceState(null, "", "#" + encodeURIComponent(d.no));
+  }
+
+  /* ===== 12. 交互：切换器 / 返回父页 / 键盘 / hash 定位 / kiosk 自动轮换 ===== */
+  $("sj-sw-prev").addEventListener("click", () => { applyDeal(idx - 1); restart(); });
+  $("sj-sw-next").addEventListener("click", () => { applyDeal(idx + 1); restart(); });
+  $("sj-back").addEventListener("click", () => { location.href = PARENT; });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyDeal(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyDeal(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* 打开时按 hash 定位（父页下钻传参用，如 #2026-08），未命中取第 0 期 */
+  const hash = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+  const hit = DEALS.findIndex((d) => d.no === hash);
+  applyDeal(hit >= 0 ? hit : 0);
+
+  /* kiosk 常驻：每 12 秒切下一期；鼠标停在切换器上时暂停 */
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => applyDeal(idx + 1), 12000); }
+  restart();
+  const sw = $("sj-switcher");
+  sw.addEventListener("mouseenter", () => clearInterval(timer));
+  sw.addEventListener("mouseleave", restart);
+
+  /* ===== 13. 勾稽自检：逐期中标量之和 = 该期金额 & 首位中标行 = 父页中标行；
+         14 期金额合计 = 3,900；认购倍数落在 1.5~3.2 倍 ===== */
+  const badTie = DEALS.filter((d) => !d.tie).map((d) => d.no);
+  const badCover = DEALS.filter((d) => d.cover < 1.5 || d.cover > 3.2).map((d) => d.no);
+  if (badTie.length || badCover.length || T.volume !== 3900) {
+    errorNode.textContent = "勾稽自检未通过：" +
+      (badTie.length ? badTie.join("、") + " 中标量之和或中标行与父页不符；" : "") +
+      (badCover.length ? badCover.join("、") + " 认购倍数越界；" : "") +
+      (T.volume !== 3900 ? "14 期金额合计 " + T.volume + " ≠ 3900" : "");
+    errorNode.classList.add("is-visible");
+  }
+  /* 控制台留痕，便于与父页逐项对账 */
+  console.log("[公共资金现金操作详情] 14 期金额合计", T.volume,
+    "| 存放余额", T.balance,
+    "| 加权中标利率", T.wRate.toFixed(4) + "%",
+    "| 加权利差", T.wSpread.toFixed(2) + "BP",
+    "| 全额利息", T.interest.toFixed(4),
+    "| 增收合计（基准1.10%）", T.gain.toFixed(4), "亿元",
+    "| 认购倍数区间", Math.min.apply(null, DEALS.map((d) => d.cover)).toFixed(2), "~", Math.max.apply(null, DEALS.map((d) => d.cover)).toFixed(2));
+})();
+</script>
+</body>
+</html>

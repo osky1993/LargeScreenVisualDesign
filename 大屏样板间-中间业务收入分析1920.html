@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 中间业务收入分析</title>
+<style>
+  :root {
+    --mi-bg: #0a1e3c;
+    --mi-panel: rgba(13, 34, 64, 0.72);
+    --mi-border: rgba(86, 150, 224, 0.28);
+    --mi-text: #e6f1ff;
+    --mi-muted: #8fa7c8;
+    --mi-rose: #ff7ab8;
+    --mi-rose-soft: #ffc0da;
+    --mi-rose-deep: #b8447e;
+    --mi-cyan: #3fe1ff;
+    --mi-blue: #4b7dff;
+    --mi-green: #38e6b0;
+    --mi-gold: #ffc857;
+    --mi-red: #ff6680;
+    --mi-violet: #9870ff;
+    --mi-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--mi-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .mi-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(255, 122, 184, 0.13), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(63, 225, 255, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 120%, rgba(140, 44, 96, 0.28), transparent 56%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--mi-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 84px 1fr 1fr 54px;
+    gap: 18px;
+    padding: 12px 18px 16px;
+  }
+
+  .mi-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .mi-error.is-visible { display: block; }
+
+  /* ===== 顶栏：面包屑 + 渐变大标题 + 徽章 + 走秒时钟 ===== */
+  .mi-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .mi-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 122, 184, 0.6) 16%, rgba(63, 225, 255, 0.85) 50%, rgba(255, 122, 184, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(255, 122, 184, 0.45);
+  }
+  .mi-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .mi-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mi-muted); }
+  .mi-crumb b { font-weight: 400; color: #6fb9e8; }
+  .mi-crumb i { font-style: normal; color: rgba(143, 167, 200, 0.55); }
+  .mi-crumb em { font-style: normal; color: #d7e8ff; }
+  .mi-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .mi-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--mi-rose-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(255, 122, 184, 0.35));
+  }
+  .mi-badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 13px; border-radius: 999px;
+    border: 1px solid rgba(255, 122, 184, 0.55); background: rgba(120, 40, 82, 0.32);
+    color: var(--mi-rose-soft); font-size: 12.5px; letter-spacing: 0.14em;
+    box-shadow: 0 0 12px rgba(255, 122, 184, 0.25), inset 0 0 10px rgba(255, 122, 184, 0.1);
+    font-variant-numeric: tabular-nums;
+  }
+  .mi-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--mi-rose); box-shadow: 0 0 8px var(--mi-rose); animation: miDot 1.6s ease-in-out infinite; }
+  .mi-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mi-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .mi-head-meta b { font-weight: 400; color: var(--mi-rose-soft); }
+  .mi-head-meta i { font-style: normal; color: rgba(143, 167, 200, 0.4); }
+  .mi-head-right { display: flex; align-items: center; gap: 24px; flex: none; }
+  .mi-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 24px; border-left: 1px solid rgba(86, 150, 224, 0.25); }
+  .mi-clock-time { font: 700 26px/1 var(--mi-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4); }
+  .mi-clock-date { font-size: 12px; color: var(--mi-muted); letter-spacing: 0.08em; }
+
+  /* ===== 面板通用（含边框流光顺时针轮走） ===== */
+  .mi-panel {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--mi-border); border-radius: 12px; background: var(--mi-panel);
+    display: flex; flex-direction: column;
+  }
+  .mi-panel::after {
+    content: ""; position: absolute; inset: 0; border-radius: 12px; pointer-events: none;
+    border: 1px solid rgba(255, 122, 184, 0.8);
+    box-shadow: 0 0 18px rgba(255, 122, 184, 0.4), inset 0 0 16px rgba(255, 122, 184, 0.12);
+    opacity: 0;
+    animation: miPanelGlow 8s linear infinite;
+  }
+  /* 顺时针轮走：左上(a) → 右上(b) → 右下(d) → 左下(c) */
+  .mi-p-a::after { animation-delay: 0s; }
+  .mi-p-b::after { animation-delay: 2s; }
+  .mi-p-d::after { animation-delay: 4s; }
+  .mi-p-c::after { animation-delay: 6s; }
+  @keyframes miPanelGlow {
+    0% { opacity: 0; }
+    6% { opacity: 1; }
+    22% { opacity: 1; }
+    30% { opacity: 0; }
+    100% { opacity: 0; }
+  }
+  .mi-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(255, 122, 184, 0.24), rgba(63, 225, 255, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .mi-panel-head i { flex: none; width: 5px; height: 16px; background: var(--mi-rose); box-shadow: 0 0 8px var(--mi-rose); transform: skewX(-12deg); }
+  .mi-panel-head h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .mi-panel-head .mi-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mi-panel-head .mi-panel-scope { margin-left: auto; font-size: 12px; color: var(--mi-rose-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .mi-chart { flex: 1; min-height: 0; }
+
+  /* ===== 底部跑马灯 ===== */
+  .mi-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--mi-border); border-radius: 12px; background: var(--mi-panel);
+  }
+  .mi-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #fff2f8;
+    background: linear-gradient(120deg, var(--mi-rose), var(--mi-rose-deep) 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .mi-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #fff2f8; animation: miDot 1.6s ease-in-out infinite; }
+  @keyframes miDot { 50% { opacity: 0.3; } }
+  .mi-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .mi-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: miMarquee 46s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+    font-variant-numeric: tabular-nums;
+  }
+  .mi-marquee-track b { color: var(--mi-rose-soft); font-weight: 700; }
+  .mi-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(255, 122, 184, 0.55); }
+  @keyframes miMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .mi-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="mi-stage" id="mi-stage">
+    <!-- mockflag:begin --><div class="mi-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="mi-error" id="mi-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="mi-header">
+      <div class="mi-head-left">
+        <div class="mi-crumb"><b>中间业务</b><i>›</i><em>中收分析</em></div>
+        <div class="mi-head-title-row">
+          <div class="mi-head-title">中间业务收入分析</div>
+          <span class="mi-badge"><i></i>月度经营 · MTD</span>
+          <div class="mi-head-meta">
+            <span>当月中收 <b id="mi-meta-total">--</b> 万元</span><i>|</i>
+            <span>月度目标 <b id="mi-meta-target">--</b> 万元</span><i>|</i>
+            <span>口径 <b>全行汇总 · T+1</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="mi-head-right">
+        <div class="mi-clock" aria-label="实时时钟">
+          <span class="mi-clock-time" id="mi-clock-time">--:--:--</span>
+          <span class="mi-clock-date" id="mi-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 左上：六大条线当月中收（grouped bar 当月 vs 上月） -->
+    <section class="mi-panel mi-p-a">
+      <header class="mi-panel-head"><i></i><h2>六大条线当月中收</h2><span class="mi-panel-en">MTD FEE INCOME BY LINE</span><span class="mi-panel-scope">当月 vs 上月 · 万元</span></header>
+      <div class="mi-chart" id="mi-chart-lines" role="img" aria-label="六大条线当月与上月中收分组柱状图"></div>
+    </section>
+
+    <!-- 右上：近 12 月中收总额走势（面积折线 + 目标线） -->
+    <section class="mi-panel mi-p-b">
+      <header class="mi-panel-head"><i></i><h2>近 12 月中收总额走势</h2><span class="mi-panel-en">12-MONTH FEE INCOME TREND</span><span class="mi-panel-scope">月度目标 17,000 万元</span></header>
+      <div class="mi-chart" id="mi-chart-trend" role="img" aria-label="近12个月中收总额面积折线图，含月度目标虚线"></div>
+    </section>
+
+    <!-- 左下：当月中收结构（donut） -->
+    <section class="mi-panel mi-p-c">
+      <header class="mi-panel-head"><i></i><h2>当月中收结构</h2><span class="mi-panel-en">MTD FEE INCOME MIX</span><span class="mi-panel-scope">六大条线 · 万元</span></header>
+      <div class="mi-chart" id="mi-chart-mix" role="img" aria-label="当月中收六大条线结构环形图"></div>
+    </section>
+
+    <!-- 右下：手续费净收入 vs 同比增速（柱线混合） -->
+    <section class="mi-panel mi-p-d">
+      <header class="mi-panel-head"><i></i><h2>手续费净收入与同比增速</h2><span class="mi-panel-en">NET FEE INCOME &amp; YOY</span><span class="mi-panel-scope">近 8 季度 · 最新季 = 走势图近 3 月合计</span></header>
+      <div class="mi-chart" id="mi-chart-fee" role="img" aria-label="近8季度手续费净收入柱状与同比增速折线混合图"></div>
+    </section>
+
+    <!-- 底部跑马灯 -->
+    <section class="mi-marquee" aria-label="中收业务播报">
+      <div class="mi-marquee-tag"><i></i>中收播报</div>
+      <div class="mi-marquee-view"><div class="mi-marquee-track" id="mi-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("mi-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("mi-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    bg: "#0a1e3c", text: "#e6f1ff", muted: "#8fa7c8",
+    rose: "#ff7ab8", roseSoft: "#ffc0da", roseDeep: "#b8447e",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    gold: "#ffc857", red: "#ff6680", violet: "#9870ff"
+  };
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 基准数据（单一数据源，勾稽同源派生，单位：万元） =====
+     LINE_CUR 是唯一权威数组：
+       - 左上柱状「当月」序列 = LINE_CUR
+       - TOTAL = LINE_CUR 求和 → 右上走势末点 = TOTAL
+       - 左下 donut 分片 = LINE_CUR
+     右下最新季度 = MONTH_TOTALS 最近 3 月现算求和（口径见面板小字）。 */
+  const LINE_NAMES = ["结算", "代理", "银行卡", "托管", "投行", "理财"];
+  const LINE_CUR = [4120, 3650, 2980, 2240, 1860, 3150];
+  const LINE_PREV = [3980, 3480, 2890, 2150, 1760, 2940]; /* 上月，合计 17,200 */
+  const TOTAL = LINE_CUR.reduce((a, b) => a + b, 0);       /* = 18,000 */
+  const PREV_TOTAL = LINE_PREV.reduce((a, b) => a + b, 0); /* = 17,200 */
+  const TARGET = 17000; /* 月度目标 */
+
+  const MONTH_LABELS = ["25-08", "25-09", "25-10", "25-11", "25-12", "26-01", "26-02", "26-03", "26-04", "26-05", "26-06", "26-07"];
+  const MONTH_TOTALS = [15650, 15420, 16080, 16560, 17280, 15880, 14960, 16420, 16850, 17150, PREV_TOTAL].concat([TOTAL]);
+  /* 注：末两点 = 上月合计 17,200 与当月合计 18,000，均由条线数组派生 */
+
+  /* 近 8 季度手续费净收入：滚动季口径，最新一季 = 走势图最近 3 个月现算求和 */
+  const Q_LABELS = ["24Q4", "25Q1", "25Q2", "25Q3", "25Q4", "26Q1", "26Q2", "近3月"];
+  const Q_LATEST = MONTH_TOTALS.slice(-3).reduce((a, b) => a + b, 0);
+  const Q_FEE = [44800, 46200, 45600, 47800, 48900, 50200, 51100].concat([Q_LATEST]);
+  const Q_PRE = [41900, 42600, 42300, 43900]; /* 前推 4 季，用于同比现算 */
+  const Q_YOY = Q_FEE.map((v, i) => +((v / (i < 4 ? Q_PRE[i] : Q_FEE[i - 4]) - 1) * 100).toFixed(1));
+
+  $("mi-meta-total").textContent = fmt(TOTAL);
+  $("mi-meta-target").textContent = fmt(TARGET);
+
+  /* ===== 4. 顶部走秒时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("mi-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("mi-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(255, 122, 184, 0.45)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const axisCommon = {
+    axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+    axisTick: { show: false },
+    axisLabel: { color: C.muted, fontSize: 11 }
+  };
+
+  /* ===== 6. 左上：六大条线当月中收（grouped bar 当月 vs 上月） ===== */
+  const linesChart = echarts.init($("mi-chart-lines"));
+  linesChart.setOption({
+    tooltip: tip({ trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: (v) => fmt(v) + " 万元" }),
+    legend: {
+      top: 8, right: 16, itemWidth: 12, itemHeight: 8,
+      textStyle: { color: "#cfe6ff", fontSize: 12 }
+    },
+    grid: { left: 18, right: 20, top: 44, bottom: 8, containLabel: true },
+    xAxis: Object.assign({ type: "category", data: LINE_NAMES }, axisCommon, {
+      axisLabel: { color: "#cfe6ff", fontSize: 12.5 }
+    }),
+    yAxis: {
+      type: "value",
+      splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+      axisLabel: { color: C.muted, fontSize: 10.5, formatter: (v) => fmt(v) }
+    },
+    series: [
+      {
+        name: "当月", type: "bar", barWidth: 20, data: LINE_CUR,
+        itemStyle: { borderRadius: [6, 6, 0, 0], color: vGrad(C.roseSoft, C.roseDeep) },
+        label: { show: true, position: "top", fontSize: 10.5, color: C.roseSoft, formatter: (o) => fmt(o.value) }
+      },
+      {
+        name: "上月", type: "bar", barWidth: 20, data: LINE_PREV,
+        itemStyle: { borderRadius: [6, 6, 0, 0], color: vGrad("rgba(75, 125, 255, 0.85)", "rgba(35, 62, 128, 0.7)") }
+      }
+    ]
+  });
+
+  /* ===== 7. 右上：近 12 月中收总额走势（面积渐变折线 + 目标虚线） ===== */
+  const trendChart = echarts.init($("mi-chart-trend"));
+  trendChart.setOption({
+    tooltip: tip({ trigger: "axis", valueFormatter: (v) => fmt(v) + " 万元" }),
+    grid: { left: 18, right: 30, top: 34, bottom: 8, containLabel: true },
+    xAxis: Object.assign({ type: "category", boundaryGap: false, data: MONTH_LABELS }, axisCommon),
+    yAxis: {
+      type: "value", min: 13000,
+      splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+      axisLabel: { color: C.muted, fontSize: 10.5, formatter: (v) => fmt(v) }
+    },
+    series: [{
+      name: "中收总额", type: "line", smooth: true, symbol: "circle", symbolSize: 7,
+      data: MONTH_TOTALS,
+      lineStyle: { width: 3, color: C.rose, shadowColor: "rgba(255, 122, 184, 0.45)", shadowBlur: 12 },
+      itemStyle: { color: C.roseSoft, borderColor: C.rose, borderWidth: 2 },
+      areaStyle: { color: vGrad("rgba(255, 122, 184, 0.38)", "rgba(255, 122, 184, 0.02)") },
+      label: {
+        show: true, position: "top", fontSize: 10, color: C.roseSoft,
+        formatter: (o) => (o.dataIndex === MONTH_TOTALS.length - 1 ? fmt(o.value) : "")
+      },
+      markLine: {
+        silent: true, symbol: "none",
+        lineStyle: { type: "dashed", color: C.gold, width: 1.5 },
+        label: { color: C.gold, fontSize: 11, formatter: "月度目标 " + fmt(TARGET), position: "insideStartTop" },
+        data: [{ yAxis: TARGET }]
+      }
+    }]
+  });
+
+  /* ===== 8. 左下：当月中收结构 donut（分片 = 左上当月柱值） ===== */
+  const MIX_COLORS = [C.rose, C.cyan, C.blue, C.gold, C.violet, C.green];
+  const mixChart = echarts.init($("mi-chart-mix"));
+  mixChart.setOption({
+    tooltip: tip({ valueFormatter: (v) => fmt(v) + " 万元" }),
+    title: {
+      text: "当月中收合计", subtext: fmt(TOTAL) + " 万元",
+      left: "37%", top: "40%", textAlign: "center",
+      textStyle: { color: C.muted, fontSize: 13, fontWeight: 400 },
+      subtextStyle: { color: C.roseSoft, fontSize: 24, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" }
+    },
+    legend: {
+      orient: "vertical", right: 26, top: "middle", itemWidth: 10, itemHeight: 10,
+      textStyle: { color: "#cfe6ff", fontSize: 12.5 },
+      formatter: (name) => {
+        const i = LINE_NAMES.indexOf(name);
+        return name + "  " + fmt(LINE_CUR[i]) + " 万 · " + (LINE_CUR[i] / TOTAL * 100).toFixed(1) + "%";
+      }
+    },
+    color: MIX_COLORS,
+    series: [{
+      name: "当月中收结构", type: "pie", radius: ["52%", "74%"], center: ["38%", "52%"],
+      itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+      label: { show: false },
+      emphasis: {
+        scaleSize: 6,
+        label: { show: true, color: "#fdf2f8", fontSize: 14, fontWeight: 700, formatter: "{b}\n{d}%" }
+      },
+      data: LINE_NAMES.map((n, i) => ({ name: n, value: LINE_CUR[i] }))
+    }, {
+      type: "pie", radius: ["82%", "83%"], center: ["38%", "52%"], silent: true,
+      label: { show: false },
+      itemStyle: { color: "rgba(255, 122, 184, 0.3)" },
+      data: [1]
+    }]
+  });
+
+  /* ===== 9. 右下：手续费净收入柱 + 同比增速线（双轴混合） ===== */
+  const feeChart = echarts.init($("mi-chart-fee"));
+  feeChart.setOption({
+    tooltip: tip({
+      trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: (arr) => {
+        const bar = arr.find((x) => x.seriesType === "bar");
+        const line = arr.find((x) => x.seriesType === "line");
+        return arr[0].axisValue +
+          "<br/>手续费净收入 <b style=\"color:" + C.roseSoft + "\">" + fmt(bar.value) + "</b> 万元" +
+          "<br/>同比增速 <b style=\"color:" + C.cyan + "\">" + fmtDec(line.value, 1) + "%</b>";
+      }
+    }),
+    legend: {
+      top: 8, right: 16, itemWidth: 12, itemHeight: 8,
+      textStyle: { color: "#cfe6ff", fontSize: 12 }
+    },
+    grid: { left: 18, right: 18, top: 44, bottom: 8, containLabel: true },
+    xAxis: Object.assign({ type: "category", data: Q_LABELS }, axisCommon, {
+      axisLabel: { color: "#cfe6ff", fontSize: 12 }
+    }),
+    yAxis: [
+      {
+        type: "value", name: "万元", nameTextStyle: { color: C.muted, fontSize: 10.5 },
+        min: 40000,
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+        axisLabel: { color: C.muted, fontSize: 10.5, formatter: (v) => fmt(v) }
+      },
+      {
+        type: "value", name: "同比 %", nameTextStyle: { color: C.muted, fontSize: 10.5 },
+        min: 0, max: 16,
+        splitLine: { show: false },
+        axisLabel: { color: C.muted, fontSize: 10.5, formatter: "{value}%" }
+      }
+    ],
+    series: [
+      {
+        name: "手续费净收入", type: "bar", barWidth: 22, data: Q_FEE,
+        itemStyle: {
+          borderRadius: [6, 6, 0, 0],
+          color: (o) => (o.dataIndex === Q_FEE.length - 1
+            ? vGrad(C.rose, C.roseDeep)
+            : vGrad("rgba(255, 192, 218, 0.75)", "rgba(150, 58, 104, 0.55)"))
+        },
+        label: {
+          show: true, position: "top", fontSize: 10, color: C.roseSoft,
+          formatter: (o) => (o.dataIndex === Q_FEE.length - 1 ? fmt(o.value) : "")
+        }
+      },
+      {
+        name: "同比增速", type: "line", yAxisIndex: 1, smooth: true,
+        symbol: "circle", symbolSize: 7, data: Q_YOY,
+        lineStyle: { width: 2.5, color: C.cyan, shadowColor: "rgba(63, 225, 255, 0.4)", shadowBlur: 10 },
+        itemStyle: { color: "#bdf3ff", borderColor: C.cyan, borderWidth: 2 }
+      }
+    ]
+  });
+
+  /* ===== 10. 活性：四图错峰 tooltip 巡航（相位 0/1/2/3s 错开） ===== */
+  function cruiseAxis(chart, count, phase) {
+    let i = 0;
+    setTimeout(() => {
+      const step = () => {
+        chart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: i % count });
+        i++;
+      };
+      step();
+      setInterval(step, 4000);
+    }, phase);
+  }
+  cruiseAxis(linesChart, LINE_NAMES.length, 0);      /* 左上，相位 0s */
+  cruiseAxis(trendChart, MONTH_TOTALS.length, 1000); /* 右上，相位 1s */
+  cruiseAxis(feeChart, Q_LABELS.length, 3000);       /* 右下，相位 3s */
+
+  /* 左下饼图：扇区轮转 highlight + tooltip，相位 2s */
+  let mixIdx = -1;
+  setTimeout(() => {
+    const step = () => {
+      if (mixIdx >= 0) mixChart.dispatchAction({ type: "downplay", seriesIndex: 0, dataIndex: mixIdx });
+      mixIdx = (mixIdx + 1) % LINE_NAMES.length;
+      mixChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: mixIdx });
+      mixChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: mixIdx });
+    };
+    step();
+    setInterval(step, 4000);
+  }, 2000);
+
+  /* ===== 11. 底部：中收业务播报跑马灯 ===== */
+  const NEWS = [
+    "当月中收合计 <b>" + fmt(TOTAL) + " 万元</b>，超月度目标 " + fmt(TOTAL - TARGET) + " 万元，达成率 <b>" + (TOTAL / TARGET * 100).toFixed(1) + "%</b>",
+    "结算条线单月 <b>" + fmt(LINE_CUR[0]) + " 万元</b> 领跑六大条线，跨境结算手续费环比提升显著",
+    "理财条线中收 <b>" + fmt(LINE_CUR[5]) + " 万元</b>，代销保有规模突破带动尾佣收入连续 3 个月上行",
+    "近 3 月手续费净收入 <b>" + fmt(Q_LATEST) + " 万元</b>，同比增速 <b>" + fmtDec(Q_YOY[Q_YOY.length - 1], 1) + "%</b> 保持两位数附近高位",
+    "托管条线新增公募托管户 2 家，月中收 <b>" + fmt(LINE_CUR[3]) + " 万元</b> 环比多增 " + fmt(LINE_CUR[3] - LINE_PREV[3]) + " 万元",
+    "银行卡分期费率优化试点上线，收单手续费减免影响已在当月口径中体现",
+    "投行条线债券承销费 <b>" + fmt(LINE_CUR[4]) + " 万元</b>，两单绿色金融债项目于本月落地缴款"
+  ];
+  const track = $("mi-marquee-track");
+  const newsHtml = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  track.innerHTML = newsHtml + newsHtml;
+})();
+</script>
+</body>
+</html>

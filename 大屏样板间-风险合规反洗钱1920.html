@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 风险合规与反洗钱</title>
+<style>
+  :root {
+    --am-bg: #071630;
+    --am-panel: rgba(10, 28, 54, 0.74);
+    --am-border: rgba(80, 142, 218, 0.26);
+    --am-text: #e6f1ff;
+    --am-muted: #8aa3c6;
+    --am-cyan: #3fe1ff;
+    --am-blue: #4b7dff;
+    --am-green: #38e6b0;
+    --am-gold: #ffc857;
+    --am-red: #ff6680;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #030b18; }
+  body {
+    color: var(--am-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .am-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(63, 225, 255, 0.09), transparent 40%),
+      radial-gradient(circle at 90% 8%, rgba(255, 102, 128, 0.07), transparent 44%),
+      radial-gradient(ellipse at 50% 120%, rgba(28, 82, 152, 0.26), transparent 55%),
+      linear-gradient(rgba(80, 142, 218, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(80, 142, 218, 0.05) 1px, transparent 1px),
+      var(--am-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 408px 1fr 408px;
+    grid-template-rows: 76px 104px 1fr 60px;
+    gap: 14px;
+    padding: 14px 18px 16px;
+  }
+
+  .am-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .am-error.is-visible { display: block; }
+
+  /* ===== 顶部标题栏 ===== */
+  .am-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px;
+  }
+  .am-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 102, 128, 0.5) 18%, rgba(63, 225, 255, 0.9) 50%, rgba(255, 102, 128, 0.5) 82%, transparent);
+    box-shadow: 0 0 14px rgba(63, 225, 255, 0.5);
+  }
+  .am-title-wrap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -54%); text-align: center; white-space: nowrap; }
+  .am-title {
+    display: flex; align-items: center; gap: 20px;
+    font-size: 33px; font-weight: 700; letter-spacing: 0.2em;
+    background: linear-gradient(180deg, #ffffff 25%, #9fe9ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(63, 225, 255, 0.3));
+  }
+  .am-title i { position: relative; flex: none; width: 116px; height: 10px; }
+  .am-title i::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px;
+    background: linear-gradient(270deg, var(--am-cyan), rgba(63, 225, 255, 0.05));
+  }
+  .am-title i::after {
+    content: ""; position: absolute; right: 8px; top: 1px; width: 8px; height: 8px;
+    background: var(--am-red); transform: rotate(45deg); box-shadow: 0 0 8px var(--am-red);
+    animation: amDot 2s ease-in-out infinite;
+  }
+  .am-title i.is-r { transform: scaleX(-1); }
+  @keyframes amDot { 50% { opacity: 0.3; } }
+  .am-title-sub { margin-top: 3px; font-size: 11px; letter-spacing: 0.56em; color: #5f88b8; text-indent: 0.56em; }
+  .am-clock { display: flex; align-items: baseline; gap: 12px; font-variant-numeric: tabular-nums; }
+  .am-clock-time {
+    font: 700 30px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 14px rgba(63, 225, 255, 0.45);
+  }
+  .am-clock-date { font-size: 13px; color: var(--am-muted); letter-spacing: 0.08em; }
+  .am-badge {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 13px; color: #a7ecff; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid rgba(63, 225, 255, 0.34); background: rgba(10, 42, 66, 0.45);
+    font-variant-numeric: tabular-nums;
+  }
+  .am-badge b { color: #ffd7de; font-weight: 700; }
+  .am-badge i {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--am-green);
+    box-shadow: 0 0 0 3px rgba(56, 230, 176, 0.15), 0 0 10px var(--am-green);
+    animation: amBreath 2s ease-in-out infinite;
+  }
+  @keyframes amBreath { 50% { opacity: 0.35; transform: scale(0.82); } }
+
+  /* ===== KPI 行 ===== */
+  .am-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .am-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--am-border); border-radius: 12px; background: var(--am-panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  }
+  .am-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 42px; height: 3px;
+    background: linear-gradient(90deg, var(--am-cyan), transparent);
+  }
+  .am-kpi.is-alert::before { background: linear-gradient(90deg, var(--am-red), transparent); }
+  .am-kpi.is-alert { border-color: rgba(255, 102, 128, 0.34); }
+  .am-kpi-label { font-size: 13px; letter-spacing: 0.12em; color: var(--am-muted); }
+  .am-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .am-kpi-val {
+    font: 700 29px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #f4faff; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4);
+  }
+  .am-kpi.is-alert .am-kpi-val { color: #ffe9ed; text-shadow: 0 0 12px rgba(255, 102, 128, 0.5); }
+  .am-kpi-unit { font-size: 12px; color: #6fb9e8; }
+  .am-kpi-note { font-size: 12px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; color: #5f88b8; }
+  .am-kpi-note.is-good { color: var(--am-green); }
+  .am-kpi-note.is-bad { color: var(--am-red); }
+
+  /* ===== 面板通用 ===== */
+  .am-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .am-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--am-border); border-radius: 12px; background: var(--am-panel);
+    display: flex; flex-direction: column;
+  }
+  .am-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(63, 225, 255, 0.2), rgba(63, 225, 255, 0.04) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .am-panel-head i { flex: none; width: 5px; height: 16px; background: var(--am-cyan); box-shadow: 0 0 8px var(--am-cyan); transform: skewX(-12deg); }
+  .am-panel-head.is-alert i { background: var(--am-red); box-shadow: 0 0 8px var(--am-red); }
+  .am-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.1em; color: #f0f8ff; white-space: nowrap; }
+  .am-panel-head .am-panel-en { font-size: 10px; letter-spacing: 0.18em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .am-panel-head .am-panel-scope { margin-left: auto; font-size: 12px; color: var(--am-cyan); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .am-panel-head.is-alert .am-panel-scope { color: var(--am-red); }
+  .am-chart { flex: 1; min-height: 0; }
+
+  /* ===== 等级徽章（全局复用） ===== */
+  .am-tag {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 40px; height: 21px; padding: 0 8px; border-radius: 5px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+  }
+  .am-tag.is-high { color: #ffdbe1; background: rgba(255, 102, 128, 0.16); border: 1px solid rgba(255, 102, 128, 0.6); text-shadow: 0 0 8px rgba(255, 102, 128, 0.7); }
+  .am-tag.is-mid { color: #ffe9c0; background: rgba(255, 200, 87, 0.13); border: 1px solid rgba(255, 200, 87, 0.55); }
+  .am-tag.is-low { color: #c8f3ff; background: rgba(63, 225, 255, 0.1); border: 1px solid rgba(63, 225, 255, 0.45); }
+
+  /* ===== 中央上：可疑交易实时监测流 ===== */
+  .am-stream { flex: 1.22; }
+  .am-stream-head-row {
+    flex: none; display: grid; grid-template-columns: 0.62fr 0.95fr 1.35fr 0.72fr 1.15fr 0.5fr; gap: 8px;
+    padding: 9px 18px 7px; font-size: 12px; letter-spacing: 0.1em; color: #6fb9e8;
+    border-bottom: 1px solid rgba(80, 142, 218, 0.25);
+  }
+  .am-stream-head-row span:nth-child(4) { text-align: right; }
+  .am-stream-head-row span:nth-child(6) { text-align: center; }
+  .am-stream-view { flex: 1; min-height: 0; overflow: hidden; }
+  .am-stream-list { margin: 0; padding: 0; list-style: none; }
+  .am-stream-list li {
+    display: grid; grid-template-columns: 0.62fr 0.95fr 1.35fr 0.72fr 1.15fr 0.5fr; gap: 8px;
+    height: 38px; align-items: center; padding: 0 18px; font-size: 13px; color: #cfe3fa;
+    border-bottom: 1px dashed rgba(80, 142, 218, 0.12); font-variant-numeric: tabular-nums;
+  }
+  .am-stream-list li:nth-child(odd) { background: rgba(20, 48, 90, 0.25); }
+  .am-stream-list li.is-high {
+    background: rgba(255, 102, 128, 0.08);
+    box-shadow: inset 3px 0 0 var(--am-red), inset 0 0 24px rgba(255, 102, 128, 0.1);
+    animation: amRowFlash 1.6s ease-in-out infinite;
+  }
+  @keyframes amRowFlash {
+    50% { background: rgba(255, 102, 128, 0.17); box-shadow: inset 3px 0 0 var(--am-red), inset 0 0 34px rgba(255, 102, 128, 0.22); }
+  }
+  .am-stream-time { color: var(--am-muted); }
+  .am-stream-rule { color: #a9d2f5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .am-stream-amt { color: var(--am-gold); font-weight: 700; text-align: right; }
+  .am-score { display: flex; align-items: center; gap: 8px; }
+  .am-score-bar { flex: 1; height: 8px; border-radius: 4px; background: rgba(63, 120, 200, 0.18); overflow: hidden; }
+  .am-score-bar i { display: block; height: 100%; border-radius: 4px; }
+  .am-score.is-high .am-score-bar i { background: linear-gradient(90deg, #7a2237, var(--am-red)); box-shadow: 0 0 8px rgba(255, 102, 128, 0.7); }
+  .am-score.is-mid .am-score-bar i { background: linear-gradient(90deg, #7a5a18, var(--am-gold)); }
+  .am-score.is-low .am-score-bar i { background: linear-gradient(90deg, #145a80, var(--am-cyan)); }
+  .am-score-num { flex: none; width: 30px; text-align: right; font-weight: 700; font-size: 12.5px; }
+  .am-score.is-high .am-score-num { color: var(--am-red); }
+  .am-score.is-mid .am-score-num { color: var(--am-gold); }
+  .am-score.is-low .am-score-num { color: var(--am-cyan); }
+  .am-stream-list li .am-tag { justify-self: center; }
+
+  /* ===== 右下：合规检查进度 ===== */
+  .am-audit-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-evenly; padding: 6px 18px 10px; }
+  .am-audit-item { display: flex; flex-direction: column; gap: 7px; }
+  .am-audit-top { display: flex; align-items: baseline; gap: 10px; font-size: 13.5px; color: #dcebff; }
+  .am-audit-top b { font-weight: 700; letter-spacing: 0.04em; }
+  .am-audit-due { margin-left: auto; font-size: 12px; color: var(--am-muted); font-variant-numeric: tabular-nums; }
+  .am-audit-due.is-near { color: var(--am-red); }
+  .am-audit-pct { font-size: 13px; font-weight: 700; color: var(--am-cyan); font-variant-numeric: tabular-nums; }
+  .am-audit-bar { height: 10px; border-radius: 5px; background: rgba(63, 120, 200, 0.16); overflow: hidden; border: 1px solid rgba(80, 142, 218, 0.2); }
+  .am-audit-bar i {
+    display: block; height: 100%; border-radius: 5px; position: relative;
+    background: linear-gradient(90deg, #1d5d9e, var(--am-cyan));
+    box-shadow: 0 0 10px rgba(63, 225, 255, 0.4);
+    transition: width 1s ease;
+  }
+  .am-audit-bar i::after {
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(120deg, rgba(255, 255, 255, 0.18) 0 6px, transparent 6px 14px);
+    animation: amStripe 1.4s linear infinite;
+  }
+  @keyframes amStripe { to { transform: translateX(20px); } }
+  .am-audit-item.is-warn .am-audit-bar i { background: linear-gradient(90deg, #8a5f18, var(--am-gold)); box-shadow: 0 0 10px rgba(255, 200, 87, 0.4); }
+  .am-audit-item.is-warn .am-audit-pct { color: var(--am-gold); }
+
+  /* ===== 底部跑马灯 ===== */
+  .am-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--am-border); border-radius: 12px; background: var(--am-panel);
+  }
+  .am-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a0812;
+    background: linear-gradient(120deg, var(--am-red), #d43f5e 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .am-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a0812; animation: amDot 1.6s ease-in-out infinite; }
+  .am-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .am-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: amMarquee 48s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .am-marquee-track b { color: var(--am-red); font-weight: 700; }
+  .am-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(63, 225, 255, 0.55); }
+  @keyframes amMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .am-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="am-stage" id="am-stage">
+    <!-- mockflag:begin --><div class="am-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="am-error" id="am-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶部标题栏 -->
+    <header class="am-header">
+      <div class="am-clock" aria-label="实时时钟">
+        <span class="am-clock-time" id="am-clock-time">--:--:--</span>
+        <span class="am-clock-date" id="am-clock-date">----年--月--日 星期-</span>
+      </div>
+      <div class="am-title-wrap">
+        <div class="am-title"><i></i><span>风险合规与反洗钱</span><i class="is-r"></i></div>
+        <div class="am-title-sub">RISK COMPLIANCE &amp; AML MONITOR</div>
+      </div>
+      <div class="am-badge"><i></i>反洗钱模型 <b>v5.2</b> · 在线规则 <b>386</b> 条 · 演示数据</div>
+    </header>
+
+    <!-- KPI 行 -->
+    <section class="am-kpis" aria-label="核心指标" id="am-kpis"></section>
+
+    <!-- 左列 -->
+    <div class="am-col">
+      <section class="am-panel">
+        <header class="am-panel-head"><i></i><h2>规则命中 TOP8</h2><span class="am-panel-en">RULE HITS</span><span class="am-panel-scope">今日</span></header>
+        <div class="am-chart" id="am-chart-rules" role="img" aria-label="反洗钱规则命中次数横向条形图"></div>
+      </section>
+      <section class="am-panel">
+        <header class="am-panel-head"><i></i><h2>风险等级客户分布</h2><span class="am-panel-en">CUSTOMER RISK RATING</span><span class="am-panel-scope">存量</span></header>
+        <div class="am-chart" id="am-chart-risk" role="img" aria-label="高中低风险客户占比环形图"></div>
+      </section>
+    </div>
+
+    <!-- 中央（偏宽） -->
+    <div class="am-col">
+      <section class="am-panel am-stream">
+        <header class="am-panel-head is-alert"><i></i><h2>可疑交易实时监测流</h2><span class="am-panel-en">SUSPICIOUS TXN STREAM</span><span class="am-panel-scope" id="am-stream-count">--</span></header>
+        <div class="am-stream-head-row"><span>时间</span><span>客户（脱敏）</span><span>触发规则</span><span>金额（万元）</span><span>风险分</span><span>等级</span></div>
+        <div class="am-stream-view"><ul class="am-stream-list" id="am-stream-list"></ul></div>
+      </section>
+      <section class="am-panel">
+        <header class="am-panel-head"><i></i><h2>名单筛查命中分时曲线</h2><span class="am-panel-en">WATCHLIST SCREENING · 24H</span><span class="am-panel-scope" id="am-watch-count">--</span></header>
+        <div class="am-chart" id="am-chart-watch" role="img" aria-label="制裁名单、涉恐名单、高风险地区24小时命中小多线"></div>
+      </section>
+    </div>
+
+    <!-- 右列 -->
+    <div class="am-col">
+      <section class="am-panel">
+        <header class="am-panel-head"><i></i><h2>案件处置漏斗</h2><span class="am-panel-en">CASE DISPOSAL FUNNEL</span><span class="am-panel-scope">今日</span></header>
+        <div class="am-chart" id="am-chart-funnel" role="img" aria-label="预警到结案的案件处置漏斗图"></div>
+      </section>
+      <section class="am-panel">
+        <header class="am-panel-head"><i></i><h2>合规检查进度</h2><span class="am-panel-en">COMPLIANCE INSPECTIONS</span><span class="am-panel-scope">4 项在办</span></header>
+        <div class="am-audit-body" id="am-audit-body"></div>
+      </section>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="am-marquee" aria-label="合规要闻">
+      <div class="am-marquee-tag"><i></i>合规要闻</div>
+      <div class="am-marquee-view"><div class="am-marquee-track" id="am-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("am-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("am-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const C = {
+    text: "#e6f1ff", muted: "#8aa3c6",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    gold: "#ffc857", red: "#ff6680", violet: "#9870ff"
+  };
+  const rnd = (min, max) => Math.round(min + Math.random() * (max - min));
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  /* ===== 3. 静态业务数据（中型城商行反洗钱中心 · 演示口径） ===== */
+  /* 规则命中 TOP8（今日命中次数，与模型命中总笔数量级衔接） */
+  const RULES = [
+    { name: "资金快进快出", value: 286 },
+    { name: "分散转入集中转出", value: 231 },
+    { name: "大额现金分散存取", value: 198 },
+    { name: "夜间高频交易", value: 152 },
+    { name: "跨境资金异常", value: 121 },
+    { name: "频繁整数金额交易", value: 104 },
+    { name: "新开户短期大额", value: 89 },
+    { name: "关联账户循环互转", value: 71 }
+  ];
+  /* 风险等级客户分布（存量客户 486.5 万户，客户尽职调查后定级） */
+  const RISK_DIST = [
+    { name: "高风险", value: 3.9, color: C.red },     /* 万户，占比 0.8% */
+    { name: "中风险", value: 31.1, color: C.gold },   /* 万户，占比 6.4% */
+    { name: "低风险", value: 451.5, color: C.cyan }   /* 万户，占比 92.8% */
+  ];
+  const RISK_TOTAL = RISK_DIST.reduce((s, d) => s + d.value, 0);
+  /* 名单筛查 24h 命中（制裁名单 / 涉恐名单 / 高风险地区，次） */
+  const HOURS = Array.from({ length: 24 }, (_, i) => pad(i) + ":00");
+  const WATCH = [
+    { name: "制裁名单", color: C.red, data: [0, 0, 1, 0, 0, 0, 1, 2, 3, 2, 4, 3, 2, 3, 4, 3, 2, 3, 2, 1, 1, 0, 1, 0] },
+    { name: "涉恐名单", color: C.gold, data: [0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 1, 1, 0, 1, 2, 1, 1, 0, 1, 0, 0, 0, 0, 0] },
+    { name: "高风险地区", color: C.cyan, data: [1, 0, 1, 1, 0, 1, 2, 3, 5, 4, 6, 5, 4, 5, 6, 5, 4, 4, 3, 2, 2, 1, 1, 1] }
+  ];
+  /* 案件处置漏斗（今日，件） */
+  const FUNNEL = [
+    { name: "模型预警", value: 1286 },
+    { name: "人工甄别", value: 512 },
+    { name: "可疑交易上报", value: 42 },
+    { name: "协查 / 冻结", value: 9 },
+    { name: "结案归档", value: 6 }
+  ];
+  /* 合规检查进度（4 项在办专项检查） */
+  const AUDITS = [
+    { name: "反洗钱年度检查", pct: 78, due: "08-15", warn: false },
+    { name: "客户身份重合规专项", pct: 62, due: "09-30", warn: false },
+    { name: "账户实名制回头看", pct: 91, due: "07-31", warn: true },
+    { name: "数据报送质量核查", pct: 45, due: "10-20", warn: false }
+  ];
+  /* 可疑交易流：脱敏客户 & 规则池 */
+  const CUSTOMERS = [
+    "王*成", "李**", "陈*华", "刘**", "张*明", "周**", "赵*芸", "吴**", "郑*涛", "孙**",
+    "**贸易有限公司", "**跨境电商有限公司", "**建材有限公司", "**供应链管理有限公司",
+    "**信息科技有限公司", "**国际货运代理有限公司", "**珠宝首饰有限公司", "**文化传媒有限公司"
+  ];
+  const NEWS = [
+    "监管通报：人民银行发布《金融机构反洗钱和反恐怖融资监督管理办法》修订稿，<b>10 月 1 日</b>起施行",
+    "名单库今日 06:00 完成更新：新增制裁实体 <b>37 个</b>、涉恐名单 <b>5 条</b>，已同步下发全行筛查引擎",
+    "本月可疑交易报告按期报送率 <b>100%</b>，大额交易报告差错率 <b>0.02%</b>，持续优于监管基准",
+    "新规生效：《受益所有人信息管理办法》存量客户信息补录截止 <b>9 月 30 日</b>，当前完成率 82.4%",
+    "内部培训：三季度反洗钱全员培训已覆盖 <b>1.2 万人次</b>，完成率 96.4%，考核通过率 99.1%",
+    "监管通报：某同业机构因客户身份识别不到位被处罚，请各经营机构对照开展客户尽职调查自查",
+    "反洗钱模型 <b>v5.2</b> 已上线运行 14 天，误报率较上一版本下降 <b>11.8%</b>，甄别效率提升 9.6%"
+  ];
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    document.getElementById("am-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    document.getElementById("am-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. KPI 行（等宽数字缓动跳变；日筛查数百万笔、命中率约万分之 2） ===== */
+  const KPIS = [
+    { label: "今日筛查交易", unit: "笔", target: 5842317, note: "全量实时筛查 · 386 条规则", cls: "", grow: [180, 620] },
+    { label: "模型命中", unit: "笔", target: 1286, note: "命中率 万分之 2.2", cls: "", grow: [0, 1] },
+    { label: "可疑交易上报", unit: "件", target: 42, note: "STR 按期报送率 100%", cls: "", grow: [0, 0.12] },
+    { label: "名单命中", unit: "次", target: 17, note: "制裁 9 · 涉恐 2 · 高风险地区 6", cls: "is-alert", grow: [0, 0.1] },
+    { label: "在办案件", unit: "件", target: 63, note: "▲ 较昨日 +5", cls: "", noteCls: "is-bad", grow: [0, 0] },
+    { label: "逾期未办结", unit: "件", target: 4, note: "▼ 较上周 -3", cls: "is-alert", noteCls: "is-good", grow: [0, 0] }
+  ];
+  const kpiWrap = document.getElementById("am-kpis");
+  KPIS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "am-kpi" + (k.cls ? " " + k.cls : "");
+    card.innerHTML =
+      '<div class="am-kpi-label">' + k.label + '</div>' +
+      '<div class="am-kpi-num"><span class="am-kpi-val">0</span><span class="am-kpi-unit">' + k.unit + '</span></div>' +
+      '<div class="am-kpi-note' + (k.noteCls ? " " + k.noteCls : "") + '">' + k.note + '</div>';
+    kpiWrap.appendChild(card);
+    k.node = card.querySelector(".am-kpi-val");
+    k.cur = 0; /* 从 0 缓动至目标值 */
+  });
+  setInterval(() => { /* 缓动逼近目标 */
+    KPIS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < 0.5) { k.cur = k.target; } else { k.cur += diff * 0.14; }
+      k.node.textContent = fmt(k.cur);
+    });
+  }, 80);
+  setInterval(() => { /* 业务量自然增长（筛查量持续、命中偶发） */
+    KPIS.forEach((k) => {
+      if (k.grow[1] > 0 && Math.random() < Math.min(1, k.grow[1])) {
+        k.target += Math.max(1, rnd(k.grow[0], Math.max(k.grow[0], k.grow[1])));
+      }
+    });
+  }, 3000);
+
+  /* ===== 6. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(7, 20, 42, 0.92)",
+    borderColor: "rgba(102, 178, 255, 0.4)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const charts = [];
+  function makeChart(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const c = echarts.init(el);
+    charts.push(c);
+    return c;
+  }
+
+  /* ===== 7. 左上：规则命中 TOP8（横向条形，前三告警红渐变） ===== */
+  const rulesChart = makeChart("am-chart-rules");
+  function rulesOption() {
+    const sorted = RULES.slice().sort((a, b) => b.value - a.value);
+    return {
+      tooltip: tip({ valueFormatter: (v) => fmt(v) + " 次" }),
+      grid: { left: 12, right: 52, top: 12, bottom: 6, containLabel: true },
+      xAxis: { type: "value", show: false },
+      yAxis: {
+        type: "category", inverse: true,
+        data: sorted.map((r) => r.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      series: [{
+        type: "bar", barWidth: 11,
+        data: sorted.map((r, i) => ({
+          value: r.value,
+          itemStyle: { borderRadius: 6, color: i < 3 ? hGrad("#6e1e30", C.red) : hGrad("#1d5d9e", C.cyan) }
+        })),
+        label: { show: true, position: "right", fontSize: 12, color: "#a9d2f5", formatter: (p) => fmt(p.value) },
+        showBackground: true,
+        backgroundStyle: { color: "rgba(63, 120, 200, 0.12)", borderRadius: 6 }
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+  rulesChart.setOption(rulesOption());
+
+  /* ===== 8. 左下：风险等级客户分布（环形 + 中心总户数） ===== */
+  const riskChart = makeChart("am-chart-risk");
+  riskChart.setOption({
+    tooltip: tip({ valueFormatter: (v) => v.toFixed(1) + " 万户" }),
+    legend: {
+      orient: "vertical", right: 12, top: "middle", itemWidth: 10, itemHeight: 10,
+      textStyle: { color: "#cfe6ff", fontSize: 12 },
+      formatter: (name) => {
+        const d = RISK_DIST.find((x) => x.name === name);
+        return name + "  " + (d.value / RISK_TOTAL * 100).toFixed(1) + "%";
+      }
+    },
+    series: [{
+      type: "pie", radius: ["56%", "76%"], center: ["36%", "52%"],
+      itemStyle: { borderColor: "#071630", borderWidth: 2 },
+      label: { show: false },
+      emphasis: { label: { show: true, color: "#eaf6ff", fontSize: 13, fontWeight: 700, formatter: "{b}\n{c} 万户" } },
+      data: RISK_DIST.map((d) => ({ name: d.name, value: d.value, itemStyle: { color: d.color } }))
+    }, {
+      type: "pie", radius: ["84%", "85%"], center: ["36%", "52%"], silent: true,
+      label: { show: false },
+      itemStyle: { color: "rgba(255, 102, 128, 0.28)" },
+      data: [1]
+    }],
+    graphic: [
+      {
+        type: "text", left: "27%", top: "44%",
+        style: { text: RISK_TOTAL.toFixed(1), fill: "#f4faff", fontSize: 26, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" }
+      },
+      {
+        type: "text", left: "28.5%", top: "56%",
+        style: { text: "客户总数(万户)", fill: "#8aa3c6", fontSize: 11 }
+      }
+    ],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 9. 中央下：名单筛查命中分时曲线（三序列小多线，一实例三 grid） ===== */
+  const watchChart = makeChart("am-chart-watch");
+  const WATCH_GRIDS = WATCH.map((w, i) => ({
+    left: 96, right: 26, top: (10 + i * 30) + "%", height: "21%"
+  }));
+  function watchOption() {
+    return {
+      tooltip: tip({ trigger: "axis", valueFormatter: (v) => v + " 次" }),
+      axisPointer: { link: [{ xAxisIndex: "all" }], lineStyle: { color: "rgba(63, 225, 255, 0.4)" } },
+      grid: WATCH_GRIDS,
+      xAxis: WATCH.map((w, i) => ({
+        gridIndex: i, type: "category", boundaryGap: false, data: HOURS,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.25)" } },
+        axisTick: { show: false },
+        axisLabel: i === WATCH.length - 1 ? { color: C.muted, fontSize: 10, interval: 3 } : { show: false }
+      })),
+      yAxis: WATCH.map((w, i) => ({
+        gridIndex: i, type: "value", minInterval: 1, max: (v) => Math.max(4, Math.ceil(v.max * 1.2)),
+        splitLine: { lineStyle: { color: "rgba(80, 142, 218, 0.12)" } },
+        axisLabel: { color: C.muted, fontSize: 10 },
+        name: w.name, nameLocation: "middle", nameGap: 58,
+        nameTextStyle: { color: w.color, fontSize: 12, fontWeight: 700 }
+      })),
+      series: WATCH.map((w, i) => ({
+        name: w.name, type: "line", xAxisIndex: i, yAxisIndex: i,
+        data: w.data, smooth: true, symbol: "circle", symbolSize: 4, step: false,
+        lineStyle: { width: 2, color: w.color, shadowColor: w.color, shadowBlur: 8 },
+        itemStyle: { color: w.color },
+        areaStyle: { opacity: 0.14, color: w.color }
+      })),
+      animationDurationUpdate: 600
+    };
+  }
+  watchChart.setOption(watchOption());
+  const watchCount = document.getElementById("am-watch-count");
+  function updateWatchCount() {
+    const total = WATCH.reduce((s, w) => s + w.data.reduce((a, b) => a + b, 0), 0);
+    watchCount.textContent = "今日累计命中 " + total + " 次";
+  }
+  updateWatchCount();
+
+  /* ===== 10. 右上：案件处置漏斗（各级数量 + 上级转化率） ===== */
+  const funnelChart = makeChart("am-chart-funnel");
+  const FUNNEL_COLORS = [C.cyan, C.blue, C.gold, C.red, C.green];
+  funnelChart.setOption({
+    tooltip: tip({
+      formatter: (p) => {
+        const i = FUNNEL.findIndex((f) => f.name === p.name);
+        const conv = i <= 0 ? "—" : (FUNNEL[i].value / FUNNEL[i - 1].value * 100).toFixed(1) + "%";
+        return p.name + "：<b>" + fmt(p.value) + "</b> 件<br>上级转化率：" + conv;
+      }
+    }),
+    series: [{
+      type: "funnel",
+      left: 18, right: 130, top: 16, bottom: 14,
+      sort: "descending", gap: 5, minSize: "12%",
+      /* 各级量级差异大，按序位可视化、以标签读数为准 */
+      data: FUNNEL.map((f, i) => ({ name: f.name, value: FUNNEL.length - i, real: f.value })),
+      itemStyle: { borderWidth: 0, opacity: 0.92 },
+      color: FUNNEL_COLORS,
+      label: {
+        show: true, position: "right", color: "#dcebff", fontSize: 12.5,
+        formatter: (p) => {
+          const i = FUNNEL.findIndex((f) => f.name === p.name);
+          const conv = i <= 0 ? "" : "  ↓" + (FUNNEL[i].value / FUNNEL[i - 1].value * 100).toFixed(1) + "%";
+          return "{n|" + p.name + "}\n{v|" + fmt(FUNNEL[i].value) + " 件" + conv + "}";
+        },
+        rich: {
+          n: { color: "#cfe6ff", fontSize: 12.5, lineHeight: 18 },
+          v: { color: "#3fe1ff", fontSize: 12, fontWeight: 700 }
+        }
+      },
+      labelLine: { length: 14, lineStyle: { color: "rgba(102, 178, 255, 0.4)" } },
+      emphasis: { label: { fontSize: 13 } }
+    }],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 11. 右下：合规检查进度（DOM 进度条） ===== */
+  const auditBody = document.getElementById("am-audit-body");
+  AUDITS.forEach((a) => {
+    const item = document.createElement("div");
+    item.className = "am-audit-item" + (a.warn ? " is-warn" : "");
+    item.innerHTML =
+      '<div class="am-audit-top"><b>' + a.name + '</b>' +
+      '<span class="am-audit-pct">' + a.pct + '%</span>' +
+      '<span class="am-audit-due' + (a.warn ? " is-near" : "") + '">到期 ' + a.due + '</span></div>' +
+      '<div class="am-audit-bar"><i style="width:0%"></i></div>';
+    auditBody.appendChild(item);
+    a.barNode = item.querySelector(".am-audit-bar i");
+    a.pctNode = item.querySelector(".am-audit-pct");
+  });
+  setTimeout(() => { AUDITS.forEach((a) => { a.barNode.style.width = a.pct + "%"; }); }, 200);
+  setInterval(() => { /* 进度缓慢推进 */
+    AUDITS.forEach((a) => {
+      if (Math.random() < 0.3 && a.pct < 99) {
+        a.pct = Math.min(99, a.pct + 1);
+        a.barNode.style.width = a.pct + "%";
+        a.pctNode.textContent = a.pct + "%";
+      }
+    });
+  }, 15000);
+
+  /* ===== 12. 中央上：可疑交易实时监测流（DOM 上滚 + 高风险闪烁） ===== */
+  const streamList = document.getElementById("am-stream-list");
+  const streamCount = document.getElementById("am-stream-count");
+  let streamTotal = 1286;
+  function levelOf(score) {
+    if (score >= 85) return ["高", "is-high"];
+    if (score >= 70) return ["中", "is-mid"];
+    return ["低", "is-low"];
+  }
+  function makeStreamRow() {
+    const d = new Date();
+    const rule = RULES[rnd(0, RULES.length - 1)];
+    const score = Math.random() < 0.22 ? rnd(85, 98) : rnd(55, 84);
+    const lv = levelOf(score);
+    const amt = score >= 85 ? rnd(180, 4800) : rnd(20, 960);
+    const li = document.createElement("li");
+    if (lv[1] === "is-high") li.className = "is-high";
+    li.innerHTML =
+      '<span class="am-stream-time">' + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()) + '</span>' +
+      '<span>' + CUSTOMERS[rnd(0, CUSTOMERS.length - 1)] + '</span>' +
+      '<span class="am-stream-rule">' + rule.name + '</span>' +
+      '<span class="am-stream-amt">' + fmt(amt) + '</span>' +
+      '<span class="am-score ' + lv[1] + '"><span class="am-score-bar"><i style="width:' + score + '%"></i></span><span class="am-score-num">' + score + '</span></span>' +
+      '<span class="am-tag ' + lv[1] + '">' + lv[0] + '</span>';
+    return li;
+  }
+  for (let i = 0; i < 10; i++) streamList.appendChild(makeStreamRow());
+  function updateStreamCount() { streamCount.textContent = "今日命中 " + fmt(streamTotal) + " 笔"; }
+  updateStreamCount();
+  setInterval(() => {
+    streamTotal += rnd(1, 3);
+    updateStreamCount();
+    streamList.insertBefore(makeStreamRow(), streamList.firstChild);
+    while (streamList.children.length > 12) streamList.removeChild(streamList.lastChild);
+  }, 2400);
+
+  /* ===== 13. 底部跑马灯（内容 x2 无缝循环） ===== */
+  const marqueeTrack = document.getElementById("am-marquee-track");
+  const marqueeHtml = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  marqueeTrack.innerHTML = marqueeHtml + marqueeHtml;
+
+  /* ===== 14. 数据微刷新（规则榜抖动 / 当前小时名单命中递增） ===== */
+  setInterval(() => {
+    RULES.forEach((r) => { r.value = Math.max(30, Math.round(r.value + rndf(-1, 4))); });
+    rulesChart.setOption(rulesOption());
+    if (Math.random() < 0.45) {
+      const h = new Date().getHours();
+      const w = WATCH[rnd(0, WATCH.length - 1)];
+      w.data[h] += 1;
+      watchChart.setOption(watchOption());
+      updateWatchCount();
+    }
+  }, 9000);
+})();
+</script>
+</body>
+</html>

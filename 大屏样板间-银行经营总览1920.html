@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 银行经营总览</title>
+<style>
+  :root {
+    --bk-bg: #0a1e3c;
+    --bk-panel: rgba(13, 34, 64, 0.72);
+    --bk-border: rgba(86, 150, 224, 0.28);
+    --bk-text: #e6f1ff;
+    --bk-muted: #8fa7c8;
+    --bk-cyan: #3fe1ff;
+    --bk-blue: #4b7dff;
+    --bk-green: #38e6b0;
+    --bk-gold: #ffc857;
+    --bk-red: #ff6680;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--bk-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .bk-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(63, 225, 255, 0.10), transparent 42%),
+      radial-gradient(circle at 88% 12%, rgba(255, 200, 87, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(35, 96, 172, 0.28), transparent 55%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--bk-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 424px 1fr 424px;
+    grid-template-rows: 78px 108px 1fr 64px;
+    gap: 14px;
+    padding: 14px 18px 16px;
+  }
+
+  .bk-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .bk-error.is-visible { display: block; }
+
+  /* ===== 顶部标题栏 ===== */
+  .bk-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px;
+  }
+  .bk-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 200, 87, 0.55) 18%, rgba(63, 225, 255, 0.9) 50%, rgba(255, 200, 87, 0.55) 82%, transparent);
+    box-shadow: 0 0 14px rgba(63, 225, 255, 0.5);
+  }
+  .bk-title-wrap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -54%); text-align: center; white-space: nowrap; }
+  .bk-title {
+    display: flex; align-items: center; gap: 20px;
+    font-size: 34px; font-weight: 700; letter-spacing: 0.22em;
+    background: linear-gradient(180deg, #ffffff 25%, #ffd98a 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(255, 200, 87, 0.3));
+  }
+  .bk-title i { position: relative; flex: none; width: 120px; height: 10px; }
+  .bk-title i::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px;
+    background: linear-gradient(270deg, var(--bk-cyan), rgba(63, 225, 255, 0.05));
+  }
+  .bk-title i::after {
+    content: ""; position: absolute; right: 8px; top: 1px; width: 8px; height: 8px;
+    background: var(--bk-gold); transform: rotate(45deg); box-shadow: 0 0 8px var(--bk-gold);
+    animation: bkDot 2s ease-in-out infinite;
+  }
+  .bk-title i.is-r { transform: scaleX(-1); }
+  @keyframes bkDot { 50% { opacity: 0.3; } }
+  .bk-title-sub { margin-top: 3px; font-size: 11px; letter-spacing: 0.62em; color: #5f88b8; text-indent: 0.62em; }
+  .bk-clock { display: flex; align-items: baseline; gap: 12px; font-variant-numeric: tabular-nums; }
+  .bk-clock-time {
+    font: 700 30px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 14px rgba(63, 225, 255, 0.45);
+  }
+  .bk-clock-date { font-size: 13px; color: var(--bk-muted); letter-spacing: 0.08em; }
+  .bk-badge {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 13px; color: #ffe3a6; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid rgba(255, 200, 87, 0.38); background: rgba(60, 46, 16, 0.4);
+  }
+  .bk-badge i {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--bk-green);
+    box-shadow: 0 0 0 3px rgba(56, 230, 176, 0.15), 0 0 10px var(--bk-green);
+    animation: bkBreath 2s ease-in-out infinite;
+  }
+  @keyframes bkBreath { 50% { opacity: 0.35; transform: scale(0.82); } }
+
+  /* ===== KPI 行 ===== */
+  .bk-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .bk-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--bk-border); border-radius: 12px; background: var(--bk-panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  }
+  .bk-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 42px; height: 3px;
+    background: linear-gradient(90deg, var(--bk-gold), transparent);
+  }
+  .bk-kpi-label { font-size: 13px; letter-spacing: 0.14em; color: var(--bk-muted); }
+  .bk-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .bk-kpi-val {
+    font: 700 30px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #f4faff; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4);
+  }
+  .bk-kpi-unit { font-size: 12px; color: #6fb9e8; }
+  .bk-kpi-delta { font-size: 12px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .bk-kpi-delta.is-good { color: var(--bk-green); }
+  .bk-kpi-delta.is-bad { color: var(--bk-red); }
+
+  /* ===== 面板通用 ===== */
+  .bk-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .bk-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--bk-border); border-radius: 12px; background: var(--bk-panel);
+    display: flex; flex-direction: column;
+  }
+  .bk-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(63, 225, 255, 0.22), rgba(63, 225, 255, 0.04) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .bk-panel-head i { flex: none; width: 5px; height: 16px; background: var(--bk-cyan); box-shadow: 0 0 8px var(--bk-cyan); transform: skewX(-12deg); }
+  .bk-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .bk-panel-head .bk-panel-en { font-size: 10px; letter-spacing: 0.22em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bk-panel-head .bk-panel-scope { margin-left: auto; font-size: 12px; color: var(--bk-gold); white-space: nowrap; padding-right: 2px; }
+  .bk-chart { flex: 1; min-height: 0; }
+
+  /* ===== 中央：核心读数区 ===== */
+  .bk-core { flex: 0.95; }
+  .bk-core-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 14px; }
+  .bk-reads { flex: 1; min-height: 0; display: flex; gap: 14px; }
+  .bk-read {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    border: 1px solid rgba(94, 168, 255, 0.24); border-radius: 10px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(63, 225, 255, 0.08), transparent 62%), rgba(10, 28, 54, 0.55);
+  }
+  .bk-read.is-gold { background: radial-gradient(ellipse at 50% 0%, rgba(255, 200, 87, 0.1), transparent 62%), rgba(10, 28, 54, 0.55); border-color: rgba(255, 200, 87, 0.3); }
+  .bk-read-label { font-size: 14px; letter-spacing: 0.24em; color: var(--bk-muted); }
+  .bk-read-label b { font-weight: 400; color: #6fb9e8; margin-left: 6px; letter-spacing: 0.05em; }
+  .bk-read.is-gold .bk-read-label b { color: #d9b166; }
+
+  .bk-flip { display: inline-flex; align-items: center; gap: 5px; }
+  .bk-flip-digit { perspective: 320px; width: 34px; height: 50px; display: inline-block; }
+  .bk-flip-card {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    position: relative; font: 700 29px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif; color: #eaf6ff;
+    background: linear-gradient(180deg, #1b4478 0%, #123564 48%, #0c2547 52%, #123765 100%);
+    border: 1px solid rgba(94, 168, 255, 0.35); border-radius: 6px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35), inset 0 0 12px rgba(63, 225, 255, 0.08);
+    transition: transform 0.18s ease-out; transform-style: preserve-3d;
+  }
+  .bk-flip-card::after { content: ""; position: absolute; left: 2px; right: 2px; top: 50%; height: 1px; background: rgba(4, 14, 30, 0.85); }
+  .bk-flip-digit.is-turn .bk-flip-card { transform: rotateX(-88deg); transition: transform 0.15s ease-in; }
+  .bk-flip-sep { align-self: flex-end; padding-bottom: 6px; font: 700 22px/1 sans-serif; color: var(--bk-cyan); text-shadow: 0 0 8px rgba(63, 225, 255, 0.8); }
+  .bk-read.is-gold .bk-flip-card { color: #fff3d6; border-color: rgba(255, 200, 87, 0.4); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35), inset 0 0 12px rgba(255, 200, 87, 0.1); }
+  .bk-read.is-gold .bk-flip-sep { color: var(--bk-gold); text-shadow: 0 0 8px rgba(255, 200, 87, 0.8); }
+
+  /* 三大条线堆叠条 */
+  .bk-lines { flex: none; padding: 2px 2px 0; }
+  .bk-lines-title { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; letter-spacing: 0.16em; color: var(--bk-muted); margin-bottom: 10px; }
+  .bk-lines-title b { font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #5f88b8; }
+  .bk-stack { display: flex; height: 34px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(94, 168, 255, 0.25); }
+  .bk-stack i {
+    display: flex; align-items: center; justify-content: center; font-style: normal;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.05em; color: #06182f; white-space: nowrap; overflow: hidden;
+    transition: width 0.8s ease;
+  }
+  .bk-stack .is-corp { background: linear-gradient(180deg, #7deaff, #29b6de); box-shadow: inset 0 0 14px rgba(255, 255, 255, 0.25); }
+  .bk-stack .is-retail { background: linear-gradient(180deg, #ffdf9a, #e0a531); }
+  .bk-stack .is-fm { background: linear-gradient(180deg, #7cf0cd, #22bd8b); }
+  .bk-stack-legend { display: flex; gap: 22px; margin-top: 9px; font-size: 12px; color: #cfe3fa; font-variant-numeric: tabular-nums; }
+  .bk-stack-legend span { display: flex; align-items: center; gap: 6px; }
+  .bk-stack-legend em { font-style: normal; width: 10px; height: 10px; border-radius: 3px; }
+  .bk-stack-legend .is-corp em { background: #3fd0f2; }
+  .bk-stack-legend .is-retail em { background: var(--bk-gold); }
+  .bk-stack-legend .is-fm em { background: var(--bk-green); }
+  .bk-stack-legend b { color: #f0f8ff; margin-left: 2px; }
+
+  /* ===== 中央：大额动账明细 ===== */
+  .bk-ledger { flex: 1.05; }
+  .bk-ledger-head-row {
+    flex: none; display: grid; grid-template-columns: 0.9fr 1.1fr 1.5fr 1fr 0.6fr; gap: 8px;
+    padding: 9px 18px 7px; font-size: 12px; letter-spacing: 0.12em; color: #6fb9e8;
+    border-bottom: 1px solid rgba(86, 150, 224, 0.25);
+  }
+  .bk-ledger-head-row span:nth-child(4) { text-align: right; }
+  .bk-ledger-view { flex: 1; min-height: 0; overflow: hidden; }
+  .bk-ledger-list { margin: 0; padding: 0; list-style: none; }
+  .bk-ledger-list li {
+    display: grid; grid-template-columns: 0.9fr 1.1fr 1.5fr 1fr 0.6fr; gap: 8px;
+    height: 36px; align-items: center; padding: 0 18px; font-size: 13px; color: #cfe3fa;
+    border-bottom: 1px dashed rgba(86, 150, 224, 0.12); font-variant-numeric: tabular-nums;
+  }
+  .bk-ledger-list li:nth-child(odd) { background: rgba(24, 56, 100, 0.25); }
+  .bk-ledger-time { color: var(--bk-muted); }
+  .bk-ledger-amt { color: var(--bk-gold); font-weight: 700; text-align: right; }
+  .bk-ledger-dir { font-size: 12px; font-weight: 700; }
+  .bk-ledger-dir.is-in { color: var(--bk-green); }
+  .bk-ledger-dir.is-out { color: var(--bk-red); }
+
+  /* ===== 右列：渠道 + 客户双图 ===== */
+  .bk-duo { flex: 1; min-height: 0; display: flex; padding: 4px 6px 8px; gap: 4px; }
+  .bk-duo-item { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .bk-duo-item.is-wide { flex: 1.12; }
+  .bk-duo-cap { flex: none; text-align: center; font-size: 12px; letter-spacing: 0.14em; color: var(--bk-muted); padding: 4px 0 0; }
+
+  /* ===== 底部跑马灯 ===== */
+  .bk-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--bk-border); border-radius: 12px; background: var(--bk-panel);
+  }
+  .bk-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #06182f;
+    background: linear-gradient(120deg, var(--bk-gold), #e8a83a 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .bk-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #06182f; animation: bkDot 1.6s ease-in-out infinite; }
+  .bk-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .bk-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: bkMarquee 46s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .bk-marquee-track b { color: var(--bk-gold); font-weight: 700; }
+  .bk-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(63, 225, 255, 0.55); }
+  @keyframes bkMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .bk-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="bk-stage" id="bk-stage">
+    <!-- mockflag:begin --><div class="bk-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="bk-error" id="bk-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶部标题栏 -->
+    <header class="bk-header">
+      <div class="bk-clock" aria-label="实时时钟">
+        <span class="bk-clock-time" id="bk-clock-time">--:--:--</span>
+        <span class="bk-clock-date" id="bk-clock-date">----年--月--日 星期-</span>
+      </div>
+      <div class="bk-title-wrap">
+        <div class="bk-title"><i></i><span>银行经营总览</span><i class="is-r"></i></div>
+        <div class="bk-title-sub">BANK OPERATION OVERVIEW</div>
+      </div>
+      <div class="bk-badge"><i></i>数据链路正常 · 演示数据</div>
+    </header>
+
+    <!-- KPI 行 -->
+    <section class="bk-kpis" aria-label="核心指标" id="bk-kpis"></section>
+
+    <!-- 左列 -->
+    <div class="bk-col">
+      <section class="bk-panel">
+        <header class="bk-panel-head"><i></i><h2>存贷款月度趋势</h2><span class="bk-panel-en">DEPOSIT &amp; LOAN TREND</span><span class="bk-panel-scope">近 12 月</span></header>
+        <div class="bk-chart" id="bk-chart-trend" role="img" aria-label="近12月新增存贷款柱线混合图"></div>
+      </section>
+      <section class="bk-panel">
+        <header class="bk-panel-head"><i></i><h2>营收结构</h2><span class="bk-panel-en">REVENUE MIX</span><span class="bk-panel-scope">年累计</span></header>
+        <div class="bk-chart" id="bk-chart-revenue" role="img" aria-label="营收结构环形占比图"></div>
+      </section>
+    </div>
+
+    <!-- 中央 -->
+    <div class="bk-col">
+      <section class="bk-panel bk-core">
+        <header class="bk-panel-head"><i></i><h2>全行核心运营</h2><span class="bk-panel-en">CORE OPERATION</span><span class="bk-panel-scope">实时</span></header>
+        <div class="bk-core-body">
+          <div class="bk-reads">
+            <div class="bk-read is-gold">
+              <div class="bk-read-label">当日营收<b>万元</b></div>
+              <div class="bk-flip" id="bk-flip-rev"></div>
+            </div>
+            <div class="bk-read">
+              <div class="bk-read-label">当日新增客户<b>户</b></div>
+              <div class="bk-flip" id="bk-flip-cust"></div>
+            </div>
+          </div>
+          <div class="bk-lines">
+            <div class="bk-lines-title">三大条线营收贡献占比<b>BUSINESS LINE MIX</b></div>
+            <div class="bk-stack" id="bk-stack" aria-label="对公、零售、金融市场三大条线占比堆叠条"></div>
+            <div class="bk-stack-legend" id="bk-stack-legend"></div>
+          </div>
+        </div>
+      </section>
+      <section class="bk-panel bk-ledger">
+        <header class="bk-panel-head"><i></i><h2>大额动账实时监测</h2><span class="bk-panel-en">LARGE TRANSFER MONITOR</span><span class="bk-panel-scope" id="bk-ledger-count">--</span></header>
+        <div class="bk-ledger-head-row"><span>时间</span><span>分行</span><span>户名</span><span>金额（万元）</span><span>方向</span></div>
+        <div class="bk-ledger-view"><ul class="bk-ledger-list" id="bk-ledger-list"></ul></div>
+      </section>
+    </div>
+
+    <!-- 右列 -->
+    <div class="bk-col">
+      <section class="bk-panel">
+        <header class="bk-panel-head"><i></i><h2>分行业绩排行 TOP10</h2><span class="bk-panel-en">BRANCH TOP10</span><span class="bk-panel-scope">本月营收</span></header>
+        <div class="bk-chart" id="bk-chart-rank" role="img" aria-label="分行业绩排行横向条形图"></div>
+      </section>
+      <section class="bk-panel">
+        <header class="bk-panel-head"><i></i><h2>渠道与客户</h2><span class="bk-panel-en">CHANNEL &amp; CUSTOMER</span><span class="bk-panel-scope">本月</span></header>
+        <div class="bk-duo">
+          <div class="bk-duo-item is-wide">
+            <div class="bk-duo-cap">渠道交易占比</div>
+            <div class="bk-chart" id="bk-chart-channel" role="img" aria-label="渠道交易占比玫瑰图"></div>
+          </div>
+          <div class="bk-duo-item">
+            <div class="bk-duo-cap">客户总数月度增长（万户）</div>
+            <div class="bk-chart" id="bk-chart-cust" role="img" aria-label="客户数月度增长面积图"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="bk-marquee" aria-label="经营快讯">
+      <div class="bk-marquee-tag"><i></i>经营快讯</div>
+      <div class="bk-marquee-view"><div class="bk-marquee-track" id="bk-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("bk-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("bk-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    gold: "#ffc857", red: "#ff6680", violet: "#9870ff"
+  };
+  const rnd = (min, max) => Math.round(min + Math.random() * (max - min));
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 静态业务数据（中型城商行 · 演示口径） ===== */
+  const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
+  const DEP_ADD = [46.2, 31.8, 51.4, 38.5, 42.1, 55.3, 48.6, 35.9, 44.2, 57.8, 49.5, 62.3];   /* 新增存款（亿元） */
+  const LOAN_ADD = [37.6, 25.4, 41.2, 30.8, 34.5, 43.9, 38.7, 27.6, 35.8, 46.4, 40.6, 51.8];  /* 新增贷款（亿元） */
+  const LDR = [72.4, 72.1, 72.6, 72.3, 72.8, 73.2, 73.0, 72.7, 73.1, 73.5, 73.4, 73.6];        /* 存贷比（%） */
+  const REVENUE = [
+    { name: "利息净收入", value: 96.4 },
+    { name: "手续费及佣金", value: 28.6 },
+    { name: "投资收益", value: 18.2 },
+    { name: "其他收入", value: 6.8 }
+  ];
+  const BRANCHES = [
+    { name: "城南分行", value: 9862 }, { name: "高新分行", value: 9347 },
+    { name: "滨江分行", value: 8925 }, { name: "城北分行", value: 8462 },
+    { name: "开发区分行", value: 7938 }, { name: "江北分行", value: 7415 },
+    { name: "城西分行", value: 6987 }, { name: "东湖分行", value: 6524 },
+    { name: "临港分行", value: 6108 }, { name: "科创分行", value: 5762 }
+  ];
+  const CHANNELS = [
+    { name: "手机银行", value: 58.2 }, { name: "网上银行", value: 15.4 },
+    { name: "第三方支付", value: 12.6 }, { name: "柜面", value: 8.2 }, { name: "ATM", value: 5.6 }
+  ];
+  const CUST_TREND = [486.2, 489.5, 493.1, 496.4, 500.2, 503.6, 507.3, 510.5, 514.2, 517.6, 520.8, 524.3];
+  const ACCOUNTS = [
+    "王*成", "李**", "陈*华", "刘**", "张*明", "周**", "赵*芸", "吴**",
+    "**贸易有限公司", "**科技股份有限公司", "**建设集团有限公司", "**能源有限公司",
+    "**供应链管理有限公司", "**置业发展有限公司", "**医疗器械有限公司"
+  ];
+  const DIRS = [["收", "is-in"], ["收", "is-in"], ["付", "is-out"]];
+  const NEWS = [
+    "城南分行零售 AUM 提前 38 天完成季度目标，达成率 <b>112.6%</b>",
+    "全行手机银行月活突破 <b>512 万户</b>，同比增长 18.4%",
+    "不良贷款率连续 6 个月保持 <b>1.10%</b> 以下，资产质量持续向好",
+    "绿色信贷余额突破 <b>300 亿元</b>，较年初增长 21.7%",
+    "科创分行本月新增对公开户 <b>186 户</b>，居全行第一",
+    "今日大额动账监测正常，未发现异常交易，反洗钱模型命中率 <b>0 例</b>",
+    "普惠小微贷款余额 <b>428 亿元</b>，完成年度序时进度 108%"
+  ];
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    document.getElementById("bk-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    document.getElementById("bk-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. KPI 行（大数字缓动跳变 + 同比/环比箭头） ===== */
+  const KPIS = [
+    { label: "存款余额", unit: "亿元", target: 4286.5, dec: 1, jit: [0.2, 1.4], delta: "▲ 同比 +8.6%", good: true },
+    { label: "贷款余额", unit: "亿元", target: 3152.8, dec: 1, jit: [0.1, 1.0], delta: "▲ 同比 +11.2%", good: true },
+    { label: "中间业务收入", unit: "亿元", target: 42.7, dec: 1, jit: [0.01, 0.08], delta: "▲ 同比 +6.4%", good: true },
+    { label: "零售 AUM", unit: "亿元", target: 2368.4, dec: 1, jit: [0.1, 0.9], delta: "▲ 环比 +1.8%", good: true },
+    { label: "净息差", unit: "%", target: 1.82, dec: 2, jit: [-0.006, 0.006], delta: "▼ 环比 -0.03pct", good: false },
+    { label: "不良贷款率", unit: "%", target: 1.08, dec: 2, jit: [-0.005, 0.005], delta: "▼ 环比 -0.02pct", good: true }
+  ];
+  const kpiWrap = document.getElementById("bk-kpis");
+  KPIS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "bk-kpi";
+    card.innerHTML =
+      '<div class="bk-kpi-label">' + k.label + '</div>' +
+      '<div class="bk-kpi-num"><span class="bk-kpi-val">0</span><span class="bk-kpi-unit">' + k.unit + '</span></div>' +
+      '<div class="bk-kpi-delta ' + (k.good ? "is-good" : "is-bad") + '">' + k.delta + '</div>';
+    kpiWrap.appendChild(card);
+    k.node = card.querySelector(".bk-kpi-val");
+    k.cur = 0; /* 从 0 缓动至目标值 */
+  });
+  setInterval(() => { /* 缓动逼近目标 */
+    KPIS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) { k.cur = k.target; } else { k.cur += diff * 0.12; }
+      k.node.textContent = fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+  setInterval(() => { /* 目标值微跳变 */
+    KPIS.forEach((k) => { k.target = Math.max(0, k.target + rndf(k.jit[0], k.jit[1])); });
+  }, 6000);
+
+  /* ===== 6. 中央翻牌大读数（当日营收 / 当日新增客户） ===== */
+  function renderFlip(box, text) {
+    box.innerHTML = "";
+    for (const ch of text) {
+      if (ch === ",") {
+        const sep = document.createElement("span");
+        sep.className = "bk-flip-sep"; sep.textContent = ",";
+        box.appendChild(sep);
+      } else {
+        const d = document.createElement("span");
+        d.className = "bk-flip-digit";
+        d.innerHTML = '<span class="bk-flip-card">' + ch + "</span>";
+        box.appendChild(d);
+      }
+    }
+  }
+  function setFlip(box, n) {
+    const next = fmt(n), cur = box.getAttribute("data-cur") || "";
+    if (next.length !== cur.length) { renderFlip(box, next); box.setAttribute("data-cur", next); return; }
+    for (let i = 0; i < next.length; i++) {
+      if (next[i] === cur[i]) continue;
+      const cell = box.children[i];
+      if (!cell || cell.className.indexOf("bk-flip-digit") < 0) continue;
+      ((cell, ch, delay) => {
+        setTimeout(() => {
+          cell.classList.add("is-turn");
+          setTimeout(() => {
+            cell.querySelector(".bk-flip-card").textContent = ch;
+            cell.classList.remove("is-turn");
+          }, 150);
+        }, delay);
+      })(cell, next[i], i * 45);
+    }
+    box.setAttribute("data-cur", next);
+  }
+  const flipRev = document.getElementById("bk-flip-rev");
+  const flipCust = document.getElementById("bk-flip-cust");
+  let dayRevenue = rnd(11800, 13600);   /* 万元 */
+  let dayCustomer = rnd(2800, 3400);    /* 户 */
+  renderFlip(flipRev, fmt(dayRevenue)); flipRev.setAttribute("data-cur", fmt(dayRevenue));
+  renderFlip(flipCust, fmt(dayCustomer)); flipCust.setAttribute("data-cur", fmt(dayCustomer));
+  setInterval(() => {
+    dayRevenue += rnd(6, 42);
+    dayCustomer += rnd(1, 6);
+    setFlip(flipRev, dayRevenue);
+    setFlip(flipCust, dayCustomer);
+  }, 3000);
+
+  /* ===== 7. 三大条线堆叠条 ===== */
+  const LINES = [
+    { key: "is-corp", name: "对公金融", pct: 46.5 },
+    { key: "is-retail", name: "零售金融", pct: 38.2 },
+    { key: "is-fm", name: "金融市场", pct: 15.3 }
+  ];
+  const stackNode = document.getElementById("bk-stack");
+  const legendNode = document.getElementById("bk-stack-legend");
+  function renderStack() {
+    const total = LINES.reduce((s, l) => s + l.pct, 0);
+    stackNode.innerHTML = LINES.map((l) => {
+      const p = (l.pct / total * 100);
+      return '<i class="' + l.key + '" style="width:' + p.toFixed(2) + '%"><b>' + l.name + " " + p.toFixed(1) + "%</b></i>";
+    }).join("");
+    legendNode.innerHTML = LINES.map((l) => {
+      const p = (l.pct / LINES.reduce((s, x) => s + x.pct, 0) * 100);
+      return '<span class="' + l.key + '"><em></em>' + l.name + "<b>" + p.toFixed(1) + "%</b></span>";
+    }).join("");
+  }
+  renderStack();
+  setInterval(() => { /* 占比微刷新 */
+    LINES.forEach((l) => { l.pct = Math.max(8, l.pct + rndf(-0.35, 0.35)); });
+    renderStack();
+  }, 8000);
+
+  /* ===== 8. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(102, 178, 255, 0.4)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const charts = [];
+  function makeChart(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const c = echarts.init(el);
+    charts.push(c);
+    return c;
+  }
+
+  /* ===== 9. 左上：存贷款月度趋势（柱线混合 + 双轴） ===== */
+  const trendChart = makeChart("bk-chart-trend");
+  trendChart.setOption({
+    tooltip: tip({
+      trigger: "axis",
+      valueFormatter: (v) => (typeof v === "number" ? fmtDec(v, 1) : v)
+    }),
+    legend: {
+      top: 6, itemWidth: 12, itemHeight: 8, itemGap: 16,
+      textStyle: { color: "#cfe6ff", fontSize: 11 }
+    },
+    grid: { left: 12, right: 14, top: 40, bottom: 6, containLabel: true },
+    xAxis: {
+      type: "category", data: MONTHS,
+      axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+      axisTick: { show: false },
+      axisLabel: { color: C.muted, fontSize: 11 }
+    },
+    yAxis: [
+      {
+        type: "value", name: "亿元", nameTextStyle: { color: C.muted, fontSize: 10 },
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      {
+        type: "value", name: "%", min: 68, max: 78,
+        nameTextStyle: { color: C.muted, fontSize: 10 },
+        splitLine: { show: false },
+        axisLabel: { color: C.muted, fontSize: 11, formatter: "{value}" }
+      }
+    ],
+    series: [
+      {
+        name: "新增存款", type: "bar", barWidth: 9, data: DEP_ADD,
+        itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad(C.cyan, "#155a8f") }
+      },
+      {
+        name: "新增贷款", type: "bar", barWidth: 9, data: LOAN_ADD,
+        itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad(C.gold, "#8a5f18") }
+      },
+      {
+        name: "存贷比", type: "line", yAxisIndex: 1, smooth: true, data: LDR,
+        symbol: "circle", symbolSize: 5,
+        lineStyle: { width: 2.5, color: C.green, shadowColor: "rgba(56, 230, 176, 0.6)", shadowBlur: 10 },
+        itemStyle: { color: "#eafff6", borderColor: C.green, borderWidth: 2 }
+      }
+    ],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 10. 左下：营收结构环形饼 ===== */
+  const revenueChart = makeChart("bk-chart-revenue");
+  revenueChart.setOption({
+    tooltip: tip({ valueFormatter: (v) => fmtDec(v, 1) + " 亿元" }),
+    legend: {
+      orient: "vertical", right: 10, top: "middle", itemWidth: 10, itemHeight: 10,
+      textStyle: { color: "#cfe6ff", fontSize: 12 },
+      formatter: (name) => {
+        const d = REVENUE.find((x) => x.name === name);
+        return name + "  " + fmtDec(d.value, 1) + " 亿";
+      }
+    },
+    color: [C.cyan, C.gold, C.green, C.blue],
+    series: [{
+      type: "pie", radius: ["52%", "74%"], center: ["34%", "52%"],
+      itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+      label: { show: false },
+      emphasis: { label: { show: true, color: "#eaf6ff", fontSize: 13, fontWeight: 700, formatter: "{b}\n{d}%" } },
+      data: REVENUE
+    }, {
+      type: "pie", radius: ["82%", "83%"], center: ["34%", "52%"], silent: true,
+      label: { show: false },
+      itemStyle: { color: "rgba(255, 200, 87, 0.3)" },
+      data: [1]
+    }],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 11. 右上：分行业绩排行 TOP10（前三金银铜） ===== */
+  const RANK_GRADS = [
+    hGrad("#8a5f18", "#ffc857"),
+    hGrad("#5d6f85", "#dfeaf6"),
+    hGrad("#7a4218", "#e89a5c")
+  ];
+  const rankChart = makeChart("bk-chart-rank");
+  function rankOption() {
+    return {
+      tooltip: tip({ valueFormatter: (v) => fmt(v) + " 万元" }),
+      grid: { left: 12, right: 66, top: 12, bottom: 6, containLabel: true },
+      xAxis: { type: "value", show: false },
+      yAxis: {
+        type: "category", inverse: true,
+        data: BRANCHES.map((b) => b.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      series: [{
+        type: "bar", barWidth: 11,
+        data: BRANCHES.map((b, i) => ({
+          value: b.value,
+          itemStyle: { borderRadius: 6, color: i < 3 ? RANK_GRADS[i] : hGrad("#1d5d9e", C.cyan) }
+        })),
+        label: {
+          show: true, position: "right", fontSize: 12,
+          color: C.gold,
+          formatter: (p) => fmt(p.value)
+        },
+        showBackground: true,
+        backgroundStyle: { color: "rgba(63, 120, 200, 0.12)", borderRadius: 6 }
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+  rankChart.setOption(rankOption());
+  /* 榜单轮播：逐名高亮巡游 */
+  let rankIdx = -1;
+  setInterval(() => {
+    rankChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    rankIdx = (rankIdx + 1) % BRANCHES.length;
+    rankChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: rankIdx });
+    rankChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: rankIdx });
+  }, 2400);
+
+  /* ===== 12. 右下：渠道玫瑰图 + 客户增长面积小图 ===== */
+  const channelChart = makeChart("bk-chart-channel");
+  channelChart.setOption({
+    tooltip: tip({ valueFormatter: (v) => fmtDec(v, 1) + "%" }),
+    color: [C.cyan, C.blue, C.gold, C.green, C.violet],
+    series: [{
+      type: "pie", roseType: "radius",
+      radius: ["16%", "74%"], center: ["50%", "54%"],
+      itemStyle: { borderColor: "#0a1e3c", borderWidth: 2, borderRadius: 4 },
+      label: { color: "#cfe6ff", fontSize: 11, formatter: "{b}\n{d}%" },
+      labelLine: { length: 6, length2: 6, lineStyle: { color: "rgba(102, 178, 255, 0.4)" } },
+      data: CHANNELS
+    }],
+    animationDurationUpdate: 600
+  });
+
+  const custChart = makeChart("bk-chart-cust");
+  custChart.setOption({
+    tooltip: tip({ trigger: "axis", valueFormatter: (v) => fmtDec(v, 1) + " 万户" }),
+    grid: { left: 8, right: 12, top: 16, bottom: 4, containLabel: true },
+    xAxis: {
+      type: "category", boundaryGap: false, data: MONTHS,
+      axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+      axisTick: { show: false },
+      axisLabel: { color: C.muted, fontSize: 10, interval: 2 }
+    },
+    yAxis: {
+      type: "value", min: 470,
+      splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+      axisLabel: { color: C.muted, fontSize: 10 }
+    },
+    series: [{
+      type: "line", smooth: true, symbol: "none", data: CUST_TREND,
+      lineStyle: { width: 2.5, color: C.gold, shadowColor: "rgba(255, 200, 87, 0.55)", shadowBlur: 10 },
+      areaStyle: { color: vGrad("rgba(255, 200, 87, 0.35)", "rgba(255, 200, 87, 0.02)") }
+    }],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 13. 大额动账实时明细（DOM 表格自动上滚） ===== */
+  const ledgerList = document.getElementById("bk-ledger-list");
+  const ledgerCount = document.getElementById("bk-ledger-count");
+  let ledgerTotal = rnd(1600, 1900);
+  function makeLedgerRow() {
+    const d = new Date();
+    const dir = DIRS[rnd(0, DIRS.length - 1)];
+    const li = document.createElement("li");
+    li.innerHTML =
+      '<span class="bk-ledger-time">' + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()) + '</span>' +
+      '<span>' + BRANCHES[rnd(0, BRANCHES.length - 1)].name + '</span>' +
+      '<span>' + ACCOUNTS[rnd(0, ACCOUNTS.length - 1)] + '</span>' +
+      '<span class="bk-ledger-amt">' + fmt(rnd(50, 9800)) + '</span>' +
+      '<span class="bk-ledger-dir ' + dir[1] + '">' + dir[0] + '</span>';
+    return li;
+  }
+  for (let i = 0; i < 9; i++) ledgerList.appendChild(makeLedgerRow());
+  function updateLedgerCount() { ledgerCount.textContent = "今日累计 " + fmt(ledgerTotal) + " 笔"; }
+  updateLedgerCount();
+  setInterval(() => {
+    ledgerTotal += rnd(1, 3);
+    updateLedgerCount();
+    ledgerList.insertBefore(makeLedgerRow(), ledgerList.firstChild);
+    while (ledgerList.children.length > 11) ledgerList.removeChild(ledgerList.lastChild);
+  }, 2200);
+
+  /* ===== 14. 底部跑马灯（内容 x2 无缝循环） ===== */
+  const marqueeTrack = document.getElementById("bk-marquee-track");
+  const marqueeHtml = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  marqueeTrack.innerHTML = marqueeHtml + marqueeHtml;
+
+  /* ===== 15. 数据微刷新（趋势末月 / 榜单数值轻抖动） ===== */
+  setInterval(() => {
+    const last = MONTHS.length - 1;
+    DEP_ADD[last] = Math.max(20, DEP_ADD[last] + rndf(-1.2, 1.6));
+    LOAN_ADD[last] = Math.max(15, LOAN_ADD[last] + rndf(-1.0, 1.4));
+    LDR[last] = Math.min(76, Math.max(70, LDR[last] + rndf(-0.08, 0.1)));
+    trendChart.setOption({ series: [{ data: DEP_ADD }, { data: LOAN_ADD }, { data: LDR }] });
+    BRANCHES.forEach((b) => { b.value = Math.max(3000, Math.round(b.value + rndf(-40, 70))); });
+    BRANCHES.sort((a, b) => b.value - a.value);
+    rankChart.setOption(rankOption());
+  }, 9000);
+})();
+</script>
+</body>
+</html>

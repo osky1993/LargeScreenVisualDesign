@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 公共资金分项目收入明细</title>
+<style>
+  :root {
+    --xp-bg: #08203f;
+    --xp-panel: rgba(11, 38, 72, 0.72);
+    --xp-border: rgba(92, 156, 226, 0.28);
+    --xp-text: #e8f2ff;
+    --xp-muted: #8ea9cc;
+    --xp-gold: #f0c060;
+    --xp-gold-soft: #ffdc8f;
+    --xp-blue: #3d9cff;
+    --xp-cyan: #39d0d8;
+    --xp-green: #33e0a6;
+    --xp-red: #ff5f6e;
+    --xp-orange: #ff9d4d;
+    --xp-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--xp-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 =====
+     行高预算：12(上内边距) + 84(页头) + 14 + 888(主区) + 14 + 52(跑马灯) + 16(下内边距) = 1080
+     列宽预算：18 + 1140(左表) + 14 + 730(右图) + 18 = 1920 */
+  .xp-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(240, 192, 96, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 8%, rgba(57, 208, 216, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 60, 120, 0.34), transparent 56%),
+      linear-gradient(rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      var(--xp-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1140px 1fr;
+    grid-template-rows: 84px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .xp-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .xp-error.is-visible { display: block; }
+
+  /* ===== 页头：三级面包屑 + 返回 + 时钟 ===== */
+  .xp-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .xp-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(240, 192, 96, 0.6) 16%, rgba(57, 208, 216, 0.85) 50%, rgba(240, 192, 96, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.4);
+  }
+  .xp-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .xp-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--xp-muted); }
+  .xp-crumb b { font-weight: 400; color: var(--xp-gold); }
+  .xp-crumb i { font-style: normal; color: rgba(142, 169, 204, 0.55); }
+  .xp-crumb em { font-style: normal; color: #d7e8ff; }
+  .xp-crumb-up { color: #a8c2e0; text-decoration: none; transition: color 0.18s, text-shadow 0.18s; }
+  .xp-crumb-up:hover { color: var(--xp-gold-soft); text-decoration: underline; text-shadow: 0 0 10px rgba(240, 192, 96, 0.5); }
+  .xp-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .xp-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--xp-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(240, 192, 96, 0.35));
+  }
+  .xp-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--xp-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .xp-head-meta b { font-weight: 400; color: var(--xp-gold-soft); }
+  .xp-head-meta i { font-style: normal; color: rgba(142, 169, 204, 0.4); }
+
+  .xp-head-right { display: flex; align-items: center; gap: 18px; flex: none; }
+  .xp-path {
+    display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px; border-radius: 10px;
+    border: 1px solid rgba(240, 192, 96, 0.42); background: rgba(72, 56, 24, 0.4);
+    box-shadow: inset 0 0 14px rgba(240, 192, 96, 0.1);
+    font-size: 13px; letter-spacing: 0.06em; color: #ffdc8f; max-width: 460px; white-space: nowrap;
+  }
+  .xp-path span { overflow: hidden; text-overflow: ellipsis; }
+  .xp-path i { font-style: normal; color: rgba(240, 192, 96, 0.45); }
+  .xp-path b { font-weight: 700; color: #fff6e2; }
+  .xp-back {
+    display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 14px; cursor: pointer;
+    border-radius: 10px; font-family: inherit; font-size: 13px; letter-spacing: 0.08em;
+    border: 1px solid rgba(92, 156, 226, 0.45); background: rgba(16, 46, 86, 0.6); color: #cfe6ff;
+    transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .xp-back:hover { color: #fff; border-color: rgba(57, 208, 216, 0.8); box-shadow: 0 0 14px rgba(57, 208, 216, 0.35); }
+  .xp-back svg { width: 16px; height: 16px; }
+  .xp-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 18px; border-left: 1px solid rgba(92, 156, 226, 0.25); }
+  .xp-clock-time { font: 700 24px/1 var(--xp-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(57, 208, 216, 0.4); }
+  .xp-clock-date { font-size: 12px; color: var(--xp-muted); letter-spacing: 0.08em; }
+
+  /* ===== 面板通用 ===== */
+  .xp-panel {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--xp-border); border-radius: 12px; background: var(--xp-panel);
+    display: flex; flex-direction: column;
+  }
+  .xp-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 14px 0 14px;
+    background: linear-gradient(90deg, rgba(240, 192, 96, 0.22), rgba(57, 208, 216, 0.05) 62%, transparent);
+  }
+  .xp-panel-head i { flex: none; width: 5px; height: 16px; background: var(--xp-gold); box-shadow: 0 0 8px var(--xp-gold); transform: skewX(-12deg); }
+  .xp-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f4f9ff; white-space: nowrap; }
+  .xp-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+  .xp-panel-scope { margin-left: auto; font-size: 12px; color: var(--xp-gold-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .xp-tools { display: flex; align-items: center; gap: 8px; flex: none; }
+  .xp-tool {
+    height: 24px; padding: 0 12px; cursor: pointer; border-radius: 7px; font-family: inherit;
+    font-size: 12px; letter-spacing: 0.06em;
+    border: 1px solid rgba(240, 192, 96, 0.34);
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.15), rgba(16, 46, 86, 0.6));
+    color: #ffdc8f; transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .xp-tool:hover { color: #fff6e2; border-color: rgba(240, 192, 96, 0.85); box-shadow: 0 0 12px rgba(240, 192, 96, 0.4); }
+
+  .xp-up { color: var(--xp-green); }
+  .xp-down { color: var(--xp-red); }
+  .xp-gold { color: var(--xp-gold-soft); }
+
+  /* ===== 左列：三级嵌套明细表（CSS grid 模拟，非 table） =====
+     38 面板头 + 32 表头 + 778 表体 + 40 表尾 = 888 */
+  .xp-thead, .xp-row, .xp-tfoot {
+    display: grid;
+    grid-template-columns: 320px repeat(7, 1fr);
+    align-items: center; gap: 8px; padding: 0 14px;
+  }
+  .xp-thead {
+    flex: none; height: 32px; font-size: 11.5px; letter-spacing: 0.08em; color: #6f93bd;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.22); background: rgba(63, 120, 200, 0.08);
+  }
+  .xp-thead span:nth-child(n+2) { text-align: right; }
+  .xp-tbody {
+    flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .xp-row {
+    flex: none; position: relative; font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.09);
+    transition: background 0.28s ease, box-shadow 0.28s ease;
+    cursor: pointer;
+  }
+  .xp-row::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent;
+  }
+  /* 三个层级：行高 / 字号 / 底色 / 左侧色条各不相同，一眼可辨 */
+  .xp-row.is-l0 {
+    height: 46px; font-size: 15px; font-weight: 700;
+    background: linear-gradient(90deg, rgba(240, 192, 96, 0.16), rgba(240, 192, 96, 0.04) 55%, transparent);
+    border-bottom: 1px solid rgba(240, 192, 96, 0.3);
+  }
+  .xp-row.is-l0::before { background: var(--xp-gold); box-shadow: 0 0 10px rgba(240, 192, 96, 0.7); }
+  .xp-row.is-l0 .xp-nm { font-size: 15.5px; color: #fff6e2; letter-spacing: 0.06em; }
+  .xp-row.is-l1 {
+    height: 40px; font-size: 13.5px; font-weight: 700;
+    background: rgba(57, 208, 216, 0.09);
+    border-bottom: 1px solid rgba(57, 208, 216, 0.22);
+  }
+  .xp-row.is-l1::before { background: var(--xp-cyan); box-shadow: 0 0 8px rgba(57, 208, 216, 0.6); }
+  .xp-row.is-l1 .xp-nm { font-size: 14px; color: #b6f0f4; letter-spacing: 0.04em; }
+  .xp-row.is-l2 { height: 34px; font-size: 12.5px; font-weight: 400; }
+  .xp-row.is-l2:nth-child(odd) { background: rgba(63, 120, 200, 0.07); }
+  .xp-row.is-l2::before { background: rgba(92, 156, 226, 0.4); }
+  .xp-row.is-l2 .xp-nm { font-size: 13px; color: #dbe9fb; }
+  /* 负增长行：淡红色左侧标记 */
+  .xp-row.is-neg::before { background: var(--xp-red); box-shadow: 0 0 8px rgba(255, 95, 110, 0.55); }
+  .xp-row.is-neg { background-image: linear-gradient(90deg, rgba(255, 95, 110, 0.1), transparent 22%); }
+  .xp-row:hover { background-color: rgba(92, 156, 226, 0.16); }
+  .xp-row.is-active {
+    background-color: rgba(240, 192, 96, 0.2);
+    box-shadow: inset 0 0 0 1px rgba(240, 192, 96, 0.55), 0 0 16px rgba(240, 192, 96, 0.16);
+  }
+  .xp-row.is-active .xp-nm { color: #fff6e2; }
+
+  .xp-td-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .xp-tri {
+    flex: none; width: 16px; text-align: center; font-style: normal; font-size: 11px;
+    color: var(--xp-gold-soft); cursor: pointer; border-radius: 4px; line-height: 16px;
+    transition: color 0.18s, background 0.18s;
+  }
+  .xp-tri:hover { color: #fff6e2; background: rgba(240, 192, 96, 0.24); }
+  .xp-tri.is-empty { visibility: hidden; }
+  .xp-chip { flex: none; width: 9px; height: 9px; border-radius: 2px; text-decoration: none; }
+  .xp-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .xp-td { text-align: right; }
+  .xp-td-v { text-align: right; font: 700 14px/1 var(--xp-mono); color: var(--xp-gold-soft); }
+  .xp-row.is-l2 .xp-td-v { font-size: 13px; }
+  .xp-td-pre { text-align: right; color: #9fb8d6; }
+  .xp-td-sig { text-align: right; font-weight: 700; }
+  .xp-td-mut { text-align: right; color: #b6cbe4; }
+  /* 未全部展开时，表体余下的空间放层级图例 + 勾稽锚点，不留空白 */
+  .xp-hint { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .xp-hint-card {
+    display: flex; flex-direction: column; gap: 9px; padding: 18px 26px; border-radius: 12px;
+    border: 1px solid rgba(92, 156, 226, 0.2); background: rgba(63, 120, 200, 0.07); min-width: 620px;
+  }
+  .xp-hint-t { font-size: 12px; letter-spacing: 0.22em; color: #5f88b8; }
+  .xp-hint-row { display: grid; grid-template-columns: 12px 78px 1fr; align-items: center; gap: 12px; font-size: 12.5px; color: #a9c2de; }
+  .xp-hint-row u { width: 12px; height: 12px; border-radius: 3px; text-decoration: none; }
+  .xp-hint-row b { font-weight: 700; color: #e2eeff; letter-spacing: 0.06em; }
+  .xp-hint-anchor {
+    margin-top: 4px; padding-top: 9px; border-top: 1px dashed rgba(240, 192, 96, 0.3);
+    font-size: 12px; color: #9fb8d6; font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+  }
+  .xp-hint-anchor b { color: var(--xp-gold-soft); font-weight: 700; }
+  .xp-hint-op { font-size: 11.5px; color: #5f88b8; letter-spacing: 0.06em; }
+  .xp-hint-op b { color: rgba(240, 192, 96, 0.72); font-weight: 400; }
+  .xp-tfoot {
+    flex: none; height: 40px;
+    border-top: 1px solid rgba(240, 192, 96, 0.32); background: rgba(72, 56, 24, 0.34);
+    font-size: 12px; color: var(--xp-muted); font-variant-numeric: tabular-nums;
+  }
+  .xp-tfoot b { font: 700 15px/1 var(--xp-mono); color: var(--xp-gold-soft); }
+
+  /* ===== 右列：指标条 128 + 饼图 340 + 图例 318 + 结论 64（+38 面板头 = 888） ===== */
+  .xp-metric {
+    flex: none; height: 128px; display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 8px;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.18);
+  }
+  .xp-m-top { flex: none; height: 50px; display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .xp-m-badge {
+    flex: none; height: 24px; padding: 0 10px; border-radius: 6px; display: flex; align-items: center;
+    font-size: 11.5px; letter-spacing: 0.12em; color: #2a1c05;
+    background: linear-gradient(120deg, var(--xp-gold-soft), #d8a03c 85%);
+  }
+  .xp-m-badge.is-l1 { background: linear-gradient(120deg, #9ff0f4, #2aa8b0 85%); }
+  .xp-m-badge.is-l2 { background: linear-gradient(120deg, #bcd8f8, #5b8ec8 85%); }
+  .xp-m-name {
+    flex: 1; min-width: 0; font-size: 17px; font-weight: 700; letter-spacing: 0.04em; color: #f2f9ff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .xp-m-val { flex: none; font: 700 32px/1 var(--xp-mono); color: var(--xp-gold-soft); text-shadow: 0 0 14px rgba(240, 192, 96, 0.45); font-variant-numeric: tabular-nums; }
+  .xp-m-unit { flex: none; font-size: 12px; color: #b39a5e; }
+  .xp-m-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .xp-m-cell {
+    border-radius: 8px; border: 1px solid rgba(92, 156, 226, 0.2); background: rgba(63, 120, 200, 0.1);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  }
+  .xp-m-k { font-size: 11px; letter-spacing: 0.08em; color: var(--xp-muted); }
+  .xp-m-n { font: 700 17px/1 var(--xp-mono); color: #eaf4ff; font-variant-numeric: tabular-nums; }
+
+  .xp-chart { flex: none; height: 340px; }
+
+  .xp-legend {
+    flex: 1; min-height: 0; overflow: hidden; margin: 0; padding: 6px 14px;
+    display: grid; grid-template-columns: 1fr; align-content: center; gap: 0;
+    border-top: 1px solid rgba(92, 156, 226, 0.14);
+  }
+  .xp-lg {
+    display: grid; grid-template-columns: 11px 1fr 76px 66px 62px; align-items: center; gap: 8px;
+    padding: 0 6px; border-radius: 5px; cursor: pointer; font-variant-numeric: tabular-nums;
+    transition: background 0.2s ease;
+  }
+  .xp-lg:hover { background: rgba(92, 156, 226, 0.16); }
+  .xp-lg.is-focus { background: rgba(240, 192, 96, 0.2); box-shadow: inset 0 0 0 1px rgba(240, 192, 96, 0.5); }
+  .xp-lg.is-dim { opacity: 0.5; }
+  .xp-lg-chip { width: 11px; height: 11px; border-radius: 3px; text-decoration: none; }
+  .xp-lg-name { font-size: 12.5px; color: #dbe9fb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .xp-lg-val { text-align: right; font: 700 13px/1 var(--xp-mono); color: var(--xp-gold-soft); }
+  .xp-lg-pct { text-align: right; font-size: 12px; color: #9fb8d6; }
+  .xp-lg-yoy { text-align: right; font-size: 12px; font-weight: 700; }
+
+  .xp-note {
+    flex: none; height: 64px; display: flex; align-items: center; padding: 0 14px; overflow: hidden;
+    border-top: 1px solid rgba(240, 192, 96, 0.24); background: rgba(72, 56, 24, 0.24);
+    font-size: 12.5px; line-height: 1.5; color: #cfe0f4;
+  }
+  .xp-note b { font-weight: 700; color: var(--xp-gold-soft); }
+  .xp-note em { font-style: normal; margin: 0 6px; color: rgba(240, 192, 96, 0.45); }
+
+  /* ===== 底部跑马灯 ===== */
+  .xp-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--xp-border); border-radius: 12px; background: var(--xp-panel);
+  }
+  .xp-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a1c05;
+    background: linear-gradient(120deg, var(--xp-gold-soft), #d8a03c 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .xp-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a1c05; animation: xp-blink 1.6s ease-in-out infinite; }
+  @keyframes xp-blink { 50% { opacity: 0.25; } }
+  .xp-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .xp-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: xp-marquee 52s linear infinite; font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .xp-marquee-track b { color: var(--xp-gold-soft); font-weight: 700; }
+  .xp-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(240, 192, 96, 0.5); }
+  @keyframes xp-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .xp-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="xp-stage" id="xp-stage">
+    <!-- mockflag:begin --><div class="xp-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="xp-error" id="xp-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <header class="xp-header">
+      <div class="xp-head-left">
+        <div class="xp-crumb">
+          <b>公共资金</b><i>›</i>
+          <a class="xp-crumb-up" href="大屏样板间-公共资金收入分项目1920.html">收入分项目</a><i>›</i>
+          <em id="xp-crumb-obj">分项目收入明细</em>
+        </div>
+        <div class="xp-head-title-row">
+          <div class="xp-head-title">分项目收入明细</div>
+          <div class="xp-head-meta">
+            <span>口径 <b>一般公共预算收入</b></span><i>|</i>
+            <span>区间 <b>2026 年 1-7 月累计</b></span><i>|</i>
+            <span>时间进度 <b id="xp-timeprog">--</b></span><i>|</i>
+            <span>层级 <b>合计 › 税收 / 非税 › 18 个末级项目</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="xp-head-right">
+        <div class="xp-path" id="xp-path" aria-label="当前选中层级路径"></div>
+        <button class="xp-back" id="xp-back" type="button" title="返回收入分项目（Esc）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/><path d="M7 12 H20"/></svg>
+          返回
+        </button>
+        <div class="xp-clock" aria-label="实时时钟">
+          <span class="xp-clock-time" id="xp-clock-time">--:--:--</span>
+          <span class="xp-clock-date" id="xp-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 左列：三级嵌套明细表 -->
+    <section class="xp-panel" id="xp-tblpanel">
+      <header class="xp-panel-head">
+        <i></i><h2>分项目收入嵌套明细</h2><span class="xp-panel-en">NESTED LEDGER</span>
+        <span class="xp-panel-scope" id="xp-tbl-scope">--</span>
+        <div class="xp-tools">
+          <button class="xp-tool" id="xp-expand" type="button" title="展开全部层级">全部展开</button>
+          <button class="xp-tool" id="xp-collapse" type="button" title="收起到第 2 层">全部收起</button>
+        </div>
+      </header>
+      <div class="xp-thead">
+        <span>项目 / 层级</span><span>累计数(亿元)</span><span>上年同期</span><span>增减额</span>
+        <span>同比</span><span>占上级</span><span>占全部</span><span>拉动全部(pct)</span>
+      </div>
+      <ul class="xp-tbody" id="xp-tbody"></ul>
+      <div class="xp-tfoot" id="xp-tfoot"></div>
+    </section>
+
+    <!-- 右列：占比饼图 + 选中节点指标 -->
+    <section class="xp-panel">
+      <header class="xp-panel-head">
+        <i></i><h2>层级占比透视</h2><span class="xp-panel-en">SHARE OF LEVEL</span>
+        <span class="xp-panel-scope" id="xp-pie-scope">--</span>
+      </header>
+      <div class="xp-metric" id="xp-metric">
+        <div class="xp-m-top">
+          <span class="xp-m-badge" id="xp-m-badge">合计</span>
+          <span class="xp-m-name" id="xp-m-name">--</span>
+          <span class="xp-m-val" id="xp-m-val">0</span><span class="xp-m-unit">亿元</span>
+        </div>
+        <div class="xp-m-grid">
+          <div class="xp-m-cell"><span class="xp-m-k">同比</span><span class="xp-m-n" id="xp-m-yoy">--</span></div>
+          <div class="xp-m-cell"><span class="xp-m-k">占上级</span><span class="xp-m-n" id="xp-m-sp">--</span></div>
+          <div class="xp-m-cell"><span class="xp-m-k">占全部</span><span class="xp-m-n" id="xp-m-sa">--</span></div>
+          <div class="xp-m-cell"><span class="xp-m-k">拉动全部</span><span class="xp-m-n" id="xp-m-pull">--</span></div>
+        </div>
+      </div>
+      <div class="xp-chart" id="xp-chart-pie" role="img" aria-label="当前层级子项收入占比环形图"></div>
+      <div class="xp-legend" id="xp-legend"></div>
+      <div class="xp-note"><div id="xp-note-txt">--</div></div>
+    </section>
+
+    <section class="xp-marquee" aria-label="分项目要情">
+      <div class="xp-marquee-tag"><i></i>分项要情</div>
+      <div class="xp-marquee-view"><div class="xp-marquee-track" id="xp-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（整台靠 CSS transform，ECharts 一律不调 resize） ===== */
+  const stage = document.getElementById("xp-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("xp-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  /* 双份色板：CSS 变量的 JS 镜像（ECharts option 里读不到 CSS 变量） */
+  const C = {
+    text: "#e8f2ff", muted: "#8ea9cc",
+    gold: "#f0c060", goldSoft: "#ffdc8f", goldDeep: "#b8863a",
+    blue: "#3d9cff", cyan: "#39d0d8", green: "#33e0a6", red: "#ff5f6e", orange: "#ff9d4d", steel: "#6f93c4"
+  };
+  const PARENT = "大屏样板间-公共资金收入分项目1920.html";
+
+  const pad2 = (n) => (n < 10 ? "0" + n : String(n));
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const fmtDec = (n, dec) => {
+    const parts = Number(n).toFixed(dec == null ? 0 : dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const signed = (v, d) => (v >= 0 ? "+" : "") + fmtDec(v, d == null ? 1 : d);
+  const sigCls = (v) => (v >= 0 ? "xp-up" : "xp-down");
+  const sigColor = (v) => (v >= 0 ? C.green : C.red);
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
+  /* ===== 3. 数据源（与父页 大屏样板间-公共资金收入分项目1920.html 的 TAX_DEF / NONTAX 逐字一致）
+     本页只写入两组「末级项目」的 v 与 yoy，
+     税收 / 非税 / 合计 的 v、上年同期、同比一律由子节点加总反推，不另写死。 ===== */
+  const TAX_DEF = [
+    { name: "增值税",         v: 1980, yoy: 4.4 },
+    { name: "企业所得税",     v: 1120, yoy: 1.9 },
+    { name: "个人所得税",     v: 480,  yoy: 7.4 },
+    { name: "契税",           v: 460,  yoy: -8.4 },
+    { name: "土地增值税",     v: 420,  yoy: -6.2 },
+    { name: "城市维护建设税", v: 380,  yoy: 3.4 },
+    { name: "房产税",         v: 320,  yoy: 9.3 },
+    { name: "城镇土地使用税", v: 260,  yoy: 5.4 },
+    { name: "印花税",         v: 160,  yoy: 14.7 },
+    { name: "耕地占用税",     v: 80,   yoy: -12.6 },
+    { name: "车船税",         v: 60,   yoy: 2.9 },
+    { name: "资源税",         v: 40,   yoy: 10.2 }
+  ];
+  const NONTAX_DEF = [
+    { name: "专项收入",                     short: "专项收入",         v: 480, yoy: 4.4 },
+    { name: "国有资源（资产）有偿使用收入", short: "国有资源有偿使用", v: 460, yoy: 13.0 },
+    { name: "行政事业性收费收入",           short: "行政事业性收费",   v: 330, yoy: 2.7 },
+    { name: "罚没收入",                     short: "罚没收入",         v: 210, yoy: 7.1 },
+    { name: "国有资本经营收入",             short: "国有资本经营",     v: 180, yoy: 10.1 },
+    { name: "其他收入",                     short: "其他收入",         v: 60,  yoy: 3.4 }
+  ];
+
+  /* 时间进度基准（2026-07-31 为年内第 212 天）——仅页头标注，本页无分项目预算，不做序时列 */
+  const DAY_OF_YEAR = 212, DAYS_IN_YEAR = 365;
+  const TIME_PROG = 100 * DAY_OF_YEAR / DAYS_IN_YEAR;
+
+  /* 12 色 / 6 色分项色板（颜色写在 data 项的 itemStyle 上，不用 visualMap） */
+  const PIE12 = ["#ffdc8f", "#f0c060", "#d8a03c", "#39d0d8", "#2fa9c0", "#3d9cff",
+                 "#5f7fe0", "#9a7be0", "#33e0a6", "#5cc98c", "#ff9d4d", "#ff7a8a"];
+  const PIE6 = ["#39d0d8", "#3d9cff", "#33e0a6", "#ff9d4d", "#9a7be0", "#8ea9cc"];
+
+  /* ===== 4. 建三级树：末级 → 中间层（加总）→ 根（加总），全部指标现算 ===== */
+  const leafTax = TAX_DEF.map((t, i) => ({ id: t.name, name: t.name, short: t.name, v: t.v, yoy: t.yoy, level: 2, color: PIE12[i], children: null }));
+  const leafNon = NONTAX_DEF.map((t, i) => ({ id: t.name, name: t.name, short: t.short, v: t.v, yoy: t.yoy, level: 2, color: PIE6[i], children: null }));
+  /* 末级上年同期 = 本期 / (1 + 同比) */
+  leafTax.concat(leafNon).forEach((n) => { n.pre = n.v / (1 + n.yoy / 100); });
+
+  const nTax = { id: "税收收入", name: "税收收入", short: "税收收入", level: 1, color: C.gold, children: leafTax };
+  const nNon = { id: "非税收入", name: "非税收入", short: "非税收入", level: 1, color: C.cyan, children: leafNon };
+  [nTax, nNon].forEach((m) => {
+    m.v = sum(m.children.map((x) => x.v));       /* 中间层本期 = 子节点加总 */
+    m.pre = sum(m.children.map((x) => x.pre));   /* 中间层上年同期 = 子节点加总 */
+    m.yoy = 100 * (m.v / m.pre - 1);             /* 中间层同比由两个加总现算 */
+  });
+  const ROOT = { id: "一般公共预算收入", name: "一般公共预算收入", short: "一般公共预算收入", level: 0, color: C.goldSoft, children: [nTax, nNon] };
+  ROOT.v = sum(ROOT.children.map((x) => x.v));
+  ROOT.pre = sum(ROOT.children.map((x) => x.pre));
+  ROOT.yoy = 100 * (ROOT.v / ROOT.pre - 1);
+
+  ROOT.parent = null;
+  ROOT.children.forEach((m) => { m.parent = ROOT; m.children.forEach((l) => { l.parent = m; }); });
+
+  const ALL = [];
+  (function walk(n) { ALL.push(n); (n.children || []).forEach(walk); })(ROOT);
+  ALL.forEach((n) => {
+    n.delta = n.v - n.pre;                                          /* 增减额 */
+    n.shareParent = n.parent ? 100 * n.v / n.parent.v : null;       /* 占上级%（根为 —） */
+    n.shareAll = 100 * n.v / ROOT.v;                                /* 占全部% */
+    n.pull = 100 * n.delta / ROOT.pre;                              /* 拉动全部(pct) */
+  });
+  const BY_ID = {}; ALL.forEach((n) => { BY_ID[n.id] = n; });
+  const LEAVES = ALL.filter((n) => !n.children);
+
+  /* ===== 5. 勾稽自检：任一条不成立即点亮告警条 ===== */
+  const sumL2 = ALL.filter((n) => n.level === 2 && n.parent === nTax);
+  const CHECKS = [
+    ["12 个税种之和 = 5,760", Math.round(nTax.v) === 5760, nTax.v],
+    ["6 个非税分项之和 = 1,720", Math.round(nNon.v) === 1720, nNon.v],
+    ["税收 + 非税 = 7,480", Math.round(ROOT.v) === 7480, ROOT.v],
+    ["分项上年同期加总反推税收同比 = +2.4%", nTax.yoy.toFixed(1) === "2.4", nTax.yoy],
+    ["分项上年同期加总反推非税同比 = +7.1%", nNon.yoy.toFixed(1) === "7.1", nNon.yoy],
+    ["18 个分项加总反推合计同比 = +3.4%", ROOT.yoy.toFixed(1) === "3.4", ROOT.yoy],
+    ["税收占比 = 77.0%", nTax.shareParent.toFixed(1) === "77.0", nTax.shareParent],
+    ["非税占比 = 23.0%", nNon.shareParent.toFixed(1) === "23.0", nNon.shareParent],
+    ["18 个末级项目拉动之和 = 合计同比", sum(LEAVES.map((n) => n.pull)).toFixed(2) === ROOT.yoy.toFixed(2), sum(LEAVES.map((n) => n.pull))],
+    ["12 个税种占上级之和 = 100.00%", sum(sumL2.map((n) => n.shareParent)).toFixed(2) === "100.00", sum(sumL2.map((n) => n.shareParent))],
+    ["6 个非税分项占上级之和 = 100.00%", sum(nNon.children.map((n) => n.shareParent)).toFixed(2) === "100.00", sum(nNon.children.map((n) => n.shareParent))],
+    ["税收 + 非税占上级之和 = 100.00%", sum(ROOT.children.map((n) => n.shareParent)).toFixed(2) === "100.00", sum(ROOT.children.map((n) => n.shareParent))]
+  ];
+  CHECKS.forEach((c) => { (c[1] ? console.log : console.warn)((c[1] ? "✓ " : "✗ ") + c[0] + " → " + c[2]); });
+  const BAD = CHECKS.filter((c) => !c[1]);
+  if (BAD.length) {
+    errorNode.textContent = "勾稽自检未通过（" + BAD.length + " 项）：" + BAD.map((c) => c[0]).join("；");
+    errorNode.classList.add("is-visible");
+  } else {
+    console.log("【勾稽自检】全部通过（" + CHECKS.length + " 项）");
+  }
+
+  /* ===== 6. 时钟 + 时间进度 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("xp-clock-time").textContent = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+    $("xp-clock-date").textContent = d.getFullYear() + "年" + pad2(d.getMonth() + 1) + "月" + pad2(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("xp-timeprog").textContent = TIME_PROG.toFixed(1) + "%（" + DAY_OF_YEAR + "/" + DAYS_IN_YEAR + "）";
+
+  /* ===== 7. 左表：展开态 + 渲染（CSS grid 模拟表格，非 <table>）
+     行高预算：根 46 + 中间层 2×40 + 末级 18×34 = 738 ≤ 表体 778，
+     即「全部展开」的 21 行也放得下，永不出现滚动（.xp-tbody overflow:hidden 兜底）。 ===== */
+  const OPEN = {};
+  OPEN[ROOT.id] = true; OPEN[nTax.id] = false; OPEN[nNon.id] = false;   /* 默认展开到第 2 层 */
+
+  function visibleRows() {
+    const out = [];
+    (function walk(n) {
+      out.push(n);
+      if (n.children && OPEN[n.id]) n.children.forEach(walk);
+    })(ROOT);
+    return out;
+  }
+
+  let selId = ROOT.id;
+
+  function cellsHTML(n) {
+    return '<span class="xp-td-v">' + fmtDec(n.v) + '</span>' +
+      '<span class="xp-td-pre">' + fmtDec(n.pre, 1) + '</span>' +
+      '<span class="xp-td-sig" style="color:' + sigColor(n.delta) + '">' + signed(n.delta, 1) + '</span>' +
+      '<span class="xp-td-sig" style="color:' + sigColor(n.yoy) + '">' + signed(n.yoy) + '%</span>' +
+      '<span class="xp-td-mut">' + (n.shareParent == null ? "—" : n.shareParent.toFixed(2) + "%") + '</span>' +
+      '<span class="xp-td-mut">' + n.shareAll.toFixed(2) + '%</span>' +
+      '<span class="xp-td-sig" style="color:' + sigColor(n.pull) + '">' + signed(n.pull, 2) + '</span>';
+  }
+
+  /* 未全部展开时铺在表体余量里的层级图例 + 勾稽锚点（锚点数字全部现算） */
+  const HINT_HTML =
+    '<div class="xp-hint-card">' +
+      '<div class="xp-hint-t">三级嵌套 · 层级图例</div>' +
+      '<div class="xp-hint-row"><u style="background:' + C.gold + '"></u><b>合计</b>' +
+        '<span>' + ROOT.name + ' —— 由税收 + 非税加总，不单独录入</span></div>' +
+      '<div class="xp-hint-row"><u style="background:' + C.cyan + '"></u><b>口径层</b>' +
+        '<span>税收收入 / 非税收入 —— 由各自末级项目加总，同比反推</span></div>' +
+      '<div class="xp-hint-row"><u style="background:rgba(92,156,226,0.55)"></u><b>末级项目</b>' +
+        '<span>' + leafTax.length + " 个税种 + " + leafNon.length + ' 个非税分项 —— 全页唯一录入层</span></div>' +
+      '<div class="xp-hint-row"><u style="background:' + C.red + '"></u><b>负增长</b>' +
+        '<span>行首红色标记，增减额与同比同步转红（当前 ' + LEAVES.filter((n) => n.yoy < 0).length + ' 项）</span></div>' +
+      '<div class="xp-hint-anchor">勾稽锚点：<b>' + fmtDec(nTax.v) + "</b> + <b>" + fmtDec(nNon.v) + "</b> = <b>" +
+        fmtDec(ROOT.v) + '</b> 亿元 · 税收 <b>' + signed(nTax.yoy) + "%</b> / 非税 <b>" + signed(nNon.yoy) +
+        "%</b> / 合计 <b>" + signed(ROOT.yoy) + "%</b> · " + LEAVES.length + " 项拉动之和 <b>" +
+        signed(sum(LEAVES.map((n) => n.pull)), 2) + ' pct</b></div>' +
+      '<div class="xp-hint-op">点击行前 <b>▸</b> 展开下一层 · 点击行体切换右侧占比饼图 · <b>↑ ↓</b> 换行 · <b>Esc</b> 返回父页</div>' +
+    '</div>';
+
+  function renderTable() {
+    const rows = visibleRows();
+    const html = rows.map((n) => {
+      const has = !!n.children;
+      const tri = has ? (OPEN[n.id] ? "▾" : "▸") : "▸";
+      return '<li class="xp-row is-l' + n.level + (n.id === selId ? " is-active" : "") + (n.yoy < 0 ? " is-neg" : "") +
+        '" data-id="' + esc(n.id) + '">' +
+        '<span class="xp-td-name" style="padding-left:' + (n.level * 22) + 'px">' +
+          '<i class="xp-tri' + (has ? "" : " is-empty") + '" data-tri="' + esc(n.id) + '" title="展开 / 收起">' + tri + '</i>' +
+          '<u class="xp-chip" style="background:' + n.color + '"></u>' +
+          '<span class="xp-nm">' + n.name + '</span>' +
+        '</span>' + cellsHTML(n) + '</li>';
+    }).join("");
+    const filled = rows.reduce((s, n) => s + (n.level === 0 ? 46 : n.level === 1 ? 40 : 34), 0);
+    const hint = filled < 640 ? '<li class="xp-hint">' + HINT_HTML + "</li>" : "";
+    $("xp-tbody").innerHTML = html + hint;
+    $("xp-tbl-scope").textContent = rows.length + " / " + ALL.length + " 行 · 3 级";
+  }
+
+  /* 表尾合计行：18 个末级项目加总，与根节点同源 */
+  $("xp-tfoot").innerHTML =
+    '<span>全部 ' + LEAVES.length + ' 个末级项目合计</span>' +
+    '<span><b>' + fmtDec(sum(LEAVES.map((n) => n.v))) + '</b></span>' +
+    '<span>' + fmtDec(sum(LEAVES.map((n) => n.pre)), 1) + '</span>' +
+    '<span style="color:' + sigColor(ROOT.delta) + ';font-weight:700">' + signed(sum(LEAVES.map((n) => n.delta)), 1) + '</span>' +
+    '<span style="color:' + sigColor(ROOT.yoy) + ';font-weight:700">' + signed(ROOT.yoy) + '%</span>' +
+    '<span>—</span>' +
+    '<span>' + sum(LEAVES.map((n) => n.shareAll)).toFixed(2) + '%</span>' +
+    '<span style="color:' + sigColor(ROOT.pull) + ';font-weight:700">' + signed(sum(LEAVES.map((n) => n.pull)), 2) + '</span>';
+
+  /* ===== 8. 跑马灯（全部现算） ===== */
+  const topTax = leafTax.slice().sort((a, b) => b.v - a.v)[0];
+  const bestPull = LEAVES.slice().sort((a, b) => b.pull - a.pull)[0];
+  const worstPull = LEAVES.slice().sort((a, b) => a.pull - b.pull)[0];
+  const negLeaves = LEAVES.filter((n) => n.yoy < 0);
+  const negLoss = sum(negLeaves.map((n) => n.pre - n.v));
+  const news = [
+    "一般公共预算收入 <b>" + fmtDec(ROOT.v) + " 亿元</b>，上年同期 <b>" + fmtDec(ROOT.pre, 1) + " 亿元</b>，同比 <b>" + signed(ROOT.yoy) + "%</b>",
+    "税收 <b>" + fmtDec(nTax.v) + " 亿元</b>（" + nTax.shareParent.toFixed(1) + "%，同比 " + signed(nTax.yoy) +
+      "%） ｜ 非税 <b>" + fmtDec(nNon.v) + " 亿元</b>（" + nNon.shareParent.toFixed(1) + "%，同比 " + signed(nNon.yoy) + "%）",
+    "第一大税种 <b>" + topTax.name + " " + fmtDec(topTax.v) + " 亿元</b>，占税收 <b>" + topTax.shareParent.toFixed(1) +
+      "%</b>，占全部 <b>" + topTax.shareAll.toFixed(1) + "%</b>",
+    "拉动最大 <b>" + bestPull.short + " " + signed(bestPull.pull, 2) + " pct</b>，拖累最大 <b>" + worstPull.short + " " + signed(worstPull.pull, 2) + " pct</b>",
+    negLeaves.length + " 个末级项目负增长，合计减收 <b>" + fmtDec(negLoss, 1) + " 亿元</b>，" +
+      (LEAVES.length - negLeaves.length) + " 个正增长",
+    "时间进度 <b>" + TIME_PROG.toFixed(1) + "%</b>（" + DAY_OF_YEAR + "/" + DAYS_IN_YEAR + "） · 本页无分项目预算数，不列序时进度"
+  ];
+  (function renderMarquee() {
+    const html = news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    $("xp-marquee-track").innerHTML = html + html;
+  })();
+
+  /* ===== 9. ★ 先把左表 / 图例 / 结论行等全部 DOM 落地，再 echarts.init ===== */
+  renderTable();
+  $("xp-legend").innerHTML = "";
+  $("xp-note-txt").innerHTML = "";
+
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(8, 26, 50, 0.93)", borderColor: "rgba(240, 192, 96, 0.45)",
+    textStyle: { color: "#e2eeff", fontSize: 12 }
+  }, extra || {});
+  /* ★ 饼图实例只创建一次，切换节点只 setOption，全程不调 resize（容器像素尺寸恒定） */
+  const pieChart = echarts.init($("xp-chart-pie"));
+
+  /* ===== 10. 饼图 option 工厂
+     focus 为末级项目时：画其父层级的饼，该扇区向外突出 + 高亮，其余降透明度。
+     12 个税种标签防重叠：只给占比 ≥ 3.5% 的扇区开标签（逐项 label.show），
+     配 labelLayout.hideOverlap + 引导线，其余明细全部落到下方 DOM 图例列表。 ===== */
+  const LABEL_MIN_PCT = 3.5;
+
+  function pieOption(src, focus) {
+    const kids = src.children;
+    const data = kids.map((ch) => ({
+      name: ch.short,
+      value: ch.v,
+      selected: focus === ch,
+      xpId: ch.id,
+      itemStyle: {
+        color: ch.color,
+        opacity: focus && focus !== ch ? 0.3 : 1,
+        borderColor: "rgba(8, 26, 50, 0.92)", borderWidth: 2
+      },
+      label: {
+        show: ch.shareParent >= LABEL_MIN_PCT,
+        color: focus && focus !== ch ? "#7e97b5" : "#dbe9fb",
+        fontSize: 12, lineHeight: 16,
+        formatter: () => ch.short + "\n" + ch.shareParent.toFixed(1) + "% · " + fmtDec(ch.v)
+      },
+      labelLine: { show: ch.shareParent >= LABEL_MIN_PCT, length: 12, length2: 16 }
+    }));
+    const c1 = focus ? focus.short : src.short;
+    const c2 = focus ? fmtDec(focus.v) : fmtDec(src.v);
+    const c3 = focus
+      ? "占" + src.short + " " + focus.shareParent.toFixed(1) + "%"
+      : "亿元 · 下辖 " + kids.length + " 项";
+    return {
+      animationDuration: 620, animationEasing: "cubicOut",
+      tooltip: tip({
+        formatter: (p) => {
+          const n = BY_ID[p.data.xpId];
+          return '<b style="color:#ffdc8f">' + n.name + "</b><br/>累计 " + fmtDec(n.v) + " 亿元<br/>占" +
+            src.short + " " + n.shareParent.toFixed(2) + "%<br/>占全部 " + n.shareAll.toFixed(2) +
+            '%<br/>同比 <b style="color:' + sigColor(n.yoy) + '">' + signed(n.yoy) + "%</b><br/>拉动全部 " + signed(n.pull, 2) + " pct";
+        }
+      }),
+      graphic: [
+        { type: "text", left: "center", top: "37%", style: { text: c1, fill: "#9fb8d6", fontSize: 12, textAlign: "center" } },
+        { type: "text", left: "center", top: "45%", style: { text: c2, fill: C.goldSoft, fontSize: 26, fontWeight: 700, textAlign: "center" } },
+        { type: "text", left: "center", top: "57%", style: { text: c3, fill: "#8ea9cc", fontSize: 10.5, textAlign: "center" } }
+      ],
+      series: [{
+        type: "pie", radius: ["42%", "64%"], center: ["50%", "50%"],
+        minAngle: 4, avoidLabelOverlap: true,
+        selectedMode: "single", selectedOffset: 16,
+        labelLine: { lineStyle: { color: "rgba(142, 169, 204, 0.5)" } },
+        labelLayout: { hideOverlap: true },
+        emphasis: { scaleSize: 8, itemStyle: { shadowBlur: 18, shadowColor: "rgba(240, 192, 96, 0.5)", opacity: 1 } },
+        data: data
+      }]
+    };
+  }
+
+  /* ===== 11. 右列渲染：指标条 / 图例 / 结论行 ===== */
+  /* 翻牌缓动：★ 必须按**时间**推进，不能按帧步进。原实现是每 80ms 走 diff × 0.16，
+     一旦页面繁忙或标签页被降频，定时器实际间隔被拉长、步进次数不够，10 秒后轮换到
+     下一项时读数还停在中途值（实测增值税 1,980 显示成 2,014、契税 460 显示成 593）——
+     头条数字等于长期是错的。改为固定 700ms 时长的缓动，按 performance.now() 计算进度，
+     到点强制落到目标值；降频恢复后的第一帧也会直接吃满进度，不会留在半路。 */
+  const FLIP = { cur: 0, from: 0, target: ROOT.v, t0: 0, dur: 700 };
+  const flipTo = (v) => { FLIP.from = FLIP.cur; FLIP.target = v; FLIP.t0 = performance.now(); };
+  /* 驱动用 setInterval 而不是 requestAnimationFrame：rAF 在页面不可见 / 被合成器暂停时
+     整个停摆，读数会永久冻在半路；setInterval 照常触发，而进度又是按时间算的，
+     即使间隔被拉长到几百毫秒，超过 dur 的第一次触发也会直接落到目标值。 */
+  setInterval(() => {
+    const k = FLIP.t0 ? Math.min(1, (performance.now() - FLIP.t0) / FLIP.dur) : 1;
+    FLIP.cur = k >= 1 ? FLIP.target : FLIP.from + (FLIP.target - FLIP.from) * (1 - Math.pow(1 - k, 3));
+    $("xp-m-val").textContent = fmtDec(FLIP.cur);
+  }, 50);
+
+  const BADGE = ["合计", "口径层", "末级项目"];
+  function renderMetric(n) {
+    const badge = $("xp-m-badge");
+    badge.className = "xp-m-badge" + (n.level === 1 ? " is-l1" : n.level === 2 ? " is-l2" : "");
+    badge.textContent = BADGE[n.level];
+    $("xp-m-name").textContent = n.name;
+    flipTo(n.v);
+    const yoy = $("xp-m-yoy"); yoy.textContent = signed(n.yoy) + "%"; yoy.className = "xp-m-n " + sigCls(n.yoy);
+    $("xp-m-sp").textContent = n.shareParent == null ? "—" : n.shareParent.toFixed(2) + "%";
+    $("xp-m-sa").textContent = n.shareAll.toFixed(2) + "%";
+    const pull = $("xp-m-pull"); pull.textContent = signed(n.pull, 2); pull.className = "xp-m-n " + sigCls(n.pull);
+  }
+
+  function renderLegend(src, focus) {
+    const kids = src.children;
+    const box = $("xp-legend");
+    box.style.gridAutoRows = Math.min(34, Math.floor(306 / kids.length)) + "px";
+    box.innerHTML = kids.map((ch) =>
+      '<div class="xp-lg' + (focus === ch ? " is-focus" : (focus ? " is-dim" : "")) + '" data-id="' + esc(ch.id) + '">' +
+        '<u class="xp-lg-chip" style="background:' + ch.color + '"></u>' +
+        '<span class="xp-lg-name">' + ch.name + '</span>' +
+        '<span class="xp-lg-val">' + fmtDec(ch.v) + '</span>' +
+        '<span class="xp-lg-pct">' + ch.shareParent.toFixed(2) + '%</span>' +
+        '<span class="xp-lg-yoy ' + sigCls(ch.yoy) + '">' + signed(ch.yoy) + '%</span>' +
+      '</div>').join("");
+  }
+
+  function renderNote(n) {
+    const src = n.children ? n : n.parent;
+    const kids = src.children;
+    const sorted = kids.slice().sort((a, b) => b.v - a.v);
+    const k = Math.min(3, sorted.length);
+    const crv = sum(sorted.slice(0, k).map((x) => x.v));
+    const pos = kids.filter((x) => x.yoy >= 0).length;
+    const best = kids.slice().sort((a, b) => b.pull - a.pull)[0];
+    let s = '当前层级 <b>' + src.short + '</b>（' + kids.length + ' 项）：前 ' + k + ' 项合计 <b>' + fmtDec(crv) +
+      ' 亿元</b>，占该层级 <b>' + (100 * crv / src.v).toFixed(1) + '%</b>（CR' + k + '）<em>·</em>' +
+      '正增长 <b class="xp-up">' + pos + '</b> 项 / 负增长 <b class="xp-down">' + (kids.length - pos) + '</b> 项<em>·</em>' +
+      '拉动最大 <b>' + best.short + ' ' + signed(best.pull, 2) + ' pct</b>';
+    if (!n.children) {
+      s += '<em>｜</em>选中 <b>' + n.short + '</b> 居该层级第 <b>' + (sorted.indexOf(n) + 1) + '</b> 位，占 <b>' +
+        n.shareParent.toFixed(2) + '%</b>，较上年 <b class="' + sigCls(n.delta) + '">' + signed(n.delta, 1) + ' 亿元</b>';
+    }
+    return s;
+  }
+
+  function pathHTML(n) {
+    const chain = []; let p = n;
+    while (p) { chain.unshift(p); p = p.parent; }
+    return chain.map((x, i) => (i === chain.length - 1 ? "<b>" + x.short + "</b>" : "<span>" + x.short + "</span>"))
+      .join("<i>›</i>");
+  }
+
+  /* ===== 12. 选中节点：整页联动（表格 / 指标 / 饼图 / 图例 / 结论 / hash） ===== */
+  function select(id) {
+    const n = BY_ID[id];
+    if (!n) return;
+    selId = n.id;
+    /* 展开所有祖先，并把有子项的节点自身展开，保证该行可见 */
+    let p = n.parent;
+    while (p) { OPEN[p.id] = true; p = p.parent; }
+    if (n.children) OPEN[n.id] = true;
+    renderTable();
+
+    const src = n.children ? n : n.parent;      /* 末级项目 → 画其父层级的饼 */
+    const focus = n.children ? null : n;
+    renderMetric(n);
+    /* notMerge：子项集合在层级间会变，整体替换才不会残留上一层的扇区与选中态 */
+    pieChart.setOption(pieOption(src, focus), true);
+    renderLegend(src, focus);
+    $("xp-note-txt").innerHTML = renderNote(n);
+    $("xp-pie-scope").textContent = src.short + " · " + src.children.length + " 项 · 合计 " + fmtDec(src.v) + " 亿元";
+    $("xp-crumb-obj").textContent = n.name;
+    $("xp-path").innerHTML = pathHTML(n);
+    document.title = "大屏样板间 · 公共资金分项目收入明细 · " + n.name;
+    /* 用 replaceState 同步 hash，不用 location.hash（会触发跳转与滚动） */
+    history.replaceState(null, "", "#" + encodeURIComponent(n.name));
+  }
+
+  /* ===== 13. 交互 ===== */
+  const tbody = $("xp-tbody");
+  tbody.addEventListener("click", (e) => {
+    const tri = e.target.closest(".xp-tri");
+    if (tri && !tri.classList.contains("is-empty")) {
+      const id = tri.getAttribute("data-tri");
+      OPEN[id] = !OPEN[id];
+      renderTable();
+      restart();
+      return;                                    /* 三角只管展开收起，不改选中 */
+    }
+    const li = e.target.closest(".xp-row");
+    if (!li) return;
+    select(li.getAttribute("data-id"));
+    restart();
+  });
+
+  $("xp-legend").addEventListener("click", (e) => {
+    const it = e.target.closest(".xp-lg");
+    if (!it) return;
+    select(it.getAttribute("data-id"));
+    restart();
+  });
+  $("xp-legend").addEventListener("mouseover", (e) => {
+    const it = e.target.closest(".xp-lg");
+    if (!it) return;
+    const id = it.getAttribute("data-id");
+    const n = BY_ID[id];
+    const src = n.parent;
+    pieChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: src.children.indexOf(n) });
+  });
+  $("xp-legend").addEventListener("mouseout", () => {
+    pieChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+  });
+
+  pieChart.on("click", (p) => {
+    if (p.data && p.data.xpId) { select(p.data.xpId); restart(); }
+  });
+
+  $("xp-expand").addEventListener("click", () => {
+    ALL.forEach((n) => { if (n.children) OPEN[n.id] = true; });
+    renderTable(); restart();
+  });
+  $("xp-collapse").addEventListener("click", () => {
+    ALL.forEach((n) => { if (n.children) OPEN[n.id] = n === ROOT; });
+    renderTable(); restart();
+  });
+
+  $("xp-back").addEventListener("click", () => { location.href = PARENT; });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { location.href = PARENT; return; }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const rows = visibleRows();
+      const i = rows.findIndex((n) => n.id === selId);
+      const next = rows[(i + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length];
+      select(next.id); restart();
+    }
+  });
+
+  /* ===== 14. hash 定位（父页桑基图下钻传参用） ===== */
+  const hash = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+  select(BY_ID[hash] ? hash : ROOT.id);
+
+  /* ===== 15. kiosk 活性：每 10 秒轮换选中节点（根 → 税收 → 非税 → 各末级项目）
+     鼠标进入左表区域时暂停，离开后恢复；任一次用户交互都会重置计时 ===== */
+  const CYCLE = [ROOT, nTax, nNon].concat(leafTax, leafNon).map((n) => n.id);
+  let timer = null;
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => {
+      const i = CYCLE.indexOf(selId);
+      select(CYCLE[(i + 1) % CYCLE.length]);
+    }, 10000);
+  }
+  restart();
+  const tblPanel = $("xp-tblpanel");
+  tblPanel.addEventListener("mouseenter", () => clearInterval(timer));
+  tblPanel.addEventListener("mouseleave", restart);
+})();
+</script>
+</body>
+</html>

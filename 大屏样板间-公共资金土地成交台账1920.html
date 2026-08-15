@@ -1,0 +1,915 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 公共资金土地成交台账</title>
+<style>
+  :root {
+    --st-bg: #08203f;
+    --st-panel: rgba(11, 38, 72, 0.72);
+    --st-border: rgba(92, 156, 226, 0.28);
+    --st-text: #e8f2ff;
+    --st-muted: #8ea9cc;
+    /* 延续父页「土地出让形势」的配色反转：暖橙 + 告警红为主强调，钢蓝作历史基准，
+       琥珀金降级为系列识别点缀（仅页头标题渐变与面板头竖标）。 */
+    --st-gold: #f0c060;
+    --st-gold-soft: #ffdc8f;
+    --st-orange: #ff9d4d;
+    --st-orange-soft: #ffc48e;
+    --st-orange-deep: #c9682a;
+    --st-red: #ff5f6e;
+    --st-red-soft: #ffa8b1;
+    --st-red-deep: #a03444;
+    --st-steel: #5f88b8;
+    --st-blue: #3d9cff;
+    --st-cyan: #39d0d8;
+    --st-green: #33e0a6;
+    --st-row-h: 34px;
+    --st-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--st-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1. 1920x1080 固定设计舞台 ===== */
+  .st-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(255, 157, 77, 0.12), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(255, 95, 110, 0.10), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 60, 120, 0.34), transparent 56%),
+      linear-gradient(rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      var(--st-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 84px 110px 126px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .st-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .st-error.is-visible { display: block; }
+
+  /* ===== 2. 顶栏：三级面包屑 + 数据截至标签 + 返回 + 时钟（本页无对象切换器） ===== */
+  .st-header {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .st-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 77, 0.6) 16%, rgba(255, 95, 110, 0.9) 50%, rgba(255, 157, 77, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(255, 122, 90, 0.42);
+  }
+  .st-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .st-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--st-muted); }
+  .st-crumb b { font-weight: 400; color: var(--st-gold); }
+  .st-crumb i { font-style: normal; color: rgba(142, 169, 204, 0.55); }
+  .st-crumb em { font-style: normal; color: #d7e8ff; }
+  .st-crumb-up { color: #a8c2e0; text-decoration: none; transition: color 0.18s, text-shadow 0.18s; }
+  .st-crumb-up:hover { color: var(--st-orange-soft); text-decoration: underline; text-shadow: 0 0 10px rgba(255, 157, 77, 0.55); }
+  .st-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .st-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--st-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(240, 192, 96, 0.32));
+  }
+  .st-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--st-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .st-head-meta b { font-weight: 400; color: var(--st-orange-soft); }
+  .st-head-meta i { font-style: normal; color: rgba(142, 169, 204, 0.4); }
+
+  .st-head-right { display: flex; align-items: center; gap: 18px; flex: none; }
+  .st-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 122px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid rgba(92, 156, 226, 0.4); background: rgba(16, 46, 86, 0.55);
+  }
+  .st-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: var(--st-steel); }
+  .st-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #d6e9ff; font-variant-numeric: tabular-nums; }
+  /* 返回父页：与父页轮播按钮同族，但描边随本页反转为暖橙 */
+  .st-back {
+    display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 15px; cursor: pointer;
+    border-radius: 10px; font-family: inherit; font-size: 13px; letter-spacing: 0.08em;
+    border: 1px solid rgba(255, 157, 77, 0.4);
+    background: linear-gradient(160deg, rgba(255, 157, 77, 0.16), rgba(16, 46, 86, 0.6));
+    color: #ffd9b8; transition: border-color 0.18s, box-shadow 0.18s, color 0.18s, transform 0.18s;
+  }
+  .st-back:hover { color: #fff2e4; border-color: rgba(255, 157, 77, 0.9); box-shadow: 0 0 14px rgba(255, 157, 77, 0.45), inset 0 0 12px rgba(255, 157, 77, 0.14); }
+  .st-back:active { transform: scale(0.95); }
+  .st-back svg { width: 16px; height: 16px; }
+  .st-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 18px; border-left: 1px solid rgba(92, 156, 226, 0.25); }
+  .st-clock-time { font: 700 25px/1 var(--st-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(255, 157, 77, 0.4); }
+  .st-clock-date { font-size: 12px; color: var(--st-muted); letter-spacing: 0.08em; }
+
+  /* ===== 3. 顶部汇总带（6 枚，跨两表） ===== */
+  .st-band { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .st-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--st-border); border-radius: 12px; background: var(--st-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 14px 0 16px;
+  }
+  .st-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--st-orange), transparent); }
+  .st-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 116px; height: 116px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 157, 77, 0.13), transparent 68%);
+  }
+  .st-kpi.is-alert { border-color: rgba(255, 95, 110, 0.42); }
+  .st-kpi.is-alert::before { background: linear-gradient(90deg, var(--st-red), transparent); }
+  .st-kpi.is-alert::after { background: radial-gradient(circle, rgba(255, 95, 110, 0.15), transparent 68%); }
+  .st-kpi-icon {
+    flex: none; width: 42px; height: 42px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 19px; color: #ffd9b8;
+    background: linear-gradient(160deg, rgba(255, 157, 77, 0.3), rgba(255, 95, 110, 0.12));
+    border: 1px solid rgba(255, 157, 77, 0.38); box-shadow: inset 0 0 12px rgba(255, 157, 77, 0.16);
+  }
+  .st-kpi.is-alert .st-kpi-icon {
+    color: #ffc3c9;
+    background: linear-gradient(160deg, rgba(255, 95, 110, 0.3), rgba(160, 52, 68, 0.16));
+    border-color: rgba(255, 95, 110, 0.45); box-shadow: inset 0 0 12px rgba(255, 95, 110, 0.18);
+  }
+  .st-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .st-kpi-label { font-size: 12px; letter-spacing: 0.08em; color: var(--st-muted); white-space: nowrap; }
+  .st-kpi-num { display: flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
+  .st-kpi-val { font: 700 27px/1 var(--st-mono); color: var(--st-orange-soft); text-shadow: 0 0 14px rgba(255, 157, 77, 0.45); }
+  .st-kpi.is-alert .st-kpi-val { color: var(--st-red-soft); text-shadow: 0 0 14px rgba(255, 95, 110, 0.45); }
+  .st-kpi-unit { font-size: 11.5px; color: #b3835e; }
+  .st-kpi.is-alert .st-kpi-unit { color: #b06a72; }
+  .st-kpi-sub { font-size: 11px; letter-spacing: 0.01em; color: var(--st-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .st-kpi-sub b { font-weight: 700; color: #cfe0f4; }
+  .st-down { color: var(--st-red); }
+  .st-up { color: var(--st-green); }
+  .st-mini-track { position: relative; height: 5px; border-radius: 3px; background: rgba(63, 120, 200, 0.2); }
+  .st-mini-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, var(--st-orange-deep), var(--st-red)); box-shadow: 0 0 10px rgba(255, 95, 110, 0.5); transition: width 1.2s ease; }
+  .st-mini-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.8); }
+
+  /* ===== 4. 对照带：台账口径 + 用途结构 + 两表对照公式 + 月度对照小图 ===== */
+  .st-brief {
+    display: grid; grid-template-columns: 1fr 1px 470px; align-items: stretch; gap: 0 16px;
+    border: 1px solid var(--st-border); border-radius: 12px; background: var(--st-panel);
+    padding: 8px 14px; min-height: 0; overflow: hidden;
+  }
+  .st-brief-left { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
+  .st-brief-sep { background: linear-gradient(180deg, transparent, rgba(255, 157, 77, 0.45) 22%, rgba(255, 95, 110, 0.5) 78%, transparent); }
+  .st-brief-right { display: flex; flex-direction: column; min-width: 0; }
+  .st-bl { display: flex; align-items: center; gap: 9px; min-width: 0; white-space: nowrap; }
+  .st-bl-tag {
+    flex: none; display: flex; align-items: center; gap: 6px;
+    font-size: 11px; letter-spacing: 0.16em; color: var(--st-orange-soft);
+  }
+  .st-bl-tag i { width: 4px; height: 12px; background: var(--st-gold); box-shadow: 0 0 8px var(--st-gold); transform: skewX(-12deg); }
+  .st-tag {
+    display: inline-flex; align-items: baseline; gap: 5px; padding: 2px 9px; border-radius: 999px;
+    font-size: 11.5px; letter-spacing: 0.04em; color: #cfe0f4; font-variant-numeric: tabular-nums;
+    border: 1px solid rgba(92, 156, 226, 0.34); background: rgba(63, 120, 200, 0.12);
+  }
+  .st-tag b { font: 700 13px/1 var(--st-mono); color: var(--st-orange-soft); }
+  .st-tag u { text-decoration: none; font-size: 10.5px; color: var(--st-steel); }
+  .st-tag i { font-style: normal; width: 8px; height: 8px; border-radius: 2px; align-self: center; }
+  .st-tag.is-alert { border-color: rgba(255, 95, 110, 0.45); background: rgba(86, 26, 38, 0.4); }
+  .st-tag.is-alert b { color: var(--st-red-soft); }
+  .st-tag.is-sum { border-color: rgba(255, 157, 77, 0.5); background: rgba(120, 58, 20, 0.34); }
+  .st-formula { font-size: 12.5px; color: #cfe0f4; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+  .st-formula b { color: var(--st-red-soft); font-weight: 700; }
+  .st-formula em { font-style: normal; color: var(--st-orange-soft); font-weight: 700; }
+  .st-formula u { text-decoration: none; color: var(--st-steel); }
+  .st-brief-cap { flex: none; font-size: 10.5px; letter-spacing: 0.12em; color: var(--st-steel); padding-bottom: 2px; }
+  .st-brief-chart { flex: 1; min-height: 0; }
+
+  /* ===== 5. 主体：左右双表 + 中缝竖分隔线 ===== */
+  .st-main { display: flex; align-items: stretch; gap: 14px; min-height: 0; }
+  .st-divider { flex: none; width: 1px; background: linear-gradient(180deg, transparent, rgba(255, 157, 77, 0.5) 14%, rgba(255, 95, 110, 0.55) 50%, rgba(255, 157, 77, 0.5) 86%, transparent); box-shadow: 0 0 10px rgba(255, 122, 90, 0.3); }
+  .st-panel {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--st-border); border-radius: 12px; background: var(--st-panel);
+    display: flex; flex-direction: column;
+  }
+  .st-panel.is-deal { flex: 58; }
+  .st-panel.is-fail { flex: 42; border-color: rgba(255, 95, 110, 0.3); }
+  .st-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(255, 157, 77, 0.2), rgba(95, 136, 184, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .st-panel.is-fail .st-panel-head { background: linear-gradient(90deg, rgba(255, 95, 110, 0.24), rgba(95, 136, 184, 0.05) 62%, transparent); }
+  /* 竖标保留琥珀金：全系列识别符 */
+  .st-panel-head i { flex: none; width: 5px; height: 16px; background: var(--st-gold); box-shadow: 0 0 8px var(--st-gold); transform: skewX(-12deg); }
+  .st-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.1em; color: #f4f9ff; white-space: nowrap; }
+  .st-panel-en { font-size: 10px; letter-spacing: 0.2em; color: var(--st-steel); align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+  .st-panel-scope { margin-left: auto; font-size: 11.5px; color: var(--st-orange-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .st-panel.is-fail .st-panel-scope { color: var(--st-red-soft); }
+
+  /* ===== 6. 表格（CSS grid 模拟，非 <table>） ===== */
+  .st-thead {
+    flex: none; height: 30px; display: grid; align-items: center; gap: 0 8px; padding: 0 14px;
+    font-size: 11px; letter-spacing: 0.06em; color: #6f93bd; white-space: nowrap;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.22); background: rgba(63, 120, 200, 0.08);
+  }
+  .st-thead em { font-style: normal; font-size: 9.5px; color: rgba(111, 147, 189, 0.75); margin-left: 3px; }
+  .st-view { flex: 1; min-height: 0; overflow: hidden; position: relative; }
+  .st-track { margin: 0; padding: 0; list-style: none; will-change: transform; }
+  .st-track li {
+    position: relative; height: var(--st-row-h); display: grid; align-items: center; gap: 0 8px; padding: 0 14px;
+    font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.09);
+    transition: background 0.35s ease, box-shadow 0.35s ease;
+  }
+  .st-track li.is-odd { background: rgba(63, 120, 200, 0.07); }
+
+  /* 左表列（9 列） */
+  .st-thead.is-deal, .st-track.is-deal li, .st-tfoot-row.is-deal {
+    grid-template-columns: 34px 150px 132px 62px 96px 96px 104px 96px 1fr;
+  }
+  /* 右表列（8 列） */
+  .st-thead.is-fail, .st-track.is-fail li, .st-tfoot-row.is-fail {
+    grid-template-columns: 34px 128px 78px 56px 84px 96px 64px 1fr;
+  }
+  .st-thead span:nth-child(1) { text-align: center; }
+  .st-thead.is-deal span:nth-child(5), .st-thead.is-deal span:nth-child(6),
+  .st-thead.is-deal span:nth-child(7), .st-thead.is-deal span:nth-child(8) { text-align: right; }
+  .st-thead.is-fail span:nth-child(5) { text-align: right; }
+
+  .st-td-no {
+    width: 22px; height: 21px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font: 700 11px/1 var(--st-mono); color: #0a1c33; background: rgba(142, 169, 204, 0.68);
+  }
+  .st-td-no.is-top { background: linear-gradient(140deg, var(--st-orange-soft), var(--st-orange-deep)); box-shadow: 0 0 9px rgba(255, 157, 77, 0.55); color: #2b1105; }
+  .st-td-no.is-bad { background: linear-gradient(140deg, var(--st-red-soft), var(--st-red-deep)); box-shadow: 0 0 8px rgba(255, 95, 110, 0.4); color: #2a0a10; }
+  .st-td-code { color: #cfe2f8; font-family: var(--st-mono); font-size: 12px; letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; }
+  .st-td-loc { color: #eaf4ff; font-weight: 700; letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; }
+  .st-td-loc u { text-decoration: none; font-weight: 400; color: #9fb8d4; font-size: 11.5px; }
+  .st-td-use { display: flex; align-items: center; gap: 5px; color: #cfe0f4; font-size: 12px; }
+  .st-td-use i { flex: none; width: 8px; height: 8px; border-radius: 2px; }
+  .st-td-num { text-align: right; color: #b6cbe4; font-family: var(--st-mono); font-size: 12.5px; }
+  .st-td-amt { text-align: right; font: 700 14px/1 var(--st-mono); color: var(--st-orange-soft); }
+  .st-panel.is-fail .st-td-amt { color: var(--st-red-soft); }
+  .st-td-prem { text-align: right; font-size: 12px; font-weight: 700; color: #a6bcd6; }
+  .st-td-prem.is-hot { color: var(--st-gold-soft); text-shadow: 0 0 10px rgba(240, 192, 96, 0.5); }
+  .st-td-prem.is-mid { color: var(--st-orange-soft); }
+  .st-td-buyer { color: #c6dcf5; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+  .st-td-date { color: #a6bcd6; font-family: var(--st-mono); font-size: 12px; }
+  .st-td-note { color: #b0c4dc; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+  .st-badge {
+    display: inline-block; padding: 1.5px 7px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
+  }
+  .st-badge.is-floor { color: #a9bdd6; border: 1px solid rgba(142, 169, 204, 0.4); background: rgba(63, 120, 200, 0.14); font-weight: 400; }
+  .st-badge.is-fail { color: #ffc3c9; border: 1px solid rgba(255, 95, 110, 0.55); background: rgba(120, 28, 42, 0.5); }
+  .st-badge.is-pull { color: #ffd0b0; border: 1px solid rgba(255, 157, 77, 0.55); background: rgba(120, 58, 20, 0.45); }
+  /* 右表整行红色语汇：行首色条 */
+  .st-track.is-fail li::before {
+    content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 0 2px 2px 0;
+    background: linear-gradient(180deg, var(--st-red), var(--st-red-deep));
+    box-shadow: 0 0 7px rgba(255, 95, 110, 0.45);
+  }
+  .st-track.is-fail li.is-pull::before { background: linear-gradient(180deg, var(--st-orange), var(--st-orange-deep)); box-shadow: 0 0 7px rgba(255, 157, 77, 0.45); }
+  .st-track.is-fail li.is-odd { background: rgba(120, 40, 54, 0.12); }
+  .st-track li.is-cursor { background: rgba(255, 157, 77, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 157, 77, 0.22); }
+  .st-track.is-fail li.is-cursor { background: rgba(255, 95, 110, 0.16); box-shadow: inset 0 0 0 1px rgba(255, 95, 110, 0.26); }
+
+  /* 表尾合计 */
+  .st-tfoot { flex: none; border-top: 1px solid rgba(255, 157, 77, 0.34); background: rgba(120, 58, 20, 0.24); }
+  .st-panel.is-fail .st-tfoot { border-top-color: rgba(255, 95, 110, 0.4); background: rgba(96, 26, 38, 0.3); }
+  .st-tfoot-row {
+    display: grid; align-items: center; gap: 0 8px; padding: 0 14px; height: 26px;
+    font-size: 11px; color: var(--st-muted); font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .st-tfoot-row.is-prov { border-top: 1px dashed rgba(255, 157, 77, 0.28); background: rgba(255, 157, 77, 0.06); }
+  .st-tfoot-row b { font: 700 13px/1 var(--st-mono); color: var(--st-orange-soft); }
+  .st-tfoot-row.is-prov b { color: var(--st-gold-soft); }
+  .st-panel.is-fail .st-tfoot-row { height: 36px; font-size: 11.5px; }
+  .st-panel.is-fail .st-tfoot-row b { color: var(--st-red-soft); font-size: 14px; }
+  .st-tfoot-row.is-deal span:nth-child(5), .st-tfoot-row.is-deal span:nth-child(6),
+  .st-tfoot-row.is-deal span:nth-child(7), .st-tfoot-row.is-deal span:nth-child(8) { text-align: right; }
+  .st-tfoot-row.is-fail span:nth-child(5) { text-align: right; }
+  .st-tfoot-lab { color: #dbe9fb; font-weight: 700; letter-spacing: 0.04em; }
+  .st-tfoot-row.is-prov .st-tfoot-lab { color: var(--st-gold-soft); }
+
+  /* ===== 7. 底部跑马灯 ===== */
+  .st-marquee {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--st-border); border-radius: 12px; background: var(--st-panel);
+  }
+  .st-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2b1105;
+    background: linear-gradient(120deg, var(--st-orange-soft), #e2612f 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .st-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2b1105; animation: stDot 1.6s ease-in-out infinite; }
+  @keyframes stDot { 50% { opacity: 0.25; } }
+  .st-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .st-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: stMarquee 58s linear infinite; font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .st-marquee-track b { color: var(--st-orange-soft); font-weight: 700; }
+  .st-marquee-track b.is-bad { color: var(--st-red-soft); }
+  .st-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(255, 157, 77, 0.5); }
+  @keyframes stMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .st-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="st-stage" id="st-stage">
+    <!-- mockflag:begin --><div class="st-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="st-error" id="st-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- ===== 顶栏 ===== -->
+    <header class="st-header">
+      <div class="st-head-left">
+        <div class="st-crumb">
+          <b>公共资金</b><i>›</i>
+          <a class="st-crumb-up" href="大屏样板间-公共资金土地出让形势1920.html">土地出让形势</a><i>›</i>
+          <em>逐宗台账</em>
+        </div>
+        <div class="st-head-title-row">
+          <div class="st-head-title">土地成交与流拍台账</div>
+          <div class="st-head-meta">
+            <span>口径 <b>国有土地使用权出让</b></span><i>|</i>
+            <span>区间 <b>2026 年 1-7 月累计</b></span><i>|</i>
+            <span>范围 <b>全量逐宗 · 无筛选</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="st-head-right">
+        <div class="st-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+        <button class="st-back" id="st-back" type="button" title="返回土地出让形势（Esc）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/><path d="M7 12 H20"/></svg>
+          返回
+        </button>
+        <div class="st-clock" aria-label="实时时钟">
+          <span class="st-clock-time" id="st-clock-time">--:--:--</span>
+          <span class="st-clock-date" id="st-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===== 顶部汇总带（跨两表） ===== -->
+    <section class="st-band" id="st-band" aria-label="土地成交与流拍撤牌汇总指标"></section>
+
+    <!-- ===== 对照带：口径 / 用途结构 / 两表对照公式 / 月度对照 ===== -->
+    <section class="st-brief" aria-label="台账口径与两表对照关系">
+      <div class="st-brief-left">
+        <div class="st-bl" id="st-bl-scope"></div>
+        <div class="st-bl" id="st-bl-use"></div>
+        <div class="st-bl" id="st-bl-tie"></div>
+      </div>
+      <div class="st-brief-sep"></div>
+      <div class="st-brief-right">
+        <div class="st-brief-cap">月度对照 · 成交出让金（亿元） vs 流拍撤牌（宗）</div>
+        <div class="st-brief-chart" id="st-chart-brief" role="img" aria-label="1-7 月成交出让金与流拍撤牌宗数月度对照"></div>
+      </div>
+    </section>
+
+    <!-- ===== 主体：左右双表 ===== -->
+    <section class="st-main">
+      <!-- 左表：成交地块 -->
+      <section class="st-panel is-deal">
+        <header class="st-panel-head">
+          <i></i><h2>成交地块</h2><span class="st-panel-en">CLOSED PARCELS</span>
+          <span class="st-panel-scope" id="st-deal-scope">--</span>
+        </header>
+        <div class="st-thead is-deal">
+          <span>序</span><span>地块编号</span><span>所在地市 · 区县</span><span>用途</span>
+          <span>出让面积<em>万㎡</em></span><span>成交价<em>亿元</em></span><span>楼面价<em>元/㎡</em></span>
+          <span>溢价率</span><span>竞得人</span>
+        </div>
+        <div class="st-view"><ul class="st-track is-deal" id="st-track-deal"></ul></div>
+        <div class="st-tfoot" id="st-tfoot-deal"></div>
+      </section>
+
+      <div class="st-divider" aria-hidden="true"></div>
+
+      <!-- 右表：流拍与撤牌地块 -->
+      <section class="st-panel is-fail">
+        <header class="st-panel-head">
+          <i></i><h2>流拍与撤牌地块</h2><span class="st-panel-en">FAILED / WITHDRAWN</span>
+          <span class="st-panel-scope" id="st-fail-scope">--</span>
+        </header>
+        <div class="st-thead is-fail">
+          <span>序</span><span>地块编号</span><span>所在地市</span><span>用途</span>
+          <span>起拍价<em>亿元</em></span><span>挂牌日期</span><span>状态</span><span>备注</span>
+        </div>
+        <div class="st-view"><ul class="st-track is-fail" id="st-track-fail"></ul></div>
+        <div class="st-tfoot" id="st-tfoot-fail"></div>
+      </section>
+    </section>
+
+    <!-- ===== 底部跑马灯 ===== -->
+    <section class="st-marquee" aria-label="台账研判">
+      <div class="st-marquee-tag"><i></i>台账研判</div>
+      <div class="st-marquee-view"><div class="st-marquee-track" id="st-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("st-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("st-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const PARENT = "大屏样板间-公共资金土地出让形势1920.html";
+  /* 配色反转：暖橙 + 告警红为主，钢蓝作历史基准，金色仅作系列识别点缀 */
+  const C = {
+    text: "#e8f2ff", muted: "#8ea9cc", steel: "#5f88b8",
+    gold: "#f0c060", goldSoft: "#ffdc8f",
+    orange: "#ff9d4d", orangeSoft: "#ffc48e", orangeDeep: "#c9682a",
+    red: "#ff5f6e", redSoft: "#ffa8b1", redDeep: "#a03444"
+  };
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = Number(n).toFixed(dec == null ? 0 : dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const signed = (v, d) => (v >= 0 ? "+" : "") + fmtDec(v, d == null ? 1 : d);
+  const r2 = (v) => Math.round(v * 100) / 100;   /* 浮点求和收敛用 */
+
+  /* ===== 3. 数据源（模拟，口径 2026 年 1-7 月累计 · 国有土地使用权出让 · 亿元）
+     合计一律由分项求和，比率 / 楼面价 / 流拍撤牌率全部现算，不复制数字。
+     父页锚点：出让金 2,860 亿元、面积 3,240 万㎡、流拍撤牌率 8.6%（逆向指标）。 ===== */
+  const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月"];
+
+  /* 3.1 全省口径常量（页面标注，右表宗数由流拍撤牌率反推） */
+  const DEAL_LOTS = 265;                 /* 全省成交宗数（口径常量，页面标注） */
+  const FAIL_RATE_ANCHOR = 8.6;          /* 父页流拍撤牌率 %，据此反推流拍撤牌宗数 */
+  const FAIL_RATE_PRE = 4.8;             /* 上年流拍撤牌率 %（逆向指标，上升即劣化） */
+  const FLOOR_DEAL_PROV = 63.4;          /* 全省底价成交占比 % */
+  const AREA_CUR = 3240, AREA_PRE = 3706;        /* 成交面积 万㎡ */
+  const TOTAL_PRE = 3505;                        /* 上年同期出让金 亿元 */
+
+  /* 3.2 父页 13 市成交价（亿元）——左表按地市分组必须落在其中 */
+  const CITY_TOTAL = [
+    { name: "苏州", val: 620 }, { name: "南京", val: 486 }, { name: "无锡", val: 342 },
+    { name: "南通", val: 236 }, { name: "常州", val: 198 }, { name: "徐州", val: 176 },
+    { name: "盐城", val: 158 }, { name: "扬州", val: 142 }, { name: "泰州", val: 128 },
+    { name: "淮安", val: 98 }, { name: "镇江", val: 96 }, { name: "宿迁", val: 92 },
+    { name: "连云港", val: 88 }
+  ];
+  /* 3.3 父页用地结构（亿元）——左表按用途分组必须落在其中 */
+  const USE_TOTAL = [
+    { name: "住宅", val: 1860, color: "#ffc48e" },
+    { name: "商服", val: 486, color: "#ff8f7a" },
+    { name: "工业", val: 372, color: "#8fb4dd" },
+    { name: "其他", val: 142, color: "#6d8db0" }
+  ];
+  const USE_COLOR = {};
+  USE_TOTAL.forEach((u) => { USE_COLOR[u.name] = u.color; });
+
+  /* 3.4 月度成交出让金（父页 2026 年序列，七项之和 = 2,860） */
+  const M2026 = [380, 262, 346, 482, 398, 546, 446];
+
+  /* 3.5 左表：28 宗代表性成交地块（覆盖 13 市 / 4 类用途）
+     —— 28 宗只是展示样本，不等于全省 265 宗，表尾同时给出展示合计与全省口径合计。
+        area 万㎡ / price 亿元 / prem 溢价率%（0 = 底价成交），楼面价由 price ÷ area 现算。 */
+  const DEALS = [
+    { code: "苏地2026-WG-018", city: "苏州", dist: "工业园区", use: "住宅", area: 8.6, price: 46.8, prem: 14.2, buyer: "中海地产" },
+    { code: "苏地2026-WG-032", city: "苏州", dist: "吴中区", use: "住宅", area: 6.2, price: 28.4, prem: 6.8, buyer: "华润置地" },
+    { code: "苏地2026-WG-047", city: "苏州", dist: "相城区", use: "商服", area: 4.8, price: 12.6, prem: 0, buyer: "苏州城投" },
+    { code: "苏地2026-WG-055", city: "苏州", dist: "昆山市", use: "工业", area: 12.4, price: 6.8, prem: 0, buyer: "立讯精密" },
+    { code: "宁地2026G-09", city: "南京", dist: "江宁区", use: "住宅", area: 7.4, price: 38.6, prem: 8.4, buyer: "保利发展" },
+    { code: "宁地2026G-14", city: "南京", dist: "建邺区", use: "住宅", area: 5.2, price: 42.2, prem: 12.6, buyer: "招商蛇口" },
+    { code: "宁地2026G-21", city: "南京", dist: "浦口区", use: "商服", area: 6.6, price: 9.8, prem: 0, buyer: "南京安居" },
+    { code: "锡地2026-06", city: "无锡", dist: "梁溪区", use: "住宅", area: 5.8, price: 26.4, prem: 4.2, buyer: "万科集团" },
+    { code: "锡地2026-11", city: "无锡", dist: "江阴市", use: "工业", area: 15.2, price: 7.6, prem: 0, buyer: "远景能源" },
+    { code: "锡地2026-18", city: "无锡", dist: "新吴区", use: "住宅", area: 4.6, price: 18.2, prem: 2.6, buyer: "绿城中国" },
+    { code: "通地2026-04", city: "南通", dist: "崇川区", use: "住宅", area: 6.4, price: 16.8, prem: 0, buyer: "南通城建" },
+    { code: "通地2026-09", city: "南通", dist: "如皋市", use: "工业", area: 18.6, price: 5.4, prem: 0, buyer: "中天科技" },
+    { code: "常地2026-07", city: "常州", dist: "武进区", use: "住宅", area: 5.6, price: 14.2, prem: 3.4, buyer: "龙湖集团" },
+    { code: "常地2026-12", city: "常州", dist: "溧阳市", use: "其他", area: 9.2, price: 3.6, prem: 0, buyer: "溧阳交产" },
+    { code: "徐地2026-05", city: "徐州", dist: "鼓楼区", use: "住宅", area: 7.2, price: 12.6, prem: 0, buyer: "徐州建总" },
+    { code: "徐地2026-13", city: "徐州", dist: "铜山区", use: "商服", area: 5.4, price: 4.8, prem: 0, buyer: "云龙城投" },
+    { code: "盐地2026-03", city: "盐城", dist: "亭湖区", use: "住宅", area: 6.8, price: 10.4, prem: 1.8, buyer: "中南建设" },
+    { code: "盐地2026-10", city: "盐城", dist: "大丰区", use: "工业", area: 16.4, price: 4.2, prem: 0, buyer: "江苏悦达" },
+    { code: "扬地2026-06", city: "扬州", dist: "邗江区", use: "住宅", area: 5.4, price: 11.8, prem: 5.6, buyer: "扬州城控" },
+    { code: "扬地2026-15", city: "扬州", dist: "仪征市", use: "其他", area: 8.6, price: 2.8, prem: 0, buyer: "扬州公用" },
+    { code: "泰地2026-04", city: "泰州", dist: "海陵区", use: "住宅", area: 6.2, price: 9.6, prem: 0, buyer: "泰州城建" },
+    { code: "泰地2026-11", city: "泰州", dist: "靖江市", use: "工业", area: 13.8, price: 3.8, prem: 0, buyer: "新时代造船" },
+    { code: "淮地2026-02", city: "淮安", dist: "清江浦区", use: "住宅", area: 5.8, price: 7.8, prem: 0, buyer: "淮安交控" },
+    { code: "淮地2026-08", city: "淮安", dist: "淮阴区", use: "商服", area: 4.2, price: 2.6, prem: 0, buyer: "淮安文旅" },
+    { code: "镇地2026-05", city: "镇江", dist: "京口区", use: "住宅", area: 4.8, price: 8.2, prem: 2.2, buyer: "镇江城建" },
+    { code: "宿地2026-03", city: "宿迁", dist: "宿城区", use: "住宅", area: 6.6, price: 7.4, prem: 0, buyer: "宿迁建设" },
+    { code: "宿地2026-09", city: "宿迁", dist: "沭阳县", use: "工业", area: 11.2, price: 2.4, prem: 0, buyer: "江苏箭鹿" },
+    { code: "连地2026-04", city: "连云港", dist: "海州区", use: "住宅", area: 5.2, price: 6.8, prem: 0, buyer: "连云港城建" }
+  ];
+
+  /* 3.6 右表：流拍与撤牌地块（宗数由流拍撤牌率反推，见 §4；按挂牌日期先后排列） */
+  const FAILS = [
+    { code: "苏地2026-WG-011", city: "苏州", use: "商服", start: 8.6, date: "2026-01-22", st: "流拍", note: "报名 0 家" },
+    { code: "宁地2026G-06", city: "南京", use: "住宅", start: 12.8, date: "2026-02-18", st: "流拍", note: "无企业报名" },
+    { code: "徐地2026-03", city: "徐州", use: "住宅", start: 6.4, date: "2026-02-26", st: "撤牌", note: "规划条件调整" },
+    { code: "淮地2026-05", city: "淮安", use: "住宅", start: 4.2, date: "2026-03-12", st: "流拍", note: "无企业报名" },
+    { code: "锡地2026-08", city: "无锡", use: "商服", start: 7.8, date: "2026-03-19", st: "流拍", note: "报名 0 家" },
+    { code: "镇地2026-03", city: "镇江", use: "住宅", start: 5.6, date: "2026-03-26", st: "撤牌", note: "拆迁未清零" },
+    { code: "连地2026-02", city: "连云港", use: "住宅", start: 3.8, date: "2026-04-09", st: "流拍", note: "无企业报名" },
+    { code: "常地2026-05", city: "常州", use: "商服", start: 5.2, date: "2026-04-16", st: "流拍", note: "报名 0 家" },
+    { code: "宁地2026G-11", city: "南京", use: "住宅", start: 16.4, date: "2026-04-23", st: "撤牌", note: "出让条件调整" },
+    { code: "盐地2026-06", city: "盐城", use: "住宅", start: 4.6, date: "2026-05-07", st: "流拍", note: "无企业报名" },
+    { code: "泰地2026-07", city: "泰州", use: "商服", start: 3.4, date: "2026-05-14", st: "流拍", note: "报名 0 家" },
+    { code: "苏地2026-WG-029", city: "苏州", use: "住宅", start: 18.2, date: "2026-05-21", st: "撤牌", note: "起始价重估" },
+    { code: "宿地2026-05", city: "宿迁", use: "住宅", start: 3.2, date: "2026-05-28", st: "流拍", note: "无企业报名" },
+    { code: "扬地2026-09", city: "扬州", use: "住宅", start: 5.8, date: "2026-06-04", st: "流拍", note: "报名 0 家" },
+    { code: "徐地2026-09", city: "徐州", use: "商服", start: 4.4, date: "2026-06-11", st: "撤牌", note: "规划条件调整" },
+    { code: "通地2026-06", city: "南通", use: "住宅", start: 6.2, date: "2026-06-18", st: "流拍", note: "无企业报名" },
+    { code: "锡地2026-14", city: "无锡", use: "住宅", start: 9.6, date: "2026-06-25", st: "撤牌", note: "出让条件调整" },
+    { code: "淮地2026-11", city: "淮安", use: "商服", start: 2.8, date: "2026-07-02", st: "流拍", note: "报名 0 家" },
+    { code: "镇地2026-08", city: "镇江", use: "商服", start: 3.6, date: "2026-07-09", st: "流拍", note: "无企业报名" },
+    { code: "宁地2026G-17", city: "南京", use: "商服", start: 11.2, date: "2026-07-09", st: "撤牌", note: "起始价重估" },
+    { code: "连地2026-06", city: "连云港", use: "工业", start: 2.2, date: "2026-07-16", st: "流拍", note: "报名 0 家" },
+    { code: "盐地2026-12", city: "盐城", use: "住宅", start: 4.8, date: "2026-07-16", st: "撤牌", note: "拆迁未清零" },
+    { code: "常地2026-09", city: "常州", use: "住宅", start: 6.6, date: "2026-07-23", st: "流拍", note: "无企业报名" },
+    { code: "苏地2026-WG-051", city: "苏州", use: "住宅", start: 14.6, date: "2026-07-23", st: "撤牌", note: "出让条件调整" },
+    { code: "泰地2026-13", city: "泰州", use: "住宅", start: 4.2, date: "2026-07-30", st: "流拍", note: "无企业报名" }
+  ];
+
+  /* ===== 4. 派生量：合计、比率、楼面价全部现算 ===== */
+  const D = {};
+  D.provTotal = sum(CITY_TOTAL.map((c) => c.val));        /* 13 市之和 → 应 = 2,860 */
+  D.useTotal = sum(USE_TOTAL.map((u) => u.val));          /* 4 类用途之和 → 应 = 2,860 */
+  D.monthTotal = sum(M2026);                              /* 月度七项之和 → 应 = 2,860 */
+  D.yoy = 100 * (D.provTotal / TOTAL_PRE - 1);            /* 出让金累计同比 */
+  D.areaYoy = 100 * (AREA_CUR / AREA_PRE - 1);
+  /* 平均楼面价 = 出让金(亿元→元) ÷ 成交面积(万㎡→㎡) */
+  D.floorPrice = (D.provTotal * 1e8) / (AREA_CUR * 1e4);
+  D.floorPricePre = (TOTAL_PRE * 1e8) / (AREA_PRE * 1e4);
+  D.floorYoy = 100 * (D.floorPrice / D.floorPricePre - 1);
+
+  /* 4.1 流拍撤牌宗数：由父页流拍撤牌率反推 M = N × r ÷ (1 − r)，再取整；
+         取整后的实际比率仍由 M ÷ (N + M) 现算，页面显示的是现算值。 */
+  const r = FAIL_RATE_ANCHOR / 100;
+  D.failLots = Math.round(DEAL_LOTS * r / (1 - r));       /* 265 × 8.6% ÷ 91.4% ≈ 25 */
+  D.listedLots = DEAL_LOTS + D.failLots;                  /* 挂牌宗数 = 成交 + 流拍撤牌 */
+  D.failRate = 100 * D.failLots / D.listedLots;           /* 现算 = 25 ÷ 290 = 8.62% */
+  D.dealRate = 100 * DEAL_LOTS / D.listedLots;
+  D.failRateGap = D.failRate - FAIL_RATE_PRE;
+
+  /* 4.2 左表展示样本派生（展示 28 宗 ≠ 全省 265 宗，两套合计并列展示） */
+  DEALS.forEach((d) => { d.floor = (d.price * 1e8) / (d.area * 1e4); });
+  const DEALS_SORTED = DEALS.slice().sort((a, b) => b.price - a.price);
+  D.showLots = DEALS.length;
+  D.showPrice = r2(sum(DEALS.map((d) => d.price)));
+  D.showArea = r2(sum(DEALS.map((d) => d.area)));
+  D.showFloor = (D.showPrice * 1e8) / (D.showArea * 1e4);
+  D.showShare = 100 * D.showPrice / D.provTotal;
+  D.showFloorDeals = DEALS.filter((d) => d.prem === 0).length;
+  D.showFloorShare = 100 * D.showFloorDeals / D.showLots;
+  D.showCities = new Set(DEALS.map((d) => d.city)).size;
+  D.showUses = new Set(DEALS.map((d) => d.use)).size;
+
+  /* 4.3 右表派生：起拍价合计、流拍/撤牌拆分、按月宗数（供对照小图） */
+  D.failStart = r2(sum(FAILS.map((f) => f.start)));
+  D.failOnly = FAILS.filter((f) => f.st === "流拍").length;
+  D.pullOnly = FAILS.filter((f) => f.st === "撤牌").length;
+  D.failStartShare = 100 * D.failStart / D.provTotal;
+  const FAIL_BY_MONTH = MONTHS.map((_, i) => FAILS.filter((f) => Number(f.date.slice(5, 7)) === i + 1).length);
+
+  /* 4.4 展示样本按地市 / 按用途分组（须逐组落在父页分组值以内） */
+  const byCity = {}, byUse = {};
+  DEALS.forEach((d) => {
+    byCity[d.city] = r2((byCity[d.city] || 0) + d.price);
+    byUse[d.use] = r2((byUse[d.use] || 0) + d.price);
+  });
+
+  /* ===== 5. 时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("st-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("st-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 6. 顶部汇总带（6 枚，翻牌缓动；末枚内嵌逆向阈值条） ===== */
+  const KPI_DEFS = [
+    { icon: "▤", label: "成交宗数", val: DEAL_LOTS, unit: "宗", dec: 0,
+      sub: () => "挂牌 <b>" + fmtDec(D.listedLots) + "</b> 宗 · 成交率 <b>" + D.dealRate.toFixed(1) + "%</b>" },
+    { icon: "¥", label: "成交总价", val: D.provTotal, unit: "亿元", dec: 0,
+      sub: () => '同比 <b class="st-down">▼ ' + signed(D.yoy) + "</b> · 上年同期 " + fmtDec(TOTAL_PRE) },
+    { icon: "▩", label: "成交面积", val: AREA_CUR, unit: "万㎡", dec: 0,
+      sub: () => '同比 <b class="st-down">▼ ' + signed(D.areaYoy) + "</b> · 上年同期 " + fmtDec(AREA_PRE) },
+    { icon: "◱", label: "平均楼面价", val: D.floorPrice, unit: "元/㎡", dec: 0,
+      sub: () => '同比 <b class="st-down">▼ ' + signed(D.floorYoy) + "</b> · 成交价 ÷ 成交面积" },
+    { icon: "⊗", label: "流拍撤牌宗数", val: D.failLots, unit: "宗", dec: 0, alert: true,
+      sub: () => "流拍 <b>" + D.failOnly + "</b> · 撤牌 <b>" + D.pullOnly + "</b> · 起拍 <b>" + fmtDec(D.failStart, 1) + "</b> 亿元" },
+    { icon: "▲", label: "流拍撤牌率", val: D.failRate, unit: "%", dec: 1, alert: true, threshold: true }
+  ];
+  const band = $("st-band");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "st-kpi" + (k.alert ? " is-alert" : "");
+    card.innerHTML =
+      '<div class="st-kpi-icon">' + k.icon + "</div>" +
+      '<div class="st-kpi-main">' +
+        '<div class="st-kpi-label">' + k.label + "</div>" +
+        '<div class="st-kpi-num"><span class="st-kpi-val">0</span><span class="st-kpi-unit">' + k.unit + "</span></div>" +
+        (k.threshold
+          ? '<div class="st-mini-track"><div class="st-mini-fill" id="st-mini-fill"></div>' +
+            '<div class="st-mini-tick" style="left:' + (100 * FAIL_RATE_PRE / 20).toFixed(2) + '%"></div></div>' +
+            '<div class="st-kpi-sub">上年 <b>' + FAIL_RATE_PRE.toFixed(1) + '%</b> · 逆向指标 <b class="st-down">' +
+            signed(D.failRateGap) + " pt</b></div>"
+          : '<div class="st-kpi-sub">' + k.sub() + "</div>") +
+      "</div>";
+    band.appendChild(card);
+    k.node = card.querySelector(".st-kpi-val");
+    k.cur = 0;
+  });
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      const diff = k.val - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) k.cur = k.val; else k.cur += diff * 0.13;
+      k.node.textContent = fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+  /* 逆向阈值条：0-20% 标尺，白刻度为上年 4.8% */
+  setTimeout(() => { $("st-mini-fill").style.width = Math.min(100, 100 * D.failRate / 20).toFixed(2) + "%"; }, 200);
+
+  /* ===== 7. 对照带（★ chips 是图表容器的同级 DOM，必须在 echarts.init 之前填充完） ===== */
+  const tag = (label, val, cls) =>
+    '<span class="st-tag' + (cls ? " " + cls : "") + '">' + label + "<b>" + val + "</b></span>";
+  const tagDot = (color, label, val, share) =>
+    '<span class="st-tag"><i style="background:' + color + '"></i>' + label + "<b>" + val +
+    "</b><u>" + share + "</u></span>";
+
+  $("st-bl-scope").innerHTML =
+    '<span class="st-bl-tag"><i></i>台账口径</span>' +
+    tag("全量逐宗 ", "无筛选") +
+    tag("覆盖地市 ", fmtDec(CITY_TOTAL.length)) +
+    tag("用途类别 ", fmtDec(USE_TOTAL.length)) +
+    tag("左表展示 ", fmtDec(D.showLots) + " 宗") +
+    tag("占全省口径 ", D.showShare.toFixed(1) + "%");
+
+  $("st-bl-use").innerHTML =
+    '<span class="st-bl-tag"><i></i>用途结构</span>' +
+    USE_TOTAL.map((u) => tagDot(u.color, u.name + " ", fmtDec(u.val),
+      (100 * u.val / D.useTotal).toFixed(1) + "%")).join("") +
+    tag("Σ 四项 ", fmtDec(D.useTotal) + " 亿元 ✓", "is-sum");
+
+  $("st-bl-tie").innerHTML =
+    '<span class="st-bl-tag"><i></i>两表对照</span>' +
+    '<span class="st-formula">左表 <em>成交 ' + fmtDec(DEAL_LOTS) + " 宗 / " + fmtDec(D.provTotal) +
+    " 亿元</em>　⇄　右表 <b>流拍撤牌 " + fmtDec(D.failLots) + " 宗 / 起拍 " + fmtDec(D.failStart, 1) +
+    " 亿元</b>　<u>|</u>　流拍撤牌率 = " + fmtDec(D.failLots) + " ÷ (" + fmtDec(DEAL_LOTS) + " + " +
+    fmtDec(D.failLots) + ") = <b>" + D.failRate.toFixed(2) + "%</b> ≈ " + FAIL_RATE_ANCHOR.toFixed(1) +
+    "%（父页口径）</span>";
+
+  /* ===== 8. 双表渲染（★ 表格先于 init 图表写入，避免容器量高度时同级 DOM 还是空的） ===== */
+  const ROW_H = 34;   /* 与 CSS --st-row-h 保持一致 */
+
+  function dealRow(d, i) {
+    const premCls = d.prem > 10 ? " is-hot" : (d.prem > 0 ? " is-mid" : "");
+    const premCell = d.prem === 0
+      ? '<span class="st-td-prem"><span class="st-badge is-floor">底价</span></span>'
+      : '<span class="st-td-prem' + premCls + '">' + signed(d.prem) + "%</span>";
+    return '<li data-i="' + i + '" class="' + (i % 2 === 0 ? "is-odd" : "") + '">' +
+      '<span class="st-td-no' + (i < 3 ? " is-top" : "") + '">' + (i + 1) + "</span>" +
+      '<span class="st-td-code">' + d.code + "</span>" +
+      '<span class="st-td-loc">' + d.city + ' <u>· ' + d.dist + "</u></span>" +
+      '<span class="st-td-use"><i style="background:' + USE_COLOR[d.use] + '"></i>' + d.use + "</span>" +
+      '<span class="st-td-num">' + fmtDec(d.area, 1) + "</span>" +
+      '<span class="st-td-amt">' + fmtDec(d.price, 1) + "</span>" +
+      '<span class="st-td-num">' + fmtDec(d.floor) + "</span>" +
+      premCell +
+      '<span class="st-td-buyer">' + d.buyer + "</span>" +
+      "</li>";
+  }
+  function failRow(f, i) {
+    const isPull = f.st === "撤牌";
+    return '<li data-i="' + i + '" class="' + (i % 2 === 0 ? "is-odd " : "") + (isPull ? "is-pull" : "") + '">' +
+      '<span class="st-td-no is-bad">' + (i + 1) + "</span>" +
+      '<span class="st-td-code">' + f.code + "</span>" +
+      '<span class="st-td-loc">' + f.city + "</span>" +
+      '<span class="st-td-use"><i style="background:' + USE_COLOR[f.use] + '"></i>' + f.use + "</span>" +
+      '<span class="st-td-amt">' + fmtDec(f.start, 1) + "</span>" +
+      '<span class="st-td-date">' + f.date + "</span>" +
+      '<span><span class="st-badge ' + (isPull ? "is-pull" : "is-fail") + '">' + f.st + "</span></span>" +
+      '<span class="st-td-note">' + f.note + "</span>" +
+      "</li>";
+  }
+
+  /* 两副拷贝 + translateY 步进 + 到底无过渡复位（不用 scrollTop） */
+  const dealHTML = DEALS_SORTED.map(dealRow).join("");
+  $("st-track-deal").innerHTML = dealHTML + dealHTML;
+  const failHTML = FAILS.map(failRow).join("");
+  $("st-track-fail").innerHTML = failHTML + failHTML;
+
+  $("st-deal-scope").textContent = "展示 " + D.showLots + " 宗 · 合计 " + fmtDec(D.showPrice, 1) +
+    " 亿元 · 占全省口径 " + D.showShare.toFixed(1) + "%";
+  $("st-fail-scope").textContent = D.failLots + " 宗全量 · 流拍 " + D.failOnly + " · 撤牌 " + D.pullOnly;
+
+  /* 左表表尾：两行——展示 28 宗合计 与 全省口径合计（265 宗），并说明差异 */
+  $("st-tfoot-deal").innerHTML =
+    '<div class="st-tfoot-row is-deal">' +
+      "<span></span>" +
+      '<span class="st-tfoot-lab">展示 ' + D.showLots + " 宗合计</span>" +
+      "<span>" + D.showCities + " 市</span><span>" + D.showUses + " 类</span>" +
+      "<span><b>" + fmtDec(D.showArea, 1) + "</b></span>" +
+      "<span><b>" + fmtDec(D.showPrice, 1) + "</b></span>" +
+      "<span>" + fmtDec(D.showFloor) + "</span>" +
+      "<span>底价 " + D.showFloorDeals + " 宗</span>" +
+      "<span>占全省 " + D.showShare.toFixed(1) + "%</span>" +
+    "</div>" +
+    '<div class="st-tfoot-row is-deal is-prov">' +
+      "<span></span>" +
+      '<span class="st-tfoot-lab">全省口径合计（' + fmtDec(DEAL_LOTS) + " 宗）</span>" +
+      "<span>" + CITY_TOTAL.length + " 市 ✓</span><span>" + USE_TOTAL.length + " 类 ✓</span>" +
+      "<span><b>" + fmtDec(AREA_CUR) + "</b></span>" +
+      "<span><b>" + fmtDec(D.provTotal) + "</b></span>" +
+      "<span>" + fmtDec(D.floorPrice) + "</span>" +
+      "<span>底价占比 " + FLOOR_DEAL_PROV.toFixed(1) + "%</span>" +
+      "<span>样本偏主城住宅</span>" +
+    "</div>";
+
+  /* 右表表尾：单行合计 */
+  $("st-tfoot-fail").innerHTML =
+    '<div class="st-tfoot-row is-fail">' +
+      "<span></span>" +
+      '<span class="st-tfoot-lab">合计 ' + D.failLots + " 宗（全量）</span>" +
+      "<span>" + new Set(FAILS.map((f) => f.city)).size + " 市</span>" +
+      "<span>" + new Set(FAILS.map((f) => f.use)).size + " 类</span>" +
+      "<span><b>" + fmtDec(D.failStart, 1) + "</b></span>" +
+      "<span>1-7 月</span>" +
+      "<span>流拍 " + D.failOnly + "</span>" +
+      "<span>撤牌 " + D.pullOnly + " · 挂牌占比 " + D.failRate.toFixed(1) + "%</span>" +
+    "</div>";
+
+  /* 8.1 无缝滚动轮播：整块 translateY 步进，走满一副拷贝后无过渡复位 */
+  function cruise(trackId, count, period) {
+    const track = $(trackId);
+    const rows = track.querySelectorAll("li");
+    let step = 0;
+    function markCursor() {
+      rows.forEach((li) => li.classList.remove("is-cursor"));
+      const k = step % count;
+      if (rows[k]) rows[k].classList.add("is-cursor");
+      if (rows[k + count]) rows[k + count].classList.add("is-cursor");
+    }
+    markCursor();
+    setInterval(() => {
+      step += 1;
+      track.style.transition = "transform 0.62s cubic-bezier(0.3, 0.8, 0.3, 1)";
+      track.style.transform = "translateY(" + (-step * ROW_H) + "px)";
+      markCursor();
+      if (step >= count) {
+        setTimeout(() => {
+          track.style.transition = "none";
+          track.style.transform = "translateY(0px)";
+          step = 0;
+          void track.offsetHeight;
+          markCursor();
+        }, 660);
+      }
+    }, period);
+  }
+  cruise("st-track-deal", DEALS_SORTED.length, 2000);
+  cruise("st-track-fail", FAILS.length, 2400);
+
+  /* ===== 9. 对照小图（月度成交出让金 vs 流拍撤牌宗数）
+     折线用 showSymbol:false 隐藏点，绝不写 symbol:"none"（会击穿渲染管线） ===== */
+  const vGrad = (a, b) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: a }, { offset: 1, color: b }]);
+  const briefChart = echarts.init($("st-chart-brief"));
+  briefChart.setOption({
+    tooltip: {
+      trigger: "axis", confine: true,
+      backgroundColor: "rgba(8, 26, 50, 0.93)", borderColor: "rgba(255, 157, 77, 0.45)",
+      textStyle: { color: "#e2eeff", fontSize: 12 },
+      formatter: (ps) => {
+        const i = ps[0].dataIndex;
+        return '<b style="color:#ffc48e">' + MONTHS[i] + "</b><br/>成交出让金 " + fmtDec(M2026[i]) +
+          ' 亿元<br/>流拍撤牌 <b style="color:#ffa8b1">' + FAIL_BY_MONTH[i] + " 宗</b>";
+      }
+    },
+    legend: {
+      top: 0, right: 2, itemWidth: 11, itemHeight: 6, itemGap: 14,
+      textStyle: { color: "#b9cee6", fontSize: 10 },
+      data: ["成交出让金（亿元）", "流拍撤牌（宗）"]
+    },
+    grid: { left: 2, right: 4, top: 22, bottom: 0, containLabel: true },
+    xAxis: {
+      type: "category", data: MONTHS,
+      axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+      axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 10 }
+    },
+    yAxis: [
+      { type: "value", splitLine: { lineStyle: { color: "rgba(92, 156, 226, 0.12)" } },
+        axisLabel: { color: C.muted, fontSize: 9.5 } },
+      { type: "value", max: 10, splitLine: { show: false },
+        axisLabel: { color: C.muted, fontSize: 9.5 } }
+    ],
+    series: [
+      { name: "成交出让金（亿元）", type: "line", smooth: true, showSymbol: false, z: 3,
+        lineStyle: { width: 2.4, color: C.orange, shadowColor: "rgba(255, 157, 77, 0.5)", shadowBlur: 10 },
+        areaStyle: { color: vGrad("rgba(255, 157, 77, 0.26)", "rgba(255, 157, 77, 0)") },
+        data: M2026 },
+      { name: "流拍撤牌（宗）", type: "bar", yAxisIndex: 1, barWidth: 13, z: 2,
+        itemStyle: { borderRadius: [3, 3, 0, 0], color: vGrad(C.redSoft, "rgba(160, 52, 68, 0.35)") },
+        label: { show: true, position: "top", fontSize: 9.5, fontWeight: 700, color: C.redSoft },
+        data: FAIL_BY_MONTH }
+    ]
+  });
+
+  /* ===== 10. 底部跑马灯：台账研判（数字与上表同源现算，语气承压） ===== */
+  const worstCity = CITY_TOTAL.slice().sort((a, b) => b.val - a.val)[0];
+  const failTopCity = (() => {
+    const m = {};
+    FAILS.forEach((f) => { m[f.city] = (m[f.city] || 0) + 1; });
+    return Object.keys(m).sort((a, b) => m[b] - m[a]).map((n) => n + " " + m[n] + " 宗").slice(0, 3).join("、");
+  })();
+  const julShare = 100 * FAIL_BY_MONTH[6] / D.failLots;
+  const NEWS = [
+    "1-7 月全省国有土地使用权出让成交 <b>" + fmtDec(DEAL_LOTS) + " 宗</b>、<b>" + fmtDec(D.provTotal) +
+      ' 亿元</b>，同比 <b class="is-bad">' + signed(D.yoy) + "%</b>，上年同期 " + fmtDec(TOTAL_PRE) + " 亿元",
+    "成交面积 <b>" + fmtDec(AREA_CUR) + " 万㎡</b>（" + signed(D.areaYoy) + "%），平均楼面价 <b>" +
+      fmtDec(D.floorPrice) + " 元/㎡</b>（现算 = " + fmtDec(D.provTotal) + " 亿元 ÷ " + fmtDec(AREA_CUR) + " 万㎡），量价双降",
+    '同期流拍撤牌 <b class="is-bad">' + D.failLots + " 宗</b>（流拍 " + D.failOnly + " · 撤牌 " + D.pullOnly +
+      '），流拍撤牌率 <b class="is-bad">' + D.failRate.toFixed(2) + "%</b> = " + D.failLots + " ÷ (" +
+      DEAL_LOTS + " + " + D.failLots + ")，较上年 " + FAIL_RATE_PRE.toFixed(1) + "% 上升 " +
+      fmtDec(D.failRateGap, 1) + " 个百分点",
+    '未能成交的挂牌起拍金额合计 <b class="is-bad">' + fmtDec(D.failStart, 1) + " 亿元</b>，相当于同期成交总价的 <b>" +
+      D.failStartShare.toFixed(1) + "%</b>，供地计划兑现承压",
+    "流拍撤牌 7 月单月 <b>" + FAIL_BY_MONTH[6] + ' 宗</b>，占 1-7 月的 <b class="is-bad">' + julShare.toFixed(1) +
+      "%</b>，年内呈逐月抬升态势，尚未出现拐点",
+    "流拍撤牌集中于 <b>" + failTopCity + "</b>，主城优质地块与远郊配套地块出现价格分层",
+    "用途结构：住宅 " + fmtDec(USE_TOTAL[0].val) + "（" + (100 * USE_TOTAL[0].val / D.useTotal).toFixed(1) +
+      "%）、商服 " + fmtDec(USE_TOTAL[1].val) + "、工业 " + fmtDec(USE_TOTAL[2].val) + "、其他 " +
+      fmtDec(USE_TOTAL[3].val) + " 亿元，四项之和回到 <b>" + fmtDec(D.useTotal) + " 亿元</b>",
+    "左表展示 <b>" + D.showLots + " 宗</b>代表性成交地块，合计 <b>" + fmtDec(D.showPrice, 1) +
+      " 亿元</b>、占全省口径 <b>" + D.showShare.toFixed(1) + "%</b>；全量 " + fmtDec(DEAL_LOTS) +
+      " 宗以省级土地成交台账为准，两者不可混用",
+    "展示样本中 <b>" + D.showFloorDeals + " 宗</b>以底价成交（" + D.showFloorShare.toFixed(1) +
+      "%），与全省底价成交占比 <b>" + FLOOR_DEAL_PROV.toFixed(1) + "%</b> 基本一致，土拍热度持续偏冷",
+    "<b>" + worstCity.name + "</b> 以 <b>" + fmtDec(worstCity.val) + ' 亿元</b>居 13 市首位，但 13 市出让金<b class="is-bad">全部负增长</b>，建议前瞻研判基金预算收支平衡与偿债资金统筹'
+  ];
+  const track = $("st-marquee-track");
+  const marqueeHTML = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  track.innerHTML = marqueeHTML + marqueeHTML;
+
+  /* ===== 11. 交互：返回父页（按钮 + Esc）；本页无对象切换器，不做 hash ===== */
+  $("st-back").addEventListener("click", () => { location.href = PARENT; });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { location.href = PARENT; } });
+
+  /* ===== 12. 勾稽自检：与父页锚点逐条对账，不通过则亮告警条 ===== */
+  const overCity = Object.keys(byCity).filter((n) => {
+    const t = CITY_TOTAL.filter((c) => c.name === n)[0];
+    return !t || byCity[n] > t.val + 1e-6;
+  });
+  const overUse = Object.keys(byUse).filter((n) => {
+    const t = USE_TOTAL.filter((u) => u.name === n)[0];
+    return !t || byUse[n] > t.val + 1e-6;
+  });
+  const CHECKS = [
+    ["13 市之和 = 2,860", D.provTotal === 2860],
+    ["4 类用途之和 = 2,860", D.useTotal === 2860],
+    ["月度七项之和 = 2,860", D.monthTotal === 2860],
+    ["平均楼面价 = 8,827 元/㎡", Math.round(D.floorPrice) === 8827],
+    ["流拍撤牌率 ≈ 8.6%", Math.abs(D.failRate - FAIL_RATE_ANCHOR) < 0.05],
+    ["流拍撤牌宗数 = 明细行数", D.failLots === FAILS.length],
+    ["流拍按月之和 = 总宗数", sum(FAIL_BY_MONTH) === FAILS.length],
+    ["展示样本分市不超父页分组", overCity.length === 0],
+    ["展示样本分用途不超父页分组", overUse.length === 0],
+    ["展示样本合计 ≤ 全省口径", D.showPrice <= D.provTotal]
+  ];
+  const failed = CHECKS.filter((c) => !c[1]).map((c) => c[0]);
+  if (failed.length) {
+    errorNode.textContent = "勾稽自检未通过：" + failed.join("；");
+    errorNode.classList.add("is-visible");
+  }
+})();
+</script>
+</body>
+</html>

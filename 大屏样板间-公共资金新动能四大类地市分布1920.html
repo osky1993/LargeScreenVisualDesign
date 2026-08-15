@@ -1,0 +1,1152 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 公共资金新动能四大类地市分布</title>
+<style>
+  :root {
+    --nd-bg: #08203f;
+    --nd-panel: rgba(11, 38, 72, 0.72);
+    --nd-border: rgba(92, 156, 226, 0.28);
+    --nd-text: #e8f2ff;
+    --nd-muted: #8ea9cc;
+    --nd-gold: #f0c060;
+    --nd-gold-soft: #ffdc8f;
+    --nd-blue: #3d9cff;
+    --nd-cyan: #39d0d8;
+    --nd-green: #33e0a6;
+    --nd-red: #ff5f6e;
+    --nd-orange: #ff9d4d;
+    --nd-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--nd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1. 1920x1080 固定设计舞台 ===== */
+  .nd-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(240, 192, 96, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(57, 208, 216, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 60, 120, 0.34), transparent 56%),
+      linear-gradient(rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      var(--nd-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 380px 1fr 430px;
+    grid-template-rows: 84px 112px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .nd-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px; max-width: 1200px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .nd-error.is-visible { display: block; }
+
+  /* ===== 2. 顶栏：三级面包屑 + 类别切换器 + 返回 + 时钟 ===== */
+  .nd-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .nd-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(240, 192, 96, 0.6) 16%, rgba(57, 208, 216, 0.85) 50%, rgba(240, 192, 96, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.4);
+  }
+  .nd-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .nd-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--nd-muted); }
+  .nd-crumb b { font-weight: 400; color: var(--nd-gold); }
+  .nd-crumb i { font-style: normal; color: rgba(142, 169, 204, 0.55); }
+  .nd-crumb em { font-style: normal; color: #d7e8ff; }
+  .nd-crumb-up { color: #a8c2e0; text-decoration: none; transition: color 0.18s, text-shadow 0.18s; }
+  .nd-crumb-up:hover { color: var(--nd-gold-soft); text-decoration: underline; text-shadow: 0 0 10px rgba(240, 192, 96, 0.5); }
+  .nd-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .nd-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--nd-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(240, 192, 96, 0.35));
+  }
+  .nd-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--nd-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .nd-head-meta b { font-weight: 400; color: var(--nd-gold-soft); }
+  .nd-head-meta i { font-style: normal; color: rgba(142, 169, 204, 0.4); }
+
+  .nd-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+  .nd-switcher { display: flex; align-items: stretch; gap: 8px; }
+  .nd-sw-btn {
+    display: flex; align-items: center; gap: 5px; padding: 0 12px; cursor: pointer; user-select: none;
+    border-radius: 9px; font-family: inherit; font-size: 13px; letter-spacing: 0.06em;
+    border: 1px solid rgba(240, 192, 96, 0.34);
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.15), rgba(16, 46, 86, 0.6));
+    color: #ffdc8f; transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .nd-sw-btn:hover { color: #fff6e2; border-color: rgba(240, 192, 96, 0.85); box-shadow: 0 0 14px rgba(240, 192, 96, 0.4); }
+  .nd-sw-btn b { font-weight: 700; font-size: 16px; }
+  .nd-sw-box {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-width: 168px; padding: 6px 16px; border-radius: 9px;
+    border: 1px solid rgba(240, 192, 96, 0.5); background: rgba(72, 56, 24, 0.42);
+    box-shadow: inset 0 0 14px rgba(240, 192, 96, 0.1);
+  }
+  .nd-sw-name { font-size: 17px; font-weight: 700; letter-spacing: 0.1em; color: var(--nd-gold-soft); white-space: nowrap; }
+  .nd-sw-idx { font-size: 11px; letter-spacing: 0.26em; color: rgba(240, 192, 96, 0.7); font-variant-numeric: tabular-nums; }
+  .nd-back {
+    display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 14px; cursor: pointer;
+    border-radius: 10px; font-family: inherit; font-size: 13px; letter-spacing: 0.08em;
+    border: 1px solid rgba(92, 156, 226, 0.45); background: rgba(16, 46, 86, 0.6); color: #cfe6ff;
+    transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .nd-back:hover { color: #fff; border-color: rgba(57, 208, 216, 0.8); box-shadow: 0 0 14px rgba(57, 208, 216, 0.35); }
+  .nd-back svg { width: 16px; height: 16px; }
+  .nd-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 16px; border-left: 1px solid rgba(92, 156, 226, 0.25); }
+  .nd-clock-time { font: 700 24px/1 var(--nd-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(57, 208, 216, 0.4); }
+  .nd-clock-date { font-size: 12px; color: var(--nd-muted); letter-spacing: 0.08em; }
+
+  /* ===== 3. KPI 带（5 枚） ===== */
+  .nd-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .nd-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--nd-border); border-radius: 12px; background: var(--nd-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .nd-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--nd-gold), transparent); }
+  .nd-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(240, 192, 96, 0.13), transparent 68%);
+  }
+  .nd-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.28), rgba(57, 208, 216, 0.12));
+    border: 1px solid rgba(240, 192, 96, 0.35); box-shadow: inset 0 0 12px rgba(240, 192, 96, 0.14);
+  }
+  .nd-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .nd-kpi-label { font-size: 12.5px; letter-spacing: 0.08em; color: var(--nd-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nd-kpi-label b { font-weight: 700; color: #cfe6ff; }
+  .nd-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .nd-kpi-val { font: 700 28px/1 var(--nd-mono); color: var(--nd-gold-soft); text-shadow: 0 0 14px rgba(240, 192, 96, 0.45); }
+  .nd-kpi-unit { font-size: 12px; color: #b39a5e; }
+  .nd-kpi-sub { font-size: 11.5px; color: var(--nd-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nd-kpi-sub b { font-weight: 700; }
+  .nd-up { color: var(--nd-green); }
+  .nd-down { color: var(--nd-red); }
+
+  /* ===== 4. 面板通用 ===== */
+  .nd-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .nd-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--nd-border); border-radius: 12px; background: var(--nd-panel);
+    display: flex; flex-direction: column;
+  }
+  .nd-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(240, 192, 96, 0.22), rgba(57, 208, 216, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .nd-panel-head i { flex: none; width: 5px; height: 16px; background: var(--nd-gold); box-shadow: 0 0 8px var(--nd-gold); transform: skewX(-12deg); }
+  .nd-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.1em; color: #f4f9ff; white-space: nowrap; }
+  .nd-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+  .nd-panel-scope { margin-left: auto; font-size: 11.5px; color: var(--nd-gold-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .nd-chart { flex: 1; min-height: 0; }
+
+  /* ===== 5. 左列上：四大类切换卡 ===== */
+  .nd-catwrap { flex: none; height: 366px; }
+  .nd-cats { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 7px; padding: 10px; }
+  .nd-cat {
+    flex: 1; min-height: 0; position: relative; overflow: hidden; cursor: pointer; text-align: left;
+    display: flex; flex-direction: column; justify-content: center; gap: 4px;
+    padding: 0 12px 0 15px; border-radius: 9px; font-family: inherit;
+    border: 1px solid rgba(92, 156, 226, 0.22); background: rgba(16, 46, 86, 0.42);
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  }
+  .nd-cat::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: currentColor; opacity: 0.75; }
+  .nd-cat:hover { border-color: rgba(240, 192, 96, 0.5); background: rgba(24, 62, 108, 0.55); }
+  .nd-cat.is-on { border-color: rgba(240, 192, 96, 0.8); background: rgba(72, 56, 24, 0.46); box-shadow: 0 0 16px rgba(240, 192, 96, 0.24), inset 0 0 16px rgba(240, 192, 96, 0.08); }
+  .nd-cat-r1 { display: flex; align-items: baseline; gap: 7px; }
+  .nd-cat-name { font-size: 13.5px; font-weight: 700; letter-spacing: 0.04em; color: #eaf4ff; white-space: nowrap; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .nd-cat-val { font: 700 18px/1 var(--nd-mono); color: var(--nd-gold-soft); font-variant-numeric: tabular-nums; }
+  .nd-cat-unit { font-size: 10.5px; color: #b39a5e; }
+  .nd-cat-r2 { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--nd-muted); font-variant-numeric: tabular-nums; }
+  .nd-cat-r2 b { font-weight: 700; }
+  .nd-cat-track { flex: 1; min-width: 0; height: 5px; border-radius: 3px; background: rgba(63, 120, 200, 0.22); position: relative; overflow: hidden; }
+  .nd-cat-track u { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 3px; background: currentColor; box-shadow: 0 0 8px currentColor; transition: width 0.9s cubic-bezier(0.22, 0.8, 0.3, 1); }
+
+  /* ===== 6. 左列下：13 市排行横条 ===== */
+  .nd-rank { flex: 1; min-height: 0; margin: 0; padding: 4px 0 0; list-style: none; display: flex; flex-direction: column; }
+  .nd-rk-row {
+    flex: 1; min-height: 0; display: grid; grid-template-columns: 20px 54px 1fr 46px;
+    align-items: center; gap: 6px; padding: 0 10px; font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.08); transition: background 0.3s, box-shadow 0.3s;
+  }
+  .nd-rk-row:nth-child(odd) { background: rgba(63, 120, 200, 0.07); }
+  .nd-rk-row.is-active { background: rgba(240, 192, 96, 0.16); box-shadow: inset 3px 0 0 var(--nd-gold); }
+  .nd-rk-no { width: 19px; height: 19px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font: 700 10.5px/1 var(--nd-mono); color: #0a1c33; background: rgba(142, 169, 204, 0.65); }
+  .nd-rk-row.is-top .nd-rk-no { background: linear-gradient(140deg, var(--nd-gold-soft), #d8a03c); box-shadow: 0 0 8px rgba(240, 192, 96, 0.5); }
+  .nd-rk-name { font-size: 12.5px; font-weight: 700; color: #eaf4ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nd-rk-bar { position: relative; height: 9px; border-radius: 5px; background: rgba(63, 120, 200, 0.18); overflow: hidden; }
+  .nd-rk-bar u { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 5px; transition: width 0.9s cubic-bezier(0.22, 0.8, 0.3, 1); }
+  .nd-rk-val { text-align: right; font: 700 13px/1 var(--nd-mono); color: var(--nd-gold-soft); }
+  .nd-rk-foot {
+    flex: none; height: 26px; display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 11.5px; color: var(--nd-muted); font-variant-numeric: tabular-nums;
+    border-top: 1px solid rgba(240, 192, 96, 0.3); background: rgba(72, 56, 24, 0.32);
+  }
+  .nd-rk-foot b { color: var(--nd-gold-soft); font-weight: 700; }
+
+  /* ===== 7. 中列上：地图（图例 / 焦点卡为绝对定位覆盖层，不影响画布高度） ===== */
+  .nd-map-wrap { position: relative; flex: 1; min-height: 0; }
+  .nd-map-wrap .nd-chart { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+  .nd-map-empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #ff9d4d; font-size: 15px; }
+  .nd-legend {
+    position: absolute; left: 14px; top: 12px; z-index: 4; width: 186px;
+    border: 1px solid rgba(92, 156, 226, 0.22); border-radius: 10px;
+    background: rgba(8, 26, 50, 0.62); padding: 9px 10px 8px;
+  }
+  .nd-legend-t { font-size: 11px; letter-spacing: 0.14em; color: #7fa6cf; margin-bottom: 6px; }
+  .nd-lg-row { display: flex; align-items: center; gap: 7px; height: 19px; font-size: 11px; color: #cfe2f8; font-variant-numeric: tabular-nums; }
+  .nd-lg-row i { flex: none; width: 15px; height: 10px; border-radius: 2px; }
+  .nd-lg-row em { font-style: normal; margin-left: auto; color: var(--nd-muted); font-size: 10.5px; }
+  .nd-legend-hr { height: 1px; background: rgba(92, 156, 226, 0.2); margin: 7px 0 6px; }
+  .nd-lg-note { display: flex; align-items: center; gap: 6px; height: 17px; font-size: 10.5px; color: #93b0d2; }
+  .nd-lg-note s { flex: none; width: 12px; height: 12px; border-radius: 50%; border: 1.6px solid var(--nd-gold-soft); text-decoration: none; box-shadow: 0 0 7px rgba(240, 192, 96, 0.6); }
+  .nd-lg-note u { flex: none; width: 14px; height: 0; border-top: 2.2px solid currentColor; text-decoration: none; }
+
+  .nd-focus {
+    position: absolute; right: 14px; top: 12px; z-index: 4; width: 214px;
+    border: 1px solid rgba(240, 192, 96, 0.32); border-radius: 10px;
+    background: linear-gradient(160deg, rgba(72, 56, 24, 0.5), rgba(8, 26, 50, 0.72));
+    padding: 10px 12px 11px; box-shadow: 0 0 20px rgba(240, 192, 96, 0.12);
+  }
+  .nd-fc-head { display: flex; align-items: baseline; gap: 8px; }
+  .nd-fc-name { font-size: 17px; font-weight: 700; letter-spacing: 0.08em; color: #f4f9ff; }
+  .nd-fc-blk { font-size: 10.5px; padding: 1px 7px; border-radius: 9px; color: #06182c; font-weight: 700; }
+  .nd-fc-rank { margin-left: auto; font-size: 11px; color: var(--nd-gold-soft); font-variant-numeric: tabular-nums; }
+  .nd-fc-val { display: flex; align-items: baseline; gap: 5px; margin: 5px 0 7px; font-variant-numeric: tabular-nums; }
+  .nd-fc-val b { font: 700 27px/1 var(--nd-mono); color: var(--nd-gold-soft); text-shadow: 0 0 14px rgba(240, 192, 96, 0.4); }
+  .nd-fc-val span { font-size: 11px; color: #b39a5e; }
+  .nd-fc-val em { margin-left: auto; font-style: normal; font-size: 12px; font-weight: 700; }
+  .nd-fc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; margin-bottom: 8px; }
+  .nd-fc-cell { display: flex; flex-direction: column; gap: 2px; }
+  .nd-fc-cell span { font-size: 10px; color: #7fa6cf; }
+  .nd-fc-cell b { font: 700 13px/1 var(--nd-mono); color: #eaf4ff; font-variant-numeric: tabular-nums; }
+  .nd-fc-mix-t { font-size: 10px; color: #7fa6cf; letter-spacing: 0.1em; margin-bottom: 4px; }
+  .nd-fc-mix { display: flex; flex-direction: column; gap: 3px; }
+  .nd-fc-mix-row { display: grid; grid-template-columns: 30px 1fr 34px; align-items: center; gap: 6px; font-size: 10px; color: #b6cbe4; font-variant-numeric: tabular-nums; }
+  .nd-fc-mix-row i { position: relative; height: 7px; border-radius: 4px; background: rgba(63, 120, 200, 0.2); overflow: hidden; }
+  .nd-fc-mix-row i u { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 4px; transition: width 0.7s ease; }
+  .nd-fc-mix-row b { text-align: right; font-weight: 700; color: #dceaff; }
+
+  /* ===== 8. 右列下：地市 x 四大类矩阵热力 ===== */
+  .nd-mx-head, .nd-mx-row, .nd-mx-foot {
+    display: grid; grid-template-columns: 50px repeat(4, 1fr) 44px; align-items: center; gap: 5px; padding: 0 10px;
+  }
+  .nd-mx-head {
+    flex: none; height: 24px; font-size: 10.5px; letter-spacing: 0.08em; color: #6f93bd;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.2); background: rgba(63, 120, 200, 0.08);
+  }
+  .nd-mx-head span { text-align: center; }
+  .nd-mx-head span:first-child { text-align: left; }
+  .nd-mx-head span:last-child { text-align: right; }
+  .nd-mx-head span.is-col { color: var(--nd-gold-soft); font-weight: 700; }
+  .nd-mx-body { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+  .nd-mx-row { flex: 1; min-height: 0; font-variant-numeric: tabular-nums; }
+  .nd-mx-city { font-size: 11.5px; font-weight: 700; color: #dceaff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nd-mx-cell {
+    height: 19px; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+    font: 700 11px/1 var(--nd-mono); color: #eef6ff; border: 1px solid transparent;
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+  .nd-mx-cell.is-col { border-color: rgba(255, 236, 190, 0.9); box-shadow: 0 0 9px rgba(240, 192, 96, 0.45); }
+  .nd-mx-tot { text-align: right; font: 700 11.5px/1 var(--nd-mono); color: var(--nd-gold-soft); }
+  .nd-mx-foot {
+    flex: none; height: 26px; font-size: 10.5px; color: var(--nd-muted); font-variant-numeric: tabular-nums;
+    border-top: 1px solid rgba(240, 192, 96, 0.3); background: rgba(72, 56, 24, 0.32);
+  }
+  .nd-mx-foot span { text-align: center; }
+  .nd-mx-foot span:first-child { text-align: left; }
+  .nd-mx-foot span:last-child { text-align: right; color: var(--nd-gold-soft); font-weight: 700; }
+  .nd-mx-foot b { color: var(--nd-gold-soft); font-weight: 700; }
+
+  /* ===== 9. 右列上：板块环 + 三行板块卡 ===== */
+  .nd-blks { flex: none; padding: 2px 12px 9px; display: flex; flex-direction: column; gap: 5px; }
+  .nd-blk {
+    display: grid; grid-template-columns: 42px 58px 1fr 112px; align-items: center; gap: 7px; height: 24px;
+    font-size: 11.5px; font-variant-numeric: tabular-nums;
+  }
+  .nd-blk-n { font-weight: 700; letter-spacing: 0.06em; }
+  .nd-blk-v { text-align: right; font: 700 13px/1 var(--nd-mono); color: var(--nd-gold-soft); }
+  .nd-blk-t { position: relative; height: 7px; border-radius: 4px; background: rgba(63, 120, 200, 0.2); overflow: hidden; }
+  .nd-blk-t u { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 4px; background: currentColor; box-shadow: 0 0 8px currentColor; transition: width 0.9s cubic-bezier(0.22, 0.8, 0.3, 1); }
+  .nd-blk-s { text-align: right; color: #b6cbe4; white-space: nowrap; overflow: hidden; }
+  .nd-blk-s b { font-weight: 700; }
+
+  /* ===== 10. 底部跑马灯 ===== */
+  .nd-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--nd-border); border-radius: 12px; background: var(--nd-panel);
+  }
+  .nd-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a1c05;
+    background: linear-gradient(120deg, var(--nd-gold-soft), #d8a03c 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .nd-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a1c05; animation: ndDot 1.6s ease-in-out infinite; }
+  @keyframes ndDot { 50% { opacity: 0.25; } }
+  .nd-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .nd-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: ndMarquee 48s linear infinite; font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .nd-marquee-track b { color: var(--nd-gold-soft); font-weight: 700; }
+  .nd-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(240, 192, 96, 0.5); }
+  @keyframes ndMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .nd-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="nd-stage" id="nd-stage">
+    <!-- mockflag:begin --><div class="nd-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="nd-error" id="nd-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <header class="nd-header">
+      <div class="nd-head-left">
+        <div class="nd-crumb">
+          <b>公共资金</b><i>›</i>
+          <a class="nd-crumb-up" href="大屏样板间-公共资金新动能税收1920.html">新动能税收</a><i>›</i>
+          <em id="nd-crumb-obj">--</em>
+        </div>
+        <div class="nd-head-title-row">
+          <div class="nd-head-title" id="nd-title">-- 地市分布</div>
+          <div class="nd-head-meta">
+            <span>口径 <b>新动能企业税收</b></span><i>|</i>
+            <span>区间 <b>2026 年 1-7 月累计</b></span><i>|</i>
+            <span>下钻 <b>四大类 × 13 设区市</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="nd-head-right">
+        <div class="nd-switcher" id="nd-switcher" aria-label="类别切换">
+          <button class="nd-sw-btn" id="nd-sw-prev" type="button" title="上一类（← 方向键）"><b>‹</b>上一类</button>
+          <div class="nd-sw-box">
+            <span class="nd-sw-name" id="nd-sw-name">--</span>
+            <span class="nd-sw-idx" id="nd-sw-idx">-- / --</span>
+          </div>
+          <button class="nd-sw-btn" id="nd-sw-next" type="button" title="下一类（→ 方向键）">下一类<b>›</b></button>
+        </div>
+        <button class="nd-back" id="nd-back" type="button" title="返回新动能税收（Esc）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/><path d="M7 12 H20"/></svg>
+          返回
+        </button>
+        <div class="nd-clock" aria-label="实时时钟">
+          <span class="nd-clock-time" id="nd-clock-time">--:--:--</span>
+          <span class="nd-clock-date" id="nd-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="nd-band" id="nd-band" aria-label="当前类别核心指标"></section>
+
+    <!-- 左列：类别切换卡 + 13 市排行 -->
+    <div class="nd-col">
+      <section class="nd-panel nd-catwrap">
+        <header class="nd-panel-head"><i></i><h2>新动能类别</h2><span class="nd-panel-en">CATEGORY</span><span class="nd-panel-scope">点击切换 · 合计 1,730 亿</span></header>
+        <div class="nd-cats" id="nd-cats"></div>
+      </section>
+      <section class="nd-panel">
+        <header class="nd-panel-head"><i></i><h2>13 市排行</h2><span class="nd-panel-en">CITY RANK</span><span class="nd-panel-scope" id="nd-rank-scope">--</span></header>
+        <ul class="nd-rank" id="nd-rank"></ul>
+        <div class="nd-rk-foot" id="nd-rank-foot">--</div>
+      </section>
+    </div>
+
+    <!-- 中列：地图 + 贡献瀑布 -->
+    <div class="nd-col">
+      <section class="nd-panel" style="flex:1.55">
+        <header class="nd-panel-head"><i></i><h2 id="nd-map-title">地市热力分布</h2><span class="nd-panel-en">CHOROPLETH</span><span class="nd-panel-scope" id="nd-map-scope">--</span></header>
+        <div class="nd-map-wrap" id="nd-map-wrap">
+          <div class="nd-chart" id="nd-chart-map" role="img" aria-label="江苏 13 设区市新动能税收热力地图"></div>
+          <div class="nd-legend" id="nd-legend">
+            <div class="nd-legend-t">税收分档（亿元）</div>
+            <div id="nd-legend-rows"></div>
+            <div class="nd-legend-hr"></div>
+            <div class="nd-lg-note"><s></s>涟漪标记该类 TOP3 地市</div>
+            <div class="nd-lg-note" style="color:#f0c060"><u></u><span style="color:#93b0d2">苏南板块界</span></div>
+            <div class="nd-lg-note" style="color:#39d0d8"><u></u><span style="color:#93b0d2">苏中板块界</span></div>
+            <div class="nd-lg-note" style="color:#3d9cff"><u></u><span style="color:#93b0d2">苏北板块界</span></div>
+          </div>
+          <aside class="nd-focus" id="nd-focus"></aside>
+        </div>
+      </section>
+      <section class="nd-panel">
+        <header class="nd-panel-head"><i></i><h2>地市贡献瀑布</h2><span class="nd-panel-en">CITY WATERFALL</span><span class="nd-panel-scope" id="nd-wf-scope">--</span></header>
+        <div class="nd-chart" id="nd-chart-wf" role="img" aria-label="该类别自全省合计按 13 市降序逐段拆解的瀑布图"></div>
+      </section>
+    </div>
+
+    <!-- 右列：板块环 + 矩阵热力 -->
+    <div class="nd-col">
+      <section class="nd-panel" style="flex:1.05">
+        <header class="nd-panel-head"><i></i><h2>三大板块占比</h2><span class="nd-panel-en">REGION SPLIT</span><span class="nd-panel-scope" id="nd-ring-scope">--</span></header>
+        <div class="nd-chart" id="nd-chart-ring" role="img" aria-label="苏南苏中苏北三大板块该类别税收占比环形图"></div>
+        <div class="nd-blks" id="nd-blks"></div>
+      </section>
+      <section class="nd-panel" style="flex:1.15">
+        <header class="nd-panel-head"><i></i><h2>地市 × 四大类结构</h2><span class="nd-panel-en">MATRIX</span><span class="nd-panel-scope" id="nd-mx-scope">--</span></header>
+        <div class="nd-mx-head" id="nd-mx-head"></div>
+        <ul class="nd-mx-body" id="nd-mx-body"></ul>
+        <div class="nd-mx-foot" id="nd-mx-foot"></div>
+      </section>
+    </div>
+
+    <section class="nd-marquee" aria-label="地市分布要情">
+      <div class="nd-marquee-tag"><i></i>分布要情</div>
+      <div class="nd-marquee-view"><div class="nd-marquee-track" id="nd-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+/* 内联 geo-data（自 shared/geo-data.js 抽取，保持页面自包含无外网请求） */
+const GEO_DATA = {
+  jiangsu: {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"name":"南京市","adcode":320100,"center":[118.767413,32.041544],"centroid":[118.847868,31.927726]},"geometry":{"type":"MultiPolygon","coordinates":[[[[119.0675,32.4624],[119.0628,32.4846],[119.0505,32.4929],[119.0433,32.5028],[119.0414,32.5148],[119.0192,32.518],[119.0075,32.5141],[118.9975,32.5039],[118.9798,32.5039],[118.9679,32.5146],[118.9648,32.5267],[118.9406,32.5478],[118.9366,32.5575],[118.9198,32.5573],[118.914,32.5488],[118.8879,32.5549],[118.8986,32.5605],[118.8964,32.5773],[118.9093,32.5869],[118.902,32.589],[118.8851,32.5863],[118.8842,32.5804],[118.875,32.583],[118.8726,32.5761],[118.856,32.5744],[118.8485,32.5682],[118.8425,32.573],[118.827,32.5727],[118.8276,32.5812],[118.8205,32.5825],[118.8247,32.5896],[118.8245,32.6025],[118.8205,32.6042],[118.8053,32.5935],[118.8018,32.5843],[118.7847,32.5824],[118.7748,32.5877],[118.7758,32.5978],[118.7575,32.604],[118.7433,32.5978],[118.7407,32.5894],[118.726,32.5965],[118.7253,32.6082],[118.698,32.6064],[118.7008,32.5885],[118.6896,32.5885],[118.6688,32.5949],[118.6584,32.5948],[118.6412,32.5871],[118.633,32.579],[118.6238,32.5924],[118.6018,32.5974],[118.5981,32.6013],[118.5695,32.5864],[118.5637,32.5644],[118.568,32.5588],[118.5847,32.549],[118.599,32.5447],[118.6089,32.537],[118.6048,32.523],[118.6145,32.5204],[118.6175,32.5124],[118.608,32.5017],[118.5925,32.5002],[118.5921,32.482],[118.5967,32.4766],[118.6081,32.4758],[118.6086,32.4706],[118.6281,32.4677],[118.6434,32.4705],[118.6477,32.4765],[118.6729,32.4699],[118.6893,32.4735],[118.6926,32.4651],[118.6871,32.4313],[118.6889,32.4182],[118.6857,32.405],[118.6787,32.3939],[118.6902,32.3783],[118.6989,32.3831],[118.6961,32.368],[118.702,32.3579],[118.6929,32.3517],[118.6998,32.3498],[118.6975,32.3426],[118.7079,32.3384],[118.7032,32.329],[118.6877,32.33],[118.6839,32.3241],[118.6964,32.3177],[118.6784,32.3165],[118.6603,32.3054],[118.66,32.2964],[118.6673,32.2964],[118.6708,32.2856],[118.6593,32.2661],[118.6674,32.2575],[118.6751,32.2559],[118.6675,32.2359],[118.6441,32.21],[118.6266,32.2025],[118.6196,32.2054],[118.5984,32.1995],[118.5809,32.1987],[118.5756,32.2025],[118.5617,32.1969],[118.5517,32.1996],[118.5396,32.1924],[118.5324,32.1958],[118.5219,32.1882],[118.5098,32.1943],[118.5065,32.1821],[118.4956,32.1771],[118.4956,32.1652],[118.5074,32.1379],[118.5006,32.1417],[118.4947,32.131],[118.5008,32.1216],[118.4895,32.1207],[118.473,32.1148],[118.4736,32.1106],[118.4629,32.1006],[118.4411,32.092],[118.4335,32.0867],[118.4055,32.0808],[118.3933,32.0627],[118.385,32.0608],[118.3943,32.0484],[118.386,32.0331],[118.4015,32.0187],[118.3896,32.0121],[118.391,31.9895],[118.3872,31.9833],[118.3767,31.9817],[118.38,31.9683],[118.369,31.9562],[118.3692,31.943],[118.3644,31.9302],[118.3753,31.9253],[118.386,31.9148],[118.403,31.914],[118.4159,31.9015],[118.4401,31.8927],[118.4523,31.8847],[118.4723,31.8796],[118.4671,31.8689],[118.4667,31.858],[118.4754,31.8503],[118.4906,31.8431],[118.5047,31.8417],[118.4861,31.7954],[118.4822,31.7783],[118.5026,31.7783],[118.5107,31.7656],[118.5236,31.762],[118.5339,31.7672],[118.5396,31.7616],[118.5387,31.7494],[118.5294,31.7486],[118.5298,31.7424],[118.5531,31.729],[118.5717,31.7463],[118.5753,31.7409],[118.5931,31.7444],[118.601,31.7541],[118.6094,31.7572],[118.6191,31.7501],[118.627,31.7594],[118.6417,31.7582],[118.6484,31.7488],[118.6417,31.744],[118.6521,31.7398],[118.654,31.7301],[118.6773,31.7286],[118.6849,31.7249],[118.6874,31.7161],[118.6977,31.7094],[118.6807,31.6966],[118.6744,31.6965],[118.6714,31.6882],[118.6549,31.6756],[118.647,31.6799],[118.6433,31.6714],[118.648,31.6594],[118.6436,31.6497],[118.6578,31.6411],[118.6738,31.6405],[118.6851,31.6361],[118.6949,31.6397],[118.7169,31.6395],[118.7194,31.6275],[118.7287,31.6342],[118.736,31.6334],[118.7394,31.6511],[118.7451,31.6565],[118.7481,31.6758],[118.7605,31.6803],[118.7683,31.6775],[118.7741,31.6826],[118.799,31.6664],[118.783,31.6563],[118.7896,31.6466],[118.796,31.6283],[118.8028,31.6195],[118.8145,31.6193],[118.8195,31.6285],[118.8328,31.6304],[118.8586,31.624],[118.8688,31.6111],[118.8708,31.5993],[118.8623,31.595],[118.8773,31.5899],[118.8733,31.5784],[118.882,31.5652],[118.8751,31.552],[118.8735,31.5321],[118.8863,31.5277],[118.8832,31.4965],[118.8705,31.463],[118.8661,31.4449],[118.8696,31.4216],[118.8511,31.3925],[118.8474,31.3939],[118.8295,31.3775],[118.8002,31.369],[118.7845,31.3686],[118.7676,31.364],[118.7709,31.377],[118.7654,31.3879],[118.7546,31.3851],[118.7457,31.3727],[118.7351,31.3448],[118.7211,31.3227],[118.7196,31.2948],[118.7044,31.3028],[118.7079,31.2968],[118.7266,31.2822],[118.7614,31.2777],[118.7786,31.2617],[118.7814,31.2398],[118.7957,31.2294],[118.8064,31.2295],[118.8195,31.236],[118.8313,31.2295],[118.8405,31.2364],[118.8697,31.2422],[118.8912,31.238],[118.9152,31.2442],[118.9249,31.2397],[118.9842,31.2375],[118.9865,31.2312],[119.0033,31.2337],[119.0145,31.2415],[119.0488,31.2336],[119.0623,31.2385],[119.0738,31.2329],[119.0837,31.2397],[119.1053,31.2353],[119.107,31.2506],[119.12,31.2617],[119.1322,31.2628],[119.1407,31.276],[119.1498,31.2769],[119.1582,31.2948],[119.1762,31.2939],[119.1811,31.3005],[119.1954,31.3094],[119.1932,31.3189],[119.1983,31.3307],[119.218,31.3489],[119.2141,31.3559],[119.2045,31.3578],[119.2003,31.3688],[119.1901,31.3791],[119.1741,31.3809],[119.1692,31.394],[119.1692,31.4217],[119.1642,31.4411],[119.1556,31.4386],[119.1409,31.445],[119.1415,31.4517],[119.1525,31.4644],[119.156,31.4801],[119.1491,31.484],[119.153,31.4932],[119.1664,31.4935],[119.1835,31.5002],[119.1995,31.5245],[119.1986,31.53],[119.1807,31.527],[119.1811,31.5381],[119.1891,31.5518],[119.1977,31.5518],[119.2158,31.5704],[119.2162,31.5854],[119.2219,31.5948],[119.2341,31.6271],[119.2325,31.6323],[119.2124,31.6277],[119.2047,31.6466],[119.1873,31.6492],[119.1923,31.6598],[119.1866,31.6777],[119.1904,31.687],[119.1864,31.6941],[119.1577,31.6994],[119.1387,31.7221],[119.1292,31.7236],[119.125,31.7358],[119.1144,31.7402],[119.1054,31.7513],[119.094,31.756],[119.0899,31.7696],[119.0778,31.7739],[119.0771,31.784],[119.0658,31.782],[119.0557,31.789],[119.0297,31.7847],[119.0215,31.7786],[119.005,31.7778],[118.9989,31.7672],[118.9805,31.7647],[118.9825,31.783],[119.0029,31.7834],[119.0064,31.7986],[118.9981,31.8017],[118.9864,31.8178],[118.9704,31.8261],[118.9695,31.8346],[118.9797,31.8424],[119.0034,31.8458],[119.0259,31.8464],[119.0328,31.8538],[119.0434,31.8544],[119.0698,31.8688],[119.0754,31.8642],[119.0924,31.8604],[119.1003,31.8658],[119.1078,31.8851],[119.1164,31.8905],[119.1112,31.9016],[119.1084,31.923],[119.1042,31.9336],[119.0676,31.9402],[119.0515,31.9359],[119.0375,31.939],[119.0295,31.95],[119.0292,31.9571],[119.0469,31.9686],[119.0649,31.9734],[119.0737,31.9696],[119.0901,31.9741],[119.103,31.9656],[119.1111,31.9695],[119.1139,31.9798],[119.1211,31.9776],[119.1216,31.9848],[119.1142,31.9882],[119.1125,32.0004],[119.1028,32.0049],[119.0924,32.0041],[119.0979,32.0113],[119.0927,32.0376],[119.0866,32.0532],[119.0985,32.0716],[119.0989,32.091],[119.0897,32.0897],[119.0798,32.1073],[119.0692,32.1079],[119.0577,32.1022],[119.0498,32.1098],[119.0266,32.1159],[119.0089,32.1159],[119.0092,32.1247],[119.0224,32.1309],[119.0318,32.1487],[119.0393,32.157],[119.0585,32.1564],[119.048,32.1613],[119.076,32.1617],[119.0787,32.1787],[119.0869,32.1785],[119.1213,32.1876],[119.1367,32.1934],[119.1544,32.1862],[119.1845,32.1896],[119.1911,32.1854],[119.2162,32.1907],[119.2214,32.2011],[119.2417,32.2163],[119.229,32.2222],[119.1772,32.2389],[119.1538,32.2437],[119.1323,32.2452],[119.086,32.2412],[119.0747,32.249],[119.0566,32.2517],[119.0371,32.2599],[119.0411,32.2717],[119.0398,32.3037],[119.0356,32.3087],[119.0359,32.3254],[119.042,32.3333],[119.0284,32.3451],[119.0273,32.3513],[119.0438,32.3652],[119.0217,32.3754],[119.0226,32.3804],[119.0384,32.3816],[119.0374,32.3888],[119.0275,32.3883],[119.0176,32.3993],[119.0164,32.4132],[119.0295,32.4288],[119.0225,32.4403],[119.0237,32.4561],[119.0359,32.4524],[119.047,32.4629],[119.0675,32.4624]]],[[[118.8658,31.519],[118.8564,31.5223],[118.8463,31.5091],[118.8467,31.503],[118.8557,31.5047],[118.8658,31.519]]]]}},{"type":"Feature","properties":{"name":"无锡市","adcode":320200,"center":[120.301663,31.574729]},"geometry":{"type":"MultiPolygon","coordinates":[[[[119.5326,31.1591],[119.5459,31.1478],[119.5602,31.1407],[119.5713,31.129],[119.5741,31.114],[119.582,31.1087],[119.5998,31.1092],[119.6137,31.1292],[119.6308,31.1313],[119.6381,31.1355],[119.6418,31.1484],[119.6625,31.1599],[119.6637,31.166],[119.678,31.1682],[119.6828,31.1605],[119.7039,31.1519],[119.7131,31.1676],[119.7405,31.1734],[119.7554,31.1708],[119.7793,31.1788],[119.7934,31.1681],[119.7913,31.1566],[119.801,31.1563],[119.8099,31.1485],[119.8233,31.1541],[119.8297,31.1614],[119.8235,31.1658],[119.8265,31.1732],[119.8375,31.1737],[119.8421,31.1688],[119.8666,31.1683],[119.8783,31.1608],[119.9002,31.1692],[119.92,31.1709],[120.1102,31.264],[120.1737,31.3088],[120.2096,31.3457],[120.2531,31.3661],[120.3355,31.4073],[120.3558,31.4165],[120.4188,31.4484],[120.4382,31.4488],[120.4602,31.4455],[120.4806,31.4491],[120.4958,31.4479],[120.5014,31.4575],[120.5174,31.4578],[120.516,31.4644],[120.5238,31.4684],[120.5361,31.4671],[120.5552,31.4803],[120.5485,31.4974],[120.5552,31.5076],[120.5686,31.5124],[120.5928,31.5275],[120.5956,31.5172],[120.6058,31.5252],[120.5993,31.5485],[120.5946,31.576],[120.5842,31.5852],[120.5674,31.584],[120.5636,31.5796],[120.548,31.5766],[120.5431,31.6017],[120.5531,31.6056],[120.5571,31.6003],[120.5664,31.6019],[120.5771,31.6142],[120.5915,31.6115],[120.6006,31.6171],[120.5921,31.6251],[120.5956,31.6314],[120.5896,31.6365],[120.5959,31.6438],[120.5921,31.6503],[120.5717,31.6558],[120.5611,31.6557],[120.5687,31.6686],[120.5629,31.6805],[120.57,31.6889],[120.5849,31.6928],[120.6008,31.7088],[120.5851,31.7144],[120.5817,31.7276],[120.6,31.7446],[120.5948,31.7604],[120.5886,31.7625],[120.5842,31.7821],[120.5707,31.7938],[120.5584,31.7857],[120.5555,31.794],[120.5444,31.7871],[120.5315,31.7878],[120.5226,31.8063],[120.53,31.8147],[120.5313,31.8278],[120.5144,31.8415],[120.5033,31.8417],[120.5021,31.8521],[120.4909,31.8713],[120.4688,31.8796],[120.4665,31.89],[120.4495,31.892],[120.425,31.8984],[120.4024,31.9074],[120.3921,31.9053],[120.3793,31.9141],[120.3905,31.9258],[120.3903,31.9322],[120.3753,31.9417],[120.3689,31.9611],[120.3707,31.9908],[120.3531,31.9806],[120.263,31.9418],[120.2366,31.9329],[120.2059,31.9315],[120.1753,31.9338],[120.1348,31.9394],[120.0649,31.9555],[120.0224,31.9678],[120.0077,31.948],[120.0074,31.9359],[120.0224,31.9197],[120.0055,31.9119],[119.9978,31.8943],[120.0148,31.8818],[120.0132,31.8717],[120.0033,31.8592],[119.9902,31.8549],[120.0005,31.8456],[120.0033,31.8282],[120.0193,31.8228],[120.0253,31.8317],[120.045,31.8217],[120.0564,31.8333],[120.0803,31.8475],[120.0854,31.8531],[120.0987,31.8556],[120.1174,31.855],[120.1228,31.8593],[120.1442,31.8589],[120.1581,31.8678],[120.1759,31.8702],[120.1852,31.8604],[120.1732,31.8388],[120.1641,31.8327],[120.1705,31.8173],[120.1792,31.8129],[120.1742,31.801],[120.1856,31.7865],[120.1925,31.7674],[120.2016,31.764],[120.2057,31.7534],[120.1839,31.7499],[120.1787,31.7584],[120.169,31.7609],[120.1556,31.7568],[120.1548,31.7414],[120.1614,31.7181],[120.1557,31.7132],[120.1568,31.7038],[120.1453,31.6971],[120.143,31.6883],[120.1511,31.6824],[120.1433,31.6761],[120.1286,31.6846],[120.1245,31.6482],[120.1195,31.6309],[120.1045,31.6288],[120.094,31.6181],[120.0756,31.6071],[120.0749,31.5954],[120.0571,31.5804],[120.0562,31.5634],[120.0692,31.5525],[120.0973,31.5487],[120.0941,31.5419],[120.1017,31.542],[120.1034,31.5186],[120.1075,31.512],[120.1135,31.5181],[120.1297,31.5047],[120.1087,31.481],[120.1057,31.4705],[120.1101,31.4615],[120.09,31.4547],[120.061,31.4404],[120.0548,31.4343],[120.0446,31.4062],[120.0397,31.3781],[120.0402,31.3645],[120.0449,31.3588],[120.0573,31.3561],[120.0962,31.3525],[120.1002,31.3353],[120.0896,31.3325],[120.0606,31.3391],[120.0418,31.3459],[120.0237,31.365],[120.0211,31.383],[120.0279,31.409],[120.0376,31.4259],[120.0462,31.4798],[120.0455,31.4903],[120.0362,31.4979],[120.0158,31.5054],[120.0055,31.5033],[119.9972,31.5081],[119.9961,31.4975],[119.9736,31.5159],[119.9717,31.536],[119.9483,31.5434],[119.9357,31.5527],[119.8976,31.5467],[119.8619,31.5463],[119.8478,31.5298],[119.8323,31.5292],[119.8074,31.5485],[119.7922,31.5534],[119.7686,31.5538],[119.7333,31.5632],[119.7212,31.5569],[119.7129,31.5583],[119.71,31.576],[119.6998,31.5766],[119.6849,31.604],[119.673,31.6093],[119.6579,31.6093],[119.6394,31.6003],[119.6427,31.5824],[119.6468,31.5777],[119.6409,31.5693],[119.6279,31.5599],[119.6133,31.5579],[119.6009,31.5387],[119.5936,31.5322],[119.5836,31.5045],[119.567,31.5047],[119.568,31.4904],[119.5752,31.4808],[119.573,31.4717],[119.5652,31.4714],[119.5652,31.4643],[119.5883,31.4667],[119.5917,31.463],[119.5879,31.4458],[119.5767,31.4307],[119.5546,31.4339],[119.5533,31.4117],[119.5365,31.4082],[119.5407,31.3901],[119.5304,31.3708],[119.5276,31.3603],[119.5305,31.3309],[119.52,31.3182],[119.5237,31.3011],[119.5352,31.2912],[119.5309,31.2777],[119.5322,31.259],[119.5226,31.2422],[119.5345,31.2368],[119.5538,31.221],[119.5525,31.2124],[119.5536,31.1791],[119.543,31.1755],[119.5326,31.1591]]]]}},{"type":"Feature","properties":{"name":"徐州市","adcode":320300,"center":[117.184811,34.261792],"centroid":[117.521565,34.355594]},"geometry":{"type":"MultiPolygon","coordinates":[[[[118.4082,34.4355],[118.4049,34.4277],[118.3952,34.4271],[118.38,34.4155],[118.3532,34.4174],[118.3522,34.4228],[118.3209,34.4213],[118.2907,34.4246],[118.2892,34.4123],[118.2799,34.4122],[118.2774,34.4047],[118.2424,34.4057],[118.231,34.3987],[118.2203,34.4059],[118.2177,34.3791],[118.2044,34.3774],[118.1896,34.3806],[118.1834,34.3903],[118.1793,34.3794],[118.1704,34.3814],[118.1771,34.4087],[118.1789,34.4252],[118.1778,34.4532],[118.1399,34.4753],[118.1329,34.4834],[118.1416,34.4969],[118.165,34.5049],[118.1676,34.5197],[118.1847,34.5442],[118.1636,34.5515],[118.1537,34.5492],[118.1407,34.554],[118.1372,34.5632],[118.1272,34.5554],[118.1005,34.5647],[118.079,34.5698],[118.0824,34.5799],[118.1028,34.5934],[118.1147,34.6144],[118.113,34.6215],[118.1005,34.6266],[118.0946,34.6366],[118.1027,34.6477],[118.084,34.6559],[118.0778,34.6537],[118.0574,34.655],[118.0539,34.6509],[118.0207,34.6604],[118.0182,34.647],[118.0079,34.6475],[118.0074,34.6561],[117.9908,34.6617],[117.9917,34.6701],[117.9633,34.6785],[117.9517,34.6785],[117.9397,34.6648],[117.9097,34.6702],[117.9031,34.6446],[117.881,34.6452],[117.8779,34.6502],[117.8635,34.6452],[117.8494,34.6472],[117.8475,34.6524],[117.8345,34.6473],[117.8317,34.6535],[117.8201,34.6462],[117.7996,34.6473],[117.7936,34.6518],[117.796,34.6377],[117.7936,34.6256],[117.7985,34.6219],[117.7914,34.5851],[117.7946,34.5598],[117.7948,34.5399],[117.7993,34.535],[117.8017,34.5188],[117.7905,34.5189],[117.774,34.5291],[117.7486,34.5334],[117.6993,34.5456],[117.6845,34.5473],[117.682,34.5296],[117.6734,34.5158],[117.6591,34.501],[117.647,34.4929],[117.6382,34.4973],[117.6292,34.4885],[117.6097,34.4905],[117.6032,34.4768],[117.5923,34.4625],[117.5698,34.4631],[117.5613,34.472],[117.5478,34.4752],[117.5383,34.4672],[117.513,34.4726],[117.4933,34.4726],[117.4874,34.4663],[117.4867,34.482],[117.4821,34.4859],[117.4665,34.4847],[117.4514,34.5063],[117.4382,34.5164],[117.4394,34.52],[117.4267,34.5252],[117.4245,34.537],[117.4038,34.5469],[117.4026,34.5694],[117.3744,34.5842],[117.3649,34.5777],[117.3529,34.5841],[117.344,34.582],[117.3337,34.5727],[117.319,34.5736],[117.3181,34.5662],[117.3309,34.568],[117.333,34.5618],[117.3213,34.5654],[117.303,34.5589],[117.3084,34.5719],[117.2816,34.5638],[117.2728,34.5567],[117.2797,34.5527],[117.2892,34.5559],[117.3034,34.5484],[117.3027,34.5414],[117.2874,34.5336],[117.2681,34.5328],[117.2752,34.5206],[117.2708,34.5161],[117.2744,34.5035],[117.2593,34.4971],[117.2675,34.48],[117.2636,34.4726],[117.256,34.4763],[117.2524,34.4865],[117.2427,34.4785],[117.2551,34.4726],[117.2558,34.462],[117.2479,34.4511],[117.2346,34.4545],[117.2223,34.4506],[117.2231,34.4465],[117.2002,34.4416],[117.1995,34.4345],[117.166,34.4347],[117.1599,34.4531],[117.1566,34.4809],[117.1459,34.504],[117.1394,34.5267],[117.1406,34.5387],[117.1513,34.5593],[117.1476,34.5703],[117.1335,34.5861],[117.1237,34.6047],[117.1152,34.6281],[117.1039,34.649],[117.0959,34.6475],[117.0815,34.6382],[117.073,34.6391],[117.0623,34.6577],[117.0617,34.6757],[117.072,34.6942],[117.0774,34.6965],[117.0691,34.7083],[117.0705,34.7137],[117.0611,34.724],[117.0432,34.7365],[117.0219,34.7592],[116.9956,34.7583],[116.9897,34.7651],[116.9785,34.7636],[116.9768,34.7713],[116.9679,34.773],[116.9658,34.7851],[116.9516,34.7946],[116.9511,34.8106],[116.9717,34.8119],[116.9791,34.815],[116.9661,34.8445],[116.9289,34.8429],[116.9301,34.8597],[116.9337,34.8619],[116.9768,34.8685],[116.967,34.8756],[116.9452,34.8768],[116.9453,34.8738],[116.9221,34.8714],[116.9223,34.8945],[116.8991,34.9047],[116.8761,34.9125],[116.8581,34.9284],[116.8222,34.9293],[116.8159,34.9653],[116.8058,34.9684],[116.8068,34.9369],[116.8122,34.928],[116.7989,34.9285],[116.8033,34.9374],[116.802,34.9705],[116.7891,34.9751],[116.7891,34.9598],[116.7816,34.9619],[116.7855,34.9473],[116.7969,34.9441],[116.7976,34.9388],[116.787,34.9405],[116.7812,34.9166],[116.7646,34.9165],[116.7352,34.9246],[116.7214,34.9259],[116.7062,34.934],[116.6969,34.9327],[116.678,34.9392],[116.6757,34.9331],[116.6584,34.9334],[116.6579,34.929],[116.64,34.9326],[116.6318,34.9407],[116.6225,34.94],[116.6139,34.9228],[116.5601,34.9093],[116.5461,34.9094],[116.5231,34.904],[116.5028,34.9061],[116.5006,34.9012],[116.4807,34.8974],[116.4558,34.9006],[116.4451,34.8954],[116.4453,34.8886],[116.4361,34.883],[116.408,34.8507],[116.4083,34.8261],[116.4058,34.8174],[116.4032,34.7563],[116.3715,34.7502],[116.3657,34.7428],[116.3684,34.7253],[116.3638,34.7152],[116.3771,34.7181],[116.3918,34.7103],[116.3927,34.7039],[116.3855,34.6947],[116.3852,34.6867],[116.3781,34.6842],[116.3782,34.668],[116.3644,34.6518],[116.3706,34.6422],[116.3826,34.6386],[116.3934,34.6431],[116.4305,34.6508],[116.4328,34.6302],[116.4476,34.6206],[116.4772,34.6151],[116.4783,34.6039],[116.4914,34.5889],[116.4904,34.5733],[116.5095,34.5575],[116.5262,34.5534],[116.5207,34.5432],[116.5292,34.5407],[116.548,34.5429],[116.5706,34.5234],[116.5877,34.5125],[116.5952,34.5115],[116.599,34.5001],[116.5924,34.4938],[116.5736,34.4977],[116.5686,34.4925],[116.5751,34.4889],[116.6234,34.4886],[116.6625,34.473],[116.7229,34.4727],[116.7451,34.4683],[116.7606,34.4626],[116.7737,34.4535],[116.7827,34.4383],[116.7821,34.4311],[116.8047,34.4128],[116.8281,34.3892],[116.8485,34.389],[116.867,34.3922],[116.8835,34.403],[116.9092,34.4083],[116.9206,34.407],[116.9456,34.3955],[116.9693,34.3888],[116.961,34.372],[116.9612,34.3633],[116.9808,34.3581],[116.983,34.3458],[116.9693,34.3231],[116.9763,34.3049],[116.9697,34.2931],[116.969,34.2837],[116.9844,34.2698],[117.0106,34.2559],[117.0189,34.2555],[117.0208,34.2433],[117.0275,34.2402],[117.0453,34.2478],[117.0496,34.2424],[117.0449,34.2247],[117.051,34.2216],[117.0472,34.2058],[117.0403,34.2015],[117.0308,34.1863],[117.0253,34.1677],[117.0384,34.1674],[117.0471,34.1514],[117.0549,34.1551],[117.0723,34.1467],[117.09,34.1457],[117.1064,34.1304],[117.1238,34.1282],[117.13,34.1175],[117.1303,34.1018],[117.1466,34.0978],[117.158,34.0987],[117.1514,34.0837],[117.1613,34.0844],[117.1821,34.0761],[117.1927,34.0687],[117.2071,34.0686],[117.2121,34.0747],[117.2247,34.0642],[117.2576,34.0659],[117.277,34.0789],[117.2878,34.0787],[117.2938,34.0711],[117.3115,34.0681],[117.3195,34.0844],[117.3434,34.0806],[117.3571,34.0882],[117.3778,34.0715],[117.3711,34.0607],[117.3882,34.0556],[117.4003,34.0416],[117.4058,34.0301],[117.4156,34.0259],[117.4354,34.0283],[117.4603,34.0374],[117.4768,34.0476],[117.5004,34.0523],[117.5049,34.0616],[117.5148,34.0609],[117.5306,34.0507],[117.5453,34.0352],[117.5425,34.0216],[117.5447,34.0136],[117.5564,34.0073],[117.5689,33.9852],[117.5758,33.9829],[117.5882,33.9879],[117.5979,33.997],[117.6103,33.9992],[117.6167,34.0049],[117.6181,34.0171],[117.6102,34.0293],[117.6164,34.0323],[117.6297,34.0287],[117.6458,34.0136],[117.6663,33.9987],[117.6713,33.9867],[117.663,33.9687],[117.6725,33.9524],[117.6726,33.935],[117.6901,33.9154],[117.7036,33.8878],[117.7154,33.8792],[117.7408,33.892],[117.7537,33.8914],[117.7587,33.8857],[117.7592,33.8745],[117.7524,33.8632],[117.753,33.8472],[117.7501,33.8272],[117.7462,33.8237],[117.7525,33.8129],[117.749,33.7916],[117.7418,33.7628],[117.7341,33.7518],[117.7247,33.7496],[117.7235,33.739],[117.732,33.7348],[117.7353,33.7227],[117.7527,33.7115],[117.767,33.7218],[117.7779,33.7225],[117.7913,33.7332],[117.8056,33.7362],[117.8282,33.737],[117.8358,33.7341],[117.8484,33.736],[117.88,33.7278],[117.8877,33.7226],[117.9017,33.7201],[117.8976,33.7293],[117.9005,33.7357],[117.9158,33.7384],[117.9182,33.7343],[117.9368,33.7294],[117.9527,33.7382],[117.9543,33.751],[117.9655,33.7635],[117.9725,33.7499],[117.9945,33.75],[118.0039,33.7449],[118.0188,33.7458],[118.0199,33.7387],[118.0309,33.7405],[118.0284,33.7466],[118.0457,33.75],[118.0624,33.7584],[118.0656,33.7658],[118.106,33.7646],[118.118,33.7665],[118.1335,33.7514],[118.1492,33.7465],[118.1683,33.7496],[118.1709,33.7591],[118.1786,33.7631],[118.1705,33.7862],[118.1595,33.7957],[118.1689,33.8076],[118.1691,33.8201],[118.1834,33.8162],[118.188,33.8229],[118.1848,33.8442],[118.176,33.8441],[118.1746,33.8652],[118.1685,33.881],[118.1564,33.8897],[118.1494,33.901],[118.1412,33.9347],[118.1259,33.955],[118.1176,33.9546],[118.1138,33.9369],[118.1061,33.9351],[118.1,33.9412],[118.0858,33.942],[118.0857,33.9652],[118.0724,33.9654],[118.053,33.9719],[118.0463,33.9815],[118.0339,33.9839],[118.0284,33.9984],[118.0349,34.0127],[118.0496,34.0134],[118.0542,34.0097],[118.0637,34.0207],[118.0598,34.0482],[118.0638,34.0538],[118.0486,34.0925],[118.0131,34.0839],[118.0055,34.0916],[118.0077,34.1003],[117.9966,34.1056],[117.9944,34.1238],[117.999,34.14],[118.0556,34.1488],[118.0642,34.1525],[118.0606,34.1571],[118.0724,34.1709],[118.0831,34.1654],[118.0883,34.155],[118.097,34.1503],[118.1029,34.1395],[118.1207,34.144],[118.1393,34.1364],[118.1505,34.1373],[118.1542,34.1488],[118.1507,34.1585],[118.1565,34.1611],[118.1773,34.1564],[118.1877,34.1617],[118.2138,34.142],[118.2136,34.1272],[118.2228,34.107],[118.2326,34.1003],[118.2892,34.1026],[118.2923,34.1097],[118.306,34.1136],[118.3636,34.1188],[118.3829,34.1173],[118.4285,34.1086],[118.4344,34.1051],[118.451,34.1066],[118.4697,34.0972],[118.4826,34.1],[118.4899,34.1067],[118.5177,34.1175],[118.5032,34.1231],[118.5037,34.1372],[118.5097,34.1488],[118.5054,34.1586],[118.5192,34.1686],[118.5602,34.1655],[118.5597,34.1878],[118.5735,34.2336],[118.5655,34.2368],[118.5611,34.248],[118.5669,34.2742],[118.5746,34.2784],[118.5715,34.299],[118.5934,34.308],[118.6241,34.3058],[118.6327,34.3082],[118.6349,34.3205],[118.6318,34.3372],[118.622,34.3411],[118.6332,34.3447],[118.6352,34.3551],[118.6443,34.359],[118.6448,34.3836],[118.6545,34.3833],[118.674,34.4007],[118.6691,34.4193],[118.6568,34.4207],[118.6488,34.4268],[118.6465,34.4395],[118.6345,34.44],[118.6079,34.4469],[118.5978,34.4454],[118.5904,34.436],[118.5856,34.4195],[118.5746,34.4167],[118.5721,34.4229],[118.5481,34.4329],[118.5323,34.4355],[118.5242,34.4402],[118.5037,34.4307],[118.4898,34.4204],[118.4897,34.4162],[118.4624,34.4069],[118.4528,34.4119],[118.4347,34.4133],[118.4221,34.4233],[118.4152,34.4203],[118.4082,34.4355]]]]}},{"type":"Feature","properties":{"name":"常州市","adcode":320400,"center":[119.946973,31.772752],"centroid":[119.641979,31.623547]},"geometry":{"type":"MultiPolygon","coordinates":[[[[120.0224,31.9678],[120.0162,31.9705],[119.9801,31.9981],[119.9755,32.0069],[119.9517,32.0023],[119.9197,32.0037],[119.9059,32.0154],[119.896,32.0402],[119.8909,32.0462],[119.8837,32.0393],[119.8786,32.0422],[119.8696,32.0581],[119.8599,32.0515],[119.8438,32.0598],[119.829,32.0519],[119.8222,32.0558],[119.8048,32.0561],[119.7963,32.049],[119.7774,32.0143],[119.7848,32.0123],[119.7756,31.9864],[119.7782,31.9841],[119.7676,31.9493],[119.7772,31.9446],[119.7894,31.9269],[119.7839,31.9194],[119.7605,31.9266],[119.7596,31.9211],[119.7818,31.9139],[119.7805,31.9016],[119.7718,31.9008],[119.7552,31.8803],[119.7641,31.8726],[119.7633,31.8569],[119.7699,31.8476],[119.7823,31.8521],[119.8118,31.8522],[119.8005,31.8333],[119.7903,31.8266],[119.7855,31.8167],[119.7905,31.807],[119.764,31.8081],[119.7573,31.7862],[119.7488,31.7803],[119.7363,31.7621],[119.7347,31.7437],[119.74,31.7312],[119.7239,31.7329],[119.7083,31.7379],[119.7067,31.7471],[119.6933,31.757],[119.6882,31.7694],[119.6565,31.7736],[119.6508,31.7777],[119.6446,31.7956],[119.6296,31.8012],[119.615,31.7962],[119.6057,31.8061],[119.6051,31.8221],[119.5973,31.8278],[119.5894,31.827],[119.5921,31.8353],[119.5869,31.8474],[119.5767,31.8484],[119.5701,31.8546],[119.5599,31.8561],[119.5561,31.8625],[119.55,31.8565],[119.5082,31.8519],[119.4688,31.8717],[119.4639,31.8812],[119.4488,31.8854],[119.4375,31.8764],[119.4232,31.8717],[119.4195,31.8521],[119.4255,31.8528],[119.432,31.8404],[119.4434,31.8289],[119.433,31.8258],[119.4293,31.8323],[119.4223,31.8294],[119.4041,31.8321],[119.387,31.8466],[119.3724,31.8458],[119.3641,31.858],[119.3421,31.8596],[119.3295,31.8458],[119.3326,31.8363],[119.32,31.8254],[119.3138,31.8138],[119.3146,31.7966],[119.3201,31.7971],[119.3147,31.7773],[119.3074,31.7765],[119.3046,31.7674],[119.3056,31.733],[119.3216,31.7322],[119.3311,31.7273],[119.3216,31.7155],[119.3211,31.7076],[119.3287,31.704],[119.3165,31.671],[119.2999,31.6548],[119.2828,31.6428],[119.2584,31.6322],[119.2369,31.6252],[119.2341,31.6271],[119.2219,31.5948],[119.2162,31.5854],[119.2158,31.5704],[119.1977,31.5518],[119.1891,31.5518],[119.1811,31.5381],[119.1807,31.527],[119.1986,31.53],[119.1995,31.5245],[119.1835,31.5002],[119.1664,31.4935],[119.153,31.4932],[119.1491,31.484],[119.156,31.4801],[119.1525,31.4644],[119.1415,31.4517],[119.1409,31.445],[119.1556,31.4386],[119.1642,31.4411],[119.1692,31.4217],[119.1692,31.394],[119.1741,31.3809],[119.1901,31.3791],[119.2003,31.3688],[119.2045,31.3578],[119.2141,31.3559],[119.218,31.3489],[119.1983,31.3307],[119.1932,31.3189],[119.1954,31.3094],[119.1811,31.3005],[119.1995,31.2936],[119.1972,31.2735],[119.2042,31.2657],[119.2153,31.2741],[119.2181,31.2648],[119.2363,31.2593],[119.2386,31.2547],[119.25,31.257],[119.2497,31.262],[119.2614,31.2613],[119.267,31.2504],[119.2948,31.2632],[119.3149,31.2657],[119.3333,31.2641],[119.3375,31.2589],[119.3459,31.269],[119.3502,31.2809],[119.3502,31.301],[119.3566,31.3033],[119.3679,31.289],[119.3716,31.2716],[119.3797,31.2694],[119.3705,31.2425],[119.3652,31.2327],[119.3601,31.2121],[119.3658,31.1959],[119.3714,31.1977],[119.3792,31.1892],[119.3949,31.1996],[119.4057,31.1928],[119.3953,31.1934],[119.3893,31.1883],[119.3912,31.1745],[119.4006,31.1787],[119.4154,31.173],[119.4235,31.1819],[119.4388,31.1771],[119.4548,31.1649],[119.4606,31.1564],[119.4758,31.1589],[119.4825,31.1525],[119.4856,31.1616],[119.4945,31.164],[119.5144,31.1561],[119.5326,31.1591],[119.543,31.1755],[119.5536,31.1791],[119.5525,31.2124],[119.5538,31.221],[119.5345,31.2368],[119.5226,31.2422],[119.5322,31.259],[119.5309,31.2777],[119.5352,31.2912],[119.5237,31.3011],[119.52,31.3182],[119.5305,31.3309],[119.5276,31.3603],[119.5304,31.3708],[119.5407,31.3901],[119.5365,31.4082],[119.5533,31.4117],[119.5546,31.4339],[119.5767,31.4307],[119.5879,31.4458],[119.5917,31.463],[119.5883,31.4667],[119.5652,31.4643],[119.5652,31.4714],[119.573,31.4717],[119.5752,31.4808],[119.568,31.4904],[119.567,31.5047],[119.5836,31.5045],[119.5936,31.5322],[119.6009,31.5387],[119.6133,31.5579],[119.6279,31.5599],[119.6409,31.5693],[119.6468,31.5777],[119.6427,31.5824],[119.6394,31.6003],[119.6579,31.6093],[119.673,31.6093],[119.6849,31.604],[119.6998,31.5766],[119.71,31.576],[119.7129,31.5583],[119.7212,31.5569],[119.7333,31.5632],[119.7686,31.5538],[119.7922,31.5534],[119.8074,31.5485],[119.8323,31.5292],[119.8478,31.5298],[119.8619,31.5463],[119.8976,31.5467],[119.9357,31.5527],[119.9483,31.5434],[119.9717,31.536],[119.9736,31.5159],[119.9961,31.4975],[119.9972,31.5081],[120.0055,31.5033],[120.0158,31.5054],[120.0362,31.4979],[120.0455,31.4903],[120.0462,31.4798],[120.0376,31.4259],[120.0279,31.409],[120.0211,31.383],[120.0237,31.365],[120.0418,31.3459],[120.0606,31.3391],[120.0896,31.3325],[120.1002,31.3353],[120.0962,31.3525],[120.0573,31.3561],[120.0449,31.3588],[120.0402,31.3645],[120.0397,31.3781],[120.0446,31.4062],[120.0548,31.4343],[120.061,31.4404],[120.09,31.4547],[120.1101,31.4615],[120.1057,31.4705],[120.1087,31.481],[120.1297,31.5047],[120.1135,31.5181],[120.1075,31.512],[120.1034,31.5186],[120.1017,31.542],[120.0941,31.5419],[120.0973,31.5487],[120.0692,31.5525],[120.0562,31.5634],[120.0571,31.5804],[120.0749,31.5954],[120.0756,31.6071],[120.094,31.6181],[120.1045,31.6288],[120.1195,31.6309],[120.1245,31.6482],[120.1286,31.6846],[120.1433,31.6761],[120.1511,31.6824],[120.143,31.6883],[120.1453,31.6971],[120.1568,31.7038],[120.1557,31.7132],[120.1614,31.7181],[120.1548,31.7414],[120.1556,31.7568],[120.169,31.7609],[120.1787,31.7584],[120.1839,31.7499],[120.2057,31.7534],[120.2016,31.764],[120.1925,31.7674],[120.1856,31.7865],[120.1742,31.801],[120.1792,31.8129],[120.1705,31.8173],[120.1641,31.8327],[120.1732,31.8388],[120.1852,31.8604],[120.1759,31.8702],[120.1581,31.8678],[120.1442,31.8589],[120.1228,31.8593],[120.1174,31.855],[120.0987,31.8556],[120.0854,31.8531],[120.0803,31.8475],[120.0564,31.8333],[120.045,31.8217],[120.0253,31.8317],[120.0193,31.8228],[120.0033,31.8282],[120.0005,31.8456],[119.9902,31.8549],[120.0033,31.8592],[120.0132,31.8717],[120.0148,31.8818],[119.9978,31.8943],[120.0055,31.9119],[120.0224,31.9197],[120.0074,31.9359],[120.0077,31.948],[120.0224,31.9678]]]]}},{"type":"Feature","properties":{"name":"苏州市","adcode":320500,"center":[120.619585,31.299379],"centroid":[120.660806,31.382865]},"geometry":{"type":"MultiPolygon","coordinates":[[[[119.92,31.1709],[119.9211,31.1612],[119.9368,31.1465],[119.9463,31.1062],[119.9698,31.0743],[119.9885,31.0592],[120.0017,31.0271],[120.017,31.0178],[120.0524,31.0057],[120.104,30.9652],[120.111,30.9559],[120.1351,30.9419],[120.1497,30.9375],[120.2218,30.9269],[120.2507,30.9262],[120.3081,30.9323],[120.3435,30.94],[120.3711,30.9488],[120.3595,30.9319],[120.3627,30.9216],[120.3569,30.9089],[120.3601,30.8928],[120.358,30.8871],[120.3647,30.8805],[120.3724,30.8822],[120.3794,30.8908],[120.3947,30.8908],[120.4235,30.9031],[120.418,30.9256],[120.4234,30.9275],[120.435,30.9208],[120.4423,30.9006],[120.4363,30.8969],[120.4395,30.8852],[120.4523,30.8679],[120.4413,30.8563],[120.4545,30.8496],[120.4604,30.8398],[120.461,30.8283],[120.4553,30.8168],[120.4772,30.8],[120.477,30.7856],[120.4894,30.7634],[120.5044,30.758],[120.5182,30.7732],[120.5638,30.8355],[120.5809,30.8457],[120.5889,30.8544],[120.603,30.8489],[120.6155,30.8496],[120.6262,30.8561],[120.6442,30.8554],[120.6554,30.8475],[120.6587,30.8653],[120.6631,30.8613],[120.6736,30.8757],[120.6828,30.8826],[120.6999,30.8678],[120.7043,30.873],[120.7025,30.884],[120.7133,30.8851],[120.7098,30.9075],[120.7127,30.9197],[120.7095,30.9332],[120.6976,30.9504],[120.6845,30.9552],[120.6982,30.9708],[120.7055,30.9665],[120.7101,30.9719],[120.7256,30.9715],[120.7361,30.9637],[120.7459,30.9625],[120.7607,30.9754],[120.7702,30.9781],[120.77,30.9966],[120.8029,31.0054],[120.8209,31.0064],[120.8401,30.9978],[120.8474,30.9896],[120.8537,30.9932],[120.8656,30.9898],[120.8681,30.9953],[120.8914,31.0037],[120.8952,31.0173],[120.9013,31.0175],[120.902,31.0376],[120.8946,31.0539],[120.9021,31.0857],[120.8922,31.0942],[120.8696,31.0972],[120.8568,31.1028],[120.8579,31.1085],[120.8706,31.1197],[120.8723,31.1272],[120.8813,31.1347],[120.9054,31.1342],[120.9304,31.1414],[120.9839,31.1317],[121.0185,31.1341],[121.0257,31.1408],[121.0418,31.1389],[121.0415,31.1498],[121.0625,31.1531],[121.0657,31.1486],[121.077,31.1584],[121.0754,31.1734],[121.0626,31.2247],[121.0643,31.2462],[121.061,31.2465],[121.0633,31.2679],[121.0804,31.2701],[121.0847,31.2876],[121.0901,31.2919],[121.0988,31.2762],[121.1055,31.2737],[121.115,31.2853],[121.1203,31.2862],[121.143,31.2755],[121.1542,31.2767],[121.1613,31.284],[121.1513,31.2919],[121.1438,31.3097],[121.1396,31.303],[121.1299,31.3026],[121.1272,31.3193],[121.1333,31.3256],[121.1304,31.3442],[121.118,31.3434],[121.1173,31.3517],[121.1083,31.3506],[121.1093,31.3647],[121.1202,31.3687],[121.1138,31.3745],[121.1485,31.3854],[121.1438,31.3923],[121.1588,31.4101],[121.1463,31.4211],[121.1643,31.4272],[121.1627,31.4322],[121.1469,31.4372],[121.1473,31.4439],[121.1609,31.4497],[121.175,31.4493],[121.1861,31.4543],[121.1861,31.4608],[121.2144,31.4791],[121.2191,31.4752],[121.2303,31.4774],[121.2347,31.4927],[121.2409,31.4937],[121.2471,31.4771],[121.2614,31.4788],[121.2689,31.4875],[121.2986,31.4915],[121.2999,31.4998],[121.3103,31.5059],[121.3199,31.4997],[121.3435,31.512],[121.3722,31.5532],[121.3456,31.5717],[121.2891,31.6163],[121.1453,31.7539],[121.1185,31.7591],[121.1012,31.7625],[121.0768,31.777],[121.0606,31.7831],[120.9595,31.783],[120.9329,31.7867],[120.9167,31.7937],[120.8838,31.8347],[120.8603,31.873],[120.8535,31.8886],[120.8031,31.9884],[120.7901,31.9981],[120.782,32.016],[120.7616,32.0204],[120.7025,32.0134],[120.6527,32.0024],[120.6284,32.0011],[120.5883,32.0097],[120.5531,32.0211],[120.5246,32.0305],[120.5038,32.041],[120.4656,32.0458],[120.4037,32.0162],[120.3879,32.0067],[120.3707,31.9908],[120.3689,31.9611],[120.3753,31.9417],[120.3903,31.9322],[120.3905,31.9258],[120.3793,31.9141],[120.3921,31.9053],[120.4024,31.9074],[120.425,31.8984],[120.4495,31.892],[120.4665,31.89],[120.4688,31.8796],[120.4909,31.8713],[120.5021,31.8521],[120.5033,31.8417],[120.5144,31.8415],[120.5313,31.8278],[120.53,31.8147],[120.5226,31.8063],[120.5315,31.7878],[120.5444,31.7871],[120.5555,31.794],[120.5584,31.7857],[120.5707,31.7938],[120.5842,31.7821],[120.5886,31.7625],[120.5948,31.7604],[120.6,31.7446],[120.5817,31.7276],[120.5851,31.7144],[120.6008,31.7088],[120.5849,31.6928],[120.57,31.6889],[120.5629,31.6805],[120.5687,31.6686],[120.5611,31.6557],[120.5717,31.6558],[120.5921,31.6503],[120.5959,31.6438],[120.5896,31.6365],[120.5956,31.6314],[120.5921,31.6251],[120.6006,31.6171],[120.5915,31.6115],[120.5771,31.6142],[120.5664,31.6019],[120.5571,31.6003],[120.5531,31.6056],[120.5431,31.6017],[120.548,31.5766],[120.5636,31.5796],[120.5674,31.584],[120.5842,31.5852],[120.5946,31.576],[120.5993,31.5485],[120.6058,31.5252],[120.5956,31.5172],[120.5928,31.5275],[120.5686,31.5124],[120.5552,31.5076],[120.5485,31.4974],[120.5552,31.4803],[120.5361,31.4671],[120.5238,31.4684],[120.516,31.4644],[120.5174,31.4578],[120.5014,31.4575],[120.4958,31.4479],[120.4806,31.4491],[120.4602,31.4455],[120.4382,31.4488],[120.4188,31.4484],[120.3558,31.4165],[120.3355,31.4073],[120.2531,31.3661],[120.2096,31.3457],[120.1737,31.3088],[120.1102,31.264],[119.92,31.1709]]]]}},{"type":"Feature","properties":{"name":"南通市","adcode":320600,"center":[120.864608,32.016212],"centroid":[121.047928,32.182334]},"geometry":{"type":"MultiPolygon","coordinates":[[[[120.2023,32.6009],[120.2076,32.5916],[120.2246,32.5818],[120.2306,32.5868],[120.2557,32.5976],[120.2629,32.5749],[120.2623,32.562],[120.2701,32.5487],[120.2637,32.5146],[120.2701,32.5018],[120.2583,32.4989],[120.2714,32.4723],[120.2752,32.4389],[120.2807,32.431],[120.2799,32.4215],[120.2892,32.385],[120.2845,32.3799],[120.2926,32.3695],[120.3025,32.3725],[120.3101,32.3615],[120.323,32.3684],[120.3517,32.3779],[120.3524,32.3689],[120.3597,32.358],[120.3462,32.344],[120.3531,32.3359],[120.3542,32.325],[120.3652,32.3088],[120.3523,32.3045],[120.3524,32.2787],[120.3472,32.2665],[120.3509,32.256],[120.3459,32.2499],[120.357,32.2387],[120.3646,32.2378],[120.3716,32.2176],[120.3432,32.1701],[120.3474,32.1505],[120.351,32.1495],[120.3562,32.1308],[120.3744,32.1281],[120.3879,32.1297],[120.417,32.1248],[120.4352,32.1239],[120.4408,32.1199],[120.4823,32.1029],[120.4867,32.0991],[120.5128,32.0917],[120.5185,32.0659],[120.5294,32.0564],[120.5505,32.0509],[120.5479,32.041],[120.5585,32.0337],[120.5531,32.0211],[120.5883,32.0097],[120.6284,32.0011],[120.6527,32.0024],[120.7025,32.0134],[120.7616,32.0204],[120.782,32.016],[120.7901,31.9981],[120.8031,31.9884],[120.8535,31.8886],[120.8603,31.873],[120.8838,31.8347],[120.9167,31.7937],[120.9329,31.7867],[120.9595,31.783],[121.0606,31.7831],[121.0768,31.777],[121.1012,31.7625],[121.1185,31.7591],[121.1492,31.7873],[121.1815,31.8204],[121.2003,31.8351],[121.2253,31.847],[121.2656,31.8641],[121.3019,31.8727],[121.3231,31.8685],[121.3693,31.8433],[121.385,31.8336],[121.4163,31.7976],[121.4109,31.7956],[121.4209,31.7796],[121.4315,31.7693],[121.4556,31.7594],[121.4877,31.7534],[121.4986,31.7532],[121.5131,31.7437],[121.5394,31.7355],[121.565,31.7167],[121.5997,31.7031],[121.6009,31.707],[121.6333,31.6962],[121.6426,31.6975],[121.7153,31.6738],[121.8178,31.652],[121.9752,31.617],[121.9677,31.7039],[121.9703,31.7189],[121.9601,31.7369],[121.941,31.7766],[121.8975,31.8535],[121.8891,31.8666],[121.8748,31.9021],[121.8703,31.9283],[121.856,31.9552],[121.7724,32.0332],[121.759,32.0594],[121.7296,32.0692],[121.5926,32.1129],[121.5444,32.123],[121.5255,32.1365],[121.5423,32.1521],[121.5031,32.1701],[121.4731,32.1698],[121.4586,32.1777],[121.4615,32.1937],[121.4793,32.198],[121.4996,32.2112],[121.4939,32.2635],[121.4578,32.2739],[121.4502,32.2823],[121.447,32.2993],[121.4405,32.3661],[121.4255,32.431],[121.4174,32.4431],[121.3905,32.4607],[121.3519,32.4743],[121.2877,32.4802],[121.2695,32.4834],[121.1531,32.5293],[121.122,32.5693],[121.0769,32.5764],[121.0517,32.5871],[121.0205,32.6055],[120.9884,32.6067],[120.9617,32.6122],[120.9796,32.6363],[120.976,32.6584],[120.9081,32.6393],[120.8953,32.6316],[120.8632,32.6302],[120.8635,32.6191],[120.8514,32.6183],[120.8512,32.6074],[120.8569,32.6122],[120.8685,32.6098],[120.8546,32.6051],[120.8372,32.6067],[120.8326,32.597],[120.8183,32.592],[120.805,32.5826],[120.7926,32.5785],[120.7935,32.6006],[120.7436,32.5983],[120.7403,32.5854],[120.721,32.5916],[120.7203,32.5997],[120.701,32.6035],[120.6809,32.5948],[120.6716,32.5879],[120.663,32.572],[120.6534,32.5719],[120.6493,32.585],[120.6561,32.5946],[120.6569,32.6035],[120.644,32.6132],[120.6298,32.6175],[120.6203,32.6019],[120.6152,32.6061],[120.6218,32.626],[120.6127,32.6356],[120.6148,32.6398],[120.6005,32.65],[120.5905,32.6397],[120.5789,32.635],[120.5499,32.6358],[120.5446,32.6323],[120.5122,32.6361],[120.5068,32.6408],[120.4953,32.6395],[120.4965,32.6244],[120.4847,32.6313],[120.4756,32.6287],[120.4656,32.6315],[120.4431,32.6293],[120.4432,32.6391],[120.437,32.6471],[120.4319,32.6765],[120.4157,32.6794],[120.4105,32.6894],[120.3943,32.6875],[120.3896,32.6907],[120.3925,32.7072],[120.3761,32.7109],[120.3667,32.7049],[120.341,32.7054],[120.333,32.6998],[120.3195,32.6993],[120.3156,32.7044],[120.2927,32.6876],[120.2763,32.6793],[120.2519,32.6799],[120.2257,32.6759],[120.2248,32.6584],[120.2289,32.6499],[120.2217,32.6484],[120.2222,32.6343],[120.2135,32.6256],[120.2094,32.6082],[120.2136,32.6027],[120.2023,32.6009]]],[[[121.4038,32.5306],[121.4027,32.5215],[121.4086,32.5196],[121.4352,32.52],[121.4365,32.5293],[121.4293,32.5315],[121.4038,32.5306]]]]}},{"type":"Feature","properties":{"name":"连云港市","adcode":320700,"center":[119.178821,34.600018],"centroid":[119.144784,34.536075]},"geometry":{"type":"MultiPolygon","coordinates":[[[[119.823,34.482],[119.8116,34.4856],[119.7818,34.5158],[119.7411,34.5329],[119.6979,34.5466],[119.6414,34.569],[119.6253,34.5859],[119.6112,34.5929],[119.5849,34.6013],[119.5689,34.6154],[119.5607,34.6315],[119.5371,34.6338],[119.465,34.6747],[119.4746,34.6961],[119.4849,34.6927],[119.4918,34.6955],[119.4925,34.7115],[119.508,34.711],[119.5228,34.7223],[119.5257,34.7333],[119.5084,34.7292],[119.4835,34.7364],[119.4571,34.7482],[119.3818,34.7524],[119.3783,34.7614],[119.4,34.7558],[119.4443,34.7584],[119.4608,34.7541],[119.4682,34.7482],[119.4884,34.7479],[119.4971,34.7595],[119.4804,34.7641],[119.4772,34.769],[119.4595,34.7711],[119.4562,34.7798],[119.4383,34.7843],[119.4407,34.7692],[119.3785,34.7645],[119.3709,34.773],[119.355,34.7758],[119.3427,34.7693],[119.3244,34.7704],[119.3128,34.7747],[119.2722,34.7978],[119.2508,34.794],[119.2386,34.7996],[119.2136,34.8339],[119.2204,34.8412],[119.218,34.8526],[119.2105,34.8623],[119.2138,34.8767],[119.2024,34.8904],[119.2127,34.9178],[119.2146,34.9377],[119.2118,34.9579],[119.2114,34.9817],[119.219,35.0048],[119.2275,35.0209],[119.2326,35.0418],[119.2381,35.0485],[119.2794,35.0711],[119.2854,35.0685],[119.2811,35.0537],[119.2918,35.0285],[119.3072,35.0331],[119.2927,35.0685],[119.2935,35.073],[119.3059,35.0767],[119.3018,35.0932],[119.2867,35.1151],[119.2738,35.1155],[119.2527,35.1227],[119.2407,35.1229],[119.2207,35.1072],[119.2032,35.1109],[119.1714,35.1072],[119.159,35.101],[119.1381,35.0963],[119.1295,35.0762],[119.1205,35.0701],[119.1204,35.058],[119.1146,35.055],[119.0736,35.0567],[119.0614,35.0516],[119.0374,35.0513],[119.0272,35.0553],[118.9999,35.053],[118.9921,35.0482],[118.9656,35.0465],[118.9452,35.0408],[118.9265,35.0508],[118.9111,35.0478],[118.9038,35.0413],[118.8858,35.0342],[118.8653,35.0299],[118.8625,35.0257],[118.8651,34.9932],[118.8592,34.9626],[118.8608,34.944],[118.8298,34.9111],[118.8072,34.8777],[118.8044,34.8703],[118.8046,34.8525],[118.7973,34.8429],[118.7887,34.8457],[118.769,34.8461],[118.7682,34.8388],[118.782,34.8275],[118.7766,34.8188],[118.779,34.8096],[118.7736,34.7953],[118.76,34.7903],[118.7375,34.7921],[118.7284,34.7869],[118.7402,34.7812],[118.7385,34.7669],[118.7272,34.7687],[118.7164,34.7638],[118.7165,34.7477],[118.7304,34.7454],[118.7401,34.7369],[118.7592,34.7409],[118.7685,34.7381],[118.7834,34.722],[118.7673,34.7105],[118.7662,34.7052],[118.7447,34.6953],[118.7201,34.6942],[118.704,34.6888],[118.6903,34.6786],[118.6814,34.6783],[118.6643,34.6934],[118.6506,34.6951],[118.6337,34.687],[118.6049,34.6965],[118.6013,34.7142],[118.5705,34.7125],[118.5589,34.7068],[118.5461,34.7062],[118.5393,34.7115],[118.5252,34.7126],[118.5227,34.6923],[118.5082,34.6871],[118.5008,34.6752],[118.4843,34.6709],[118.4685,34.6743],[118.4609,34.6576],[118.4665,34.6431],[118.4749,34.6372],[118.4738,34.6234],[118.4637,34.6253],[118.4543,34.6177],[118.4392,34.6263],[118.4239,34.5929],[118.428,34.5612],[118.4404,34.5275],[118.4395,34.508],[118.4309,34.4891],[118.4214,34.4832],[118.4162,34.4739],[118.4082,34.4355],[118.4152,34.4203],[118.4221,34.4233],[118.4347,34.4133],[118.4528,34.4119],[118.4624,34.4069],[118.4897,34.4162],[118.4898,34.4204],[118.5037,34.4307],[118.5242,34.4402],[118.5323,34.4355],[118.5481,34.4329],[118.5721,34.4229],[118.5746,34.4167],[118.5856,34.4195],[118.5904,34.436],[118.5978,34.4454],[118.6079,34.4469],[118.6345,34.44],[118.6465,34.4395],[118.6488,34.4268],[118.6568,34.4207],[118.6691,34.4193],[118.674,34.4007],[118.6545,34.3833],[118.6448,34.3836],[118.6443,34.359],[118.6661,34.3424],[118.6766,34.3394],[118.6764,34.3453],[118.6933,34.3459],[118.7082,34.3364],[118.7399,34.3251],[118.7483,34.3308],[118.7598,34.3211],[118.7583,34.3129],[118.7666,34.3089],[118.7853,34.3118],[118.8109,34.3432],[118.8121,34.3573],[118.8253,34.3588],[118.8378,34.3688],[118.8643,34.3659],[118.8749,34.3677],[118.9074,34.368],[118.9134,34.3783],[118.9248,34.3793],[118.9319,34.3747],[118.94,34.3823],[118.9532,34.3685],[118.9536,34.3501],[118.9638,34.3505],[118.9646,34.3609],[118.9749,34.3691],[118.9808,34.3796],[118.9952,34.3903],[118.995,34.4041],[119.0153,34.4053],[119.0332,34.3989],[119.0387,34.4037],[119.0414,34.4219],[119.0612,34.4202],[119.0896,34.4209],[119.0869,34.4097],[119.0653,34.4092],[119.0562,34.3823],[119.0571,34.3562],[119.0622,34.3387],[119.0755,34.3427],[119.073,34.3318],[119.0828,34.3109],[119.0741,34.2651],[119.0919,34.2624],[119.0911,34.2369],[119.097,34.2329],[119.0997,34.208],[119.1329,34.2054],[119.137,34.1779],[119.1443,34.1763],[119.1419,34.1616],[119.1454,34.1587],[119.1291,34.1458],[119.1428,34.134],[119.1503,34.1406],[119.1564,34.1336],[119.1684,34.1297],[119.1762,34.1186],[119.1668,34.1075],[119.1749,34.0935],[119.1841,34.0898],[119.1905,34.0767],[119.2095,34.0562],[119.2274,34.0527],[119.2357,34.044],[119.2362,34.0363],[119.2486,34.0338],[119.2682,34.0343],[119.2684,34.0424],[119.3029,34.0404],[119.3035,34.0345],[119.3193,34.0329],[119.32,34.0261],[119.3379,34.0297],[119.3708,34.033],[119.3928,34.0368],[119.3979,34.0244],[119.4033,34.0223],[119.4093,34.0019],[119.4255,34.0035],[119.43,33.9856],[119.4392,33.9796],[119.4741,33.9992],[119.4978,34.0146],[119.5093,34.0172],[119.5196,34.0257],[119.518,34.0314],[119.5358,34.0309],[119.5411,34.0166],[119.5552,34.0186],[119.5633,34.0102],[119.5683,34.0132],[119.5719,34.021],[119.5697,34.0328],[119.5539,34.0605],[119.5636,34.069],[119.577,34.0697],[119.5857,34.0788],[119.5884,34.0913],[119.5697,34.1062],[119.5588,34.1018],[119.551,34.1156],[119.5375,34.109],[119.5214,34.1367],[119.529,34.1377],[119.5334,34.1454],[119.5293,34.1668],[119.5103,34.1605],[119.5039,34.1726],[119.5326,34.1885],[119.5525,34.208],[119.5574,34.2054],[119.5735,34.2078],[119.5974,34.2245],[119.6123,34.23],[119.6298,34.2429],[119.6627,34.2559],[119.7021,34.2812],[119.7279,34.3031],[119.7404,34.3088],[119.7431,34.319],[119.754,34.3261],[119.7536,34.3432],[119.7587,34.3505],[119.7718,34.3543],[119.7825,34.3698],[119.8024,34.3762],[119.8038,34.3857],[119.7912,34.4003],[119.7885,34.4081],[119.7989,34.4303],[119.7956,34.4505],[119.8086,34.4501],[119.8118,34.4623],[119.8192,34.4629],[119.823,34.482]]]]}},{"type":"Feature","properties":{"name":"淮安市","adcode":320800,"center":[119.021265,33.597506],"centroid":[118.971034,33.352326]},"geometry":{"type":"MultiPolygon","coordinates":[[[[119.1849,32.8256],[119.1909,32.8254],[119.2787,32.7989],[119.3137,32.8049],[119.3327,32.815],[119.3454,32.8383],[119.3498,32.8684],[119.3456,32.8902],[119.3283,32.9459],[119.325,32.9686],[119.3251,32.9984],[119.3431,33.0114],[119.3592,33.0297],[119.3642,33.0386],[119.3637,33.0535],[119.3433,33.0651],[119.3348,33.0844],[119.3211,33.1023],[119.3139,33.1286],[119.3054,33.1346],[119.2715,33.1468],[119.2503,33.1576],[119.2285,33.1511],[119.2238,33.1613],[119.2295,33.1659],[119.222,33.1881],[119.2192,33.206],[119.2114,33.2031],[119.1999,33.2059],[119.1652,33.2076],[119.1507,33.2128],[119.1433,33.23],[119.1466,33.2486],[119.1555,33.2545],[119.1631,33.2715],[119.1534,33.2853],[119.1601,33.2835],[119.1847,33.2898],[119.2107,33.2925],[119.2399,33.3015],[119.2627,33.303],[119.2488,33.3181],[119.235,33.3451],[119.2431,33.3524],[119.2545,33.3529],[119.2918,33.3634],[119.311,33.3674],[119.3654,33.3696],[119.4013,33.3752],[119.4168,33.3762],[119.4484,33.3848],[119.4768,33.4037],[119.4884,33.4079],[119.5045,33.4073],[119.5313,33.4149],[119.5439,33.4149],[119.5531,33.4105],[119.5592,33.4009],[119.5669,33.3993],[119.6042,33.4223],[119.618,33.4272],[119.62,33.4374],[119.6053,33.4496],[119.6041,33.4554],[119.5914,33.4641],[119.581,33.4645],[119.5763,33.4742],[119.5589,33.4714],[119.5324,33.5015],[119.5208,33.5009],[119.4982,33.5203],[119.4927,33.536],[119.4933,33.5459],[119.4866,33.5607],[119.4778,33.5884],[119.4711,33.5973],[119.4644,33.6271],[119.4565,33.6416],[119.4638,33.6453],[119.4676,33.6383],[119.4961,33.6542],[119.4837,33.6585],[119.4849,33.6672],[119.4923,33.6731],[119.4817,33.686],[119.4826,33.6981],[119.5089,33.7221],[119.509,33.7395],[119.5243,33.7703],[119.5323,33.7766],[119.5362,33.7972],[119.5455,33.8036],[119.5432,33.8124],[119.5553,33.8276],[119.5594,33.8401],[119.5848,33.859],[119.5987,33.8745],[119.6179,33.8793],[119.6392,33.8938],[119.639,33.9046],[119.646,33.9248],[119.6376,33.939],[119.644,33.947],[119.6343,33.9513],[119.6204,33.9461],[119.6151,33.9547],[119.5953,33.9768],[119.6014,33.9801],[119.5973,33.9959],[119.5789,33.9999],[119.5683,34.0132],[119.5633,34.0102],[119.5552,34.0186],[119.5411,34.0166],[119.5358,34.0309],[119.518,34.0314],[119.5196,34.0257],[119.5093,34.0172],[119.4978,34.0146],[119.4741,33.9992],[119.4392,33.9796],[119.43,33.9856],[119.4255,34.0035],[119.4093,34.0019],[119.4033,34.0223],[119.3979,34.0244],[119.3928,34.0368],[119.3708,34.033],[119.3379,34.0297],[119.32,34.0261],[119.3193,34.0329],[119.3035,34.0345],[119.3029,34.0404],[119.2684,34.0424],[119.2682,34.0343],[119.2486,34.0338],[119.2362,34.0363],[119.2357,34.044],[119.2274,34.0527],[119.2095,34.0562],[119.1905,34.0767],[119.1841,34.0898],[119.1749,34.0935],[119.1665,34.0881],[119.1582,34.0764],[119.1551,34.057],[119.1488,34.0458],[119.1298,34.0288],[119.1145,34.0244],[119.0838,34.0014],[119.0819,33.9878],[119.0731,33.9815],[119.0589,33.9784],[119.0554,33.9731],[119.0427,33.9689],[119.0407,33.9596],[119.051,33.9575],[119.0533,33.9374],[119.0446,33.9294],[119.0359,33.9281],[119.0249,33.9112],[119.008,33.8966],[118.9973,33.8973],[118.9997,33.9049],[118.9876,33.9046],[118.9723,33.9194],[118.9508,33.9143],[118.9488,33.9068],[118.9413,33.9078],[118.9331,33.9007],[118.9221,33.9025],[118.9074,33.8898],[118.8854,33.8859],[118.8745,33.8925],[118.8637,33.8914],[118.8572,33.8802],[118.8288,33.8586],[118.819,33.845],[118.8073,33.8194],[118.7998,33.8135],[118.8056,33.7944],[118.7957,33.7729],[118.8051,33.7632],[118.8023,33.7412],[118.8142,33.7309],[118.8093,33.716],[118.8131,33.7009],[118.7986,33.6915],[118.7926,33.6666],[118.7996,33.6467],[118.758,33.6357],[118.7706,33.6071],[118.7853,33.587],[118.8064,33.5727],[118.8031,33.5618],[118.7974,33.5606],[118.7897,33.5367],[118.79,33.5087],[118.7856,33.4931],[118.7799,33.4876],[118.7828,33.444],[118.7469,33.3867],[118.7801,33.3458],[118.7034,33.3237],[118.6678,33.3117],[118.5111,33.2639],[118.4435,33.2048],[118.4243,33.1871],[118.3202,33.1962],[118.2617,33.1999],[118.2214,33.1807],[118.2237,33.1555],[118.2196,33.1141],[118.2105,33.1118],[118.2097,33.1043],[118.2209,33.1059],[118.2213,33.0876],[118.2065,33.0912],[118.2029,33.0881],[118.2237,33.0834],[118.2276,33.0695],[118.2149,33.0708],[118.2124,33.0619],[118.2334,33.06],[118.2396,33.0464],[118.2435,33.0278],[118.2448,32.9983],[118.2524,32.9821],[118.2694,32.9692],[118.3038,32.9687],[118.3096,32.959],[118.2934,32.9472],[118.2513,32.9362],[118.2354,32.9265],[118.233,32.9162],[118.2398,32.8834],[118.2444,32.8745],[118.2506,32.8484],[118.2632,32.8562],[118.2846,32.8573],[118.2896,32.8455],[118.3017,32.8462],[118.2979,32.8321],[118.3066,32.8106],[118.2944,32.8001],[118.2988,32.7856],[118.3071,32.7787],[118.3223,32.7775],[118.3264,32.7635],[118.3341,32.7616],[118.3488,32.773],[118.3662,32.7683],[118.3712,32.7577],[118.3723,32.7417],[118.3663,32.735],[118.3682,32.7248],[118.3753,32.719],[118.3987,32.7214],[118.411,32.716],[118.4229,32.7181],[118.4505,32.7434],[118.4593,32.7261],[118.4835,32.7214],[118.4898,32.7245],[118.5205,32.7232],[118.5447,32.7294],[118.5597,32.7299],[118.5766,32.7191],[118.5908,32.7248],[118.6076,32.7266],[118.617,32.7389],[118.6323,32.74],[118.6394,32.7448],[118.654,32.7407],[118.6576,32.7361],[118.6942,32.7266],[118.7072,32.7203],[118.7245,32.722],[118.7367,32.7323],[118.7563,32.7371],[118.7527,32.7558],[118.7464,32.7593],[118.7379,32.7733],[118.7369,32.7934],[118.7468,32.8004],[118.7418,32.8534],[118.7479,32.8587],[118.791,32.8484],[118.8117,32.855],[118.8125,32.8652],[118.8062,32.8702],[118.8112,32.8755],[118.8146,32.9027],[118.8093,32.9079],[118.8122,32.9169],[118.819,32.9206],[118.8369,32.9114],[118.8395,32.9225],[118.849,32.9272],[118.8425,32.9437],[118.8494,32.9459],[118.8493,32.9566],[118.8652,32.955],[118.8847,32.9606],[118.8962,32.9577],[118.8912,32.9515],[118.8932,32.9409],[118.9063,32.9449],[118.9214,32.9396],[118.9338,32.9386],[118.9416,32.9461],[118.9612,32.9458],[118.9936,32.9582],[119.0089,32.9594],[119.0208,32.9558],[119.0263,32.9473],[119.0233,32.9351],[119.03,32.9279],[119.0198,32.9257],[119.0156,32.9075],[119.0215,32.906],[119.045,32.9114],[119.0457,32.8925],[119.0551,32.8748],[119.0713,32.8647],[119.1043,32.8267],[119.1131,32.8229],[119.1849,32.8256]]]]}},{"type":"Feature","properties":{"name":"盐城市","adcode":320900,"center":[120.139998,33.377631],"centroid":[120.19868,33.516581]},"geometry":{"type":"MultiPolygon","coordinates":[[[[120.976,32.6584],[120.9636,32.6824],[120.9501,32.6896],[120.9338,32.6922],[120.9159,32.7012],[120.915,32.7117],[120.9329,32.7157],[120.9529,32.7141],[120.9631,32.7502],[120.9719,32.7612],[120.9814,32.8597],[120.9787,32.8757],[120.9727,32.8857],[120.9576,32.8935],[120.9504,32.9164],[120.9401,32.9755],[120.9326,33.0059],[120.9178,33.0258],[120.8944,33.0386],[120.8718,33.0472],[120.8741,33.0936],[120.8599,33.1428],[120.8438,33.2098],[120.8468,33.2199],[120.843,33.2296],[120.8195,33.2382],[120.8203,33.2561],[120.832,33.2688],[120.8326,33.2821],[120.8218,33.2986],[120.8137,33.3034],[120.7964,33.3061],[120.7829,33.3042],[120.7693,33.3068],[120.7607,33.3199],[120.741,33.3376],[120.7308,33.3652],[120.7283,33.3846],[120.7198,33.4205],[120.7175,33.4367],[120.6802,33.5203],[120.65,33.5773],[120.6228,33.6151],[120.6112,33.6273],[120.5838,33.6685],[120.5706,33.7022],[120.5345,33.7826],[120.5094,33.8309],[120.4855,33.8592],[120.4247,33.9751],[120.3676,34.0914],[120.3598,34.1219],[120.356,34.1496],[120.3475,34.1792],[120.3317,34.2093],[120.3143,34.2558],[120.3085,34.2975],[120.3116,34.307],[120.2928,34.3181],[120.2333,34.3372],[120.1037,34.3916],[120.043,34.4222],[119.9625,34.4589],[119.919,34.4691],[119.8495,34.4774],[119.823,34.482],[119.8192,34.4629],[119.8118,34.4623],[119.8086,34.4501],[119.7956,34.4505],[119.7989,34.4303],[119.7885,34.4081],[119.7912,34.4003],[119.8038,34.3857],[119.8024,34.3762],[119.7825,34.3698],[119.7718,34.3543],[119.7587,34.3505],[119.7536,34.3432],[119.754,34.3261],[119.7431,34.319],[119.7404,34.3088],[119.7279,34.3031],[119.7021,34.2812],[119.6627,34.2559],[119.6298,34.2429],[119.6123,34.23],[119.5974,34.2245],[119.5735,34.2078],[119.5574,34.2054],[119.5525,34.208],[119.5326,34.1885],[119.5039,34.1726],[119.5103,34.1605],[119.5293,34.1668],[119.5334,34.1454],[119.529,34.1377],[119.5214,34.1367],[119.5375,34.109],[119.551,34.1156],[119.5588,34.1018],[119.5697,34.1062],[119.5884,34.0913],[119.5857,34.0788],[119.577,34.0697],[119.5636,34.069],[119.5539,34.0605],[119.5697,34.0328],[119.5719,34.021],[119.5683,34.0132],[119.5789,33.9999],[119.5973,33.9959],[119.6014,33.9801],[119.5953,33.9768],[119.6151,33.9547],[119.6204,33.9461],[119.6343,33.9513],[119.644,33.947],[119.6376,33.939],[119.646,33.9248],[119.639,33.9046],[119.6392,33.8938],[119.6179,33.8793],[119.5987,33.8745],[119.5848,33.859],[119.5594,33.8401],[119.5553,33.8276],[119.5432,33.8124],[119.5455,33.8036],[119.5362,33.7972],[119.5323,33.7766],[119.5243,33.7703],[119.509,33.7395],[119.5089,33.7221],[119.4826,33.6981],[119.4817,33.686],[119.4923,33.6731],[119.4849,33.6672],[119.4837,33.6585],[119.4961,33.6542],[119.4676,33.6383],[119.4638,33.6453],[119.4565,33.6416],[119.4644,33.6271],[119.4711,33.5973],[119.4778,33.5884],[119.4866,33.5607],[119.4933,33.5459],[119.4927,33.536],[119.4982,33.5203],[119.5208,33.5009],[119.5324,33.5015],[119.5589,33.4714],[119.5763,33.4742],[119.581,33.4645],[119.5914,33.4641],[119.6041,33.4554],[119.6053,33.4496],[119.62,33.4374],[119.618,33.4272],[119.6042,33.4223],[119.5669,33.3993],[119.5767,33.3784],[119.5899,33.381],[119.6054,33.3797],[119.6131,33.3584],[119.6164,33.3331],[119.632,33.3354],[119.636,33.3266],[119.6324,33.317],[119.6414,33.311],[119.6405,33.2936],[119.654,33.2807],[119.6595,33.2858],[119.6864,33.2889],[119.7003,33.2942],[119.7151,33.2719],[119.7042,33.2698],[119.6908,33.2427],[119.6857,33.2386],[119.6932,33.2243],[119.7126,33.2191],[119.7315,33.2117],[119.7335,33.2053],[119.7288,33.1887],[119.7303,33.1729],[119.7513,33.1708],[119.7531,33.1606],[119.7398,33.1474],[119.7493,33.131],[119.7723,33.1309],[119.7873,33.1391],[119.8435,33.1535],[119.8685,33.1545],[119.8676,33.1434],[119.8773,33.1468],[119.8902,33.1443],[119.8944,33.1511],[119.9166,33.1494],[119.9364,33.1554],[119.9684,33.1499],[119.9881,33.1516],[120.0035,33.156],[120.024,33.158],[120.0482,33.164],[120.0808,33.1818],[120.0941,33.1786],[120.1534,33.1572],[120.1689,33.1531],[120.2141,33.1374],[120.2968,33.1296],[120.2897,33.1042],[120.2937,33.0967],[120.292,33.0811],[120.3094,33.0623],[120.313,33.0481],[120.3089,33.0244],[120.3124,32.9926],[120.2991,32.9666],[120.3004,32.9542],[120.2874,32.9552],[120.2864,32.9494],[120.2951,32.9455],[120.292,32.9336],[120.2808,32.9249],[120.2388,32.928],[120.2384,32.9212],[120.2204,32.917],[120.205,32.9206],[120.2011,32.9305],[120.1764,32.9325],[120.1775,32.9091],[120.1819,32.9039],[120.177,32.8778],[120.2002,32.8745],[120.1988,32.8669],[120.2084,32.8643],[120.2059,32.8522],[120.1952,32.8514],[120.1949,32.8428],[120.1848,32.8341],[120.181,32.8253],[120.1934,32.8261],[120.187,32.8122],[120.1672,32.815],[120.1611,32.8099],[120.1682,32.793],[120.1593,32.7879],[120.1625,32.781],[120.1742,32.7797],[120.1829,32.7729],[120.197,32.7815],[120.1993,32.787],[120.2224,32.7923],[120.2282,32.7786],[120.2147,32.7674],[120.2066,32.7566],[120.2026,32.743],[120.1961,32.7393],[120.1809,32.7418],[120.1817,32.7232],[120.1732,32.7157],[120.1648,32.7203],[120.1554,32.7142],[120.1576,32.7032],[120.1451,32.7059],[120.1381,32.6872],[120.1295,32.6891],[120.1217,32.6792],[120.121,32.6333],[120.1091,32.6305],[120.1132,32.6138],[120.1227,32.6103],[120.1408,32.6163],[120.1544,32.616],[120.1763,32.6212],[120.176,32.6291],[120.1973,32.6193],[120.196,32.603],[120.2023,32.6009],[120.2136,32.6027],[120.2094,32.6082],[120.2135,32.6256],[120.2222,32.6343],[120.2217,32.6484],[120.2289,32.6499],[120.2248,32.6584],[120.2257,32.6759],[120.2519,32.6799],[120.2763,32.6793],[120.2927,32.6876],[120.3156,32.7044],[120.3195,32.6993],[120.333,32.6998],[120.341,32.7054],[120.3667,32.7049],[120.3761,32.7109],[120.3925,32.7072],[120.3896,32.6907],[120.3943,32.6875],[120.4105,32.6894],[120.4157,32.6794],[120.4319,32.6765],[120.437,32.6471],[120.4432,32.6391],[120.4431,32.6293],[120.4656,32.6315],[120.4756,32.6287],[120.4847,32.6313],[120.4965,32.6244],[120.4953,32.6395],[120.5068,32.6408],[120.5122,32.6361],[120.5446,32.6323],[120.5499,32.6358],[120.5789,32.635],[120.5905,32.6397],[120.6005,32.65],[120.6148,32.6398],[120.6127,32.6356],[120.6218,32.626],[120.6152,32.6061],[120.6203,32.6019],[120.6298,32.6175],[120.644,32.6132],[120.6569,32.6035],[120.6561,32.5946],[120.6493,32.585],[120.6534,32.5719],[120.663,32.572],[120.6716,32.5879],[120.6809,32.5948],[120.701,32.6035],[120.7203,32.5997],[120.721,32.5916],[120.7403,32.5854],[120.7436,32.5983],[120.7935,32.6006],[120.7926,32.5785],[120.805,32.5826],[120.8183,32.592],[120.8326,32.597],[120.8372,32.6067],[120.8546,32.6051],[120.8685,32.6098],[120.8569,32.6122],[120.8512,32.6074],[120.8514,32.6183],[120.8635,32.6191],[120.8632,32.6302],[120.8953,32.6316],[120.9081,32.6393],[120.976,32.6584]]]]}},{"type":"Feature","properties":{"name":"扬州市","adcode":321000,"center":[119.421003,32.393159],"centroid":[119.479719,32.737224]},"geometry":{"type":"MultiPolygon","coordinates":[[[[119.229,32.2222],[119.255,32.2322],[119.2861,32.2329],[119.3364,32.231],[119.3676,32.2255],[119.3884,32.2251],[119.3967,32.2351],[119.4127,32.2466],[119.4339,32.2575],[119.4625,32.2625],[119.4786,32.2613],[119.5044,32.2549],[119.5148,32.2489],[119.5367,32.2679],[119.5464,32.2788],[119.5449,32.2828],[119.5764,32.2846],[119.5779,32.273],[119.5708,32.2716],[119.5709,32.2301],[119.5994,32.2346],[119.5979,32.2463],[119.6072,32.2529],[119.6158,32.2507],[119.6221,32.2374],[119.6217,32.2174],[119.6297,32.2277],[119.6276,32.2487],[119.6339,32.2578],[119.6614,32.2637],[119.6781,32.2701],[119.6886,32.2825],[119.7084,32.2764],[119.7307,32.304],[119.7452,32.3139],[119.7686,32.3189],[119.786,32.3179],[119.8023,32.3128],[119.8192,32.3025],[119.8439,32.3219],[119.8473,32.3284],[119.8427,32.3607],[119.8537,32.3615],[119.8562,32.3797],[119.8446,32.396],[119.8539,32.4019],[119.8517,32.4112],[119.8638,32.4171],[119.8685,32.4387],[119.8593,32.4445],[119.8534,32.4627],[119.8405,32.4645],[119.8297,32.4603],[119.8145,32.4689],[119.8182,32.4916],[119.8245,32.4963],[119.8234,32.5354],[119.8355,32.5498],[119.8272,32.5592],[119.8157,32.5788],[119.82,32.5928],[119.8158,32.6056],[119.8218,32.6073],[119.8161,32.6149],[119.8144,32.6271],[119.8287,32.6294],[119.833,32.6409],[119.8446,32.6404],[119.8551,32.6319],[119.8666,32.6276],[119.8695,32.6194],[119.8905,32.6203],[119.8987,32.6165],[119.9006,32.624],[119.9119,32.6252],[119.8971,32.6462],[119.8992,32.657],[119.8948,32.6743],[119.8835,32.6739],[119.8707,32.6791],[119.8773,32.6984],[119.8585,32.7106],[119.858,32.7212],[119.8437,32.7367],[119.8453,32.753],[119.8669,32.7685],[119.8631,32.7757],[119.8335,32.782],[119.8249,32.7949],[119.8302,32.8069],[119.8236,32.808],[119.8065,32.8006],[119.7947,32.8039],[119.7887,32.8102],[119.7908,32.82],[119.8009,32.8283],[119.8015,32.8377],[119.796,32.8415],[119.8058,32.8519],[119.7974,32.8571],[119.8027,32.8627],[119.7893,32.8812],[119.7826,32.9148],[119.7753,32.916],[119.7619,32.9041],[119.7462,32.8987],[119.7251,32.9017],[119.7195,32.9062],[119.7124,32.922],[119.7147,32.9364],[119.7031,32.9449],[119.6967,32.9613],[119.7067,32.9896],[119.708,33.0057],[119.6966,33.0169],[119.6839,33.0725],[119.6697,33.0898],[119.6477,33.1041],[119.6403,33.1192],[119.6492,33.1202],[119.6462,33.1301],[119.6537,33.1566],[119.6573,33.1623],[119.6921,33.1869],[119.7018,33.2018],[119.7082,33.1983],[119.7126,33.2191],[119.6932,33.2243],[119.6857,33.2386],[119.6908,33.2427],[119.7042,33.2698],[119.7151,33.2719],[119.7003,33.2942],[119.6864,33.2889],[119.6595,33.2858],[119.654,33.2807],[119.6405,33.2936],[119.6414,33.311],[119.6324,33.317],[119.636,33.3266],[119.632,33.3354],[119.6164,33.3331],[119.6131,33.3584],[119.6054,33.3797],[119.5899,33.381],[119.5767,33.3784],[119.5669,33.3993],[119.5592,33.4009],[119.5531,33.4105],[119.5439,33.4149],[119.5313,33.4149],[119.5045,33.4073],[119.4884,33.4079],[119.4768,33.4037],[119.4484,33.3848],[119.4168,33.3762],[119.4013,33.3752],[119.3654,33.3696],[119.311,33.3674],[119.2918,33.3634],[119.2545,33.3529],[119.2431,33.3524],[119.235,33.3451],[119.2488,33.3181],[119.2627,33.303],[119.2399,33.3015],[119.2107,33.2925],[119.1847,33.2898],[119.1601,33.2835],[119.1534,33.2853],[119.1631,33.2715],[119.1555,33.2545],[119.1466,33.2486],[119.1433,33.23],[119.1507,33.2128],[119.1652,33.2076],[119.1999,33.2059],[119.2114,33.2031],[119.2192,33.206],[119.222,33.1881],[119.2295,33.1659],[119.2238,33.1613],[119.2285,33.1511],[119.2503,33.1576],[119.2715,33.1468],[119.3054,33.1346],[119.3139,33.1286],[119.3211,33.1023],[119.3348,33.0844],[119.3433,33.0651],[119.3637,33.0535],[119.3642,33.0386],[119.3592,33.0297],[119.3431,33.0114],[119.3251,32.9984],[119.325,32.9686],[119.3283,32.9459],[119.3456,32.8902],[119.3498,32.8684],[119.3454,32.8383],[119.3327,32.815],[119.3137,32.8049],[119.2787,32.7989],[119.1909,32.8254],[119.1849,32.8256],[119.1889,32.8109],[119.1913,32.7888],[119.2009,32.751],[119.2082,32.7405],[119.2089,32.7152],[119.2116,32.7082],[119.2087,32.6415],[119.2202,32.6296],[119.2169,32.6173],[119.2205,32.6099],[119.231,32.6071],[119.2201,32.5924],[119.2202,32.5766],[119.2093,32.5736],[119.1937,32.5792],[119.1872,32.5999],[119.177,32.5938],[119.1752,32.5711],[119.1538,32.5619],[119.1545,32.5549],[119.1667,32.546],[119.1678,32.5363],[119.1556,32.5281],[119.1501,32.5098],[119.1423,32.4994],[119.1478,32.4927],[119.1345,32.4916],[119.1155,32.477],[119.096,32.4661],[119.0851,32.4527],[119.0737,32.4554],[119.0675,32.4624],[119.047,32.4629],[119.0359,32.4524],[119.0237,32.4561],[119.0225,32.4403],[119.0295,32.4288],[119.0164,32.4132],[119.0176,32.3993],[119.0275,32.3883],[119.0374,32.3888],[119.0384,32.3816],[119.0226,32.3804],[119.0217,32.3754],[119.0438,32.3652],[119.0273,32.3513],[119.0284,32.3451],[119.042,32.3333],[119.0359,32.3254],[119.0356,32.3087],[119.0398,32.3037],[119.0411,32.2717],[119.0371,32.2599],[119.0566,32.2517],[119.0747,32.249],[119.086,32.2412],[119.1323,32.2452],[119.1538,32.2437],[119.1772,32.2389],[119.229,32.2222]]]]}},{"type":"Feature","properties":{"name":"镇江市","adcode":321100,"center":[119.452753,32.204402],"centroid":[119.458183,32.014028]},"geometry":{"type":"MultiPolygon","coordinates":[[[[119.2341,31.6271],[119.2369,31.6252],[119.2584,31.6322],[119.2828,31.6428],[119.2999,31.6548],[119.3165,31.671],[119.3287,31.704],[119.3211,31.7076],[119.3216,31.7155],[119.3311,31.7273],[119.3216,31.7322],[119.3056,31.733],[119.3046,31.7674],[119.3074,31.7765],[119.3147,31.7773],[119.3201,31.7971],[119.3146,31.7966],[119.3138,31.8138],[119.32,31.8254],[119.3326,31.8363],[119.3295,31.8458],[119.3421,31.8596],[119.3641,31.858],[119.3724,31.8458],[119.387,31.8466],[119.4041,31.8321],[119.4223,31.8294],[119.4293,31.8323],[119.433,31.8258],[119.4434,31.8289],[119.432,31.8404],[119.4255,31.8528],[119.4195,31.8521],[119.4232,31.8717],[119.4375,31.8764],[119.4488,31.8854],[119.4639,31.8812],[119.4688,31.8717],[119.5082,31.8519],[119.55,31.8565],[119.5561,31.8625],[119.5599,31.8561],[119.5701,31.8546],[119.5767,31.8484],[119.5869,31.8474],[119.5921,31.8353],[119.5894,31.827],[119.5973,31.8278],[119.6051,31.8221],[119.6057,31.8061],[119.615,31.7962],[119.6296,31.8012],[119.6446,31.7956],[119.6508,31.7777],[119.6565,31.7736],[119.6882,31.7694],[119.6933,31.757],[119.7067,31.7471],[119.7083,31.7379],[119.7239,31.7329],[119.74,31.7312],[119.7347,31.7437],[119.7363,31.7621],[119.7488,31.7803],[119.7573,31.7862],[119.764,31.8081],[119.7905,31.807],[119.7855,31.8167],[119.7903,31.8266],[119.8005,31.8333],[119.8118,31.8522],[119.7823,31.8521],[119.7699,31.8476],[119.7633,31.8569],[119.7641,31.8726],[119.7552,31.8803],[119.7718,31.9008],[119.7805,31.9016],[119.7818,31.9139],[119.7596,31.9211],[119.7605,31.9266],[119.7839,31.9194],[119.7894,31.9269],[119.7772,31.9446],[119.7676,31.9493],[119.7782,31.9841],[119.7756,31.9864],[119.7848,32.0123],[119.7774,32.0143],[119.7963,32.049],[119.8048,32.0561],[119.8222,32.0558],[119.829,32.0519],[119.8438,32.0598],[119.8599,32.0515],[119.8696,32.0581],[119.8786,32.0422],[119.8837,32.0393],[119.8909,32.0462],[119.896,32.0402],[119.9059,32.0154],[119.9197,32.0037],[119.9517,32.0023],[119.9755,32.0069],[119.9487,32.0475],[119.9306,32.0789],[119.8941,32.1829],[119.892,32.2011],[119.8785,32.2475],[119.8695,32.2627],[119.8527,32.2819],[119.8346,32.2957],[119.8192,32.3025],[119.8023,32.3128],[119.786,32.3179],[119.7686,32.3189],[119.7452,32.3139],[119.7307,32.304],[119.7084,32.2764],[119.6886,32.2825],[119.6781,32.2701],[119.6614,32.2637],[119.6339,32.2578],[119.6276,32.2487],[119.6297,32.2277],[119.6217,32.2174],[119.6221,32.2374],[119.6158,32.2507],[119.6072,32.2529],[119.5979,32.2463],[119.5994,32.2346],[119.5709,32.2301],[119.5708,32.2716],[119.5779,32.273],[119.5764,32.2846],[119.5449,32.2828],[119.5464,32.2788],[119.5367,32.2679],[119.5148,32.2489],[119.5044,32.2549],[119.4786,32.2613],[119.4625,32.2625],[119.4339,32.2575],[119.4127,32.2466],[119.3967,32.2351],[119.3884,32.2251],[119.3676,32.2255],[119.3364,32.231],[119.2861,32.2329],[119.255,32.2322],[119.229,32.2222],[119.2417,32.2163],[119.2214,32.2011],[119.2162,32.1907],[119.1911,32.1854],[119.1845,32.1896],[119.1544,32.1862],[119.1367,32.1934],[119.1213,32.1876],[119.0869,32.1785],[119.0787,32.1787],[119.076,32.1617],[119.048,32.1613],[119.0585,32.1564],[119.0393,32.157],[119.0318,32.1487],[119.0224,32.1309],[119.0092,32.1247],[119.0089,32.1159],[119.0266,32.1159],[119.0498,32.1098],[119.0577,32.1022],[119.0692,32.1079],[119.0798,32.1073],[119.0897,32.0897],[119.0989,32.091],[119.0985,32.0716],[119.0866,32.0532],[119.0927,32.0376],[119.0979,32.0113],[119.0924,32.0041],[119.1028,32.0049],[119.1125,32.0004],[119.1142,31.9882],[119.1216,31.9848],[119.1211,31.9776],[119.1139,31.9798],[119.1111,31.9695],[119.103,31.9656],[119.0901,31.9741],[119.0737,31.9696],[119.0649,31.9734],[119.0469,31.9686],[119.0292,31.9571],[119.0295,31.95],[119.0375,31.939],[119.0515,31.9359],[119.0676,31.9402],[119.1042,31.9336],[119.1084,31.923],[119.1112,31.9016],[119.1164,31.8905],[119.1078,31.8851],[119.1003,31.8658],[119.0924,31.8604],[119.0754,31.8642],[119.0698,31.8688],[119.0434,31.8544],[119.0328,31.8538],[119.0259,31.8464],[119.0034,31.8458],[118.9797,31.8424],[118.9695,31.8346],[118.9704,31.8261],[118.9864,31.8178],[118.9981,31.8017],[119.0064,31.7986],[119.0029,31.7834],[118.9825,31.783],[118.9805,31.7647],[118.9989,31.7672],[119.005,31.7778],[119.0215,31.7786],[119.0297,31.7847],[119.0557,31.789],[119.0658,31.782],[119.0771,31.784],[119.0778,31.7739],[119.0899,31.7696],[119.094,31.756],[119.1054,31.7513],[119.1144,31.7402],[119.125,31.7358],[119.1292,31.7236],[119.1387,31.7221],[119.1577,31.6994],[119.1864,31.6941],[119.1904,31.687],[119.1866,31.6777],[119.1923,31.6598],[119.1873,31.6492],[119.2047,31.6466],[119.2124,31.6277],[119.2325,31.6323],[119.2341,31.6271]]]]}},{"type":"Feature","properties":{"name":"泰州市","adcode":321200,"center":[119.915176,32.484882],"centroid":[120.060841,32.571433]},"geometry":{"type":"MultiPolygon","coordinates":[[[[120.5531,32.0211],[120.5585,32.0337],[120.5479,32.041],[120.5505,32.0509],[120.5294,32.0564],[120.5185,32.0659],[120.5128,32.0917],[120.4867,32.0991],[120.4823,32.1029],[120.4408,32.1199],[120.4352,32.1239],[120.417,32.1248],[120.3879,32.1297],[120.3744,32.1281],[120.3562,32.1308],[120.351,32.1495],[120.3474,32.1505],[120.3432,32.1701],[120.3716,32.2176],[120.3646,32.2378],[120.357,32.2387],[120.3459,32.2499],[120.3509,32.256],[120.3472,32.2665],[120.3524,32.2787],[120.3523,32.3045],[120.3652,32.3088],[120.3542,32.325],[120.3531,32.3359],[120.3462,32.344],[120.3597,32.358],[120.3524,32.3689],[120.3517,32.3779],[120.323,32.3684],[120.3101,32.3615],[120.3025,32.3725],[120.2926,32.3695],[120.2845,32.3799],[120.2892,32.385],[120.2799,32.4215],[120.2807,32.431],[120.2752,32.4389],[120.2714,32.4723],[120.2583,32.4989],[120.2701,32.5018],[120.2637,32.5146],[120.2701,32.5487],[120.2623,32.562],[120.2629,32.5749],[120.2557,32.5976],[120.2306,32.5868],[120.2246,32.5818],[120.2076,32.5916],[120.2023,32.6009],[120.196,32.603],[120.1973,32.6193],[120.176,32.6291],[120.1763,32.6212],[120.1544,32.616],[120.1408,32.6163],[120.1227,32.6103],[120.1132,32.6138],[120.1091,32.6305],[120.121,32.6333],[120.1217,32.6792],[120.1295,32.6891],[120.1381,32.6872],[120.1451,32.7059],[120.1576,32.7032],[120.1554,32.7142],[120.1648,32.7203],[120.1732,32.7157],[120.1817,32.7232],[120.1809,32.7418],[120.1961,32.7393],[120.2026,32.743],[120.2066,32.7566],[120.2147,32.7674],[120.2282,32.7786],[120.2224,32.7923],[120.1993,32.787],[120.197,32.7815],[120.1829,32.7729],[120.1742,32.7797],[120.1625,32.781],[120.1593,32.7879],[120.1682,32.793],[120.1611,32.8099],[120.1672,32.815],[120.187,32.8122],[120.1934,32.8261],[120.181,32.8253],[120.1848,32.8341],[120.1949,32.8428],[120.1952,32.8514],[120.2059,32.8522],[120.2084,32.8643],[120.1988,32.8669],[120.2002,32.8745],[120.177,32.8778],[120.1819,32.9039],[120.1775,32.9091],[120.1764,32.9325],[120.2011,32.9305],[120.205,32.9206],[120.2204,32.917],[120.2384,32.9212],[120.2388,32.928],[120.2808,32.9249],[120.292,32.9336],[120.2951,32.9455],[120.2864,32.9494],[120.2874,32.9552],[120.3004,32.9542],[120.2991,32.9666],[120.3124,32.9926],[120.3089,33.0244],[120.313,33.0481],[120.3094,33.0623],[120.292,33.0811],[120.2937,33.0967],[120.2897,33.1042],[120.2968,33.1296],[120.2141,33.1374],[120.1689,33.1531],[120.1534,33.1572],[120.0941,33.1786],[120.0808,33.1818],[120.0482,33.164],[120.024,33.158],[120.0035,33.156],[119.9881,33.1516],[119.9684,33.1499],[119.9364,33.1554],[119.9166,33.1494],[119.8944,33.1511],[119.8902,33.1443],[119.8773,33.1468],[119.8676,33.1434],[119.8685,33.1545],[119.8435,33.1535],[119.7873,33.1391],[119.7723,33.1309],[119.7493,33.131],[119.7398,33.1474],[119.7531,33.1606],[119.7513,33.1708],[119.7303,33.1729],[119.7288,33.1887],[119.7335,33.2053],[119.7315,33.2117],[119.7126,33.2191],[119.7082,33.1983],[119.7018,33.2018],[119.6921,33.1869],[119.6573,33.1623],[119.6537,33.1566],[119.6462,33.1301],[119.6492,33.1202],[119.6403,33.1192],[119.6477,33.1041],[119.6697,33.0898],[119.6839,33.0725],[119.6966,33.0169],[119.708,33.0057],[119.7067,32.9896],[119.6967,32.9613],[119.7031,32.9449],[119.7147,32.9364],[119.7124,32.922],[119.7195,32.9062],[119.7251,32.9017],[119.7462,32.8987],[119.7619,32.9041],[119.7753,32.916],[119.7826,32.9148],[119.7893,32.8812],[119.8027,32.8627],[119.7974,32.8571],[119.8058,32.8519],[119.796,32.8415],[119.8015,32.8377],[119.8009,32.8283],[119.7908,32.82],[119.7887,32.8102],[119.7947,32.8039],[119.8065,32.8006],[119.8236,32.808],[119.8302,32.8069],[119.8249,32.7949],[119.8335,32.782],[119.8631,32.7757],[119.8669,32.7685],[119.8453,32.753],[119.8437,32.7367],[119.858,32.7212],[119.8585,32.7106],[119.8773,32.6984],[119.8707,32.6791],[119.8835,32.6739],[119.8948,32.6743],[119.8992,32.657],[119.8971,32.6462],[119.9119,32.6252],[119.9006,32.624],[119.8987,32.6165],[119.8905,32.6203],[119.8695,32.6194],[119.8666,32.6276],[119.8551,32.6319],[119.8446,32.6404],[119.833,32.6409],[119.8287,32.6294],[119.8144,32.6271],[119.8161,32.6149],[119.8218,32.6073],[119.8158,32.6056],[119.82,32.5928],[119.8157,32.5788],[119.8272,32.5592],[119.8355,32.5498],[119.8234,32.5354],[119.8245,32.4963],[119.8182,32.4916],[119.8145,32.4689],[119.8297,32.4603],[119.8405,32.4645],[119.8534,32.4627],[119.8593,32.4445],[119.8685,32.4387],[119.8638,32.4171],[119.8517,32.4112],[119.8539,32.4019],[119.8446,32.396],[119.8562,32.3797],[119.8537,32.3615],[119.8427,32.3607],[119.8473,32.3284],[119.8439,32.3219],[119.8192,32.3025],[119.8346,32.2957],[119.8527,32.2819],[119.8695,32.2627],[119.8785,32.2475],[119.892,32.2011],[119.8941,32.1829],[119.9306,32.0789],[119.9487,32.0475],[119.9755,32.0069],[119.9801,31.9981],[120.0162,31.9705],[120.0224,31.9678],[120.0649,31.9555],[120.1348,31.9394],[120.1753,31.9338],[120.2059,31.9315],[120.2366,31.9329],[120.263,31.9418],[120.3531,31.9806],[120.3707,31.9908],[120.3879,32.0067],[120.4037,32.0162],[120.4656,32.0458],[120.5038,32.041],[120.5246,32.0305],[120.5531,32.0211]]]]}},{"type":"Feature","properties":{"name":"宿迁市","adcode":321300,"center":[118.275162,33.963008],"centroid":[118.526352,33.784713]},"geometry":{"type":"MultiPolygon","coordinates":[[[[119.1749,34.0935],[119.1668,34.1075],[119.1762,34.1186],[119.1684,34.1297],[119.1564,34.1336],[119.1503,34.1406],[119.1428,34.134],[119.1291,34.1458],[119.1454,34.1587],[119.1419,34.1616],[119.1443,34.1763],[119.137,34.1779],[119.1329,34.2054],[119.0997,34.208],[119.097,34.2329],[119.0911,34.2369],[119.0919,34.2624],[119.0741,34.2651],[119.0828,34.3109],[119.073,34.3318],[119.0755,34.3427],[119.0622,34.3387],[119.0571,34.3562],[119.0562,34.3823],[119.0653,34.4092],[119.0869,34.4097],[119.0896,34.4209],[119.0612,34.4202],[119.0414,34.4219],[119.0387,34.4037],[119.0332,34.3989],[119.0153,34.4053],[118.995,34.4041],[118.9952,34.3903],[118.9808,34.3796],[118.9749,34.3691],[118.9646,34.3609],[118.9638,34.3505],[118.9536,34.3501],[118.9532,34.3685],[118.94,34.3823],[118.9319,34.3747],[118.9248,34.3793],[118.9134,34.3783],[118.9074,34.368],[118.8749,34.3677],[118.8643,34.3659],[118.8378,34.3688],[118.8253,34.3588],[118.8121,34.3573],[118.8109,34.3432],[118.7853,34.3118],[118.7666,34.3089],[118.7583,34.3129],[118.7598,34.3211],[118.7483,34.3308],[118.7399,34.3251],[118.7082,34.3364],[118.6933,34.3459],[118.6764,34.3453],[118.6766,34.3394],[118.6661,34.3424],[118.6443,34.359],[118.6352,34.3551],[118.6332,34.3447],[118.622,34.3411],[118.6318,34.3372],[118.6349,34.3205],[118.6327,34.3082],[118.6241,34.3058],[118.5934,34.308],[118.5715,34.299],[118.5746,34.2784],[118.5669,34.2742],[118.5611,34.248],[118.5655,34.2368],[118.5735,34.2336],[118.5597,34.1878],[118.5602,34.1655],[118.5192,34.1686],[118.5054,34.1586],[118.5097,34.1488],[118.5037,34.1372],[118.5032,34.1231],[118.5177,34.1175],[118.4899,34.1067],[118.4826,34.1],[118.4697,34.0972],[118.451,34.1066],[118.4344,34.1051],[118.4285,34.1086],[118.3829,34.1173],[118.3636,34.1188],[118.306,34.1136],[118.2923,34.1097],[118.2892,34.1026],[118.2326,34.1003],[118.2228,34.107],[118.2136,34.1272],[118.2138,34.142],[118.1877,34.1617],[118.1773,34.1564],[118.1565,34.1611],[118.1507,34.1585],[118.1542,34.1488],[118.1505,34.1373],[118.1393,34.1364],[118.1207,34.144],[118.1029,34.1395],[118.097,34.1503],[118.0883,34.155],[118.0831,34.1654],[118.0724,34.1709],[118.0606,34.1571],[118.0642,34.1525],[118.0556,34.1488],[117.999,34.14],[117.9944,34.1238],[117.9966,34.1056],[118.0077,34.1003],[118.0055,34.0916],[118.0131,34.0839],[118.0486,34.0925],[118.0638,34.0538],[118.0598,34.0482],[118.0637,34.0207],[118.0542,34.0097],[118.0496,34.0134],[118.0349,34.0127],[118.0284,33.9984],[118.0339,33.9839],[118.0463,33.9815],[118.053,33.9719],[118.0724,33.9654],[118.0857,33.9652],[118.0858,33.942],[118.1,33.9412],[118.1061,33.9351],[118.1138,33.9369],[118.1176,33.9546],[118.1259,33.955],[118.1412,33.9347],[118.1494,33.901],[118.1564,33.8897],[118.1685,33.881],[118.1746,33.8652],[118.176,33.8441],[118.1848,33.8442],[118.188,33.8229],[118.1834,33.8162],[118.1691,33.8201],[118.1689,33.8076],[118.1595,33.7957],[118.1705,33.7862],[118.1786,33.7631],[118.1709,33.7591],[118.1683,33.7496],[118.1853,33.7449],[118.1778,33.7361],[118.1609,33.7353],[118.1533,33.7202],[118.1677,33.715],[118.164,33.6926],[118.1681,33.6637],[118.1201,33.6217],[118.1123,33.6171],[118.1173,33.5917],[118.1084,33.53],[118.0991,33.5294],[118.108,33.5202],[118.1068,33.5039],[118.1081,33.4751],[118.0578,33.4917],[118.0506,33.492],[118.0436,33.4737],[118.0286,33.4584],[118.0236,33.4409],[118.022,33.4216],[118.0168,33.4067],[118.0282,33.3906],[118.0293,33.3723],[118.0059,33.3521],[117.9955,33.3471],[117.9716,33.3493],[117.9754,33.3357],[117.9924,33.3331],[117.9859,33.3203],[117.9833,33.2968],[117.9742,33.2797],[117.9394,33.2626],[117.948,33.2521],[117.939,33.2343],[117.9424,33.2251],[117.9538,33.2239],[117.9774,33.2263],[117.9935,33.2113],[117.9936,33.2056],[117.9809,33.2002],[117.9864,33.1934],[117.9892,33.1796],[118.0039,33.177],[118.0085,33.1678],[118.0174,33.1646],[118.0257,33.1559],[118.0367,33.1525],[118.0382,33.1352],[118.0469,33.1384],[118.0692,33.1399],[118.0883,33.1497],[118.1189,33.1606],[118.149,33.1695],[118.16,33.181],[118.1563,33.1955],[118.1684,33.2135],[118.1782,33.218],[118.1944,33.2117],[118.2116,33.1991],[118.2214,33.1807],[118.2617,33.1999],[118.3202,33.1962],[118.4243,33.1871],[118.4435,33.2048],[118.5111,33.2639],[118.6678,33.3117],[118.7034,33.3237],[118.7801,33.3458],[118.7469,33.3867],[118.7828,33.444],[118.7799,33.4876],[118.7856,33.4931],[118.79,33.5087],[118.7897,33.5367],[118.7974,33.5606],[118.8031,33.5618],[118.8064,33.5727],[118.7853,33.587],[118.7706,33.6071],[118.758,33.6357],[118.7996,33.6467],[118.7926,33.6666],[118.7986,33.6915],[118.8131,33.7009],[118.8093,33.716],[118.8142,33.7309],[118.8023,33.7412],[118.8051,33.7632],[118.7957,33.7729],[118.8056,33.7944],[118.7998,33.8135],[118.8073,33.8194],[118.819,33.845],[118.8288,33.8586],[118.8572,33.8802],[118.8637,33.8914],[118.8745,33.8925],[118.8854,33.8859],[118.9074,33.8898],[118.9221,33.9025],[118.9331,33.9007],[118.9413,33.9078],[118.9488,33.9068],[118.9508,33.9143],[118.9723,33.9194],[118.9876,33.9046],[118.9997,33.9049],[118.9973,33.8973],[119.008,33.8966],[119.0249,33.9112],[119.0359,33.9281],[119.0446,33.9294],[119.0533,33.9374],[119.051,33.9575],[119.0407,33.9596],[119.0427,33.9689],[119.0554,33.9731],[119.0589,33.9784],[119.0731,33.9815],[119.0819,33.9878],[119.0838,34.0014],[119.1145,34.0244],[119.1298,34.0288],[119.1488,34.0458],[119.1551,34.057],[119.1582,34.0764],[119.1665,34.0881],[119.1749,34.0935]]]]}}]},
+  jiangsuBlocks: {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"name":"苏南","centroid":[119.8151,31.6568]},"geometry":{"type":"MultiPolygon","coordinates":[[[[120.4037,32.0162],[120.4656,32.0458],[120.5038,32.041],[120.5246,32.0305],[120.5883,32.0097],[120.6284,32.0011],[120.6527,32.0024],[120.7025,32.0134],[120.7616,32.0204],[120.782,32.016],[120.7901,31.9981],[120.8031,31.9884],[120.8603,31.873],[120.8838,31.8347],[120.9167,31.7937],[120.9329,31.7867],[120.9595,31.783],[121.0606,31.7831],[121.0768,31.777],[121.1012,31.7625],[121.1453,31.7539],[121.2891,31.6163],[121.3456,31.5717],[121.3722,31.5532],[121.3435,31.512],[121.3199,31.4997],[121.3103,31.5059],[121.2999,31.4998],[121.2986,31.4915],[121.2689,31.4875],[121.2614,31.4788],[121.2471,31.4771],[121.2409,31.4937],[121.2347,31.4927],[121.2303,31.4774],[121.2191,31.4752],[121.2144,31.4791],[121.1861,31.4608],[121.1861,31.4543],[121.175,31.4493],[121.1609,31.4497],[121.1473,31.4439],[121.1469,31.4372],[121.1627,31.4322],[121.1643,31.4272],[121.1463,31.4211],[121.1588,31.4101],[121.1438,31.3923],[121.1485,31.3854],[121.1138,31.3745],[121.1202,31.3687],[121.1093,31.3647],[121.1083,31.3506],[121.1173,31.3517],[121.118,31.3434],[121.1304,31.3442],[121.1333,31.3256],[121.1272,31.3193],[121.1299,31.3026],[121.1396,31.303],[121.1438,31.3097],[121.1513,31.2919],[121.1613,31.284],[121.1542,31.2767],[121.143,31.2755],[121.1203,31.2862],[121.115,31.2853],[121.1055,31.2737],[121.0988,31.2762],[121.0901,31.2919],[121.0847,31.2876],[121.0804,31.2701],[121.0633,31.2679],[121.061,31.2465],[121.0643,31.2462],[121.0626,31.2247],[121.0754,31.1734],[121.077,31.1584],[121.0657,31.1486],[121.0625,31.1531],[121.0415,31.1498],[121.0418,31.1389],[121.0257,31.1408],[121.0185,31.1341],[120.9839,31.1317],[120.9304,31.1414],[120.9054,31.1342],[120.8813,31.1347],[120.8723,31.1272],[120.8706,31.1197],[120.8579,31.1085],[120.8568,31.1028],[120.8696,31.0972],[120.8922,31.0942],[120.9021,31.0857],[120.8946,31.0539],[120.902,31.0376],[120.9013,31.0175],[120.8952,31.0173],[120.8914,31.0037],[120.8681,30.9953],[120.8656,30.9898],[120.8537,30.9932],[120.8474,30.9896],[120.8401,30.9978],[120.8209,31.0064],[120.8029,31.0054],[120.77,30.9966],[120.7702,30.9781],[120.7607,30.9754],[120.7459,30.9625],[120.7361,30.9637],[120.7256,30.9715],[120.7101,30.9719],[120.7055,30.9665],[120.6982,30.9708],[120.6845,30.9552],[120.6976,30.9504],[120.7095,30.9332],[120.7127,30.9197],[120.7098,30.9075],[120.7133,30.8851],[120.7025,30.884],[120.7043,30.873],[120.6999,30.8678],[120.6828,30.8826],[120.6736,30.8757],[120.6631,30.8613],[120.6587,30.8653],[120.6554,30.8475],[120.6442,30.8554],[120.6262,30.8561],[120.6155,30.8496],[120.603,30.8489],[120.5889,30.8544],[120.5809,30.8457],[120.5638,30.8355],[120.5182,30.7732],[120.5044,30.758],[120.4894,30.7634],[120.477,30.7856],[120.4772,30.8],[120.4553,30.8168],[120.461,30.8283],[120.4604,30.8398],[120.4545,30.8496],[120.4413,30.8563],[120.4523,30.8679],[120.4395,30.8852],[120.4363,30.8969],[120.4423,30.9006],[120.435,30.9208],[120.4234,30.9275],[120.418,30.9256],[120.4235,30.9031],[120.3947,30.8908],[120.3794,30.8908],[120.3724,30.8822],[120.3647,30.8805],[120.358,30.8871],[120.3601,30.8928],[120.3569,30.9089],[120.3627,30.9216],[120.3595,30.9319],[120.3711,30.9488],[120.3435,30.94],[120.3081,30.9323],[120.2507,30.9262],[120.2218,30.9269],[120.1497,30.9375],[120.1351,30.9419],[120.111,30.9559],[120.104,30.9652],[120.0524,31.0057],[120.017,31.0178],[120.0017,31.0271],[119.9885,31.0592],[119.9698,31.0743],[119.9463,31.1062],[119.9368,31.1465],[119.9211,31.1612],[119.92,31.1709],[119.9002,31.1692],[119.8783,31.1608],[119.8666,31.1683],[119.8421,31.1688],[119.8375,31.1737],[119.8265,31.1732],[119.8235,31.1658],[119.8297,31.1614],[119.8233,31.1541],[119.8099,31.1485],[119.801,31.1563],[119.7913,31.1566],[119.7934,31.1681],[119.7793,31.1788],[119.7554,31.1708],[119.7405,31.1734],[119.7131,31.1676],[119.7039,31.1519],[119.6828,31.1605],[119.678,31.1682],[119.6637,31.166],[119.6625,31.1599],[119.6418,31.1484],[119.6381,31.1355],[119.6308,31.1313],[119.6137,31.1292],[119.5998,31.1092],[119.582,31.1087],[119.5741,31.114],[119.5713,31.129],[119.5602,31.1407],[119.5459,31.1478],[119.5326,31.1591],[119.5144,31.1561],[119.4945,31.164],[119.4856,31.1616],[119.4825,31.1525],[119.4758,31.1589],[119.4606,31.1564],[119.4548,31.1649],[119.4388,31.1771],[119.4235,31.1819],[119.4154,31.173],[119.4006,31.1787],[119.3912,31.1745],[119.3893,31.1883],[119.3953,31.1934],[119.4057,31.1928],[119.3949,31.1996],[119.3792,31.1892],[119.3714,31.1977],[119.3658,31.1959],[119.3601,31.2121],[119.3652,31.2327],[119.3705,31.2425],[119.3797,31.2694],[119.3716,31.2716],[119.3679,31.289],[119.3566,31.3033],[119.3502,31.301],[119.3502,31.2809],[119.3459,31.269],[119.3375,31.2589],[119.3333,31.2641],[119.3149,31.2657],[119.2948,31.2632],[119.267,31.2504],[119.2614,31.2613],[119.2497,31.262],[119.25,31.257],[119.2386,31.2547],[119.2363,31.2593],[119.2181,31.2648],[119.2153,31.2741],[119.2042,31.2657],[119.1972,31.2735],[119.1995,31.2936],[119.1811,31.3005],[119.1762,31.2939],[119.1582,31.2948],[119.1498,31.2769],[119.1407,31.276],[119.1322,31.2628],[119.12,31.2617],[119.107,31.2506],[119.1053,31.2353],[119.0837,31.2397],[119.0738,31.2329],[119.0623,31.2385],[119.0488,31.2336],[119.0145,31.2415],[119.0033,31.2337],[118.9865,31.2312],[118.9842,31.2375],[118.9249,31.2397],[118.9152,31.2442],[118.8912,31.238],[118.8697,31.2422],[118.8405,31.2364],[118.8313,31.2295],[118.8195,31.236],[118.8064,31.2295],[118.7957,31.2294],[118.7814,31.2398],[118.7786,31.2617],[118.7614,31.2777],[118.7266,31.2822],[118.7079,31.2968],[118.7044,31.3028],[118.7196,31.2948],[118.7211,31.3227],[118.7351,31.3448],[118.7457,31.3727],[118.7546,31.3851],[118.7654,31.3879],[118.7709,31.377],[118.7676,31.364],[118.7845,31.3686],[118.8002,31.369],[118.8295,31.3775],[118.8474,31.3939],[118.8511,31.3925],[118.8696,31.4216],[118.8661,31.4449],[118.8705,31.463],[118.8832,31.4965],[118.8863,31.5277],[118.8735,31.5321],[118.8751,31.552],[118.882,31.5652],[118.8733,31.5784],[118.8773,31.5899],[118.8623,31.595],[118.8708,31.5993],[118.8688,31.6111],[118.8586,31.624],[118.8328,31.6304],[118.8195,31.6285],[118.8145,31.6193],[118.8028,31.6195],[118.796,31.6283],[118.7896,31.6466],[118.783,31.6563],[118.799,31.6664],[118.7741,31.6826],[118.7683,31.6775],[118.7605,31.6803],[118.7481,31.6758],[118.7451,31.6565],[118.7394,31.6511],[118.736,31.6334],[118.7287,31.6342],[118.7194,31.6275],[118.7169,31.6395],[118.6949,31.6397],[118.6851,31.6361],[118.6738,31.6405],[118.6578,31.6411],[118.6436,31.6497],[118.648,31.6594],[118.6433,31.6714],[118.647,31.6799],[118.6549,31.6756],[118.6714,31.6882],[118.6744,31.6965],[118.6807,31.6966],[118.6977,31.7094],[118.6874,31.7161],[118.6849,31.7249],[118.6773,31.7286],[118.654,31.7301],[118.6521,31.7398],[118.6417,31.744],[118.6484,31.7488],[118.6417,31.7582],[118.627,31.7594],[118.6191,31.7501],[118.6094,31.7572],[118.601,31.7541],[118.5931,31.7444],[118.5753,31.7409],[118.5717,31.7463],[118.5531,31.729],[118.5298,31.7424],[118.5294,31.7486],[118.5387,31.7494],[118.5396,31.7616],[118.5339,31.7672],[118.5236,31.762],[118.5107,31.7656],[118.5026,31.7783],[118.4822,31.7783],[118.4861,31.7954],[118.5047,31.8417],[118.4906,31.8431],[118.4754,31.8503],[118.4667,31.858],[118.4671,31.8689],[118.4723,31.8796],[118.4523,31.8847],[118.4401,31.8927],[118.4159,31.9015],[118.403,31.914],[118.386,31.9148],[118.3753,31.9253],[118.3644,31.9302],[118.3692,31.943],[118.369,31.9562],[118.38,31.9683],[118.3767,31.9817],[118.3872,31.9833],[118.391,31.9895],[118.3896,32.0121],[118.4015,32.0187],[118.386,32.0331],[118.3943,32.0484],[118.385,32.0608],[118.3933,32.0627],[118.4055,32.0808],[118.4335,32.0867],[118.4411,32.092],[118.4629,32.1006],[118.4736,32.1106],[118.473,32.1148],[118.4895,32.1207],[118.5008,32.1216],[118.4947,32.131],[118.5006,32.1417],[118.5074,32.1379],[118.4956,32.1652],[118.4956,32.1771],[118.5065,32.1821],[118.5098,32.1943],[118.5219,32.1882],[118.5324,32.1958],[118.5396,32.1924],[118.5517,32.1996],[118.5617,32.1969],[118.5756,32.2025],[118.5809,32.1987],[118.5984,32.1995],[118.6196,32.2054],[118.6266,32.2025],[118.6441,32.21],[118.6675,32.2359],[118.6751,32.2559],[118.6674,32.2575],[118.6593,32.2661],[118.6708,32.2856],[118.6673,32.2964],[118.66,32.2964],[118.6603,32.3054],[118.6784,32.3165],[118.6964,32.3177],[118.6839,32.3241],[118.6877,32.33],[118.7032,32.329],[118.7079,32.3384],[118.6975,32.3426],[118.6998,32.3498],[118.6929,32.3517],[118.702,32.3579],[118.6961,32.368],[118.6989,32.3831],[118.6902,32.3783],[118.6787,32.3939],[118.6857,32.405],[118.6889,32.4182],[118.6871,32.4313],[118.6926,32.4651],[118.6893,32.4735],[118.6729,32.4699],[118.6477,32.4765],[118.6434,32.4705],[118.6281,32.4677],[118.6086,32.4706],[118.6081,32.4758],[118.5967,32.4766],[118.5921,32.482],[118.5925,32.5002],[118.608,32.5017],[118.6175,32.5124],[118.6145,32.5204],[118.6048,32.523],[118.6089,32.537],[118.599,32.5447],[118.5847,32.549],[118.568,32.5588],[118.5637,32.5644],[118.5695,32.5864],[118.5981,32.6013],[118.6018,32.5974],[118.6238,32.5924],[118.633,32.579],[118.6412,32.5871],[118.6584,32.5948],[118.6688,32.5949],[118.6896,32.5885],[118.7008,32.5885],[118.698,32.6064],[118.7253,32.6082],[118.726,32.5965],[118.7407,32.5894],[118.7433,32.5978],[118.7575,32.604],[118.7758,32.5978],[118.7748,32.5877],[118.7847,32.5824],[118.8018,32.5843],[118.8053,32.5935],[118.8205,32.6042],[118.8245,32.6025],[118.8247,32.5896],[118.8205,32.5825],[118.8276,32.5812],[118.827,32.5727],[118.8425,32.573],[118.8485,32.5682],[118.856,32.5744],[118.8726,32.5761],[118.875,32.583],[118.8842,32.5804],[118.8851,32.5863],[118.902,32.589],[118.9093,32.5869],[118.8964,32.5773],[118.8986,32.5605],[118.8879,32.5549],[118.914,32.5488],[118.9198,32.5573],[118.9366,32.5575],[118.9406,32.5478],[118.9648,32.5267],[118.9679,32.5146],[118.9798,32.5039],[118.9975,32.5039],[119.0075,32.5141],[119.0192,32.518],[119.0414,32.5148],[119.0433,32.5028],[119.0505,32.4929],[119.0628,32.4846],[119.0675,32.4624],[119.047,32.4629],[119.0359,32.4524],[119.0237,32.4561],[119.0225,32.4403],[119.0295,32.4288],[119.0164,32.4132],[119.0176,32.3993],[119.0275,32.3883],[119.0374,32.3888],[119.0384,32.3816],[119.0226,32.3804],[119.0217,32.3754],[119.0438,32.3652],[119.0273,32.3513],[119.0284,32.3451],[119.042,32.3333],[119.0359,32.3254],[119.0356,32.3087],[119.0398,32.3037],[119.0411,32.2717],[119.0371,32.2599],[119.0566,32.2517],[119.0747,32.249],[119.086,32.2412],[119.1323,32.2452],[119.1538,32.2437],[119.1772,32.2389],[119.229,32.2222],[119.255,32.2322],[119.2861,32.2329],[119.3364,32.231],[119.3676,32.2255],[119.3884,32.2251],[119.3967,32.2351],[119.4127,32.2466],[119.4339,32.2575],[119.4625,32.2625],[119.4786,32.2613],[119.5044,32.2549],[119.5148,32.2489],[119.5367,32.2679],[119.5464,32.2788],[119.5449,32.2828],[119.5764,32.2846],[119.5779,32.273],[119.5708,32.2716],[119.5709,32.2301],[119.5994,32.2346],[119.5979,32.2463],[119.6072,32.2529],[119.6158,32.2507],[119.6221,32.2374],[119.6217,32.2174],[119.6297,32.2277],[119.6276,32.2487],[119.6339,32.2578],[119.6614,32.2637],[119.6781,32.2701],[119.6886,32.2825],[119.7084,32.2764],[119.7307,32.304],[119.7452,32.3139],[119.7686,32.3189],[119.786,32.3179],[119.8023,32.3128],[119.8192,32.3025],[119.8346,32.2957],[119.8527,32.2819],[119.8695,32.2627],[119.8785,32.2475],[119.892,32.2011],[119.8941,32.1829],[119.9306,32.0789],[119.9801,31.9981],[120.0162,31.9705],[120.0649,31.9555],[120.1348,31.9394],[120.1753,31.9338],[120.2059,31.9315],[120.2366,31.9329],[120.263,31.9418],[120.3531,31.9806],[120.3707,31.9908],[120.3879,32.0067],[120.4037,32.0162]]],[[[118.8463,31.5091],[118.8564,31.5223],[118.8658,31.519],[118.8557,31.5047],[118.8467,31.503],[118.8463,31.5091]]]]}},{"type":"Feature","properties":{"name":"苏中","centroid":[120.3259,32.4468]},"geometry":{"type":"MultiPolygon","coordinates":[[[[120.2094,32.6082],[120.2135,32.6256],[120.2222,32.6343],[120.2217,32.6484],[120.2289,32.6499],[120.2248,32.6584],[120.2257,32.6759],[120.2519,32.6799],[120.2763,32.6793],[120.2927,32.6876],[120.3156,32.7044],[120.3195,32.6993],[120.333,32.6998],[120.341,32.7054],[120.3667,32.7049],[120.3761,32.7109],[120.3925,32.7072],[120.3896,32.6907],[120.3943,32.6875],[120.4105,32.6894],[120.4157,32.6794],[120.4319,32.6765],[120.437,32.6471],[120.4432,32.6391],[120.4431,32.6293],[120.4656,32.6315],[120.4756,32.6287],[120.4847,32.6313],[120.4965,32.6244],[120.4953,32.6395],[120.5068,32.6408],[120.5122,32.6361],[120.5446,32.6323],[120.5499,32.6358],[120.5789,32.635],[120.5905,32.6397],[120.6005,32.65],[120.6148,32.6398],[120.6127,32.6356],[120.6218,32.626],[120.6152,32.6061],[120.6203,32.6019],[120.6298,32.6175],[120.644,32.6132],[120.6569,32.6035],[120.6561,32.5946],[120.6493,32.585],[120.6534,32.5719],[120.663,32.572],[120.6716,32.5879],[120.6809,32.5948],[120.701,32.6035],[120.7203,32.5997],[120.721,32.5916],[120.7403,32.5854],[120.7436,32.5983],[120.7935,32.6006],[120.7926,32.5785],[120.805,32.5826],[120.8183,32.592],[120.8326,32.597],[120.8372,32.6067],[120.8546,32.6051],[120.8685,32.6098],[120.8569,32.6122],[120.8512,32.6074],[120.8514,32.6183],[120.8635,32.6191],[120.8632,32.6302],[120.8953,32.6316],[120.9081,32.6393],[120.976,32.6584],[120.9796,32.6363],[120.9617,32.6122],[120.9884,32.6067],[121.0205,32.6055],[121.0517,32.5871],[121.0769,32.5764],[121.122,32.5693],[121.1531,32.5293],[121.2695,32.4834],[121.2877,32.4802],[121.3519,32.4743],[121.3905,32.4607],[121.4174,32.4431],[121.4255,32.431],[121.4405,32.3661],[121.447,32.2993],[121.4502,32.2823],[121.4578,32.2739],[121.4939,32.2635],[121.4996,32.2112],[121.4793,32.198],[121.4615,32.1937],[121.4586,32.1777],[121.4731,32.1698],[121.5031,32.1701],[121.5423,32.1521],[121.5255,32.1365],[121.5444,32.123],[121.5926,32.1129],[121.759,32.0594],[121.7724,32.0332],[121.856,31.9552],[121.8703,31.9283],[121.8748,31.9021],[121.8891,31.8666],[121.941,31.7766],[121.9703,31.7189],[121.9677,31.7039],[121.9752,31.617],[121.7153,31.6738],[121.6426,31.6975],[121.6333,31.6962],[121.6009,31.707],[121.5997,31.7031],[121.565,31.7167],[121.5394,31.7355],[121.5131,31.7437],[121.4986,31.7532],[121.4877,31.7534],[121.4556,31.7594],[121.4315,31.7693],[121.4209,31.7796],[121.4109,31.7956],[121.4163,31.7976],[121.385,31.8336],[121.3231,31.8685],[121.3019,31.8727],[121.2656,31.8641],[121.2003,31.8351],[121.1815,31.8204],[121.1492,31.7873],[121.1185,31.7591],[121.1012,31.7625],[121.0768,31.777],[121.0606,31.7831],[120.9595,31.783],[120.9329,31.7867],[120.9167,31.7937],[120.8838,31.8347],[120.8603,31.873],[120.8031,31.9884],[120.7901,31.9981],[120.782,32.016],[120.7616,32.0204],[120.7025,32.0134],[120.6527,32.0024],[120.6284,32.0011],[120.5883,32.0097],[120.5246,32.0305],[120.5038,32.041],[120.4656,32.0458],[120.4037,32.0162],[120.3879,32.0067],[120.3707,31.9908],[120.3531,31.9806],[120.263,31.9418],[120.2366,31.9329],[120.2059,31.9315],[120.1753,31.9338],[120.1348,31.9394],[120.0649,31.9555],[120.0224,31.9678],[120.0162,31.9705],[119.9801,31.9981],[119.9306,32.0789],[119.8941,32.1829],[119.892,32.2011],[119.8785,32.2475],[119.8695,32.2627],[119.8527,32.2819],[119.8346,32.2957],[119.8192,32.3025],[119.8023,32.3128],[119.786,32.3179],[119.7686,32.3189],[119.7452,32.3139],[119.7307,32.304],[119.7084,32.2764],[119.6886,32.2825],[119.6781,32.2701],[119.6614,32.2637],[119.6339,32.2578],[119.6276,32.2487],[119.6297,32.2277],[119.6217,32.2174],[119.6221,32.2374],[119.6158,32.2507],[119.6072,32.2529],[119.5979,32.2463],[119.5994,32.2346],[119.5709,32.2301],[119.5708,32.2716],[119.5779,32.273],[119.5764,32.2846],[119.5449,32.2828],[119.5464,32.2788],[119.5367,32.2679],[119.5148,32.2489],[119.5044,32.2549],[119.4786,32.2613],[119.4625,32.2625],[119.4339,32.2575],[119.4127,32.2466],[119.3967,32.2351],[119.3884,32.2251],[119.3676,32.2255],[119.3364,32.231],[119.2861,32.2329],[119.255,32.2322],[119.229,32.2222],[119.1772,32.2389],[119.1538,32.2437],[119.1323,32.2452],[119.086,32.2412],[119.0747,32.249],[119.0566,32.2517],[119.0371,32.2599],[119.0411,32.2717],[119.0398,32.3037],[119.0356,32.3087],[119.0359,32.3254],[119.042,32.3333],[119.0284,32.3451],[119.0273,32.3513],[119.0438,32.3652],[119.0217,32.3754],[119.0226,32.3804],[119.0384,32.3816],[119.0374,32.3888],[119.0275,32.3883],[119.0176,32.3993],[119.0164,32.4132],[119.0295,32.4288],[119.0225,32.4403],[119.0237,32.4561],[119.0359,32.4524],[119.047,32.4629],[119.0675,32.4624],[119.0737,32.4554],[119.0851,32.4527],[119.096,32.4661],[119.1155,32.477],[119.1345,32.4916],[119.1478,32.4927],[119.1423,32.4994],[119.1501,32.5098],[119.1556,32.5281],[119.1678,32.5363],[119.1667,32.546],[119.1545,32.5549],[119.1538,32.5619],[119.1752,32.5711],[119.177,32.5938],[119.1872,32.5999],[119.1937,32.5792],[119.2093,32.5736],[119.2202,32.5766],[119.2201,32.5924],[119.231,32.6071],[119.2205,32.6099],[119.2169,32.6173],[119.2202,32.6296],[119.2087,32.6415],[119.2116,32.7082],[119.2089,32.7152],[119.2082,32.7405],[119.2009,32.751],[119.1913,32.7888],[119.1889,32.8109],[119.1849,32.8256],[119.1909,32.8254],[119.2787,32.7989],[119.3137,32.8049],[119.3327,32.815],[119.3454,32.8383],[119.3498,32.8684],[119.3456,32.8902],[119.3283,32.9459],[119.325,32.9686],[119.3251,32.9984],[119.3431,33.0114],[119.3592,33.0297],[119.3642,33.0386],[119.3637,33.0535],[119.3433,33.0651],[119.3348,33.0844],[119.3211,33.1023],[119.3139,33.1286],[119.3054,33.1346],[119.2715,33.1468],[119.2503,33.1576],[119.2285,33.1511],[119.2238,33.1613],[119.2295,33.1659],[119.222,33.1881],[119.2192,33.206],[119.2114,33.2031],[119.1999,33.2059],[119.1652,33.2076],[119.1507,33.2128],[119.1433,33.23],[119.1466,33.2486],[119.1555,33.2545],[119.1631,33.2715],[119.1534,33.2853],[119.1601,33.2835],[119.1847,33.2898],[119.2107,33.2925],[119.2399,33.3015],[119.2627,33.303],[119.2488,33.3181],[119.235,33.3451],[119.2431,33.3524],[119.2545,33.3529],[119.311,33.3674],[119.3654,33.3696],[119.4168,33.3762],[119.4484,33.3848],[119.4768,33.4037],[119.4884,33.4079],[119.5045,33.4073],[119.5313,33.4149],[119.5439,33.4149],[119.5531,33.4105],[119.5592,33.4009],[119.5669,33.3993],[119.5767,33.3784],[119.5899,33.381],[119.6054,33.3797],[119.6131,33.3584],[119.6164,33.3331],[119.632,33.3354],[119.636,33.3266],[119.6324,33.317],[119.6414,33.311],[119.6405,33.2936],[119.654,33.2807],[119.6595,33.2858],[119.6864,33.2889],[119.7003,33.2942],[119.7151,33.2719],[119.7042,33.2698],[119.6908,33.2427],[119.6857,33.2386],[119.6932,33.2243],[119.7126,33.2191],[119.7315,33.2117],[119.7335,33.2053],[119.7288,33.1887],[119.7303,33.1729],[119.7513,33.1708],[119.7531,33.1606],[119.7398,33.1474],[119.7493,33.131],[119.7723,33.1309],[119.7873,33.1391],[119.8435,33.1535],[119.8685,33.1545],[119.8676,33.1434],[119.8773,33.1468],[119.8902,33.1443],[119.8944,33.1511],[119.9166,33.1494],[119.9364,33.1554],[119.9684,33.1499],[119.9881,33.1516],[120.0035,33.156],[120.024,33.158],[120.0482,33.164],[120.0808,33.1818],[120.0941,33.1786],[120.2141,33.1374],[120.2968,33.1296],[120.2897,33.1042],[120.2937,33.0967],[120.292,33.0811],[120.3094,33.0623],[120.313,33.0481],[120.3089,33.0244],[120.3124,32.9926],[120.2991,32.9666],[120.3004,32.9542],[120.2874,32.9552],[120.2864,32.9494],[120.2951,32.9455],[120.292,32.9336],[120.2808,32.9249],[120.2388,32.928],[120.2384,32.9212],[120.2204,32.917],[120.205,32.9206],[120.2011,32.9305],[120.1764,32.9325],[120.1775,32.9091],[120.1819,32.9039],[120.177,32.8778],[120.2002,32.8745],[120.1988,32.8669],[120.2084,32.8643],[120.2059,32.8522],[120.1952,32.8514],[120.1949,32.8428],[120.1848,32.8341],[120.181,32.8253],[120.1934,32.8261],[120.187,32.8122],[120.1672,32.815],[120.1611,32.8099],[120.1682,32.793],[120.1593,32.7879],[120.1625,32.781],[120.1742,32.7797],[120.1829,32.7729],[120.197,32.7815],[120.1993,32.787],[120.2224,32.7923],[120.2282,32.7786],[120.2147,32.7674],[120.2066,32.7566],[120.2026,32.743],[120.1961,32.7393],[120.1809,32.7418],[120.1817,32.7232],[120.1732,32.7157],[120.1648,32.7203],[120.1554,32.7142],[120.1576,32.7032],[120.1451,32.7059],[120.1381,32.6872],[120.1295,32.6891],[120.1217,32.6792],[120.121,32.6333],[120.1091,32.6305],[120.1132,32.6138],[120.1227,32.6103],[120.1408,32.6163],[120.1544,32.616],[120.1763,32.6212],[120.176,32.6291],[120.1973,32.6193],[120.196,32.603],[120.2023,32.6009],[120.2136,32.6027],[120.2094,32.6082]]],[[[121.4365,32.5293],[121.4352,32.52],[121.4086,32.5196],[121.4027,32.5215],[121.4038,32.5306],[121.4293,32.5315],[121.4365,32.5293]]]]}},{"type":"Feature","properties":{"name":"苏北","centroid":[118.9881,33.8486]},"geometry":{"type":"Polygon","coordinates":[[[119.1043,32.8267],[119.0713,32.8647],[119.0551,32.8748],[119.0457,32.8925],[119.045,32.9114],[119.0215,32.906],[119.0156,32.9075],[119.0198,32.9257],[119.03,32.9279],[119.0233,32.9351],[119.0263,32.9473],[119.0208,32.9558],[119.0089,32.9594],[118.9936,32.9582],[118.9612,32.9458],[118.9416,32.9461],[118.9338,32.9386],[118.9214,32.9396],[118.9063,32.9449],[118.8932,32.9409],[118.8912,32.9515],[118.8962,32.9577],[118.8847,32.9606],[118.8652,32.955],[118.8493,32.9566],[118.8494,32.9459],[118.8425,32.9437],[118.849,32.9272],[118.8395,32.9225],[118.8369,32.9114],[118.819,32.9206],[118.8122,32.9169],[118.8093,32.9079],[118.8146,32.9027],[118.8112,32.8755],[118.8062,32.8702],[118.8125,32.8652],[118.8117,32.855],[118.791,32.8484],[118.7479,32.8587],[118.7418,32.8534],[118.7468,32.8004],[118.7369,32.7934],[118.7379,32.7733],[118.7464,32.7593],[118.7527,32.7558],[118.7563,32.7371],[118.7367,32.7323],[118.7245,32.722],[118.7072,32.7203],[118.6942,32.7266],[118.6576,32.7361],[118.654,32.7407],[118.6394,32.7448],[118.6323,32.74],[118.617,32.7389],[118.6076,32.7266],[118.5908,32.7248],[118.5766,32.7191],[118.5597,32.7299],[118.5447,32.7294],[118.5205,32.7232],[118.4898,32.7245],[118.4835,32.7214],[118.4593,32.7261],[118.4505,32.7434],[118.4229,32.7181],[118.411,32.716],[118.3987,32.7214],[118.3753,32.719],[118.3682,32.7248],[118.3663,32.735],[118.3723,32.7417],[118.3712,32.7577],[118.3662,32.7683],[118.3488,32.773],[118.3341,32.7616],[118.3264,32.7635],[118.3223,32.7775],[118.3071,32.7787],[118.2988,32.7856],[118.2944,32.8001],[118.3066,32.8106],[118.2979,32.8321],[118.3017,32.8462],[118.2896,32.8455],[118.2846,32.8573],[118.2632,32.8562],[118.2506,32.8484],[118.2444,32.8745],[118.2398,32.8834],[118.233,32.9162],[118.2354,32.9265],[118.2513,32.9362],[118.2934,32.9472],[118.3096,32.959],[118.3038,32.9687],[118.2694,32.9692],[118.2524,32.9821],[118.2448,32.9983],[118.2435,33.0278],[118.2396,33.0464],[118.2334,33.06],[118.2124,33.0619],[118.2149,33.0708],[118.2276,33.0695],[118.2237,33.0834],[118.2029,33.0881],[118.2065,33.0912],[118.2213,33.0876],[118.2209,33.1059],[118.2097,33.1043],[118.2105,33.1118],[118.2196,33.1141],[118.2237,33.1555],[118.2214,33.1807],[118.2116,33.1991],[118.1944,33.2117],[118.1782,33.218],[118.1684,33.2135],[118.1563,33.1955],[118.16,33.181],[118.149,33.1695],[118.0883,33.1497],[118.0692,33.1399],[118.0469,33.1384],[118.0382,33.1352],[118.0367,33.1525],[118.0257,33.1559],[118.0174,33.1646],[118.0085,33.1678],[118.0039,33.177],[117.9892,33.1796],[117.9864,33.1934],[117.9809,33.2002],[117.9936,33.2056],[117.9935,33.2113],[117.9774,33.2263],[117.9538,33.2239],[117.9424,33.2251],[117.939,33.2343],[117.948,33.2521],[117.9394,33.2626],[117.9742,33.2797],[117.9833,33.2968],[117.9859,33.3203],[117.9924,33.3331],[117.9754,33.3357],[117.9716,33.3493],[117.9955,33.3471],[118.0059,33.3521],[118.0293,33.3723],[118.0282,33.3906],[118.0168,33.4067],[118.022,33.4216],[118.0236,33.4409],[118.0286,33.4584],[118.0436,33.4737],[118.0506,33.492],[118.0578,33.4917],[118.1081,33.4751],[118.1068,33.5039],[118.108,33.5202],[118.0991,33.5294],[118.1084,33.53],[118.1173,33.5917],[118.1123,33.6171],[118.1201,33.6217],[118.1681,33.6637],[118.164,33.6926],[118.1677,33.715],[118.1533,33.7202],[118.1609,33.7353],[118.1778,33.7361],[118.1853,33.7449],[118.1683,33.7496],[118.1492,33.7465],[118.1335,33.7514],[118.118,33.7665],[118.106,33.7646],[118.0656,33.7658],[118.0624,33.7584],[118.0457,33.75],[118.0284,33.7466],[118.0309,33.7405],[118.0199,33.7387],[118.0188,33.7458],[118.0039,33.7449],[117.9945,33.75],[117.9725,33.7499],[117.9655,33.7635],[117.9543,33.751],[117.9527,33.7382],[117.9368,33.7294],[117.9182,33.7343],[117.9158,33.7384],[117.9005,33.7357],[117.8976,33.7293],[117.9017,33.7201],[117.8877,33.7226],[117.88,33.7278],[117.8484,33.736],[117.8358,33.7341],[117.8282,33.737],[117.8056,33.7362],[117.7913,33.7332],[117.7779,33.7225],[117.767,33.7218],[117.7527,33.7115],[117.7353,33.7227],[117.732,33.7348],[117.7235,33.739],[117.7247,33.7496],[117.7341,33.7518],[117.7418,33.7628],[117.749,33.7916],[117.7525,33.8129],[117.7462,33.8237],[117.7501,33.8272],[117.753,33.8472],[117.7524,33.8632],[117.7592,33.8745],[117.7587,33.8857],[117.7537,33.8914],[117.7408,33.892],[117.7154,33.8792],[117.7036,33.8878],[117.6901,33.9154],[117.6726,33.935],[117.6725,33.9524],[117.663,33.9687],[117.6713,33.9867],[117.6663,33.9987],[117.6458,34.0136],[117.6297,34.0287],[117.6164,34.0323],[117.6102,34.0293],[117.6181,34.0171],[117.6167,34.0049],[117.6103,33.9992],[117.5979,33.997],[117.5882,33.9879],[117.5758,33.9829],[117.5689,33.9852],[117.5564,34.0073],[117.5447,34.0136],[117.5425,34.0216],[117.5453,34.0352],[117.5306,34.0507],[117.5148,34.0609],[117.5049,34.0616],[117.5004,34.0523],[117.4768,34.0476],[117.4603,34.0374],[117.4354,34.0283],[117.4156,34.0259],[117.4058,34.0301],[117.4003,34.0416],[117.3882,34.0556],[117.3711,34.0607],[117.3778,34.0715],[117.3571,34.0882],[117.3434,34.0806],[117.3195,34.0844],[117.3115,34.0681],[117.2938,34.0711],[117.2878,34.0787],[117.277,34.0789],[117.2576,34.0659],[117.2247,34.0642],[117.2121,34.0747],[117.2071,34.0686],[117.1927,34.0687],[117.1821,34.0761],[117.1613,34.0844],[117.1514,34.0837],[117.158,34.0987],[117.1466,34.0978],[117.1303,34.1018],[117.13,34.1175],[117.1238,34.1282],[117.1064,34.1304],[117.09,34.1457],[117.0723,34.1467],[117.0549,34.1551],[117.0471,34.1514],[117.0384,34.1674],[117.0253,34.1677],[117.0308,34.1863],[117.0403,34.2015],[117.0472,34.2058],[117.051,34.2216],[117.0449,34.2247],[117.0496,34.2424],[117.0453,34.2478],[117.0275,34.2402],[117.0208,34.2433],[117.0189,34.2555],[117.0106,34.2559],[116.9844,34.2698],[116.969,34.2837],[116.9697,34.2931],[116.9763,34.3049],[116.9693,34.3231],[116.983,34.3458],[116.9808,34.3581],[116.9612,34.3633],[116.961,34.372],[116.9693,34.3888],[116.9456,34.3955],[116.9206,34.407],[116.9092,34.4083],[116.8835,34.403],[116.867,34.3922],[116.8485,34.389],[116.8281,34.3892],[116.8047,34.4128],[116.7821,34.4311],[116.7827,34.4383],[116.7737,34.4535],[116.7606,34.4626],[116.7451,34.4683],[116.7229,34.4727],[116.6625,34.473],[116.6234,34.4886],[116.5751,34.4889],[116.5686,34.4925],[116.5736,34.4977],[116.5924,34.4938],[116.599,34.5001],[116.5952,34.5115],[116.5877,34.5125],[116.5706,34.5234],[116.548,34.5429],[116.5292,34.5407],[116.5207,34.5432],[116.5262,34.5534],[116.5095,34.5575],[116.4904,34.5733],[116.4914,34.5889],[116.4783,34.6039],[116.4772,34.6151],[116.4476,34.6206],[116.4328,34.6302],[116.4305,34.6508],[116.3934,34.6431],[116.3826,34.6386],[116.3706,34.6422],[116.3644,34.6518],[116.3782,34.668],[116.3781,34.6842],[116.3852,34.6867],[116.3855,34.6947],[116.3927,34.7039],[116.3918,34.7103],[116.3771,34.7181],[116.3638,34.7152],[116.3684,34.7253],[116.3657,34.7428],[116.3715,34.7502],[116.4032,34.7563],[116.4058,34.8174],[116.4083,34.8261],[116.408,34.8507],[116.4361,34.883],[116.4453,34.8886],[116.4451,34.8954],[116.4558,34.9006],[116.4807,34.8974],[116.5006,34.9012],[116.5028,34.9061],[116.5231,34.904],[116.5461,34.9094],[116.5601,34.9093],[116.6139,34.9228],[116.6225,34.94],[116.6318,34.9407],[116.64,34.9326],[116.6579,34.929],[116.6584,34.9334],[116.6757,34.9331],[116.678,34.9392],[116.6969,34.9327],[116.7062,34.934],[116.7214,34.9259],[116.7352,34.9246],[116.7646,34.9165],[116.7812,34.9166],[116.787,34.9405],[116.7976,34.9388],[116.7969,34.9441],[116.7855,34.9473],[116.7816,34.9619],[116.7891,34.9598],[116.7891,34.9751],[116.802,34.9705],[116.8033,34.9374],[116.7989,34.9285],[116.8122,34.928],[116.8068,34.9369],[116.8058,34.9684],[116.8159,34.9653],[116.8222,34.9293],[116.8581,34.9284],[116.8761,34.9125],[116.8991,34.9047],[116.9223,34.8945],[116.9221,34.8714],[116.9453,34.8738],[116.9452,34.8768],[116.967,34.8756],[116.9768,34.8685],[116.9337,34.8619],[116.9301,34.8597],[116.9289,34.8429],[116.9661,34.8445],[116.9791,34.815],[116.9717,34.8119],[116.9511,34.8106],[116.9516,34.7946],[116.9658,34.7851],[116.9679,34.773],[116.9768,34.7713],[116.9785,34.7636],[116.9897,34.7651],[116.9956,34.7583],[117.0219,34.7592],[117.0432,34.7365],[117.0611,34.724],[117.0705,34.7137],[117.0691,34.7083],[117.0774,34.6965],[117.072,34.6942],[117.0617,34.6757],[117.0623,34.6577],[117.073,34.6391],[117.0815,34.6382],[117.0959,34.6475],[117.1039,34.649],[117.1152,34.6281],[117.1237,34.6047],[117.1335,34.5861],[117.1476,34.5703],[117.1513,34.5593],[117.1406,34.5387],[117.1394,34.5267],[117.1459,34.504],[117.1566,34.4809],[117.1599,34.4531],[117.166,34.4347],[117.1995,34.4345],[117.2002,34.4416],[117.2231,34.4465],[117.2223,34.4506],[117.2346,34.4545],[117.2479,34.4511],[117.2558,34.462],[117.2551,34.4726],[117.2427,34.4785],[117.2524,34.4865],[117.256,34.4763],[117.2636,34.4726],[117.2675,34.48],[117.2593,34.4971],[117.2744,34.5035],[117.2708,34.5161],[117.2752,34.5206],[117.2681,34.5328],[117.2874,34.5336],[117.3027,34.5414],[117.3034,34.5484],[117.2892,34.5559],[117.2797,34.5527],[117.2728,34.5567],[117.2816,34.5638],[117.3084,34.5719],[117.303,34.5589],[117.3213,34.5654],[117.333,34.5618],[117.3309,34.568],[117.3181,34.5662],[117.319,34.5736],[117.3337,34.5727],[117.344,34.582],[117.3529,34.5841],[117.3649,34.5777],[117.3744,34.5842],[117.4026,34.5694],[117.4038,34.5469],[117.4245,34.537],[117.4267,34.5252],[117.4394,34.52],[117.4382,34.5164],[117.4514,34.5063],[117.4665,34.4847],[117.4821,34.4859],[117.4867,34.482],[117.4874,34.4663],[117.4933,34.4726],[117.513,34.4726],[117.5383,34.4672],[117.5478,34.4752],[117.5613,34.472],[117.5698,34.4631],[117.5923,34.4625],[117.6032,34.4768],[117.6097,34.4905],[117.6292,34.4885],[117.6382,34.4973],[117.647,34.4929],[117.6591,34.501],[117.6734,34.5158],[117.682,34.5296],[117.6845,34.5473],[117.6993,34.5456],[117.7486,34.5334],[117.774,34.5291],[117.7905,34.5189],[117.8017,34.5188],[117.7993,34.535],[117.7948,34.5399],[117.7946,34.5598],[117.7914,34.5851],[117.7985,34.6219],[117.7936,34.6256],[117.796,34.6377],[117.7936,34.6518],[117.7996,34.6473],[117.8201,34.6462],[117.8317,34.6535],[117.8345,34.6473],[117.8475,34.6524],[117.8494,34.6472],[117.8635,34.6452],[117.8779,34.6502],[117.881,34.6452],[117.9031,34.6446],[117.9097,34.6702],[117.9397,34.6648],[117.9517,34.6785],[117.9633,34.6785],[117.9917,34.6701],[117.9908,34.6617],[118.0074,34.6561],[118.0079,34.6475],[118.0182,34.647],[118.0207,34.6604],[118.0539,34.6509],[118.0574,34.655],[118.0778,34.6537],[118.084,34.6559],[118.1027,34.6477],[118.0946,34.6366],[118.1005,34.6266],[118.113,34.6215],[118.1147,34.6144],[118.1028,34.5934],[118.0824,34.5799],[118.079,34.5698],[118.1005,34.5647],[118.1272,34.5554],[118.1372,34.5632],[118.1407,34.554],[118.1537,34.5492],[118.1636,34.5515],[118.1847,34.5442],[118.1676,34.5197],[118.165,34.5049],[118.1416,34.4969],[118.1329,34.4834],[118.1399,34.4753],[118.1778,34.4532],[118.1789,34.4252],[118.1771,34.4087],[118.1704,34.3814],[118.1793,34.3794],[118.1834,34.3903],[118.1896,34.3806],[118.2044,34.3774],[118.2177,34.3791],[118.2203,34.4059],[118.231,34.3987],[118.2424,34.4057],[118.2774,34.4047],[118.2799,34.4122],[118.2892,34.4123],[118.2907,34.4246],[118.3209,34.4213],[118.3522,34.4228],[118.3532,34.4174],[118.38,34.4155],[118.3952,34.4271],[118.4049,34.4277],[118.4082,34.4355],[118.4162,34.4739],[118.4214,34.4832],[118.4309,34.4891],[118.4395,34.508],[118.4404,34.5275],[118.428,34.5612],[118.4239,34.5929],[118.4392,34.6263],[118.4543,34.6177],[118.4637,34.6253],[118.4738,34.6234],[118.4749,34.6372],[118.4665,34.6431],[118.4609,34.6576],[118.4685,34.6743],[118.4843,34.6709],[118.5008,34.6752],[118.5082,34.6871],[118.5227,34.6923],[118.5252,34.7126],[118.5393,34.7115],[118.5461,34.7062],[118.5589,34.7068],[118.5705,34.7125],[118.6013,34.7142],[118.6049,34.6965],[118.6337,34.687],[118.6506,34.6951],[118.6643,34.6934],[118.6814,34.6783],[118.6903,34.6786],[118.704,34.6888],[118.7201,34.6942],[118.7447,34.6953],[118.7662,34.7052],[118.7673,34.7105],[118.7834,34.722],[118.7685,34.7381],[118.7592,34.7409],[118.7401,34.7369],[118.7304,34.7454],[118.7165,34.7477],[118.7164,34.7638],[118.7272,34.7687],[118.7385,34.7669],[118.7402,34.7812],[118.7284,34.7869],[118.7375,34.7921],[118.76,34.7903],[118.7736,34.7953],[118.779,34.8096],[118.7766,34.8188],[118.782,34.8275],[118.7682,34.8388],[118.769,34.8461],[118.7887,34.8457],[118.7973,34.8429],[118.8046,34.8525],[118.8044,34.8703],[118.8072,34.8777],[118.8298,34.9111],[118.8608,34.944],[118.8592,34.9626],[118.8651,34.9932],[118.8625,35.0257],[118.8653,35.0299],[118.8858,35.0342],[118.9038,35.0413],[118.9111,35.0478],[118.9265,35.0508],[118.9452,35.0408],[118.9656,35.0465],[118.9921,35.0482],[118.9999,35.053],[119.0272,35.0553],[119.0374,35.0513],[119.0614,35.0516],[119.0736,35.0567],[119.1146,35.055],[119.1204,35.058],[119.1205,35.0701],[119.1295,35.0762],[119.1381,35.0963],[119.159,35.101],[119.1714,35.1072],[119.2032,35.1109],[119.2207,35.1072],[119.2407,35.1229],[119.2527,35.1227],[119.2738,35.1155],[119.2867,35.1151],[119.3018,35.0932],[119.3059,35.0767],[119.2935,35.073],[119.2927,35.0685],[119.3072,35.0331],[119.2918,35.0285],[119.2811,35.0537],[119.2854,35.0685],[119.2794,35.0711],[119.2381,35.0485],[119.2326,35.0418],[119.2275,35.0209],[119.219,35.0048],[119.2114,34.9817],[119.2118,34.9579],[119.2146,34.9377],[119.2127,34.9178],[119.2024,34.8904],[119.2138,34.8767],[119.2105,34.8623],[119.218,34.8526],[119.2204,34.8412],[119.2136,34.8339],[119.2386,34.7996],[119.2508,34.794],[119.2722,34.7978],[119.3128,34.7747],[119.3244,34.7704],[119.3427,34.7693],[119.355,34.7758],[119.3709,34.773],[119.3785,34.7645],[119.4407,34.7692],[119.4383,34.7843],[119.4562,34.7798],[119.4595,34.7711],[119.4772,34.769],[119.4804,34.7641],[119.4971,34.7595],[119.4884,34.7479],[119.4682,34.7482],[119.4608,34.7541],[119.4443,34.7584],[119.4,34.7558],[119.3783,34.7614],[119.3818,34.7524],[119.4571,34.7482],[119.4835,34.7364],[119.5084,34.7292],[119.5257,34.7333],[119.5228,34.7223],[119.508,34.711],[119.4925,34.7115],[119.4918,34.6955],[119.4849,34.6927],[119.4746,34.6961],[119.465,34.6747],[119.5371,34.6338],[119.5607,34.6315],[119.5689,34.6154],[119.5849,34.6013],[119.6112,34.5929],[119.6253,34.5859],[119.6414,34.569],[119.6979,34.5466],[119.7411,34.5329],[119.7818,34.5158],[119.8116,34.4856],[119.823,34.482],[119.8495,34.4774],[119.919,34.4691],[119.9625,34.4589],[120.043,34.4222],[120.1037,34.3916],[120.2333,34.3372],[120.2928,34.3181],[120.3116,34.307],[120.3085,34.2975],[120.3143,34.2558],[120.3317,34.2093],[120.3475,34.1792],[120.356,34.1496],[120.3598,34.1219],[120.3676,34.0914],[120.4247,33.9751],[120.4855,33.8592],[120.5094,33.8309],[120.5345,33.7826],[120.5706,33.7022],[120.5838,33.6685],[120.6112,33.6273],[120.6228,33.6151],[120.65,33.5773],[120.6802,33.5203],[120.7175,33.4367],[120.7198,33.4205],[120.7283,33.3846],[120.7308,33.3652],[120.741,33.3376],[120.7607,33.3199],[120.7693,33.3068],[120.7829,33.3042],[120.7964,33.3061],[120.8137,33.3034],[120.8218,33.2986],[120.8326,33.2821],[120.832,33.2688],[120.8203,33.2561],[120.8195,33.2382],[120.843,33.2296],[120.8468,33.2199],[120.8438,33.2098],[120.8599,33.1428],[120.8741,33.0936],[120.8718,33.0472],[120.8944,33.0386],[120.9178,33.0258],[120.9326,33.0059],[120.9401,32.9755],[120.9504,32.9164],[120.9576,32.8935],[120.9727,32.8857],[120.9787,32.8757],[120.9814,32.8597],[120.9719,32.7612],[120.9631,32.7502],[120.9529,32.7141],[120.9329,32.7157],[120.915,32.7117],[120.9159,32.7012],[120.9338,32.6922],[120.9501,32.6896],[120.9636,32.6824],[120.976,32.6584],[120.9081,32.6393],[120.8953,32.6316],[120.8632,32.6302],[120.8635,32.6191],[120.8514,32.6183],[120.8512,32.6074],[120.8569,32.6122],[120.8685,32.6098],[120.8546,32.6051],[120.8372,32.6067],[120.8326,32.597],[120.8183,32.592],[120.805,32.5826],[120.7926,32.5785],[120.7935,32.6006],[120.7436,32.5983],[120.7403,32.5854],[120.721,32.5916],[120.7203,32.5997],[120.701,32.6035],[120.6809,32.5948],[120.6716,32.5879],[120.663,32.572],[120.6534,32.5719],[120.6493,32.585],[120.6561,32.5946],[120.6569,32.6035],[120.644,32.6132],[120.6298,32.6175],[120.6203,32.6019],[120.6152,32.6061],[120.6218,32.626],[120.6127,32.6356],[120.6148,32.6398],[120.6005,32.65],[120.5905,32.6397],[120.5789,32.635],[120.5499,32.6358],[120.5446,32.6323],[120.5122,32.6361],[120.5068,32.6408],[120.4953,32.6395],[120.4965,32.6244],[120.4847,32.6313],[120.4756,32.6287],[120.4656,32.6315],[120.4431,32.6293],[120.4432,32.6391],[120.437,32.6471],[120.4319,32.6765],[120.4157,32.6794],[120.4105,32.6894],[120.3943,32.6875],[120.3896,32.6907],[120.3925,32.7072],[120.3761,32.7109],[120.3667,32.7049],[120.341,32.7054],[120.333,32.6998],[120.3195,32.6993],[120.3156,32.7044],[120.2927,32.6876],[120.2763,32.6793],[120.2519,32.6799],[120.2257,32.6759],[120.2248,32.6584],[120.2289,32.6499],[120.2217,32.6484],[120.2222,32.6343],[120.2135,32.6256],[120.2094,32.6082],[120.2136,32.6027],[120.2023,32.6009],[120.196,32.603],[120.1973,32.6193],[120.176,32.6291],[120.1763,32.6212],[120.1544,32.616],[120.1408,32.6163],[120.1227,32.6103],[120.1132,32.6138],[120.1091,32.6305],[120.121,32.6333],[120.1217,32.6792],[120.1295,32.6891],[120.1381,32.6872],[120.1451,32.7059],[120.1576,32.7032],[120.1554,32.7142],[120.1648,32.7203],[120.1732,32.7157],[120.1817,32.7232],[120.1809,32.7418],[120.1961,32.7393],[120.2026,32.743],[120.2066,32.7566],[120.2147,32.7674],[120.2282,32.7786],[120.2224,32.7923],[120.1993,32.787],[120.197,32.7815],[120.1829,32.7729],[120.1742,32.7797],[120.1625,32.781],[120.1593,32.7879],[120.1682,32.793],[120.1611,32.8099],[120.1672,32.815],[120.187,32.8122],[120.1934,32.8261],[120.181,32.8253],[120.1848,32.8341],[120.1949,32.8428],[120.1952,32.8514],[120.2059,32.8522],[120.2084,32.8643],[120.1988,32.8669],[120.2002,32.8745],[120.177,32.8778],[120.1819,32.9039],[120.1775,32.9091],[120.1764,32.9325],[120.2011,32.9305],[120.205,32.9206],[120.2204,32.917],[120.2384,32.9212],[120.2388,32.928],[120.2808,32.9249],[120.292,32.9336],[120.2951,32.9455],[120.2864,32.9494],[120.2874,32.9552],[120.3004,32.9542],[120.2991,32.9666],[120.3124,32.9926],[120.3089,33.0244],[120.313,33.0481],[120.3094,33.0623],[120.292,33.0811],[120.2937,33.0967],[120.2897,33.1042],[120.2968,33.1296],[120.2141,33.1374],[120.0941,33.1786],[120.0808,33.1818],[120.0482,33.164],[120.024,33.158],[120.0035,33.156],[119.9881,33.1516],[119.9684,33.1499],[119.9364,33.1554],[119.9166,33.1494],[119.8944,33.1511],[119.8902,33.1443],[119.8773,33.1468],[119.8676,33.1434],[119.8685,33.1545],[119.8435,33.1535],[119.7873,33.1391],[119.7723,33.1309],[119.7493,33.131],[119.7398,33.1474],[119.7531,33.1606],[119.7513,33.1708],[119.7303,33.1729],[119.7288,33.1887],[119.7335,33.2053],[119.7315,33.2117],[119.7126,33.2191],[119.6932,33.2243],[119.6857,33.2386],[119.6908,33.2427],[119.7042,33.2698],[119.7151,33.2719],[119.7003,33.2942],[119.6864,33.2889],[119.6595,33.2858],[119.654,33.2807],[119.6405,33.2936],[119.6414,33.311],[119.6324,33.317],[119.636,33.3266],[119.632,33.3354],[119.6164,33.3331],[119.6131,33.3584],[119.6054,33.3797],[119.5899,33.381],[119.5767,33.3784],[119.5669,33.3993],[119.5592,33.4009],[119.5531,33.4105],[119.5439,33.4149],[119.5313,33.4149],[119.5045,33.4073],[119.4884,33.4079],[119.4768,33.4037],[119.4484,33.3848],[119.4168,33.3762],[119.3654,33.3696],[119.311,33.3674],[119.2545,33.3529],[119.2431,33.3524],[119.235,33.3451],[119.2488,33.3181],[119.2627,33.303],[119.2399,33.3015],[119.2107,33.2925],[119.1847,33.2898],[119.1601,33.2835],[119.1534,33.2853],[119.1631,33.2715],[119.1555,33.2545],[119.1466,33.2486],[119.1433,33.23],[119.1507,33.2128],[119.1652,33.2076],[119.1999,33.2059],[119.2114,33.2031],[119.2192,33.206],[119.222,33.1881],[119.2295,33.1659],[119.2238,33.1613],[119.2285,33.1511],[119.2503,33.1576],[119.2715,33.1468],[119.3054,33.1346],[119.3139,33.1286],[119.3211,33.1023],[119.3348,33.0844],[119.3433,33.0651],[119.3637,33.0535],[119.3642,33.0386],[119.3592,33.0297],[119.3431,33.0114],[119.3251,32.9984],[119.325,32.9686],[119.3283,32.9459],[119.3456,32.8902],[119.3498,32.8684],[119.3454,32.8383],[119.3327,32.815],[119.3137,32.8049],[119.2787,32.7989],[119.1909,32.8254],[119.1131,32.8229],[119.1043,32.8267]]]}}]}
+};
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("nd-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("nd-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e8f2ff", muted: "#8ea9cc",
+    gold: "#f0c060", goldSoft: "#ffdc8f", goldDeep: "#b8863a",
+    blue: "#3d9cff", cyan: "#39d0d8", green: "#33e0a6", red: "#ff5f6e", orange: "#ff9d4d",
+    steel: "#6f93c4", deep: "#1c4a7e"
+  };
+  const PARENT = "大屏样板间-公共资金新动能税收1920.html";
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = Number(n).toFixed(dec == null ? 0 : dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const signed = (v, d) => (v >= 0 ? "+" : "") + fmtDec(v, d == null ? 1 : d);
+  const rgba = (hex, a) => {
+    const h = hex.replace("#", "");
+    return "rgba(" + parseInt(h.slice(0, 2), 16) + "," + parseInt(h.slice(2, 4), 16) + "," + parseInt(h.slice(4, 6), 16) + "," + a + ")";
+  };
+  /* 每张图的 setOption 单独包 try/catch：任一张出错不会中断后面的图，且错误可读 */
+  const FAILS = [];
+  function safeSet(chart, opt, tag) {
+    if (!chart) return;
+    try { chart.setOption(opt); }
+    catch (e) { FAILS.push(tag + ": " + (e && e.message ? e.message : e)); window.__ndErr = (window.__ndErr || []).concat([e]); }
+  }
+
+  /* ===== 3. 数据源（模拟，口径 2026 年 1-7 月累计 · 亿元）
+     父页锚点（不得改动）：高新 720 / 数字经济 420 / 专精特新 380 / 绿色新能源 210，
+     四类之和 = 1,730 = 全省新动能税收；户数之和 = 12.8 万户。
+     每一类的 13 市之和必须回到该类全省值；13 市名与「全省地市收入」页一致。 ===== */
+  const CITY_NAMES = ["苏州", "南京", "无锡", "南通", "常州", "徐州", "盐城", "扬州", "泰州", "淮安", "镇江", "宿迁", "连云港"];
+
+  /* 3.1 四大类：全省值 / 同比 / 户数（取自父页），dist = 13 市分布（之和 = 全省值），
+         yoyRaw = 各市增速的相对形态（下面会按「上年同期加总必须等于全省上年同期」整体归一） */
+  const CAT_DEFS = [
+    { name: "高新技术企业", short: "高新", val: 720, yoy: 7.7, firms: 4.6, color: C.gold,
+      dist:   [178, 132,  96,  58,  52,  38,  32,  28,  26,  20,  24,  18,  18],
+      yoyRaw: [8.2, 7.4, 8.6, 7.1, 8.9, 5.8, 6.4, 6.9, 7.2, 5.4, 6.6, 9.4, 4.8] },
+    { name: "数字经济核心产业", short: "数字", val: 420, yoy: 11.9, firms: 3.8, color: C.cyan,
+      dist:   [108, 126,  52,   26,   28,  18,  14,  12,  10,   7,   10,   5,   4],
+      yoyRaw: [12.4, 13.6, 11.2, 10.4, 10.8, 9.6, 9.2, 9.8, 9.4, 8.6, 10.1, 11.4, 8.2] },
+    { name: "专精特新企业", short: "专精", val: 380, yoy: 8.5, firms: 2.9, color: C.blue,
+      dist:   [ 96,  58,  62,  32,  38,  18,  12,  16,  20,   6,  14,   4,   4],
+      yoyRaw: [9.2, 8.1, 9.6, 8.4, 9.8, 6.8, 7.1, 7.2, 7.6, 6.2, 7.4, 8.8, 5.9] },
+    { name: "绿色新能源", short: "绿色", val: 210, yoy: 14.1, firms: 1.5, color: C.green,
+      dist:   [  28,   12,   22,   20,   44,   14,   38,    6,    7,    8,   2,    3,    6],
+      yoyRaw: [12.8, 11.2, 13.4, 12.6, 17.2, 11.8, 16.4, 10.8, 11.6, 12.2, 9.8, 12.4, 15.6] }
+  ];
+
+  /* 3.2 派生：上年同期按「分项反推后整体归一到该类上年同期」，保证分市同比加总必然对上全省同比 */
+  CAT_DEFS.forEach((c) => {
+    c.distSum = sum(c.dist);
+    c.prevTotal = c.val / (1 + c.yoy / 100);
+    const raw = c.dist.map((v, i) => v / (1 + c.yoyRaw[i] / 100));
+    const k = c.prevTotal / sum(raw);
+    c.prev = raw.map((p) => p * k);
+    c.cityYoy = c.dist.map((v, i) => 100 * (v / c.prev[i] - 1));
+  });
+
+  /* 3.3 「全部新动能」= 四类逐市相加（行合计），其上年同期 = 四类上年同期逐市相加 */
+  const ALL_DIST = CITY_NAMES.map((_, i) => sum(CAT_DEFS.map((c) => c.dist[i])));
+  const ALL_PREV = CITY_NAMES.map((_, i) => sum(CAT_DEFS.map((c) => c.prev[i])));
+  const ALL_CAT = {
+    name: "全部新动能", short: "全部", color: C.goldSoft, isAll: true,
+    dist: ALL_DIST, prev: ALL_PREV,
+    val: sum(ALL_DIST), distSum: sum(ALL_DIST),
+    firms: +sum(CAT_DEFS.map((c) => c.firms)).toFixed(1),
+    prevTotal: sum(ALL_PREV)
+  };
+  ALL_CAT.yoy = 100 * (ALL_CAT.val / ALL_CAT.prevTotal - 1);
+  ALL_CAT.cityYoy = ALL_DIST.map((v, i) => 100 * (v / ALL_PREV[i] - 1));
+  const CATS = [ALL_CAT].concat(CAT_DEFS);
+  const NEW_TOTAL = ALL_CAT.val;                 /* 1,730 = 全省新动能税收 */
+  const FIRM_TOTAL = ALL_CAT.firms;              /* 12.8 万户 */
+  CATS.forEach((c) => { c.shareOfNew = 100 * c.val / NEW_TOTAL; });
+
+  /* 3.4 三大板块（由 13 市分组求和现算） */
+  const BLOCKS = [
+    { name: "苏南", color: C.gold, cities: ["南京", "无锡", "常州", "苏州", "镇江"] },
+    { name: "苏中", color: C.cyan, cities: ["南通", "扬州", "泰州"] },
+    { name: "苏北", color: C.blue, cities: ["徐州", "连云港", "淮安", "盐城", "宿迁"] }
+  ];
+  BLOCKS.forEach((b) => { b.idx = b.cities.map((n) => CITY_NAMES.indexOf(n)); });
+  const BLOCK_OF = {};
+  BLOCKS.forEach((b) => { b.cities.forEach((n) => { BLOCK_OF[n] = b; }); });
+
+  /* 3.5 每类的派生视图：降序序列、分档阈值、板块分组 */
+  const PIECE_COLORS = [C.gold, C.cyan, C.blue, C.deep];
+  CATS.forEach((c) => {
+    c.order = CITY_NAMES.map((n, i) => i).sort((a, b) => c.dist[b] - c.dist[a]);
+    c.rank = [];
+    c.order.forEach((ci, r) => { c.rank[ci] = r + 1; });
+    const desc = c.order.map((i) => c.dist[i]);
+    /* 四档边界取相邻序位中点：TOP3 / 4-6 / 7-9 / 其余，避免边界与真实值重合 */
+    c.br = [(desc[2] + desc[3]) / 2, (desc[5] + desc[6]) / 2, (desc[8] + desc[9]) / 2];
+    c.max = desc[0];
+    c.blocks = BLOCKS.map((b) => {
+      const val = sum(b.idx.map((i) => c.dist[i]));
+      const prev = sum(b.idx.map((i) => c.prev[i]));
+      return { name: b.name, color: b.color, n: b.cities.length, val: val, prev: prev,
+        yoy: 100 * (val / prev - 1), share: 100 * val / c.val };
+    });
+  });
+  const pieceOf = (v, br) => (v >= br[0] ? 0 : v >= br[1] ? 1 : v >= br[2] ? 2 : 3);
+
+  /* 3.6 矩阵行序：按「全部新动能」城市合计降序固定，切换类别时只换高亮列 */
+  const MX_ORDER = ALL_CAT.order.slice();
+  let MX_MAX_SHARE = 0;
+  MX_ORDER.forEach((i) => {
+    CAT_DEFS.forEach((c) => { MX_MAX_SHARE = Math.max(MX_MAX_SHARE, c.dist[i] / ALL_DIST[i]); });
+  });
+
+  /* ===== 4. 时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("nd-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("nd-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. 静态 DOM 全部先建好（★ 图表容器的同级 DOM 必须在 echarts.init 之前填充完） ===== */
+
+  /* 5.1 KPI 带（5 枚，翻牌缓动） */
+  const KPI_DEFS = [
+    { icon: "¥", key: "val", label: "当前类别税收", unit: "亿元", dec: 0 },
+    { icon: "△", key: "yoy", label: "同比增速", unit: "%", dec: 1, sign: true },
+    { icon: "◈", key: "share", label: "占全省新动能比重", unit: "%", dec: 1 },
+    { icon: "◇", key: "firms", label: "企业户数", unit: "万户", dec: 1 },
+    { icon: "①", key: "topShare", label: "首位地市", unit: "%", dec: 1 }
+  ];
+  const band = $("nd-band");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "nd-kpi";
+    card.innerHTML =
+      '<div class="nd-kpi-icon">' + k.icon + '</div>' +
+      '<div class="nd-kpi-main">' +
+        '<div class="nd-kpi-label">' + k.label + '</div>' +
+        '<div class="nd-kpi-num"><span class="nd-kpi-val">0</span><span class="nd-kpi-unit">' + k.unit + '</span></div>' +
+        '<div class="nd-kpi-sub"></div>' +
+      '</div>';
+    band.appendChild(card);
+    k.labelNode = card.querySelector(".nd-kpi-label");
+    k.node = card.querySelector(".nd-kpi-val");
+    k.subNode = card.querySelector(".nd-kpi-sub");
+    k.cur = 0; k.target = 0;
+  });
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) k.cur = k.target; else k.cur += diff * 0.14;
+      k.node.textContent = (k.sign && k.cur >= 0 ? "+" : "") + fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+
+  /* 5.2 左上：五张类别切换卡（元素只建一次，切换只改文本与高亮） */
+  const catsBox = $("nd-cats");
+  CATS.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.className = "nd-cat";
+    b.type = "button";
+    b.style.color = c.color;
+    b.innerHTML =
+      '<div class="nd-cat-r1"><span class="nd-cat-name">' + c.name + '</span>' +
+        '<span class="nd-cat-val">' + fmtDec(c.val) + '</span><span class="nd-cat-unit">亿元</span></div>' +
+      '<div class="nd-cat-r2"><b style="color:' + (c.yoy >= 0 ? C.green : C.red) + '">' + signed(c.yoy) + '%</b>' +
+        '<span>' + fmtDec(c.firms, 1) + ' 万户</span>' +
+        '<span class="nd-cat-track"><u></u></span>' +
+        '<span>占 <b style="color:#ffdc8f">' + c.shareOfNew.toFixed(1) + '%</b></span></div>';
+    b.title = c.name + " · " + fmtDec(c.val) + " 亿元 · 同比 " + signed(c.yoy) + "% · " + fmtDec(c.firms, 1) + " 万户";
+    b.addEventListener("click", () => { applyCat(i); restart(); });
+    catsBox.appendChild(b);
+    c.card = b;
+    c.cardFill = b.querySelector(".nd-cat-track u");
+  });
+
+  /* 5.3 左下：13 行排行条（元素固定 13 行，切换只改内容） */
+  const rankBox = $("nd-rank");
+  const RK_ROWS = CITY_NAMES.map(() => {
+    const li = document.createElement("li");
+    li.className = "nd-rk-row";
+    li.innerHTML = '<span class="nd-rk-no"></span><span class="nd-rk-name"></span>' +
+      '<span class="nd-rk-bar"><u></u></span><span class="nd-rk-val"></span>';
+    rankBox.appendChild(li);
+    return { li: li, no: li.querySelector(".nd-rk-no"), name: li.querySelector(".nd-rk-name"),
+      fill: li.querySelector(".nd-rk-bar u"), val: li.querySelector(".nd-rk-val") };
+  });
+
+  /* 5.4 地图图例四档（元素固定 4 行） */
+  const LG_ROWS = PIECE_COLORS.map((col, i) => {
+    const d = document.createElement("div");
+    d.className = "nd-lg-row";
+    d.innerHTML = '<i style="background:' + col + '"></i><span></span><em></em>';
+    $("nd-legend-rows").appendChild(d);
+    return { txt: d.querySelector("span"), cnt: d.querySelector("em") };
+  });
+
+  /* 5.5 焦点卡骨架（内容随轮播刷新，绝对定位覆盖层不影响画布高度） */
+  $("nd-focus").innerHTML =
+    '<div class="nd-fc-head"><span class="nd-fc-name" id="nd-fc-name">--</span>' +
+      '<span class="nd-fc-blk" id="nd-fc-blk">--</span><span class="nd-fc-rank" id="nd-fc-rank">--</span></div>' +
+    '<div class="nd-fc-val"><b id="nd-fc-val">0</b><span>亿元</span><em id="nd-fc-yoy">--</em></div>' +
+    '<div class="nd-fc-grid">' +
+      '<div class="nd-fc-cell"><span>占该类</span><b id="nd-fc-share">--</b></div>' +
+      '<div class="nd-fc-cell"><span>该市新动能合计</span><b id="nd-fc-city">--</b></div>' +
+    '</div>' +
+    '<div class="nd-fc-mix-t">该市四大类结构</div>' +
+    '<div class="nd-fc-mix" id="nd-fc-mix"></div>';
+  const FC_MIX = CAT_DEFS.map((c) => {
+    const d = document.createElement("div");
+    d.className = "nd-fc-mix-row";
+    d.innerHTML = '<span style="color:' + c.color + '">' + c.short + '</span><i><u style="background:' + c.color + '"></u></i><b></b>';
+    $("nd-fc-mix").appendChild(d);
+    return { fill: d.querySelector("u"), txt: d.querySelector("b") };
+  });
+
+  /* 5.6 右上：三行板块卡（先建 DOM，环形图后 init） */
+  const blkBox = $("nd-blks");
+  const BLK_ROWS = BLOCKS.map((b) => {
+    const d = document.createElement("div");
+    d.className = "nd-blk";
+    d.style.color = b.color;
+    d.innerHTML = '<span class="nd-blk-n">' + b.name + '</span><span class="nd-blk-v"></span>' +
+      '<span class="nd-blk-t"><u></u></span><span class="nd-blk-s"></span>';
+    blkBox.appendChild(d);
+    return { val: d.querySelector(".nd-blk-v"), fill: d.querySelector(".nd-blk-t u"), sub: d.querySelector(".nd-blk-s") };
+  });
+
+  /* 5.7 右下：矩阵热力（13 行 × 4 列 + 行合计；表头 / 表尾固定） */
+  $("nd-mx-head").innerHTML = '<span>地市</span>' +
+    CAT_DEFS.map((c) => '<span data-col="1">' + c.short + '</span>').join("") + '<span>合计</span>';
+  const MX_HEAD_COLS = Array.prototype.slice.call($("nd-mx-head").querySelectorAll("[data-col]"));
+  const mxBody = $("nd-mx-body");
+  const MX_ROWS = MX_ORDER.map((ci) => {
+    const li = document.createElement("li");
+    li.className = "nd-mx-row";
+    li.innerHTML = '<span class="nd-mx-city">' + CITY_NAMES[ci] + '</span>' +
+      CAT_DEFS.map(() => '<span class="nd-mx-cell"></span>').join("") +
+      '<span class="nd-mx-tot">' + fmtDec(ALL_DIST[ci]) + '</span>';
+    mxBody.appendChild(li);
+    const cells = Array.prototype.slice.call(li.querySelectorAll(".nd-mx-cell"));
+    cells.forEach((el, k) => {
+      const v = CAT_DEFS[k].dist[ci], sh = v / ALL_DIST[ci];
+      el.textContent = fmtDec(v);
+      el.style.background = rgba(CAT_DEFS[k].color, 0.10 + 0.72 * (sh / MX_MAX_SHARE));
+      el.title = CITY_NAMES[ci] + " · " + CAT_DEFS[k].name + " " + fmtDec(v) + " 亿元 · 占该市新动能 " + (100 * sh).toFixed(1) + "%";
+    });
+    return { ci: ci, cells: cells };
+  });
+  $("nd-mx-foot").innerHTML = '<span>列合计</span>' +
+    CAT_DEFS.map((c) => '<span><b>' + fmtDec(sum(c.dist)) + '</b></span>').join("") +
+    '<span>' + fmtDec(sum(ALL_DIST)) + '</span>';
+  $("nd-mx-scope").textContent = "行=市 · 列=类 · 亿元";
+
+  /* ===== 6. ECharts 公共构件（DOM 已就绪后再 init，且实例只创建一次） ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(8, 26, 50, 0.93)", borderColor: "rgba(240, 192, 96, 0.45)",
+    textStyle: { color: "#e2eeff", fontSize: 12 }
+  }, extra || {});
+  const vGrad = (a, b) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: a }, { offset: 1, color: b }]);
+  const AXIS_LINE = { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } };
+  const SPLIT_LINE = { lineStyle: { color: "rgba(92, 156, 226, 0.13)" } };
+
+  /* 6.1 地图注册（registerMap 前判空兜底） */
+  const GEO_JS = (typeof GEO_DATA !== "undefined" && GEO_DATA && GEO_DATA.jiangsu) ? GEO_DATA.jiangsu : null;
+  const GEO_BK = (typeof GEO_DATA !== "undefined" && GEO_DATA && GEO_DATA.jiangsuBlocks) ? GEO_DATA.jiangsuBlocks : null;
+  let hasCityMap = false, hasBlockMap = false;
+  const CENTER_OF = {};
+  if (GEO_JS && GEO_JS.features && GEO_JS.features.length) {
+    echarts.registerMap("nd-cities", GEO_JS);
+    GEO_JS.features.forEach((f) => {
+      const p = f.properties || {};
+      if (p.name && p.center) CENTER_OF[String(p.name).replace("市", "")] = p.center;
+    });
+    hasCityMap = true;
+  }
+  if (GEO_BK && GEO_BK.features && GEO_BK.features.length) {
+    echarts.registerMap("nd-blocks", GEO_BK);
+    hasBlockMap = true;
+  }
+  const MAP_NAME = CITY_NAMES.map((n) => n + "市");
+  const IDX_OF_MAPNAME = {};
+  MAP_NAME.forEach((m, i) => { IDX_OF_MAPNAME[m] = i; });
+
+  let mapChart = null;
+  if (!hasCityMap) {
+    const holder = document.createElement("div");
+    holder.className = "nd-map-empty";
+    holder.textContent = "江苏地图数据缺失，请检查内联 GEO_DATA";
+    $("nd-map-wrap").appendChild(holder);
+  } else {
+    mapChart = echarts.init($("nd-chart-map"));
+  }
+  const wfChart = echarts.init($("nd-chart-wf"));
+  const ringChart = echarts.init($("nd-chart-ring"));
+
+  /* ===== 7. option 工厂（入参为当前类别） ===== */
+  /* 7.1 地图：地市热力（visualMap 分档，必带 outOfRange）+ 板块描边层 + TOP3 涟漪 */
+  const MAP_LAYOUT = { layoutCenter: ["50%", "52%"], layoutSize: "98%" };
+  function mapOption(c) {
+    const series = [];
+    series.push(Object.assign({
+      name: "地市税收", type: "map", map: "nd-cities", z: 2,
+      selectedMode: false, roam: false,
+      label: {
+        show: true, fontSize: 10.5,
+        formatter: (p) => {
+          const i = IDX_OF_MAPNAME[p.name];
+          return i == null ? p.name : "{n|" + CITY_NAMES[i] + "}\n{v|" + fmtDec(c.dist[i]) + "}";
+        },
+        rich: {
+          n: { fontSize: 11, fontWeight: 700, color: "#f2f9ff", lineHeight: 13, textShadowColor: "rgba(4,12,24,0.95)", textShadowBlur: 5 },
+          v: { fontSize: 11.5, fontWeight: 700, color: "#ffdc8f", fontFamily: "Bahnschrift, DIN Alternate, sans-serif", lineHeight: 13, textShadowColor: "rgba(4,12,24,0.95)", textShadowBlur: 5 }
+        }
+      },
+      itemStyle: { borderColor: "rgba(6, 22, 44, 0.85)", borderWidth: 1 },
+      emphasis: {
+        label: { rich: { n: { fontSize: 13, color: "#ffffff" }, v: { fontSize: 13, color: "#ffdc8f" } } },
+        itemStyle: { shadowColor: "rgba(255, 214, 140, 0.75)", shadowBlur: 22, borderColor: "#ffe9b8", borderWidth: 1.6 }
+      },
+      data: MAP_NAME.map((m, i) => ({ name: m, value: c.dist[i] }))
+    }, MAP_LAYOUT));
+    /* 板块描边层：无填充只描边，silent 让鼠标事件穿透到地市层 */
+    if (hasBlockMap) {
+      series.push(Object.assign({
+        name: "板块边界", type: "map", map: "nd-blocks", z: 6,
+        silent: true, selectedMode: false, roam: false,
+        label: { show: false }, emphasis: { disabled: true },
+        data: BLOCKS.map((b) => ({
+          name: b.name, value: 0,
+          itemStyle: { areaColor: "transparent", borderColor: b.color, borderWidth: 2.2, shadowColor: rgba(b.color, 0.55), shadowBlur: 10 }
+        }))
+      }, MAP_LAYOUT));
+    }
+    /* TOP3 涟漪：坐标取 GeoJSON properties.center，缺坐标的城市自动跳过（守卫） */
+    const top3 = c.order.slice(0, 3)
+      .map((i, r) => ({ i: i, r: r, ct: CENTER_OF[CITY_NAMES[i]] }))
+      .filter((x) => x.ct && x.ct.length === 2);
+    series.push({
+      name: "TOP3", type: "effectScatter", coordinateSystem: "geo", geoIndex: 0, z: 12,
+      showEffectOn: "render", rippleEffect: { brushType: "stroke", scale: 3.6, period: 3.4 },
+      symbolSize: (v) => [17, 14, 12][v[3]] || 11,
+      itemStyle: { color: C.goldSoft, shadowColor: "rgba(255, 220, 143, 0.9)", shadowBlur: 12 },
+      data: top3.map((x) => ({ name: CITY_NAMES[x.i], value: [x.ct[0], x.ct[1], c.dist[x.i], x.r] }))
+    });
+    return {
+      tooltip: tip({
+        formatter: (p) => {
+          const i = p.seriesType === "effectScatter" ? CITY_NAMES.indexOf(p.name) : IDX_OF_MAPNAME[p.name];
+          if (i == null || i < 0) return p.name;
+          const n = CITY_NAMES[i], b = BLOCK_OF[n];
+          return '<b style="color:' + b.color + '">' + n + "</b> · " + b.name + "板块 · 该类第 " + c.rank[i] + " 位<br/>" +
+            c.name + " <b style=\"color:#ffdc8f\">" + fmtDec(c.dist[i]) + "</b> 亿元 · 占该类 " + (100 * c.dist[i] / c.val).toFixed(1) + "%<br/>" +
+            "同比 <b style=\"color:" + (c.cityYoy[i] >= 0 ? "#33e0a6" : "#ff5f6e") + '">' + signed(c.cityYoy[i]) + "%</b> · 上年同期 " + fmtDec(c.prev[i], 1) + " 亿元<br/>" +
+            "该市新动能合计 " + fmtDec(ALL_DIST[i]) + " 亿元 · 本类占该市 " + (100 * c.dist[i] / ALL_DIST[i]).toFixed(1) + "%";
+        }
+      }),
+      /* geo 组件只作为 effectScatter 的坐标系（与 map series 同底图、同布局参数，投影完全一致） */
+      geo: Object.assign({
+        map: "nd-cities", z: 1, silent: true, roam: false,
+        itemStyle: { areaColor: "transparent", borderColor: "transparent" },
+        emphasis: { disabled: true }, label: { show: false }
+      }, MAP_LAYOUT),
+      /* ★ 分档着色必须带 outOfRange，否则 setOption 渲染阶段会抛 reading 'coord' 并中断管线；
+         seriesIndex 限定为 0，避免把板块描边层与涟漪层一并染色 */
+      visualMap: {
+        show: false, seriesIndex: 0,
+        pieces: [
+          { min: c.br[0], color: PIECE_COLORS[0] },
+          { min: c.br[1], max: c.br[0], color: PIECE_COLORS[1] },
+          { min: c.br[2], max: c.br[1], color: PIECE_COLORS[2] },
+          { max: c.br[2], color: PIECE_COLORS[3] }
+        ],
+        outOfRange: { color: "rgba(23, 64, 111, 0.65)" }
+      },
+      series: series,
+      animationDurationUpdate: 500
+    };
+  }
+
+  /* 7.2 瀑布：自全省该类合计出发，按 13 市降序逐段拆解到 0；折线为累计占比 */
+  function wfOption(c) {
+    const names = ["全省合计"].concat(c.order.map((i) => CITY_NAMES[i]));
+    const vals = c.order.map((i) => c.dist[i]);
+    const base = [0], show = [c.val], cum = [null];
+    let left = c.val, acc = 0;
+    vals.forEach((v) => {
+      left -= v; acc += v;
+      base.push(left);
+      show.push(v);
+      cum.push(+(100 * acc / c.val).toFixed(2));
+    });
+    const colors = [vGrad(C.goldSoft, "rgba(184, 134, 58, 0.45)")].concat(
+      c.order.map((i) => {
+        const col = PIECE_COLORS[pieceOf(c.dist[i], c.br)];
+        return vGrad(col, rgba(col, 0.28));
+      })
+    );
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(240, 192, 96, 0.08)" } },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex;
+          if (k === 0) return '<b style="color:#ffdc8f">' + c.name + " · 全省合计</b><br/>" + fmtDec(c.val) + " 亿元<br/>同比 " + signed(c.yoy) + "%";
+          const i = c.order[k - 1];
+          return '<b style="color:#ffdc8f">' + CITY_NAMES[i] + "</b>（第 " + c.rank[i] + " 位）<br/>" +
+            "本类税收 <b>" + fmtDec(c.dist[i]) + "</b> 亿元 · 占该类 " + (100 * c.dist[i] / c.val).toFixed(1) + "%<br/>" +
+            "累计占比 <b style=\"color:#39d0d8\">" + cum[k].toFixed(1) + "%</b> · 剩余 " + fmtDec(base[k], 0) + " 亿元<br/>" +
+            "同比 " + signed(c.cityYoy[i]) + "%";
+        }
+      }),
+      grid: { left: 14, right: 14, top: 30, bottom: 4, containLabel: true },
+      xAxis: {
+        type: "category", data: names, axisLine: AXIS_LINE, axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 10.5, interval: 0 }
+      },
+      yAxis: [
+        { type: "value", name: "亿元", nameTextStyle: { color: "#5f88b8", fontSize: 10.5 }, splitLine: SPLIT_LINE,
+          axisLabel: { color: C.muted, fontSize: 10.5 } },
+        { type: "value", name: "累计占比 %", nameTextStyle: { color: "#5f88b8", fontSize: 10.5 }, min: 0, max: 100,
+          splitLine: { show: false }, axisLabel: { color: C.muted, fontSize: 10.5, formatter: "{value}%" } }
+      ],
+      series: [
+        { name: "垫底", type: "bar", stack: "wf", silent: true, barWidth: "58%",
+          itemStyle: { color: "transparent" }, emphasis: { disabled: true }, data: base },
+        { name: "分段", type: "bar", stack: "wf", barWidth: "58%",
+          itemStyle: { borderRadius: [3, 3, 0, 0] },
+          label: { show: true, position: "top", fontSize: 10, fontWeight: 700, color: "#ffdc8f",
+            formatter: (o) => fmtDec(o.value, 0) },
+          data: show.map((v, k) => ({ value: v, itemStyle: { color: colors[k] } })) },
+        /* 折线隐藏点用 showSymbol:false（不能写 symbol:"none"，会让 markPoint/markLine 解析失败并中断渲染） */
+        { name: "累计占比", type: "line", yAxisIndex: 1, smooth: true, z: 5,
+          symbol: "circle", symbolSize: 6, showSymbol: true, connectNulls: false,
+          lineStyle: { width: 2, color: C.cyan, shadowColor: "rgba(57, 208, 216, 0.5)", shadowBlur: 8 },
+          itemStyle: { color: C.cyan, borderColor: "#052a2c", borderWidth: 1.6 },
+          data: cum }
+      ],
+      animationDurationUpdate: 500
+    };
+  }
+
+  /* 7.3 板块环 */
+  function ringOption(c) {
+    return {
+      tooltip: tip({
+        formatter: (p) => {
+          const b = c.blocks.filter((x) => x.name === p.name)[0];
+          if (!b) return p.name;
+          return '<b style="color:' + b.color + '">' + b.name + "板块</b>（" + b.n + " 市）<br/>" +
+            c.name + " <b style=\"color:#ffdc8f\">" + fmtDec(b.val) + "</b> 亿元<br/>" +
+            "占该类 " + b.share.toFixed(1) + "% · 同比 " + signed(b.yoy) + "%";
+        }
+      }),
+      graphic: [
+        { type: "text", left: "center", top: "40%", style: { text: fmtDec(c.val), fill: C.goldSoft, fontSize: 23, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif", textAlign: "center" } },
+        { type: "text", left: "center", top: "54%", style: { text: "合计 · 亿元", fill: "#7f93b5", fontSize: 10.5, textAlign: "center" } }
+      ],
+      series: [{
+        name: "板块构成", type: "pie", radius: ["46%", "66%"], center: ["50%", "48%"],
+        avoidLabelOverlap: true, minAngle: 6,
+        itemStyle: { borderColor: "rgba(8, 26, 50, 0.9)", borderWidth: 2 },
+        label: {
+          color: "#cfe2f8", fontSize: 11,
+          formatter: (p) => "{n|" + p.name + "} {p|" + p.percent.toFixed(1) + "%}",
+          rich: {
+            n: { fontSize: 12, fontWeight: 700, color: "#eaf4ff" },
+            p: { fontSize: 11.5, fontWeight: 700, color: C.goldSoft, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" }
+          }
+        },
+        labelLine: { length: 6, length2: 9, lineStyle: { color: "rgba(142, 169, 204, 0.5)" } },
+        emphasis: { scaleSize: 7, itemStyle: { shadowColor: "rgba(240, 192, 96, 0.45)", shadowBlur: 18 } },
+        data: c.blocks.map((b) => ({ name: b.name, value: b.val, itemStyle: { color: vGrad(rgba(b.color, 0.95), rgba(b.color, 0.42)) } }))
+      }],
+      animationDurationUpdate: 0
+    };
+  }
+
+  /* ===== 8. 焦点卡 / 排行 / 图例 / 板块行 / 矩阵高亮的刷新 ===== */
+  function renderFocus(c, i) {
+    const n = CITY_NAMES[i], b = BLOCK_OF[n];
+    $("nd-fc-name").textContent = n;
+    const blk = $("nd-fc-blk");
+    blk.textContent = b.name;
+    blk.style.background = b.color;
+    $("nd-fc-rank").textContent = "NO." + c.rank[i];
+    $("nd-fc-val").textContent = fmtDec(c.dist[i]);
+    const y = $("nd-fc-yoy");
+    y.textContent = signed(c.cityYoy[i]) + "%";
+    y.style.color = c.cityYoy[i] >= 0 ? C.green : C.red;
+    $("nd-fc-share").textContent = (100 * c.dist[i] / c.val).toFixed(1) + "%";
+    $("nd-fc-city").textContent = fmtDec(ALL_DIST[i]) + " 亿元";
+    FC_MIX.forEach((m, k) => {
+      const v = CAT_DEFS[k].dist[i], sh = 100 * v / ALL_DIST[i];
+      m.txt.textContent = sh.toFixed(1) + "%";
+      m.fill.style.width = sh.toFixed(1) + "%";
+    });
+  }
+
+  function renderRank(c) {
+    c.order.forEach((ci, r) => {
+      const row = RK_ROWS[r], v = c.dist[ci], col = PIECE_COLORS[pieceOf(v, c.br)];
+      row.no.textContent = r + 1;
+      row.name.textContent = CITY_NAMES[ci];
+      row.val.textContent = fmtDec(v);
+      row.fill.style.background = "linear-gradient(90deg," + rgba(col, 0.45) + "," + col + ")";
+      row.fill.style.boxShadow = "0 0 8px " + rgba(col, 0.5);
+      row.li.classList.toggle("is-top", r < 3);
+      row.li.classList.remove("is-active");
+      row.li.title = CITY_NAMES[ci] + " · " + c.name + " " + fmtDec(v) + " 亿元 · 同比 " + signed(c.cityYoy[ci]) + "%";
+      row.cityIdx = ci;
+    });
+    /* 条宽相对首位归一，入场缓动 */
+    RK_ROWS.forEach((r) => { r.fill.style.width = "0%"; });
+    setTimeout(() => {
+      c.order.forEach((ci, r) => { RK_ROWS[r].fill.style.width = (100 * c.dist[ci] / c.max).toFixed(1) + "%"; });
+    }, 60);
+    $("nd-rank-scope").textContent = "按本类税收降序";
+    $("nd-rank-foot").innerHTML = "13 市合计 <b>" + fmtDec(c.distSum) + "</b> 亿元 · " +
+      (c.distSum === c.val ? "与全省一致 ✓" : "口径不符 ✗") + " · 首位占 <b>" + (100 * c.max / c.val).toFixed(1) + "%</b>";
+  }
+
+  function renderLegend(c) {
+    const cnt = [0, 0, 0, 0];
+    CITY_NAMES.forEach((_, i) => { cnt[pieceOf(c.dist[i], c.br)]++; });
+    const texts = [
+      "≥ " + fmtDec(c.br[0], 0),
+      fmtDec(c.br[1], 0) + " ~ " + fmtDec(c.br[0], 0),
+      fmtDec(c.br[2], 0) + " ~ " + fmtDec(c.br[1], 0),
+      "< " + fmtDec(c.br[2], 0)
+    ];
+    LG_ROWS.forEach((r, i) => { r.txt.textContent = texts[i]; r.cnt.textContent = cnt[i] + " 市"; });
+  }
+
+  function renderBlocks(c) {
+    c.blocks.forEach((b, i) => {
+      const r = BLK_ROWS[i];
+      r.val.textContent = fmtDec(b.val);
+      r.sub.innerHTML = "占 <b>" + b.share.toFixed(1) + "%</b> · <b style=\"color:" +
+        (b.yoy >= 0 ? C.green : C.red) + '">' + signed(b.yoy) + "%</b>";
+      r.fill.style.width = "0%";
+      setTimeout(() => { r.fill.style.width = b.share.toFixed(1) + "%"; }, 80 + i * 90);
+    });
+    $("nd-ring-scope").textContent = "合计 " + fmtDec(c.val) + " 亿元";
+  }
+
+  function renderMatrix(catIdx) {
+    const col = catIdx - 1;    /* 「全部新动能」不对应任何一列，则整表无高亮列 */
+    MX_HEAD_COLS.forEach((el, k) => { el.classList.toggle("is-col", k === col); });
+    MX_ROWS.forEach((r) => { r.cells.forEach((el, k) => { el.classList.toggle("is-col", k === col); }); });
+  }
+
+  /* ===== 9. 跑马灯（数字与上方图表同源现算） ===== */
+  function renderMarquee(c) {
+    const o = c.order, t1 = o[0], t2 = o[1], t3 = o[2];
+    const top3sum = c.dist[t1] + c.dist[t2] + c.dist[t3];
+    const fastest = CITY_NAMES.map((_, i) => i).sort((a, b) => c.cityYoy[b] - c.cityYoy[a]).slice(0, 3);
+    const bk = c.blocks;
+    const news = [
+      "1-7 月全省 <b>" + c.name + "</b> 税收 <b>" + fmtDec(c.val) + " 亿元</b>，同比 <b>" + signed(c.yoy) + "%</b>，占全省新动能 <b>" + c.shareOfNew.toFixed(1) + "%</b>",
+      "13 市首位 <b>" + CITY_NAMES[t1] + " " + fmtDec(c.dist[t1]) + " 亿元</b>（占 " + (100 * c.dist[t1] / c.val).toFixed(1) + "%），前三市 " +
+        [t1, t2, t3].map((i) => CITY_NAMES[i]).join("、") + " 合计 <b>" + fmtDec(top3sum) + " 亿元</b>，占 <b>" + (100 * top3sum / c.val).toFixed(1) + "%</b>",
+      "苏南 <b>" + fmtDec(bk[0].val) + " 亿元</b>（" + bk[0].share.toFixed(1) + "%）· 苏中 <b>" + fmtDec(bk[1].val) + " 亿元</b>（" + bk[1].share.toFixed(1) +
+        "%）· 苏北 <b>" + fmtDec(bk[2].val) + " 亿元</b>（" + bk[2].share.toFixed(1) + "%）",
+      "增速领跑：" + fastest.map((i) => CITY_NAMES[i] + " <b>" + signed(c.cityYoy[i]) + "%</b>").join(" · ") +
+        "；末位 " + CITY_NAMES[o[12]] + " <b>" + fmtDec(c.dist[o[12]]) + " 亿元</b> 有待发力",
+      "本类企业 <b>" + fmtDec(c.firms, 1) + " 万户</b>，户均税收 <b>" + fmtDec(c.val / c.firms, 1) + " 万元</b>（亿元/万户 = 万元/户），上年同期税收 <b>" + fmtDec(c.prevTotal, 1) + " 亿元</b>",
+      "勾稽：13 市之和 <b>" + fmtDec(c.distSum) + "</b> = 全省 <b>" + fmtDec(c.val) + "</b> 亿元；四大类合计 <b>" + fmtDec(NEW_TOTAL) +
+        " 亿元</b>、户数合计 <b>" + fmtDec(FIRM_TOTAL, 1) + " 万户</b>，与父页一致"
+    ];
+    const html = news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("nd-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+
+  /* ===== 10. 切换类别：整页重设（图表只 setOption，绝不重新 init） ===== */
+  let idx = 0, focusIdx = -1;
+  function applyCat(i) {
+    idx = (i + CATS.length) % CATS.length;
+    const c = CATS[idx];
+
+    $("nd-crumb-obj").textContent = c.name;
+    $("nd-title").textContent = c.name + " 地市分布";
+    $("nd-sw-name").textContent = c.name;
+    $("nd-sw-idx").textContent = (idx + 1) + " / " + CATS.length;
+    $("nd-map-title").textContent = c.name + " · 地市热力分布";
+    document.title = "大屏样板间 · 公共资金新动能四大类地市分布 · " + c.name;
+
+    CATS.forEach((x, k) => {
+      x.card.classList.toggle("is-on", k === idx);
+      x.cardFill.style.width = "0%";
+    });
+    setTimeout(() => { CATS.forEach((x) => { x.cardFill.style.width = x.shareOfNew.toFixed(1) + "%"; }); }, 60);
+
+    const top = c.order[0];
+    const vals = { val: c.val, yoy: c.yoy, share: c.shareOfNew, firms: c.firms, topShare: 100 * c.dist[top] / c.val };
+    KPI_DEFS.forEach((k) => { k.target = vals[k.key]; });
+    KPI_DEFS[0].subNode.innerHTML = "上年同期 <b>" + fmtDec(c.prevTotal, 1) + "</b> 亿元 · 增量 <b>" + signed(c.val - c.prevTotal, 1) + "</b> 亿元";
+    KPI_DEFS[1].subNode.innerHTML = "全省新动能 <b>" + signed(ALL_CAT.yoy) + "%</b>" +
+      (c.isAll ? " · 四类加权" : " · " + (c.yoy >= ALL_CAT.yoy ? "跑赢 " : "落后 ") + Math.abs(c.yoy - ALL_CAT.yoy).toFixed(1) + " pct");
+    KPI_DEFS[2].subNode.innerHTML = "全省新动能 <b>" + fmtDec(NEW_TOTAL) + "</b> 亿元（四类之和）";
+    KPI_DEFS[3].subNode.innerHTML = "户均税收 <b>" + (c.val / c.firms).toFixed(1) + "</b> 万元 · 全省 <b>" + fmtDec(FIRM_TOTAL, 1) + "</b> 万户";
+    KPI_DEFS[4].labelNode.innerHTML = "首位地市 · <b>" + CITY_NAMES[top] + "</b>";
+    KPI_DEFS[4].subNode.innerHTML = CITY_NAMES[top] + " <b>" + fmtDec(c.dist[top]) + "</b> 亿元 · 领先次席 <b>" +
+      fmtDec(c.dist[top] - c.dist[c.order[1]]) + "</b> 亿元";
+
+    renderRank(c);
+    renderLegend(c);
+    renderBlocks(c);
+    renderMatrix(idx);
+    renderMarquee(c);
+
+    $("nd-map-scope").textContent = "13 市 · 合计 " + fmtDec(c.distSum) + " 亿元";
+    $("nd-wf-scope").textContent = "自 " + fmtDec(c.val) + " 亿元逐市拆解至 0";
+
+    safeSet(mapChart, mapOption(c), "map");
+    safeSet(wfChart, wfOption(c), "waterfall");
+    safeSet(ringChart, ringOption(c), "ring");
+
+    focusIdx = -1;
+    stepFocus();
+
+    history.replaceState(null, "", "#" + encodeURIComponent(c.name));
+    if (FAILS.length) {
+      errorNode.textContent = "图表渲染异常：" + FAILS.join(" / ");
+      errorNode.classList.add("is-visible");
+    }
+  }
+
+  /* ===== 11. 活性：每 3.5s 按本类降序高亮下一个市（地图 + 排行 + 焦点卡三处同步） ===== */
+  function stepFocus() {
+    const c = CATS[idx];
+    if (focusIdx >= 0 && RK_ROWS[focusIdx]) RK_ROWS[focusIdx].li.classList.remove("is-active");
+    focusIdx = (focusIdx + 1) % CITY_NAMES.length;
+    const ci = c.order[focusIdx];
+    RK_ROWS[focusIdx].li.classList.add("is-active");
+    renderFocus(c, ci);
+    if (mapChart) {
+      mapChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+      mapChart.dispatchAction({ type: "highlight", seriesIndex: 0, name: MAP_NAME[ci] });
+    }
+    ringChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    ringChart.dispatchAction({ type: "highlight", seriesIndex: 0, name: BLOCK_OF[CITY_NAMES[ci]].name });
+  }
+
+  /* ===== 12. 交互：切换器 / 返回父页 / 键盘 / hash 定位 / kiosk 自动轮换 ===== */
+  $("nd-sw-prev").addEventListener("click", () => { applyCat(idx - 1); restart(); });
+  $("nd-sw-next").addEventListener("click", () => { applyCat(idx + 1); restart(); });
+  $("nd-back").addEventListener("click", () => { location.href = PARENT; });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyCat(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyCat(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* 打开时按 hash 定位（父页下钻传参用），未命中则取第 0 个「全部新动能」 */
+  const hash = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+  const hit = CATS.findIndex((c) => c.name === hash);
+  applyCat(hit >= 0 ? hit : 0);
+  setInterval(stepFocus, 3500);
+
+  /* kiosk 常驻：每 12 秒切下一类；鼠标停在切换器上时暂停 */
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => applyCat(idx + 1), 12000); }
+  restart();
+  const sw = $("nd-switcher");
+  sw.addEventListener("mouseenter", () => clearInterval(timer));
+  sw.addEventListener("mouseleave", restart);
+
+  /* ===== 13. 勾稽自检：行/列双向合计 + 父页锚点，不通过即点亮告警条 ===== */
+  (function selfCheck() {
+    const bad = [];
+    CAT_DEFS.forEach((c) => { if (c.distSum !== c.val) bad.push(c.name + " 13 市之和 " + c.distSum + " ≠ " + c.val); });
+    const colTotal = sum(CAT_DEFS.map((c) => c.val));
+    if (colTotal !== 1730) bad.push("四大类之和 " + colTotal + " ≠ 1730");
+    if (ALL_CAT.val !== 1730) bad.push("全部新动能 13 市之和 " + ALL_CAT.val + " ≠ 1730");
+    const firmTotal = +sum(CAT_DEFS.map((c) => c.firms)).toFixed(1);
+    if (firmTotal !== 12.8) bad.push("户数之和 " + firmTotal + " ≠ 12.8");
+    CITY_NAMES.forEach((n, i) => {
+      const row = sum(CAT_DEFS.map((c) => c.dist[i]));
+      if (row !== ALL_DIST[i]) bad.push(n + " 行合计 " + row + " ≠ " + ALL_DIST[i]);
+    });
+    CATS.forEach((c) => {
+      const b = sum(c.blocks.map((x) => x.val));
+      if (b !== c.val) bad.push(c.name + " 三板块之和 " + b + " ≠ " + c.val);
+    });
+    if (bad.length) {
+      errorNode.textContent = "勾稽自检未通过：" + bad.join("；");
+      errorNode.classList.add("is-visible");
+    }
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 交易活跃热力</title>
+<style>
+  :root {
+    --hm-bg: #071a30;
+    --hm-panel: rgba(12, 32, 58, 0.72);
+    --hm-border: rgba(96, 156, 224, 0.26);
+    --hm-text: #e9f2ff;
+    --hm-muted: #8ea8c8;
+    --hm-warm: #fb7185;
+    --hm-warm-soft: #fda4af;
+    --hm-amber: #f6c453;
+    --hm-teal: #2fd0c6;
+    --hm-blue: #4d8bff;
+    --hm-cyan: #3fe1ff;
+    --hm-green: #38e6b0;
+    --hm-cold: #14507e;
+    --hm-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--hm-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 舞台 + 整体缩放适配 ===== */
+  .hm-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(251, 113, 133, 0.16), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(63, 225, 255, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 120%, rgba(158, 52, 84, 0.24), transparent 56%),
+      linear-gradient(rgba(96, 156, 224, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 156, 224, 0.05) 1px, transparent 1px),
+      var(--hm-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 84px 148px 1fr 54px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .hm-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .hm-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .hm-header {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .hm-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(251, 113, 133, 0.6) 16%, rgba(63, 225, 255, 0.8) 50%, rgba(251, 113, 133, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(251, 113, 133, 0.4);
+  }
+  .hm-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .hm-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--hm-muted); }
+  .hm-crumb b { font-weight: 400; color: #f19aab; }
+  .hm-crumb i { font-style: normal; color: rgba(142, 168, 200, 0.5); }
+  .hm-crumb em { font-style: normal; color: #d7e8ff; }
+  .hm-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .hm-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--hm-warm-soft) 96%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(251, 113, 133, 0.35));
+  }
+  .hm-badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 12px; border-radius: 999px; font-size: 12px; letter-spacing: 0.08em;
+    border: 1px solid rgba(251, 113, 133, 0.5); color: var(--hm-warm-soft);
+    background: rgba(158, 52, 84, 0.22); box-shadow: inset 0 0 12px rgba(251, 113, 133, 0.12);
+  }
+  .hm-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--hm-warm); box-shadow: 0 0 8px var(--hm-warm); animation: hmDot 1.5s ease-in-out infinite; }
+
+  .hm-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .hm-tabs { display: flex; align-items: stretch; gap: 8px; }
+  .hm-tab {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 16px; height: 40px; border-radius: 9px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(96, 156, 224, 0.4); background: rgba(18, 44, 82, 0.55);
+    color: #cfe0f2; font-size: 14px; letter-spacing: 0.06em; font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s, background 0.2s;
+  }
+  .hm-tab:hover { color: #fff; border-color: rgba(251, 113, 133, 0.7); }
+  .hm-tab.is-active {
+    color: #fff; border-color: rgba(251, 113, 133, 0.85);
+    background: linear-gradient(160deg, rgba(251, 113, 133, 0.32), rgba(158, 52, 84, 0.28));
+    box-shadow: 0 0 14px rgba(251, 113, 133, 0.35), inset 0 0 10px rgba(251, 113, 133, 0.12);
+  }
+  .hm-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 156, 224, 0.25); }
+  .hm-clock-time { font: 700 26px/1 var(--hm-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4); }
+  .hm-clock-date { font-size: 12px; color: var(--hm-muted); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .hm-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .hm-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--hm-border); border-radius: 12px; background: var(--hm-panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  }
+  .hm-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px;
+    background: linear-gradient(90deg, var(--hm-warm), transparent);
+  }
+  .hm-kpi-label { font-size: 13px; letter-spacing: 0.12em; color: var(--hm-muted); }
+  .hm-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .hm-kpi-val { font: 700 30px/1 var(--hm-mono); color: #f7fbff; letter-spacing: 0.02em; text-shadow: 0 0 14px rgba(251, 113, 133, 0.4); }
+  .hm-kpi-val.is-text { font-size: 25px; }
+  .hm-kpi-val.is-flip { animation: hmFlip 0.55s ease; }
+  .hm-kpi-unit { font-size: 12px; color: var(--hm-warm-soft); }
+  .hm-kpi-sub { font-size: 11.5px; letter-spacing: 0.04em; color: var(--hm-muted); font-variant-numeric: tabular-nums; }
+  .hm-kpi-sub b { color: var(--hm-green); font-weight: 700; }
+  @keyframes hmFlip { 0% { transform: perspective(400px) rotateX(-90deg); opacity: 0.2; } 100% { transform: perspective(400px) rotateX(0); opacity: 1; } }
+  @keyframes hmDot { 50% { opacity: 0.3; } }
+
+  /* ===== 主区 ===== */
+  .hm-main { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; min-height: 0; }
+  .hm-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .hm-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--hm-border); border-radius: 12px; background: var(--hm-panel);
+    display: flex; flex-direction: column;
+  }
+  .hm-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(251, 113, 133, 0.25), rgba(63, 225, 255, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .hm-panel-head i { flex: none; width: 5px; height: 16px; background: var(--hm-warm); box-shadow: 0 0 8px var(--hm-warm); transform: skewX(-12deg); }
+  .hm-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .hm-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #6690bd; align-self: flex-end; padding-bottom: 7px; white-space: nowrap; }
+  .hm-panel-scope { margin-left: auto; font-size: 12px; color: var(--hm-warm-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .hm-chart { flex: 1; min-height: 0; }
+
+  /* 渠道横条 */
+  .hm-chan-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 8px 20px 12px; }
+  .hm-chan { display: flex; align-items: center; gap: 12px; }
+  .hm-chan-name { flex: none; width: 68px; font-size: 13px; color: #d3e3f6; letter-spacing: 0.04em; }
+  .hm-chan-track { flex: 1; min-width: 0; height: 15px; border-radius: 8px; background: rgba(63, 120, 200, 0.14); overflow: hidden; position: relative; }
+  .hm-chan-fill {
+    height: 100%; width: 0; border-radius: 8px;
+    background: linear-gradient(90deg, #2a6fae, var(--hm-warm));
+    box-shadow: 0 0 10px rgba(251, 113, 133, 0.4);
+    transition: width 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hm-chan-fill.is-top { background: linear-gradient(90deg, #b64760, var(--hm-warm-soft)); }
+  .hm-chan-val { flex: none; width: 46px; text-align: right; font: 700 15px/1 var(--hm-mono); color: var(--hm-warm-soft); font-variant-numeric: tabular-nums; }
+
+  /* ===== 跑马灯 ===== */
+  .hm-marquee {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--hm-border); border-radius: 12px; background: var(--hm-panel);
+  }
+  .hm-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #fff0f2;
+    background: linear-gradient(120deg, var(--hm-warm), #b03a54 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .hm-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #fff0f2; animation: hmDot 1.6s ease-in-out infinite; }
+  .hm-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .hm-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: hmMarquee 46s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .hm-marquee-track b { color: var(--hm-warm-soft); font-weight: 700; }
+  .hm-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(251, 113, 133, 0.55); }
+  @keyframes hmMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .hm-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="hm-stage" id="hm-stage">
+    <!-- mockflag:begin --><div class="hm-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="hm-error" id="hm-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="hm-header">
+      <div class="hm-head-left">
+        <div class="hm-crumb"><b>运营监控</b><i>›</i><em>交易活跃</em></div>
+        <div class="hm-head-title-row">
+          <div class="hm-head-title">交易活跃热力监控</div>
+          <span class="hm-badge"><i></i>实时热力 · T+0 口径</span>
+        </div>
+      </div>
+      <div class="hm-head-right">
+        <div class="hm-tabs" id="hm-tabs" aria-label="指标切换">
+          <button class="hm-tab is-active" type="button" data-scope="0">交易笔数</button>
+          <button class="hm-tab" type="button" data-scope="1">交易金额</button>
+          <button class="hm-tab" type="button" data-scope="2">客流量</button>
+        </div>
+        <div class="hm-clock" aria-label="实时时钟">
+          <span class="hm-clock-time" id="hm-clock-time">--:--:--</span>
+          <span class="hm-clock-date" id="hm-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <section class="hm-kpis" id="hm-kpis" aria-label="核心指标"></section>
+
+    <!-- 主区 -->
+    <div class="hm-main">
+      <!-- 左：近 12 月日历热力 -->
+      <section class="hm-panel">
+        <header class="hm-panel-head"><i></i><h2>近 12 月交易日历热力</h2><span class="hm-panel-en">DAILY CALENDAR HEATMAP</span><span class="hm-panel-scope" id="hm-cal-scope">每日交易量 · 万笔</span></header>
+        <div class="hm-chart" id="hm-chart-cal" role="img" aria-label="近12个月每日交易量日历热力图"></div>
+      </section>
+
+      <!-- 右：7×24 矩阵 + 渠道横条 -->
+      <div class="hm-col">
+        <section class="hm-panel">
+          <header class="hm-panel-head"><i></i><h2>星期 × 时段活跃矩阵</h2><span class="hm-panel-en">7×24 ACTIVITY MATRIX</span><span class="hm-panel-scope" id="hm-mat-scope">活跃度</span></header>
+          <div class="hm-chart" id="hm-chart-mat" role="img" aria-label="星期与小时的活跃度热力矩阵"></div>
+        </section>
+        <section class="hm-panel">
+          <header class="hm-panel-head"><i></i><h2>各渠道活跃度构成</h2><span class="hm-panel-en">CHANNEL SHARE</span><span class="hm-panel-scope">占比 %</span></header>
+          <div class="hm-chan-body" id="hm-chans" aria-label="各渠道活跃度占比横条"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- 跑马灯 -->
+    <section class="hm-marquee" aria-label="交易运营播报">
+      <div class="hm-marquee-tag"><i></i>交易运营播报</div>
+      <div class="hm-marquee-view"><div class="hm-marquee-track" id="hm-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("hm-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("hm-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e9f2ff", muted: "#8ea8c8",
+    warm: "#fb7185", warmSoft: "#fda4af", amber: "#f6c453",
+    teal: "#2fd0c6", blue: "#4d8bff", cyan: "#3fe1ff", green: "#38e6b0",
+    bg: "#071a30"
+  };
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const rndf = (a, b) => a + Math.random() * (b - a);
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const fmtInt = (n) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  /* ===== 3. 冷→暖 热力色阶 ===== */
+  const HEAT_RAMP = ["#0d2c50", "#14507e", "#1f8a8c", "#f6c453", "#fb7185"];
+
+  /* ===== 4. 确定性数据源（单一伪随机 → 勾稽自洽） ===== */
+  /* 一周活跃形态：工作日高（周五最高）/ 周末低；时段：早间攀升、10-11 峰、午间小峰、下午高、夜间低 */
+  const HOUR_SHAPE = [3, 2, 1, 1, 1, 2, 5, 12, 28, 44, 54, 50, 36, 40, 52, 48, 42, 34, 28, 24, 20, 15, 10, 6];
+  const DOW_FACTOR = [1.05, 1.08, 1.06, 1.07, 1.10, 0.55, 0.42]; /* 周一..周日 */
+  const MON_FACTOR = [1.02, 0.94, 1.00, 1.03, 1.05, 1.06, 1.08, 1.00, 1.04, 1.06, 1.10, 1.14]; /* 1..12 月，年末冲高 */
+  const HOUR_SUM = HOUR_SHAPE.reduce((a, b) => a + b, 0);
+  const PEAK_HOUR = HOUR_SHAPE.indexOf(Math.max.apply(null, HOUR_SHAPE)); /* = 10 */
+  const PEAK_SHARE = HOUR_SHAPE[PEAK_HOUR] / HOUR_SUM;
+  const ACTIVE_SHARE = HOUR_SHAPE.slice(9, 18).reduce((a, b) => a + b, 0) / HOUR_SUM * 100; /* 9-17 时占比 */
+  const WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+  const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const iso = (d) => d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate());
+
+  /* 日历：2025-08-01 ~ 2026-07-31，每日量按形态生成，月末冲量峰 */
+  function genCalendar(scale, seed) {
+    const start = Date.UTC(2025, 7, 1), end = Date.UTC(2026, 6, 31);
+    const rng = mulberry32(seed);
+    const arr = []; let total = 0;
+    const dowBase = DOW_FACTOR.map((f) => f * HOUR_SUM);
+    for (let t = start; t <= end; t += 86400000) {
+      const d = new Date(t);
+      const dow = (d.getUTCDay() + 6) % 7;
+      const dim = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+      const dom = d.getUTCDate();
+      const surge = dom >= dim - 2 ? 1.38 : (dom <= 2 ? 1.12 : 1.0);
+      const mon = MON_FACTOR[d.getUTCMonth()];
+      const jit = 0.90 + rng() * 0.22;
+      let v = dowBase[dow] * surge * mon * jit * scale;
+      v = Math.round(v * 10) / 10;
+      total += v;
+      arr.push([iso(d), v]);
+    }
+    total = Math.round(total * 10) / 10;
+    return { arr: arr, total: total, days: arr.length, avg: total / arr.length };
+  }
+
+  /* 7×24 矩阵：activity[dow][hour] = 形态 × 倍率（列/行和自洽） */
+  function genMatrix(mult) {
+    const data = []; let grand = 0; let maxCell = 0;
+    for (let y = 0; y < 7; y++) {
+      for (let x = 0; x < 24; x++) {
+        const val = Math.round(HOUR_SHAPE[x] * DOW_FACTOR[y] * mult);
+        data.push([x, y, val]);
+        grand += val; if (val > maxCell) maxCell = val;
+      }
+    }
+    return { data: data, grand: grand, max: maxCell };
+  }
+
+  /* ===== 5. 三套指标口径（单一数据源派生，切换 tab 全部重算） ===== */
+  const SCOPE_DEFS = [
+    {
+      key: "cnt", tab: "交易笔数", dailyUnit: "万笔", calScopeTxt: "每日交易量 · 万笔",
+      scale: 2.42, seed: 8801, mult: 1.70, tpsK: 14.0, activeAdj: 0, mom: 6.2,
+      channels: [45, 14, 8, 11, 16, 6]
+    },
+    {
+      key: "amt", tab: "交易金额", dailyUnit: "亿元", calScopeTxt: "每日交易额 · 亿元",
+      scale: 0.0512, seed: 8802, mult: 1.28, tpsK: 11.4, activeAdj: -3.1, mom: 4.8,
+      channels: [38, 24, 16, 6, 10, 6]
+    },
+    {
+      key: "flw", tab: "客流量", dailyUnit: "万人次", calScopeTxt: "每日客流 · 万人次",
+      scale: 0.415, seed: 8803, mult: 1.46, tpsK: 6.2, activeAdj: 2.0, mom: 5.5,
+      channels: [52, 10, 14, 12, 8, 4]
+    }
+  ];
+  const CHAN_NAMES = ["手机银行", "网上银行", "柜面", "ATM", "POS", "快捷支付"];
+
+  const SCOPES = SCOPE_DEFS.map((def) => {
+    const cal = genCalendar(def.scale, def.seed);
+    const mat = genMatrix(def.mult);
+    const dailyPeakTxns = cal.avg * 10000 * PEAK_SHARE; /* 峰值时段单位量 */
+    const tps = Math.round(dailyPeakTxns / 3600 * def.tpsK);
+    return {
+      def: def,
+      calArr: cal.arr, calTotal: cal.total, calDays: cal.days, calAvg: cal.avg,
+      calMax: Math.ceil(Math.max.apply(null, cal.arr.map((x) => x[1])) / 10) * 10,
+      matData: mat.data, matMax: Math.ceil(mat.max / 5) * 5,
+      kpi: {
+        daily: cal.avg,
+        peak: pad(PEAK_HOUR) + ":00-" + pad(PEAK_HOUR + 1) + ":00",
+        tps: tps,
+        active: +(ACTIVE_SHARE + def.activeAdj).toFixed(1),
+        mom: def.mom
+      }
+    };
+  });
+
+  /* 日历顶部高值日（月末冲量峰）→ effectScatter 涟漪 */
+  function topDays(sc) {
+    const th = sc.calMax * 0.86;
+    return sc.calArr.filter((x) => x[1] >= th);
+  }
+
+  /* ===== 6. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("hm-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("hm-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 7. KPI 卡（DOM 翻牌 + 数字缓动） ===== */
+  const KPI_DEFS = [
+    { key: "daily", label: "日均交易量", kind: "num", dec: 1, unit: "scope" },
+    { key: "peak", label: "峰值时段", kind: "text", unit: "" },
+    { key: "tps", label: "峰值 TPS", kind: "num", dec: 0, unit: "笔/秒" },
+    { key: "active", label: "活跃占比", kind: "num", dec: 1, unit: "%" },
+    { key: "mom", label: "环比", kind: "num", dec: 1, unit: "%", signed: true }
+  ];
+  const kpisWrap = $("hm-kpis");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "hm-kpi";
+    const unit = k.unit === "scope" ? "" : k.unit;
+    card.innerHTML =
+      '<div class="hm-kpi-label">' + k.label + '</div>' +
+      '<div class="hm-kpi-num"><span class="hm-kpi-val' + (k.kind === "text" ? " is-text" : "") + '">--</span>' +
+        '<span class="hm-kpi-unit">' + unit + '</span></div>' +
+      '<div class="hm-kpi-sub">--</div>';
+    kpisWrap.appendChild(card);
+    k.valNode = card.querySelector(".hm-kpi-val");
+    k.unitNode = card.querySelector(".hm-kpi-unit");
+    k.subNode = card.querySelector(".hm-kpi-sub");
+    k.cur = 0; k.target = 0;
+  });
+  const KPI_SUB = {
+    daily: "近 12 月 · 日历累计派生",
+    peak: "全周活跃度峰值时段",
+    tps: "峰值时段并发估算",
+    active: "9-17 时活跃度占比",
+    mom: "较上月同口径"
+  };
+  function flip(node) {
+    node.classList.remove("is-flip"); void node.offsetWidth; node.classList.add("is-flip");
+  }
+  function applyKpi(sc) {
+    KPI_DEFS.forEach((k) => {
+      const v = sc.kpi[k.key];
+      k.subNode.innerHTML = KPI_SUB[k.key];
+      if (k.unit === "scope") k.unitNode.textContent = sc.def.dailyUnit;
+      if (k.kind === "text") {
+        k.valNode.textContent = v;
+      } else {
+        k.target = v;
+      }
+      flip(k.valNode);
+    });
+  }
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      if (k.kind === "text") return;
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) { k.cur = k.target; } else { k.cur += diff * 0.16; }
+      const txt = fmtDec(k.cur, k.dec);
+      k.valNode.textContent = k.signed && k.cur >= 0 ? "+" + txt : txt;
+    });
+  }, 70);
+
+  /* ===== 8. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(251, 113, 133, 0.45)",
+    textStyle: { color: "#eaf2ff", fontSize: 12 }
+  }, extra || {});
+  const calChart = echarts.init($("hm-chart-cal"));
+  const matChart = echarts.init($("hm-chart-mat"));
+
+  /* ===== 9. 左：近 12 月日历热力 ===== */
+  function calOption(sc) {
+    return {
+      tooltip: tip({ formatter: (p) => p.data[0] + "<br/>" + sc.def.calScopeTxt.split(" · ")[0] + " <b style=\"color:#fda4af\">" + fmtDec(p.data[1], 1) + "</b> " + sc.def.dailyUnit }),
+      visualMap: {
+        type: "continuous", min: 0, max: sc.calMax,
+        orient: "horizontal", left: "center", bottom: 8,
+        itemWidth: 14, itemHeight: 200, calculable: true,
+        text: ["高", "低"], textStyle: { color: C.muted, fontSize: 11 },
+        inRange: { color: HEAT_RAMP }
+      },
+      calendar: {
+        orient: "horizontal",
+        range: ["2025-08-01", "2026-07-31"],
+        top: 42, left: 56, right: 22, bottom: 66, cellSize: ["auto", 15],
+        itemStyle: { color: "rgba(16, 40, 76, 0.82)", borderColor: "rgba(8, 22, 45, 0.9)", borderWidth: 1 },
+        splitLine: { show: true, lineStyle: { color: "rgba(251, 113, 133, 0.28)", width: 1 } },
+        dayLabel: { color: C.muted, fontSize: 11, nameMap: ["日", "一", "二", "三", "四", "五", "六"], firstDay: 1 },
+        monthLabel: { color: "#a9c6e8", fontSize: 11, nameMap: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"] },
+        yearLabel: { show: false }
+      },
+      series: [
+        { type: "heatmap", coordinateSystem: "calendar", data: sc.calArr, itemStyle: { borderColor: "rgba(8, 22, 45, 0.6)", borderWidth: 0.5 } },
+        {
+          type: "effectScatter", coordinateSystem: "calendar", data: topDays(sc),
+          symbolSize: 7, rippleEffect: { scale: 2.4, brushType: "stroke", period: 4 },
+          itemStyle: { color: "#fecdd3", shadowBlur: 8, shadowColor: "rgba(251,113,133,0.8)" }
+        }
+      ]
+    };
+  }
+
+  /* ===== 10. 右上：7×24 活跃矩阵 ===== */
+  function matOption(sc) {
+    return {
+      tooltip: tip({ formatter: (p) => WEEKDAYS[p.data[1]] + " · " + HOURS[p.data[0]] + ":00<br/>活跃度 <b style=\"color:#fda4af\">" + p.data[2] + "</b>" }),
+      grid: { left: 44, right: 14, top: 12, bottom: 46 },
+      xAxis: {
+        type: "category", data: HOURS, splitArea: { show: true },
+        axisLine: { lineStyle: { color: "rgba(96, 156, 224, 0.3)" } }, axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 9, interval: 1, formatter: (v) => (+v % 3 === 0 ? v : "") }
+      },
+      yAxis: {
+        type: "category", data: WEEKDAYS, inverse: true, splitArea: { show: true },
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      visualMap: {
+        min: 0, max: sc.matMax, calculable: false,
+        orient: "horizontal", left: "center", bottom: 4,
+        itemWidth: 150, itemHeight: 8, text: ["高", "低"],
+        textStyle: { color: C.muted, fontSize: 9 }, inRange: { color: HEAT_RAMP }
+      },
+      series: [{
+        type: "heatmap", data: sc.matData,
+        itemStyle: { borderColor: "rgba(7, 26, 48, 0.85)", borderWidth: 1.5 },
+        emphasis: { itemStyle: { shadowBlur: 12, shadowColor: "rgba(251,113,133,0.9)", borderColor: C.text } },
+        markLine: {
+          silent: true, symbol: "none",
+          lineStyle: { color: "rgba(63, 225, 255, 0.85)", width: 1.5, type: "dashed" },
+          label: { show: true, formatter: "现在", color: "#bfefff", fontSize: 10, position: "start" },
+          data: [{ xAxis: new Date().getHours() }]
+        },
+        markArea: {
+          silent: true, itemStyle: { color: "rgba(251, 113, 133, 0.14)" },
+          data: [[{ xAxis: 0 }, { xAxis: 0 }]]
+        }
+      }]
+    };
+  }
+
+  /* ===== 11. 右下：各渠道活跃度横条 ===== */
+  const chanNodes = [];
+  (function buildChannels() {
+    const box = $("hm-chans");
+    CHAN_NAMES.forEach((name) => {
+      const row = document.createElement("div");
+      row.className = "hm-chan";
+      row.innerHTML =
+        '<span class="hm-chan-name">' + name + '</span>' +
+        '<div class="hm-chan-track"><div class="hm-chan-fill"></div></div>' +
+        '<span class="hm-chan-val">0%</span>';
+      box.appendChild(row);
+      chanNodes.push({ fill: row.querySelector(".hm-chan-fill"), val: row.querySelector(".hm-chan-val") });
+    });
+  })();
+  function applyChannels(sc) {
+    const vals = sc.def.channels;
+    const maxV = Math.max.apply(null, vals);
+    chanNodes.forEach((n, i) => {
+      n.fill.style.width = "0%";
+      n.fill.classList.toggle("is-top", vals[i] === maxV);
+    });
+    /* 生长动效：下一帧设目标宽度 */
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      chanNodes.forEach((n, i) => { n.fill.style.width = vals[i] + "%"; });
+    }));
+    /* 数字缓动 */
+    chanNodes.forEach((n, i) => {
+      let cur = 0; const tgt = vals[i];
+      clearInterval(n.timer);
+      n.timer = setInterval(() => {
+        cur += (tgt - cur) * 0.2;
+        if (Math.abs(tgt - cur) < 0.1) { cur = tgt; clearInterval(n.timer); }
+        n.val.textContent = Math.round(cur) + "%";
+      }, 40);
+    });
+  }
+
+  /* ===== 12. 跑马灯 ===== */
+  const NEWS = [
+    "工作日 <b>10:00-11:00</b> 为全周交易活跃峰值时段，建议弹性调度前置",
+    "月末最后三日交易量较日常上浮约 <b>38%</b>，冲量高峰需关注系统容量",
+    "周末交易活跃度约为工作日的 <b>五成</b>，夜间 1-5 时进入最低谷",
+    "手机银行渠道贡献交易笔数 <b>45%</b>，稳居全渠道活跃度首位",
+    "9-17 时活跃度占全天 <b>七成以上</b>，午间 14 时出现次高峰",
+    "峰值时段并发 TPS 逼近预警阈值，弹性扩容策略已进入待命状态",
+    "近 12 月日均交易稳步上行，年末 12 月受结算季推动创阶段新高"
+  ];
+  (function buildMarquee() {
+    const html = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    $("hm-marquee-track").innerHTML = html + html;
+  })();
+
+  /* ===== 13. 应用指标口径（tab 切换） ===== */
+  let curScope = 0;
+  const tabs = Array.prototype.slice.call(document.querySelectorAll(".hm-tab"));
+  function applyScope(idx) {
+    curScope = idx;
+    const sc = SCOPES[idx];
+    tabs.forEach((t, i) => t.classList.toggle("is-active", i === idx));
+    $("hm-cal-scope").textContent = sc.def.calScopeTxt;
+    applyKpi(sc);
+    calChart.setOption(calOption(sc));
+    matChart.setOption(matOption(sc), true);
+    applyChannels(sc);
+  }
+  tabs.forEach((t) => t.addEventListener("click", () => applyScope(+t.dataset.scope)));
+  applyScope(0);
+
+  /* ===== 14. 动效：矩阵时段游标扫描 + 实时抖动 ===== */
+  let scanHour = 0;
+  setInterval(() => {
+    scanHour = (scanHour + 1) % 24;
+    matChart.setOption({
+      series: [{
+        markArea: { silent: true, itemStyle: { color: "rgba(251, 113, 133, 0.16)" }, data: [[{ xAxis: scanHour }, { xAxis: scanHour }]] },
+        markLine: { data: [{ xAxis: new Date().getHours() }] }
+      }]
+    });
+  }, 700);
+
+  /* 核心数字微跳变（保持勾稽基准，仅 TPS/活跃度轻抖动） */
+  setInterval(() => {
+    const sc = SCOPES[curScope];
+    KPI_DEFS.forEach((k) => {
+      if (k.key === "tps") k.target = Math.max(1, Math.round(sc.kpi.tps + rndf(-60, 80)));
+      if (k.key === "active") k.target = +Math.min(99, Math.max(1, sc.kpi.active + rndf(-0.3, 0.3))).toFixed(1);
+    });
+  }, 5000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 信贷资产质量</title>
+<style>
+  :root {
+    --cr-bg: #0a1e3c;
+    --cr-panel: rgba(13, 34, 64, 0.72);
+    --cr-border: rgba(86, 150, 224, 0.28);
+    --cr-text: #e6f1ff;
+    --cr-muted: #8fa7c8;
+    --cr-cyan: #3fe1ff;
+    --cr-blue: #4b7dff;
+    --cr-green: #38e6b0;
+    --cr-orange: #ff9360;
+    --cr-red: #ff6680;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--cr-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .cr-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(63, 225, 255, 0.10), transparent 42%),
+      radial-gradient(circle at 90% 10%, rgba(255, 147, 96, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(35, 96, 172, 0.28), transparent 55%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--cr-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    grid-template-rows: 78px 104px 1fr 62px;
+    gap: 14px;
+    padding: 14px 18px 16px;
+  }
+
+  .cr-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .cr-error.is-visible { display: block; }
+
+  /* ===== 顶部标题栏 ===== */
+  .cr-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px;
+  }
+  .cr-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 147, 96, 0.55) 18%, rgba(63, 225, 255, 0.9) 50%, rgba(255, 147, 96, 0.55) 82%, transparent);
+    box-shadow: 0 0 14px rgba(63, 225, 255, 0.5);
+  }
+  .cr-title-wrap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -54%); text-align: center; white-space: nowrap; }
+  .cr-title {
+    display: flex; align-items: center; gap: 20px;
+    font-size: 34px; font-weight: 700; letter-spacing: 0.22em;
+    background: linear-gradient(180deg, #ffffff 25%, #ffc9a8 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(255, 147, 96, 0.28));
+  }
+  .cr-title i { position: relative; flex: none; width: 120px; height: 10px; }
+  .cr-title i::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px;
+    background: linear-gradient(270deg, var(--cr-cyan), rgba(63, 225, 255, 0.05));
+  }
+  .cr-title i::after {
+    content: ""; position: absolute; right: 8px; top: 1px; width: 8px; height: 8px;
+    background: var(--cr-orange); transform: rotate(45deg); box-shadow: 0 0 8px var(--cr-orange);
+    animation: crDot 2s ease-in-out infinite;
+  }
+  .cr-title i.is-r { transform: scaleX(-1); }
+  @keyframes crDot { 50% { opacity: 0.3; } }
+  .cr-title-sub { margin-top: 3px; font-size: 11px; letter-spacing: 0.58em; color: #5f88b8; text-indent: 0.58em; }
+  .cr-clock { display: flex; align-items: baseline; gap: 12px; font-variant-numeric: tabular-nums; }
+  .cr-clock-time {
+    font: 700 30px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 14px rgba(63, 225, 255, 0.45);
+  }
+  .cr-clock-date { font-size: 13px; color: var(--cr-muted); letter-spacing: 0.08em; }
+  .cr-badge {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 13px; color: #ffd2b8; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid rgba(255, 147, 96, 0.38); background: rgba(64, 36, 20, 0.4);
+  }
+  .cr-badge i {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--cr-green);
+    box-shadow: 0 0 0 3px rgba(56, 230, 176, 0.15), 0 0 10px var(--cr-green);
+    animation: crBreath 2s ease-in-out infinite;
+  }
+  @keyframes crBreath { 50% { opacity: 0.35; transform: scale(0.82); } }
+
+  /* ===== KPI 行 ===== */
+  .cr-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .cr-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--cr-border); border-radius: 12px; background: var(--cr-panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  }
+  .cr-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 42px; height: 3px;
+    background: linear-gradient(90deg, var(--cr-cyan), transparent);
+  }
+  .cr-kpi.is-warn::before { background: linear-gradient(90deg, var(--cr-orange), transparent); }
+  .cr-kpi-label { font-size: 13px; letter-spacing: 0.14em; color: var(--cr-muted); }
+  .cr-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .cr-kpi-val {
+    font: 700 30px/1 "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    color: #f4faff; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4);
+  }
+  .cr-kpi.is-warn .cr-kpi-val { color: #ffe0cd; text-shadow: 0 0 12px rgba(255, 147, 96, 0.45); }
+  .cr-kpi-unit { font-size: 12px; color: #6fb9e8; }
+  .cr-kpi-delta { font-size: 12px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .cr-kpi-delta.is-good { color: var(--cr-green); }
+  .cr-kpi-delta.is-bad { color: var(--cr-red); }
+
+  /* ===== 面板通用 ===== */
+  .cr-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .cr-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--cr-border); border-radius: 12px; background: var(--cr-panel);
+    display: flex; flex-direction: column;
+  }
+  .cr-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(63, 225, 255, 0.22), rgba(63, 225, 255, 0.04) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .cr-panel-head i { flex: none; width: 5px; height: 16px; background: var(--cr-cyan); box-shadow: 0 0 8px var(--cr-cyan); transform: skewX(-12deg); }
+  .cr-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .cr-panel-head .cr-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cr-panel-head .cr-panel-scope { margin-left: auto; font-size: 12px; color: var(--cr-orange); white-space: nowrap; padding-right: 2px; }
+  .cr-chart { flex: 1; min-height: 0; }
+
+  /* 左列两块比例 */
+  .cr-panel.is-trend { flex: 1; }
+  .cr-panel.is-sankey { flex: 1.08; }
+
+  /* 右列三块比例 */
+  .cr-panel.is-industry { flex: 1.16; }
+  .cr-panel.is-aging { flex: 0.94; }
+  .cr-panel.is-provision { flex: 1; }
+
+  /* 拨备仪表 + 清收进度环双图 */
+  .cr-duo { flex: 1; min-height: 0; display: flex; padding: 2px 6px 6px; gap: 4px; }
+  .cr-duo-item { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .cr-duo-item.is-wide { flex: 1.14; }
+  .cr-duo-cap { flex: none; text-align: center; font-size: 12px; letter-spacing: 0.14em; color: var(--cr-muted); padding: 4px 0 0; }
+  .cr-duo-cap b { font-weight: 400; color: var(--cr-orange); letter-spacing: 0.02em; margin-left: 6px; }
+
+  /* ===== 底部跑马灯 ===== */
+  .cr-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--cr-border); border-radius: 12px; background: var(--cr-panel);
+  }
+  .cr-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a1206;
+    background: linear-gradient(120deg, var(--cr-orange), #e06f38 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .cr-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a1206; animation: crDot 1.6s ease-in-out infinite; }
+  .cr-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .cr-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: crMarquee 48s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .cr-marquee-track b { color: var(--cr-orange); font-weight: 700; }
+  .cr-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(63, 225, 255, 0.55); }
+  @keyframes crMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .cr-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="cr-stage" id="cr-stage">
+    <!-- mockflag:begin --><div class="cr-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="cr-error" id="cr-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶部标题栏 -->
+    <header class="cr-header">
+      <div class="cr-clock" aria-label="实时时钟">
+        <span class="cr-clock-time" id="cr-clock-time">--:--:--</span>
+        <span class="cr-clock-date" id="cr-clock-date">----年--月--日 星期-</span>
+      </div>
+      <div class="cr-title-wrap">
+        <div class="cr-title"><i></i><span>信贷资产质量</span><i class="is-r"></i></div>
+        <div class="cr-title-sub">CREDIT ASSET QUALITY MONITOR</div>
+      </div>
+      <div class="cr-badge"><i></i>数据口径：截至昨日日终 · 演示数据</div>
+    </header>
+
+    <!-- KPI 行 -->
+    <section class="cr-kpis" aria-label="核心指标" id="cr-kpis"></section>
+
+    <!-- 左列（60%）：投放与不良双趋势 + 五级分类迁徙桑基 -->
+    <div class="cr-col">
+      <section class="cr-panel is-trend">
+        <header class="cr-panel-head"><i></i><h2>投放与不良双趋势</h2><span class="cr-panel-en">DISBURSEMENT vs NPL TREND</span><span class="cr-panel-scope">近 12 月</span></header>
+        <div class="cr-chart" id="cr-chart-trend" role="img" aria-label="近12月当月投放额柱状与不良率、关注率双线趋势图"></div>
+      </section>
+      <section class="cr-panel is-sankey">
+        <header class="cr-panel-head"><i></i><h2>五级分类迁徙</h2><span class="cr-panel-en">5-TIER CLASSIFICATION MIGRATION</span><span class="cr-panel-scope">仅展示迁徙流量 · 维持存量已隐略</span></header>
+        <div class="cr-chart" id="cr-chart-sankey" role="img" aria-label="上季度到本季度五级分类迁徙桑基图，仅展示发生迁徙的流量，向下迁徙为橙红、向上回迁为绿色"></div>
+      </section>
+    </div>
+
+    <!-- 右列（40%）：行业集中度 + 逾期账龄 + 拨备与清收 -->
+    <div class="cr-col">
+      <section class="cr-panel is-industry">
+        <header class="cr-panel-head"><i></i><h2>行业集中度 TOP8</h2><span class="cr-panel-en">INDUSTRY EXPOSURE</span><span class="cr-panel-scope">余额 · 不良率</span></header>
+        <div class="cr-chart" id="cr-chart-industry" role="img" aria-label="行业贷款余额与不良率双序列横向条形图"></div>
+      </section>
+      <section class="cr-panel is-aging">
+        <header class="cr-panel-head"><i></i><h2>逾期账龄分布</h2><span class="cr-panel-en">OVERDUE AGING</span><span class="cr-panel-scope">亿元</span></header>
+        <div class="cr-chart" id="cr-chart-aging" role="img" aria-label="逾期贷款账龄分桶柱状图，90天以上为橙红色"></div>
+      </section>
+      <section class="cr-panel is-provision">
+        <header class="cr-panel-head"><i></i><h2>拨备与清收</h2><span class="cr-panel-en">PROVISION &amp; RECOVERY</span><span class="cr-panel-scope">本月</span></header>
+        <div class="cr-duo">
+          <div class="cr-duo-item is-wide">
+            <div class="cr-duo-cap">拨备覆盖率<b>监管线 150%</b></div>
+            <div class="cr-chart" id="cr-chart-gauge" role="img" aria-label="拨备覆盖率仪表盘，标注150%监管线"></div>
+          </div>
+          <div class="cr-duo-item">
+            <div class="cr-duo-cap">当月清收进度<b id="cr-recover-cap">--</b></div>
+            <div class="cr-chart" id="cr-chart-recover" role="img" aria-label="当月清收回款完成进度环"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部通栏：清收处置动态 -->
+    <section class="cr-marquee" aria-label="清收处置动态">
+      <div class="cr-marquee-tag"><i></i>清收处置动态</div>
+      <div class="cr-marquee-view"><div class="cr-marquee-track" id="cr-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("cr-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("cr-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    orange: "#ff9360", red: "#ff6680", gold: "#ffc857"
+  };
+  const rnd = (min, max) => Math.round(min + Math.random() * (max - min));
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 静态业务数据（中型城商行信贷口径 · 演示数据） ===== */
+  const MONTHS = ["8月", "9月", "10月", "11月", "12月", "1月", "2月", "3月", "4月", "5月", "6月", "7月"];
+  const DISBURSE = [42.6, 38.4, 35.2, 40.8, 58.6, 52.3, 28.7, 61.4, 44.9, 41.2, 55.8, 47.5];  /* 当月投放额（亿元） */
+  const NPL_RATE = [1.31, 1.29, 1.30, 1.27, 1.24, 1.26, 1.28, 1.25, 1.23, 1.22, 1.21, 1.21];   /* 不良率（%） */
+  const WATCH_RATE = [2.62, 2.58, 2.55, 2.49, 2.44, 2.47, 2.51, 2.45, 2.41, 2.38, 2.36, 2.35]; /* 关注率（%） */
+
+  /* 五级分类迁徙（上季度 → 本季度，亿元）。dir: down=向下迁徙(劣变) up=向上回迁(好转) keep=维持 */
+  const TIERS = ["正常", "关注", "次级", "可疑", "损失"];
+  const TIER_COLORS = { "正常": "#3fe1ff", "关注": "#ffc857", "次级": "#ff9360", "可疑": "#ff7a5c", "损失": "#ff6680" };
+  const MIGRATIONS = [
+    { from: "正常", to: "正常", value: 3021.5, dir: "keep" },
+    { from: "正常", to: "关注", value: 23.8, dir: "down" },
+    { from: "正常", to: "次级", value: 4.9, dir: "down" },
+    { from: "关注", to: "正常", value: 9.6, dir: "up" },
+    { from: "关注", to: "关注", value: 54.2, dir: "keep" },
+    { from: "关注", to: "次级", value: 6.4, dir: "down" },
+    { from: "关注", to: "可疑", value: 2.3, dir: "down" },
+    { from: "次级", to: "关注", value: 1.5, dir: "up" },
+    { from: "次级", to: "次级", value: 12.8, dir: "keep" },
+    { from: "次级", to: "可疑", value: 3.1, dir: "down" },
+    { from: "次级", to: "损失", value: 0.9, dir: "down" },
+    { from: "可疑", to: "次级", value: 0.7, dir: "up" },
+    { from: "可疑", to: "可疑", value: 9.2, dir: "keep" },
+    { from: "可疑", to: "损失", value: 2.1, dir: "down" },
+    { from: "损失", to: "损失", value: 7.3, dir: "keep" }
+  ];
+
+  /* 行业集中度 TOP8（贷款余额亿元 + 不良率%） */
+  const INDUSTRIES = [
+    { name: "制造业", bal: 486.2, npl: 1.62 },
+    { name: "批发零售业", bal: 352.4, npl: 2.08 },
+    { name: "房地产业", bal: 298.6, npl: 2.86 },
+    { name: "建筑业", bal: 264.3, npl: 1.94 },
+    { name: "租赁商务服务", bal: 231.8, npl: 1.38 },
+    { name: "交通运输业", bal: 198.5, npl: 0.92 },
+    { name: "电力热力燃气", bal: 176.2, npl: 0.56 },
+    { name: "信息技术业", bal: 142.7, npl: 0.74 }
+  ];
+
+  /* 逾期账龄分桶（亿元），90+ 天为警示橙红 */
+  const AGING = [
+    { name: "1-30天", value: 9.6, warn: false },
+    { name: "31-60天", value: 6.2, warn: false },
+    { name: "61-90天", value: 4.8, warn: false },
+    { name: "91-180天", value: 7.4, warn: true },
+    { name: "180天以上", value: 10.8, warn: true }
+  ];
+
+  /* 清收处置动态跑马灯 */
+  const NEWS = [
+    "重点户 **实业集团 抵押物处置回款 <b>2,360 万元</b>，已全额入账冲减本金",
+    "**置业发展有限公司 以物抵债资产（商业裙楼 4,200㎡）过户完成，抵债金额 <b>5,800 万元</b>",
+    "本季度核销审批：<b>7 户 / 1.24 亿元</b> 已过总行贷审会，报监管备案中",
+    "城南支行不良户 王*成 经营贷现金清收 <b>430 万元</b>，实现本息全额收回",
+    "**供应链管理有限公司 重组方案落地，展期 24 个月并追加保证人，风险敞口下降 <b>36%</b>",
+    "批量转让资产包（本金 2.8 亿元）挂牌银登中心，已有 <b>4 家</b> AMC 报名尽调",
+    "诉讼清收：本月新增立案 <b>12 件</b>，执行到位金额 <b>1,870 万元</b>",
+    "关注类大户 **能源有限公司 提前归还欠息 <b>620 万元</b>，拟于下季度上迁正常类"
+  ];
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    document.getElementById("cr-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    document.getElementById("cr-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. KPI 行（大数字缓动跳变 + 同比/环比箭头） ===== */
+  const KPIS = [
+    { label: "贷款总额", unit: "亿元", target: 3186.4, dec: 1, jit: [0.1, 1.2], delta: "▲ 较年初 +6.8%", good: true },
+    { label: "不良贷款余额", unit: "亿元", target: 38.6, dec: 1, jit: [-0.05, 0.04], delta: "▼ 环比 -0.7 亿", good: true, warn: true },
+    { label: "不良率", unit: "%", target: 1.21, dec: 2, jit: [-0.004, 0.004], delta: "▼ 环比 -0.02pct", good: true, warn: true },
+    { label: "关注类占比", unit: "%", target: 2.35, dec: 2, jit: [-0.005, 0.005], delta: "▼ 环比 -0.04pct", good: true, warn: true },
+    { label: "拨备覆盖率", unit: "%", target: 186.4, dec: 1, jit: [-0.15, 0.2], delta: "▲ 环比 +2.3pct", good: true },
+    { label: "当月清收回款", unit: "万元", target: 8652, dec: 0, jit: [2, 26], delta: "▲ 完成序时 108%", good: true }
+  ];
+  const kpiWrap = document.getElementById("cr-kpis");
+  KPIS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "cr-kpi" + (k.warn ? " is-warn" : "");
+    card.innerHTML =
+      '<div class="cr-kpi-label">' + k.label + '</div>' +
+      '<div class="cr-kpi-num"><span class="cr-kpi-val">0</span><span class="cr-kpi-unit">' + k.unit + '</span></div>' +
+      '<div class="cr-kpi-delta ' + (k.good ? "is-good" : "is-bad") + '">' + k.delta + '</div>';
+    kpiWrap.appendChild(card);
+    k.node = card.querySelector(".cr-kpi-val");
+    k.cur = 0; /* 从 0 缓动至目标值 */
+  });
+  setInterval(() => { /* 缓动逼近目标 */
+    KPIS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) { k.cur = k.target; } else { k.cur += diff * 0.12; }
+      k.node.textContent = fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+  setInterval(() => { /* 目标值微跳变 */
+    KPIS.forEach((k) => { k.target = Math.max(0, k.target + rndf(k.jit[0], k.jit[1])); });
+  }, 6000);
+
+  /* ===== 6. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(102, 178, 255, 0.4)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  function makeChart(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    return echarts.init(el);
+  }
+
+  /* ===== 7. 左上：投放与不良双趋势（柱 + 双线右轴） ===== */
+  const trendChart = makeChart("cr-chart-trend");
+  trendChart.setOption({
+    tooltip: tip({
+      trigger: "axis",
+      formatter: (ps) => {
+        let html = ps[0].axisValueLabel;
+        ps.forEach((p) => {
+          const unit = p.seriesName === "当月投放额" ? " 亿元" : "%";
+          html += "<br>" + p.marker + p.seriesName + "  <b>" + fmtDec(p.value, p.seriesName === "当月投放额" ? 1 : 2) + unit + "</b>";
+        });
+        return html;
+      }
+    }),
+    legend: {
+      top: 8, itemWidth: 12, itemHeight: 8, itemGap: 18,
+      textStyle: { color: "#cfe6ff", fontSize: 12 }
+    },
+    grid: { left: 14, right: 16, top: 44, bottom: 8, containLabel: true },
+    xAxis: {
+      type: "category", data: MONTHS,
+      axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+      axisTick: { show: false },
+      axisLabel: { color: C.muted, fontSize: 12 }
+    },
+    yAxis: [
+      {
+        type: "value", name: "投放额（亿元）", nameTextStyle: { color: C.muted, fontSize: 10, padding: [0, 0, 0, 20] },
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      {
+        type: "value", name: "%", min: 0.8, max: 3.2,
+        nameTextStyle: { color: C.muted, fontSize: 10 },
+        splitLine: { show: false },
+        axisLabel: { color: C.muted, fontSize: 11, formatter: (v) => v.toFixed(1) }
+      }
+    ],
+    series: [
+      {
+        name: "当月投放额", type: "bar", barWidth: 16, data: DISBURSE,
+        itemStyle: { borderRadius: [5, 5, 0, 0], color: vGrad(C.cyan, "#155a8f") }
+      },
+      {
+        name: "不良率", type: "line", yAxisIndex: 1, smooth: true, data: NPL_RATE,
+        symbol: "circle", symbolSize: 6,
+        lineStyle: { width: 2.5, color: C.orange, shadowColor: "rgba(255, 147, 96, 0.6)", shadowBlur: 10 },
+        itemStyle: { color: "#fff1e8", borderColor: C.orange, borderWidth: 2 }
+      },
+      {
+        name: "关注率", type: "line", yAxisIndex: 1, smooth: true, data: WATCH_RATE,
+        symbol: "circle", symbolSize: 5,
+        lineStyle: { width: 2, type: [6, 4], color: C.gold, shadowColor: "rgba(255, 200, 87, 0.4)", shadowBlur: 8 },
+        itemStyle: { color: "#fff8e6", borderColor: C.gold, borderWidth: 2 }
+      }
+    ],
+    animationDurationUpdate: 600
+  });
+
+  /* ===== 8. 左下：五级分类迁徙桑基（向下迁徙橙红 / 向上回迁绿） ===== */
+  const sankeyChart = makeChart("cr-chart-sankey");
+  /* 只画发生迁徙的流：剔除全部同级维持流（尤其 正常→正常 的 3000+ 亿存量，
+     否则量级碾压导致其余迁徙流挤成细线、标签重叠不可读） */
+  const MIGRATED = MIGRATIONS.filter((m) => m.dir !== "keep");
+  const DIR_LINK_COLOR = { down: "rgba(255, 122, 92, 0.55)", up: "rgba(56, 230, 176, 0.6)" };
+  const DIR_LABEL = { down: "向下迁徙", up: "向上回迁" };
+  const sankeyNodes = TIERS.filter((t) => MIGRATED.some((m) => m.from === t)).map((t) => ({
+    name: t + "·上季", itemStyle: { color: TIER_COLORS[t] }
+  })).concat(TIERS.filter((t) => MIGRATED.some((m) => m.to === t)).map((t) => ({
+    name: t + "·本季", itemStyle: { color: TIER_COLORS[t] }
+  })));
+  const sankeyLinks = MIGRATED.map((m) => ({
+    source: m.from + "·上季",
+    target: m.to + "·本季",
+    value: m.value,
+    dir: m.dir,
+    lineStyle: { color: DIR_LINK_COLOR[m.dir], opacity: 1 },
+    emphasis: { lineStyle: { opacity: 1 } }
+  }));
+  sankeyChart.setOption({
+    tooltip: tip({
+      formatter: (p) => {
+        if (p.dataType === "edge") {
+          const tag = DIR_LABEL[p.data.dir] || "";
+          return p.data.source.replace("·上季", "") + " → " + p.data.target.replace("·本季", "") +
+            "（" + tag + "）<br>金额 <b>" + fmtDec(p.data.value, 1) + " 亿元</b>";
+        }
+        return p.name + "<br>迁徙合计 <b>" + fmtDec(p.value, 1) + " 亿元</b>（不含维持存量）";
+      }
+    }),
+    series: [{
+      type: "sankey",
+      left: 90, right: 130, top: 18, bottom: 14,
+      nodeWidth: 14, nodeGap: 14, nodeAlign: "justify",
+      draggable: false,
+      layoutIterations: 0, /* 保持 正常→损失 自上而下的固定次序 */
+      data: sankeyNodes,
+      links: sankeyLinks,
+      label: {
+        color: "#e6f1ff", fontSize: 13,
+        formatter: (p) => p.name.replace("·上季", "").replace("·本季", "")
+      },
+      edgeLabel: {
+        show: true, fontSize: 11, color: "#ffd9c4",
+        formatter: (p) => fmtDec(p.data.value, 1) + "亿"
+      },
+      itemStyle: { borderColor: "rgba(230, 241, 255, 0.35)", borderWidth: 1 },
+      lineStyle: { curveness: 0.5 },
+      emphasis: { focus: "adjacency" }
+    }],
+    animationDuration: 1200
+  });
+
+  /* ===== 9. 右上：行业集中度 TOP8（余额条 + 不良率细条，双 x 轴） ===== */
+  const industryChart = makeChart("cr-chart-industry");
+  function industryOption() {
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          let html = ps[0].axisValueLabel;
+          ps.forEach((p) => {
+            html += "<br>" + p.marker + p.seriesName + "  <b>" +
+              (p.seriesName === "贷款余额" ? fmtDec(p.value, 1) + " 亿元" : fmtDec(p.value, 2) + "%") + "</b>";
+          });
+          return html;
+        }
+      }),
+      legend: {
+        top: 4, right: 10, itemWidth: 12, itemHeight: 8, itemGap: 14,
+        textStyle: { color: "#cfe6ff", fontSize: 11 }
+      },
+      grid: { left: 12, right: 54, top: 26, bottom: 4, containLabel: true },
+      xAxis: [
+        { type: "value", show: false },
+        { type: "value", show: false, max: 6 }
+      ],
+      yAxis: {
+        type: "category", inverse: true,
+        data: INDUSTRIES.map((d) => d.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      series: [
+        {
+          name: "贷款余额", type: "bar", barWidth: 12, z: 2,
+          data: INDUSTRIES.map((d) => d.bal),
+          itemStyle: { borderRadius: 6, color: hGrad("#1d5d9e", C.cyan) },
+          label: { show: true, position: "right", fontSize: 11, color: "#9fd8ff", formatter: (p) => fmtDec(p.value, 0) + "亿" },
+          showBackground: true,
+          backgroundStyle: { color: "rgba(63, 120, 200, 0.12)", borderRadius: 6 }
+        },
+        {
+          name: "不良率", type: "bar", xAxisIndex: 1, barWidth: 4, barGap: "80%", z: 3,
+          data: INDUSTRIES.map((d) => ({
+            value: d.npl,
+            itemStyle: { borderRadius: 3, color: d.npl >= 2 ? hGrad("#a3401f", C.orange) : hGrad("#8a6a1f", C.gold) }
+          })),
+          label: { show: true, position: "right", fontSize: 10, color: C.orange, formatter: (p) => fmtDec(p.value, 2) + "%" }
+        }
+      ],
+      animationDurationUpdate: 600
+    };
+  }
+  industryChart.setOption(industryOption());
+  /* 行业轮播：逐行高亮巡游 */
+  let indIdx = -1;
+  setInterval(() => {
+    industryChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    indIdx = (indIdx + 1) % INDUSTRIES.length;
+    industryChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: indIdx });
+    industryChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: indIdx });
+  }, 2600);
+
+  /* ===== 10. 右中：逾期账龄分布（90+ 天橙红警示） ===== */
+  const agingChart = makeChart("cr-chart-aging");
+  function agingOption() {
+    return {
+      tooltip: tip({ valueFormatter: (v) => fmtDec(v, 1) + " 亿元" }),
+      grid: { left: 12, right: 14, top: 26, bottom: 6, containLabel: true },
+      xAxis: {
+        type: "category", data: AGING.map((d) => d.name),
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+        axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      yAxis: {
+        type: "value",
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      series: [{
+        name: "逾期余额", type: "bar", barWidth: 26,
+        data: AGING.map((d) => ({
+          value: d.value,
+          itemStyle: {
+            borderRadius: [6, 6, 0, 0],
+            color: d.warn ? vGrad("#ff8a63", "#8f3018") : vGrad(C.cyan, "#155a8f"),
+            shadowColor: d.warn ? "rgba(255, 122, 92, 0.45)" : "transparent",
+            shadowBlur: d.warn ? 12 : 0
+          }
+        })),
+        label: {
+          show: true, position: "top", fontSize: 12, fontWeight: 700,
+          color: "#ffd9c4",
+          formatter: (p) => fmtDec(p.value, 1)
+        }
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+  agingChart.setOption(agingOption());
+
+  /* ===== 11. 右下：拨备覆盖率仪表（150% 监管线） + 当月清收进度环 ===== */
+  const gaugeChart = makeChart("cr-chart-gauge");
+  let provision = 186.4;
+  function gaugeOption() {
+    return {
+      series: [
+        {
+          type: "gauge",
+          center: ["50%", "58%"], radius: "92%",
+          startAngle: 210, endAngle: -30, min: 0, max: 300,
+          splitNumber: 6,
+          axisLine: {
+            lineStyle: {
+              width: 14,
+              color: [
+                [0.5, "rgba(255, 102, 128, 0.75)"],          /* 0-150%：低于监管线警示 */
+                [provision / 300, vGrad(C.cyan, C.green)],    /* 150%-当前值 */
+                [1, "rgba(63, 120, 200, 0.18)"]
+              ]
+            }
+          },
+          axisTick: { distance: -22, length: 5, lineStyle: { color: "rgba(143, 167, 200, 0.6)", width: 1 } },
+          splitLine: { distance: -26, length: 10, lineStyle: { color: "rgba(143, 167, 200, 0.8)", width: 2 } },
+          axisLabel: { distance: -14, color: C.muted, fontSize: 10 },
+          pointer: { length: "62%", width: 4, itemStyle: { color: C.cyan } },
+          anchor: { show: true, size: 10, itemStyle: { color: "#0a1e3c", borderColor: C.cyan, borderWidth: 2 } },
+          title: { show: false },
+          detail: {
+            offsetCenter: [0, "44%"],
+            fontSize: 26, fontWeight: 700, color: "#f4faff",
+            formatter: (v) => fmtDec(v, 1) + "%"
+          },
+          data: [{ value: provision }]
+        },
+        { /* 150% 监管线刻度标注 */
+          type: "gauge",
+          center: ["50%", "58%"], radius: "92%",
+          startAngle: 210, endAngle: -30, min: 0, max: 300,
+          axisLine: { show: false }, axisTick: { show: false },
+          splitLine: {
+            show: true, length: 20, distance: -17,
+            lineStyle: { color: C.orange, width: 3, shadowColor: "rgba(255, 147, 96, 0.8)", shadowBlur: 8 }
+          },
+          splitNumber: 2, /* 0 / 150 / 300 三个分割，中间即监管线 */
+          axisLabel: {
+            distance: -46, fontSize: 11, fontWeight: 700, color: C.orange,
+            formatter: (v) => (v === 150 ? "监管线150%" : "")
+          },
+          pointer: { show: false }, detail: { show: false },
+          data: [{ value: 0 }]
+        }
+      ],
+      animationDurationUpdate: 600
+    };
+  }
+  gaugeChart.setOption(gaugeOption());
+
+  const recoverChart = makeChart("cr-chart-recover");
+  const RECOVER_TARGET = 12000; /* 当月清收目标（万元） */
+  let recovered = 8652;
+  const recoverCap = document.getElementById("cr-recover-cap");
+  function recoverOption() {
+    const pct = Math.min(100, recovered / RECOVER_TARGET * 100);
+    return {
+      series: [{
+        type: "pie", radius: ["68%", "82%"], center: ["50%", "56%"],
+        silent: true, startAngle: 90, clockwise: true,
+        label: {
+          show: true, position: "center",
+          formatter: fmtDec(pct, 1) + "%\n{s|完成率}",
+          color: "#f4faff", fontSize: 24, fontWeight: 700, lineHeight: 28,
+          rich: { s: { fontSize: 11, fontWeight: 400, color: "#8fa7c8", padding: [6, 0, 0, 0] } }
+        },
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+        data: [
+          { value: pct, itemStyle: { color: hGrad(C.green, C.cyan), shadowColor: "rgba(56, 230, 176, 0.5)", shadowBlur: 10 } },
+          { value: 100 - pct, itemStyle: { color: "rgba(63, 120, 200, 0.15)" }, label: { show: false } }
+        ]
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+  function renderRecoverCap() {
+    recoverCap.textContent = fmt(recovered) + " / " + fmt(RECOVER_TARGET) + " 万";
+  }
+  recoverChart.setOption(recoverOption());
+  renderRecoverCap();
+
+  /* ===== 12. 底部跑马灯（内容 x2 无缝循环） ===== */
+  const marqueeTrack = document.getElementById("cr-marquee-track");
+  const marqueeHtml = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  marqueeTrack.innerHTML = marqueeHtml + marqueeHtml;
+
+  /* ===== 13. 数据微刷新（趋势末月 / 账龄 / 拨备 / 清收进度轻抖动） ===== */
+  setInterval(() => {
+    const last = MONTHS.length - 1;
+    DISBURSE[last] = Math.max(20, DISBURSE[last] + rndf(-0.8, 1.2));
+    NPL_RATE[last] = Math.min(1.5, Math.max(1.05, NPL_RATE[last] + rndf(-0.008, 0.008)));
+    WATCH_RATE[last] = Math.min(2.8, Math.max(2.1, WATCH_RATE[last] + rndf(-0.012, 0.012)));
+    trendChart.setOption({ series: [{ data: DISBURSE }, { data: NPL_RATE }, { data: WATCH_RATE }] });
+
+    AGING.forEach((d) => { d.value = Math.max(1.5, d.value + rndf(-0.18, 0.2)); });
+    agingChart.setOption(agingOption());
+  }, 9000);
+
+  setInterval(() => {
+    provision = Math.min(240, Math.max(160, provision + rndf(-0.6, 0.8)));
+    gaugeChart.setOption(gaugeOption());
+
+    recovered = Math.min(RECOVER_TARGET, recovered + rnd(4, 38));
+    recoverChart.setOption(recoverOption());
+    renderRecoverCap();
+  }, 5000);
+
+  /* ===== 14. 视口缩放时同步重排图表 ===== */
+  window.addEventListener("resize", () => {
+    [trendChart, sankeyChart, industryChart, agingChart, gaugeChart, recoverChart].forEach((c) => c && c.resize());
+  });
+})();
+</script>
+</body>
+</html>

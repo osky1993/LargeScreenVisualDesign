@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 公共资金行业税收详情</title>
+<style>
+  :root {
+    --sh-bg: #08203f;
+    --sh-panel: rgba(11, 38, 72, 0.72);
+    --sh-border: rgba(92, 156, 226, 0.28);
+    --sh-text: #e8f2ff;
+    --sh-muted: #8ea9cc;
+    --sh-gold: #f0c060;
+    --sh-gold-soft: #ffdc8f;
+    --sh-blue: #3d9cff;
+    --sh-cyan: #39d0d8;
+    --sh-green: #33e0a6;
+    --sh-red: #ff5f6e;
+    --sh-orange: #ff9d4d;
+    --sh-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--sh-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 ===== */
+  .sh-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(240, 192, 96, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(57, 208, 216, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 60, 120, 0.34), transparent 56%),
+      linear-gradient(rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      var(--sh-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 720px 1fr;
+    grid-template-rows: 84px 128px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .sh-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .sh-error.is-visible { display: block; }
+
+  /* ===== 顶栏：三级面包屑 + 行业切换器 + 返回 + 时钟 ===== */
+  .sh-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 10px;
+  }
+  .sh-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(240, 192, 96, 0.6) 16%, rgba(57, 208, 216, 0.85) 50%, rgba(240, 192, 96, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.4);
+  }
+  .sh-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .sh-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--sh-muted); }
+  .sh-crumb b { font-weight: 400; color: var(--sh-gold); }
+  .sh-crumb i { font-style: normal; color: rgba(142, 169, 204, 0.55); }
+  .sh-crumb em { font-style: normal; color: #d7e8ff; }
+  /* 第二级是回父页的链接 */
+  .sh-crumb-up { color: #a8c2e0; text-decoration: none; transition: color 0.18s, text-shadow 0.18s; }
+  .sh-crumb-up:hover { color: var(--sh-gold-soft); text-decoration: underline; text-shadow: 0 0 10px rgba(240, 192, 96, 0.5); }
+  .sh-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .sh-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.06em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--sh-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(240, 192, 96, 0.35));
+  }
+  .sh-head-meta { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--sh-muted); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .sh-head-meta b { font-weight: 400; color: var(--sh-gold-soft); }
+  .sh-head-meta i { font-style: normal; color: rgba(142, 169, 204, 0.4); }
+
+  .sh-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+  /* 行业切换器 */
+  .sh-switcher { display: flex; align-items: stretch; gap: 8px; }
+  .sh-sw-btn {
+    display: flex; align-items: center; gap: 5px; padding: 0 12px; cursor: pointer; user-select: none;
+    border-radius: 9px; font-family: inherit; font-size: 13px; letter-spacing: 0.04em;
+    border: 1px solid rgba(240, 192, 96, 0.34);
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.15), rgba(16, 46, 86, 0.6));
+    color: #ffdc8f; transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .sh-sw-btn:hover { color: #fff6e2; border-color: rgba(240, 192, 96, 0.85); box-shadow: 0 0 14px rgba(240, 192, 96, 0.4); }
+  .sh-sw-btn b { font-weight: 700; font-size: 16px; }
+  .sh-sw-box {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-width: 128px; padding: 6px 16px; border-radius: 9px;
+    border: 1px solid rgba(240, 192, 96, 0.5); background: rgba(72, 56, 24, 0.42);
+    box-shadow: inset 0 0 14px rgba(240, 192, 96, 0.1);
+  }
+  .sh-sw-name { font-size: 18px; font-weight: 700; letter-spacing: 0.1em; color: var(--sh-gold-soft); white-space: nowrap; }
+  .sh-sw-idx { font-size: 11px; letter-spacing: 0.24em; color: rgba(240, 192, 96, 0.7); font-variant-numeric: tabular-nums; }
+  /* 返回父页 */
+  .sh-back {
+    display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 14px; cursor: pointer;
+    border-radius: 10px; font-family: inherit; font-size: 13px; letter-spacing: 0.08em;
+    border: 1px solid rgba(92, 156, 226, 0.45); background: rgba(16, 46, 86, 0.6); color: #cfe6ff;
+    transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .sh-back:hover { color: #fff; border-color: rgba(57, 208, 216, 0.8); box-shadow: 0 0 14px rgba(57, 208, 216, 0.35); }
+  .sh-back svg { width: 16px; height: 16px; }
+  .sh-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 16px; border-left: 1px solid rgba(92, 156, 226, 0.25); }
+  .sh-clock-time { font: 700 24px/1 var(--sh-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(57, 208, 216, 0.4); }
+  .sh-clock-date { font-size: 12px; color: var(--sh-muted); letter-spacing: 0.06em; }
+
+  /* ===== KPI 带（5 枚） ===== */
+  .sh-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .sh-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--sh-border); border-radius: 12px; background: var(--sh-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .sh-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--sh-gold), transparent); }
+  .sh-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(240, 192, 96, 0.13), transparent 68%);
+  }
+  .sh-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.28), rgba(57, 208, 216, 0.12));
+    border: 1px solid rgba(240, 192, 96, 0.35); box-shadow: inset 0 0 12px rgba(240, 192, 96, 0.14);
+  }
+  .sh-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .sh-kpi-label { font-size: 12.5px; letter-spacing: 0.08em; color: var(--sh-muted); white-space: nowrap; }
+  .sh-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .sh-kpi-val { font: 700 28px/1 var(--sh-mono); color: var(--sh-gold-soft); text-shadow: 0 0 14px rgba(240, 192, 96, 0.45); }
+  .sh-kpi-unit { font-size: 12px; color: #b39a5e; }
+  .sh-kpi-sub { font-size: 11.5px; color: var(--sh-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sh-kpi-sub b { font-weight: 700; }
+  .sh-up { color: var(--sh-green); }
+  .sh-down { color: var(--sh-red); }
+  .sh-mini-track { position: relative; height: 6px; border-radius: 3px; background: rgba(63, 120, 200, 0.2); }
+  .sh-mini-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, #b8863a, var(--sh-gold-soft)); box-shadow: 0 0 10px rgba(240, 192, 96, 0.5); transition: width 1.1s ease; }
+  .sh-mini-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.8); }
+
+  /* ===== 面板通用 ===== */
+  .sh-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .sh-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--sh-border); border-radius: 12px; background: var(--sh-panel);
+    display: flex; flex-direction: column;
+  }
+  .sh-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(240, 192, 96, 0.22), rgba(57, 208, 216, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .sh-panel-head i { flex: none; width: 5px; height: 16px; background: var(--sh-gold); box-shadow: 0 0 8px var(--sh-gold); transform: skewX(-12deg); }
+  .sh-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.1em; color: #f4f9ff; white-space: nowrap; }
+  .sh-panel-en { font-size: 10px; letter-spacing: 0.18em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+  .sh-panel-scope { margin-left: auto; font-size: 12px; color: var(--sh-gold-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .sh-chart { flex: 1; min-height: 0; }
+
+  /* ===== 左列：分地市税收明细表（DOM grid） ===== */
+  .sh-thead, .sh-tbody li, .sh-tfoot {
+    display: grid;
+    grid-template-columns: 38px 1.05fr 1fr 0.85fr 1.6fr 0.95fr;
+    align-items: center; gap: 8px; padding: 0 14px;
+  }
+  .sh-thead {
+    flex: none; height: 34px; font-size: 11.5px; letter-spacing: 0.08em; color: #6f93bd;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.22); background: rgba(63, 120, 200, 0.08);
+  }
+  .sh-thead span:nth-child(n+3) { text-align: right; }
+  .sh-thead span:nth-child(5) { text-align: left; }
+  .sh-tbody { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+  .sh-tbody li {
+    flex: 1; min-height: 0; font-size: 13px; font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.09); transition: background 0.3s ease, box-shadow 0.3s ease;
+  }
+  .sh-tbody li:nth-child(odd) { background: rgba(63, 120, 200, 0.07); }
+  .sh-tbody li.is-lead { background: rgba(240, 192, 96, 0.13); box-shadow: inset 3px 0 0 var(--sh-gold); }
+  .sh-td-no {
+    width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font: 700 11px/1 var(--sh-mono); color: #0a1c33; background: rgba(142, 169, 204, 0.7);
+  }
+  .sh-tbody li:nth-child(-n+3) .sh-td-no { background: linear-gradient(140deg, var(--sh-gold-soft), #d8a03c); box-shadow: 0 0 9px rgba(240, 192, 96, 0.5); }
+  .sh-td-name { color: #eaf4ff; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sh-td-val { text-align: right; font: 700 14px/1 var(--sh-mono); color: var(--sh-gold-soft); }
+  .sh-td-yoy { text-align: right; font-size: 12px; font-weight: 700; }
+  /* 占该行业：条 + 百分比同格 */
+  .sh-td-bar { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .sh-td-bar u { position: relative; flex: 1; min-width: 0; height: 8px; border-radius: 4px; background: rgba(63, 120, 200, 0.2); }
+  .sh-td-bar u b {
+    position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; width: 0;
+    background: linear-gradient(90deg, rgba(184, 134, 58, 0.85), var(--sh-gold-soft));
+    box-shadow: 0 0 8px rgba(240, 192, 96, 0.4); transition: width 1s cubic-bezier(0.22, 0.8, 0.3, 1);
+  }
+  .sh-td-bar s { flex: none; width: 42px; text-align: right; text-decoration: none; font-size: 11.5px; color: #cfe2f8; }
+  .sh-td-share { text-align: right; font-size: 12px; color: #b6cbe4; }
+  .sh-tfoot {
+    flex: none; height: 40px;
+    border-top: 1px solid rgba(240, 192, 96, 0.32); background: rgba(72, 56, 24, 0.34);
+    font-size: 12px; color: var(--sh-muted); font-variant-numeric: tabular-nums;
+  }
+  .sh-tfoot b { font: 700 15px/1 var(--sh-mono); color: var(--sh-gold-soft); }
+  .sh-tfoot span:nth-child(3), .sh-tfoot span:nth-child(4), .sh-tfoot span:nth-child(6) { text-align: right; }
+  .sh-tie { color: var(--sh-green); font-weight: 700; }
+  .sh-tie.is-bad { color: var(--sh-red); }
+
+  /* ===== 右列 ===== */
+  .sh-r1 { flex: 1.18; }
+  .sh-duo { flex: 1; min-height: 0; display: flex; gap: 14px; }
+  .sh-duo > .sh-panel { flex: 1; }
+
+  /* ===== 底部跑马灯 ===== */
+  .sh-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--sh-border); border-radius: 12px; background: var(--sh-panel);
+  }
+  .sh-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a1c05;
+    background: linear-gradient(120deg, var(--sh-gold-soft), #d8a03c 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .sh-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a1c05; animation: shDot 1.6s ease-in-out infinite; }
+  @keyframes shDot { 50% { opacity: 0.25; } }
+  .sh-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .sh-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: shMarquee 52s linear infinite; font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .sh-marquee-track b { color: var(--sh-gold-soft); font-weight: 700; }
+  .sh-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(240, 192, 96, 0.5); }
+  @keyframes shMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .sh-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="sh-stage" id="sh-stage">
+    <!-- mockflag:begin --><div class="sh-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="sh-error" id="sh-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <header class="sh-header">
+      <div class="sh-head-left">
+        <div class="sh-crumb">
+          <b>公共资金</b><i>›</i>
+          <a class="sh-crumb-up" href="大屏样板间-公共资金税收分行业1920.html">税收分行业</a><i>›</i>
+          <em id="sh-crumb-obj">--</em>
+        </div>
+        <div class="sh-head-title-row">
+          <div class="sh-head-title" id="sh-title">-- 税收详情</div>
+          <div class="sh-head-meta">
+            <span>口径 <b>地方级税收收入</b></span><i>|</i>
+            <span>区间 <b>2026 年 1-7 月累计</b></span><i>|</i>
+            <span>下钻 <b>13 个设区市</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="sh-head-right">
+        <div class="sh-switcher" id="sh-switcher" aria-label="行业切换">
+          <button class="sh-sw-btn" id="sh-sw-prev" type="button" title="上一行业（← 方向键）"><b>‹</b>上一行业</button>
+          <div class="sh-sw-box">
+            <span class="sh-sw-name" id="sh-sw-name">--</span>
+            <span class="sh-sw-idx" id="sh-sw-idx">-- / --</span>
+          </div>
+          <button class="sh-sw-btn" id="sh-sw-next" type="button" title="下一行业（→ 方向键）">下一行业<b>›</b></button>
+        </div>
+        <button class="sh-back" id="sh-back" type="button" title="返回税收分行业（Esc）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/><path d="M7 12 H20"/></svg>
+          返回
+        </button>
+        <div class="sh-clock" aria-label="实时时钟">
+          <span class="sh-clock-time" id="sh-clock-time">--:--:--</span>
+          <span class="sh-clock-date" id="sh-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="sh-band" id="sh-band" aria-label="当前行业核心指标"></section>
+
+    <!-- 左列：该行业分地市税收明细 -->
+    <div class="sh-col">
+      <section class="sh-panel">
+        <header class="sh-panel-head"><i></i><h2>分地市税收明细</h2><span class="sh-panel-en">LEDGER BY CITY</span><span class="sh-panel-scope" id="sh-tbl-scope">--</span></header>
+        <div class="sh-thead">
+          <span>序</span><span>地市</span><span>税收(亿元)</span><span>同比</span><span>占该行业</span><span>占该市税收</span>
+        </div>
+        <ul class="sh-tbody" id="sh-tbody"></ul>
+        <div class="sh-tfoot" id="sh-tfoot"></div>
+      </section>
+    </div>
+
+    <!-- 右列 -->
+    <div class="sh-col">
+      <section class="sh-panel sh-r1">
+        <header class="sh-panel-head"><i></i><h2>月度税收节奏与累计同比</h2><span class="sh-panel-en">MONTHLY RHYTHM</span><span class="sh-panel-scope" id="sh-month-scope">--</span></header>
+        <div class="sh-chart" id="sh-chart-month" role="img" aria-label="该行业月度税收本年柱与上年同期参照柱及累计同比折线"></div>
+      </section>
+      <div class="sh-duo">
+        <section class="sh-panel">
+          <header class="sh-panel-head"><i></i><h2>税收构成</h2><span class="sh-panel-en">COMPOSITION</span><span class="sh-panel-scope" id="sh-mix-scope">--</span></header>
+          <div class="sh-chart" id="sh-chart-mix" role="img" aria-label="该行业税收构成环形图"></div>
+        </section>
+        <section class="sh-panel">
+          <header class="sh-panel-head"><i></i><h2>重点纳税企业 TOP8</h2><span class="sh-panel-en">TOP TAXPAYERS</span><span class="sh-panel-scope" id="sh-firm-scope">--</span></header>
+          <div class="sh-chart" id="sh-chart-firm" role="img" aria-label="该行业重点纳税企业前八名横向条形图"></div>
+        </section>
+      </div>
+    </div>
+
+    <section class="sh-marquee" aria-label="行业要情">
+      <div class="sh-marquee-tag"><i></i>行业要情</div>
+      <div class="sh-marquee-view"><div class="sh-marquee-track" id="sh-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("sh-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("sh-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e8f2ff", muted: "#8ea9cc",
+    gold: "#f0c060", goldSoft: "#ffdc8f", goldDeep: "#b8863a",
+    blue: "#3d9cff", cyan: "#39d0d8", green: "#33e0a6", red: "#ff5f6e", orange: "#ff9d4d", steel: "#6f93c4"
+  };
+  const PARENT = "大屏样板间-公共资金税收分行业1920.html";
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = Number(n).toFixed(dec == null ? 0 : dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const signed = (v, d) => (v >= 0 ? "+" : "") + fmtDec(v, d == null ? 1 : d);
+  const r1 = (v) => Math.round(v * 10) / 10;
+
+  /* ===== 3. 数据源（模拟，口径 江苏省地方级税收收入 2026 年 1-7 月累计 · 亿元）
+     父页锚点（「税收分行业」页 13 个门类）：门类税收与同比一律原值引入，不得改动；
+     本页新增的分地市矩阵，其**每一行之和必须回到门类值**，13 个门类之和 = 5,760。 ===== */
+  const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月"];
+  const CITY_NAMES = ["苏州", "南京", "无锡", "南通", "常州", "徐州", "盐城", "扬州", "泰州", "淮安", "镇江", "宿迁", "连云港"];
+  const TAX_TOTAL = 5760;              /* 父页税收合计锚点 */
+  const YOY_TAX_OFFICIAL = 2.4;        /* 全省税收口径同比（「收入分项目」页），与分行业加权同比不同口径 */
+
+  /* 3.1 全省税收月度形态（由父页四大支柱月度数组逐月求和得到，本页据此拆分其余门类）
+         本年 3,780 = 制造 1560 + 批零 880 + 房地产 720 + 金融 620 */
+  const CUR_SHAPE = [652, 447, 499, 640, 510, 567, 465];
+  /* 上年同期不另给形态，而是按本年形态乘一条单调递减的倾斜系数再归一到「上年同期合计」：
+     这样当月同比逐月温和抬升、累计同比平滑收敛到门类同比，不会出现月间锯齿。 */
+  const PRE_TILT = [1.030, 1.022, 1.014, 1.004, 0.994, 0.984, 0.972];
+  const PRE_SHAPE = CUR_SHAPE.map((w, i) => w * PRE_TILT[i]);
+
+  /* 3.2 四大支柱行业的月度原值（与父页「四大支柱行业月度走势」逐月一致，不重算） */
+  const PILLAR_MONTHLY = {
+    "制造业":       [267, 171, 200, 273, 211, 242, 196],
+    "批发和零售业": [151,  96, 113, 154, 119, 137, 110],
+    "房地产业":     [128, 112, 106, 104,  96,  92,  82],
+    "金融业":       [106,  68,  80, 109,  84,  96,  77]
+  };
+
+  /* 3.3 制造业 7 个细分（父页原值，之和 = 1,560） */
+  const MFG_SUB = [
+    { name: "电子设备", v: 386 }, { name: "化工", v: 292 }, { name: "装备制造", v: 268 },
+    { name: "冶金", v: 196 }, { name: "汽车", v: 178 }, { name: "纺织服装", v: 124 }, { name: "医药", v: 116 }
+  ];
+
+  /* 3.4 13 个行业门类
+     cities：该行业分 13 市税收（顺序同 CITY_NAMES，之和 = v，见 §5 自检）
+             拆分依据各市经济结构——苏锡常制造业密集、南京金融与信息服务集中、
+             南通泰州建筑业发达、盐城连云港能源与农渔占比高、徐宿淮传统产业为主。
+     mix：非制造业按「增值税 / 企业所得税 / 其他税种」三段拆分的占比
+     firms：重点纳税企业名录（模拟），金额由 share/decay 现算 */
+  const IND_DEF = [
+    { name: "制造业", mid: "制造业", short: "制造业", yoy: 3.2, v: 1560,
+      cities: [454.9, 154.1, 224.6, 131.3, 115.7, 74.7, 80.1, 66.6, 71.1, 48.9, 56.0, 42.6, 39.4],
+      mix: null, share: 0.19, decay: 0.86,
+      firms: ["苏州晶元半导体", "无锡微电子集团", "南京化学工业", "江阴特钢集团", "常州动力电池", "苏州精密装备", "南通船舶重工", "泰州生物医药"] },
+    { name: "批发和零售业", mid: "批发和零售业", short: "批发零售", yoy: 1.8, v: 880,
+      cities: [215.7, 167.9, 100.5, 64.6, 53.9, 53.8, 44.2, 37.5, 33.6, 30.6, 28.0, 25.0, 24.7],
+      mix: [62, 22, 16], share: 0.22, decay: 0.84,
+      firms: ["江苏汇通商贸", "南京物资贸易", "苏州国贸集团", "无锡商贸物流", "徐州农资流通", "常州建材市场", "南通纺织外贸", "盐城汽贸集团"] },
+    { name: "房地产业", mid: "房地产业", short: "房地产", yoy: -9.6, v: 720,
+      cities: [167.0, 137.8, 77.5, 54.1, 46.1, 44.2, 38.5, 32.1, 28.2, 27.7, 23.5, 23.0, 20.3],
+      mix: [34, 20, 46], share: 0.26, decay: 0.83,
+      firms: ["江苏金鼎置业", "南京城建地产", "苏州园区开发", "无锡湖滨置业", "常州龙城房产", "南通滨江置业", "徐州淮海地产", "扬州运河置业"] },
+    { name: "金融业", mid: "金融业", short: "金融业", yoy: 2.4, v: 620,
+      cities: [151.1, 185.5, 67.3, 36.2, 31.1, 28.5, 24.3, 21.2, 18.2, 16.5, 15.6, 12.3, 12.2],
+      mix: [40, 42, 18], share: 0.32, decay: 0.80,
+      firms: ["江苏银行", "南京银行", "工行江苏分行", "建行江苏分行", "中行江苏分行", "农行江苏分行", "苏州银行", "江苏农商行"] },
+    { name: "建筑业", mid: "建筑业", short: "建筑业", yoy: -3.1, v: 480,
+      cities: [85.4, 80.0, 47.7, 70.6, 29.2, 29.7, 29.9, 21.2, 25.7, 17.6, 15.8, 14.4, 12.8],
+      mix: [52, 20, 28], share: 0.28, decay: 0.84,
+      firms: ["南通建工集团", "苏中建设集团", "江苏建筑安装", "泰州建工集团", "南京市政建设", "苏州建设集团", "盐城城建集团", "徐州路桥工程"] },
+    { name: "租赁和商务服务业", mid: "租赁和商务服务业", short: "租赁商务", yoy: 6.2, v: 340,
+      cities: [92.3, 81.8, 40.8, 21.9, 19.2, 15.2, 13.6, 12.2, 10.5, 9.0, 9.5, 7.1, 6.9],
+      mix: [55, 26, 19], share: 0.24, decay: 0.85,
+      firms: ["江苏国际会展", "南京商务咨询", "苏州人力资源", "无锡融资租赁", "江苏工程咨询", "南京会计服务", "苏州设备租赁", "常州物业管理"] },
+    { name: "信息传输、软件和信息技术服务业", mid: "信息传输和软件业", short: "信息软件", yoy: 11.4, v: 300,
+      cities: [83.9, 95.5, 34.5, 16.6, 15.5, 10.4, 8.7, 7.9, 6.6, 5.7, 6.4, 4.2, 4.1],
+      mix: [46, 34, 20], share: 0.30, decay: 0.82,
+      firms: ["南京软件谷科技", "苏州云计算中心", "江苏电信服务", "无锡物联网科技", "南京通信技术", "苏州工业软件", "江苏移动互联", "常州数据服务"] },
+    { name: "电力热力燃气及水生产和供应业", mid: "电力热力燃气水", short: "电力热力", yoy: 4.6, v: 260,
+      cities: [56.5, 44.4, 26.7, 23.8, 15.3, 18.8, 18.9, 10.9, 9.9, 10.0, 8.1, 7.2, 9.5],
+      mix: [58, 24, 18], share: 0.32, decay: 0.78,
+      firms: ["江苏电力发展", "南京燃气集团", "苏州热电联产", "盐城海上风电", "连云港核电", "徐州能源集团", "无锡水务集团", "南通新能源"] },
+    { name: "交通运输、仓储和邮政业", mid: "交通运输仓储邮政", short: "交通运输", yoy: 2.2, v: 200,
+      cities: [45.5, 39.5, 20.2, 19.5, 10.8, 13.1, 9.5, 7.9, 7.2, 6.6, 6.3, 5.0, 8.9],
+      mix: [56, 24, 20], share: 0.31, decay: 0.80,
+      firms: ["江苏交通控股", "连云港港口", "南京港务物流", "苏州现代物流", "江苏邮政速递", "南通航运集团", "徐州铁路货运", "无锡仓储配送"] },
+    { name: "科学研究和技术服务业", mid: "科学研究技术服务", short: "科研技服", yoy: 9.8, v: 150,
+      cities: [45.3, 44.6, 17.5, 8.3, 7.9, 4.9, 4.2, 3.9, 3.4, 2.7, 3.4, 2.0, 1.9],
+      mix: [48, 32, 20], share: 0.26, decay: 0.84,
+      firms: ["南京研发设计院", "苏州纳米技术院", "江苏工程设计院", "无锡检验检测", "南京规划设计院", "苏州医药研发", "常州工业设计", "江苏环境科技"] },
+    { name: "住宿和餐饮业", mid: "住宿和餐饮业", short: "住宿餐饮", yoy: 5.4, v: 90,
+      cities: [22.8, 18.0, 10.4, 6.3, 5.2, 4.7, 4.1, 5.1, 3.1, 2.9, 2.9, 2.2, 2.3],
+      mix: [60, 18, 22], share: 0.18, decay: 0.88,
+      firms: ["南京国际酒店", "苏州园林酒店", "无锡太湖度假", "扬州淮扬餐饮", "徐州彭城酒店", "南通滨江宾馆", "常州新城酒店", "连云港海滨度假"] },
+    { name: "农、林、牧、渔业", mid: "农林牧渔业", short: "农林牧渔", yoy: 1.2, v: 40,
+      cities: [4.0, 2.0, 2.3, 5.0, 1.6, 5.1, 5.7, 2.0, 2.3, 3.2, 1.2, 2.9, 2.7],
+      mix: [44, 16, 40], share: 0.24, decay: 0.85,
+      firms: ["江苏农垦集团", "盐城现代农业", "宿迁农产加工", "徐州种业集团", "连云港远洋渔业", "淮安粮油购销", "南通海洋牧场", "泰州畜牧养殖"] },
+    { name: "其他行业", mid: "其他行业", short: "其他行业", yoy: 2.6, v: 120,
+      cities: [28.5, 22.3, 13.8, 9.2, 7.5, 7.0, 6.3, 5.4, 4.8, 4.3, 4.0, 3.5, 3.4],
+      mix: [50, 22, 28], share: 0.20, decay: 0.87,
+      firms: ["江苏文旅集团", "南京教育科技", "苏州医疗健康", "无锡环保产业", "常州体育产业", "扬州文化传媒", "镇江养老服务", "宿迁家政服务"] }
+  ];
+
+  /* 3.5 各市景气偏移（pct），用于把门类同比分解到 13 市；见 §4.2 的加权校准 */
+  const CITY_OFF = {
+    "苏州": 0.4, "南京": -0.3, "无锡": 0.6, "南通": -0.2, "常州": 0.9, "徐州": -0.7, "盐城": 0.2,
+    "扬州": -0.1, "泰州": 0.5, "淮安": -0.5, "镇江": -0.4, "宿迁": 0.8, "连云港": -0.9
+  };
+  const MIX_NAMES = ["增值税", "企业所得税", "其他税种"];
+
+  /* ===== 4. 派生量：合计、占比、月度、构成、企业金额全部现算 ===== */
+
+  /* 4.1 分地市矩阵与列合计（= 各市税收，供「占该市税收」列使用） */
+  const CITY_TAX = CITY_NAMES.map((_, i) => r1(sum(IND_DEF.map((d) => d.cities[i]))));
+  const CITY_TAX_TOTAL = r1(sum(CITY_TAX));
+
+  /* 4.2 把门类同比分解到 13 市：先按景气偏移（对该行业的市值加权居中），
+         再把「上年同期 = 本期/(1+同比)」的残差精确落到第一大市，
+         保证 Σ 各市上年同期 = 该行业上年同期，分市同比与门类同比不打架。 */
+  function splitYoy(rows, Y) {
+    const V = sum(rows.map((r) => r.v));
+    const k = 1 + Math.min(2, Math.abs(Y) / 6);                       /* 增速绝对值越大，市间分化越明显 */
+    const wavg = sum(rows.map((r) => r.v * CITY_OFF[r.city])) / V;
+    rows.forEach((r) => { r.y = Y + k * (CITY_OFF[r.city] - wavg); });
+    const target = V / (1 + Y / 100);
+    let bi = 0;
+    rows.forEach((r, i) => { if (r.v > rows[bi].v) bi = i; });
+    const others = sum(rows.filter((_, i) => i !== bi).map((r) => r.v / (1 + r.y / 100)));
+    rows[bi].y = 100 * (rows[bi].v / (target - others) - 1);
+    rows.forEach((r) => { r.prev = r.v / (1 + r.y / 100); });
+  }
+
+  /* 4.3 逐行业派生 */
+  const IND = IND_DEF.map((d) => {
+    const o = {
+      name: d.name, mid: d.mid, short: d.short, yoy: d.yoy, v: d.v,
+      dec: d.v >= 400 ? 0 : 1                                          /* 小行业保留一位小数，避免月度全是整数 0 */
+    };
+    /* 分地市 */
+    o.rows = CITY_NAMES.map((c, i) => ({ city: c, v: d.cities[i], idx: i }));
+    o.citySum = r1(sum(o.rows.map((r) => r.v)));
+    o.tie = Math.round(o.citySum * 10) === Math.round(d.v * 10);        /* 硬勾稽：13 市之和 = 门类值 */
+    splitYoy(o.rows, d.yoy);
+    o.rows.forEach((r) => {
+      r.share = 100 * r.v / d.v;                                       /* 占该行业 */
+      r.cityShare = 100 * r.v / CITY_TAX[r.idx];                       /* 占该市税收 */
+    });
+    o.sorted = o.rows.slice().sort((a, b) => b.v - a.v);
+    o.top3 = r1(sum(o.sorted.slice(0, 3).map((r) => r.v)));
+    o.peak = o.rows.slice().sort((a, b) => b.cityShare - a.cityShare)[0];   /* 该行业在哪个市占比最高 */
+
+    /* 月度：四大支柱用父页原数组，其余按全省税收月度形态拆分，末月吸收舍入残差 */
+    o.prevTotal = d.v / (1 + d.yoy / 100);
+    if (PILLAR_MONTHLY[d.name]) {
+      o.cur = PILLAR_MONTHLY[d.name].slice();
+    } else {
+      const s = sum(CUR_SHAPE);
+      o.cur = CUR_SHAPE.map((w) => r1(d.v * w / s));
+      o.cur[6] = r1(d.v - sum(o.cur.slice(0, 6)));
+    }
+    const ps = sum(PRE_SHAPE);
+    o.pre = PRE_SHAPE.map((w) => r1(o.prevTotal * w / ps));
+    o.pre[6] = r1(o.prevTotal - sum(o.pre.slice(0, 6)));
+    o.curSum = r1(sum(o.cur));
+    o.monthTie = Math.round(o.curSum * 10) === Math.round(d.v * 10);
+    o.cum = o.cur.map((_, i) => +(100 * (sum(o.cur.slice(0, i + 1)) / sum(o.pre.slice(0, i + 1)) - 1)).toFixed(2));
+
+    /* 构成：制造业 = 7 个细分（父页原值）；其余 = 三段拆分，末段吸收残差 */
+    if (d.mix) {
+      const seg = MIX_NAMES.map((n, i) => ({ name: n, value: r1(d.v * d.mix[i] / 100) }));
+      seg[2].value = r1(d.v - seg[0].value - seg[1].value);
+      o.mix = seg;
+      o.mixNote = "三段拆分";
+    } else {
+      o.mix = MFG_SUB.map((s) => ({ name: s.name, value: s.v }));
+      o.mixNote = "7 个细分";
+    }
+    o.mixSum = r1(sum(o.mix.map((m) => m.value)));
+
+    /* 重点纳税企业 TOP8：等比衰减分配到目标占比（一律 ≤ 35%），末位吸收残差 */
+    const w = d.firms.map((_, i) => Math.pow(d.decay, i));
+    const ws = sum(w);
+    const cap = r1(d.v * d.share);
+    o.firms = d.firms.map((n, i) => ({ name: n, value: r1(cap * w[i] / ws) }));
+    o.firms[7].value = r1(cap - sum(o.firms.slice(0, 7).map((f) => f.value)));
+    o.firmSum = r1(sum(o.firms.map((f) => f.value)));
+    o.firmShare = 100 * o.firmSum / d.v;
+    return o;
+  });
+
+  /* 4.4 全局派生：门类合计、加权同比、位次、拉动 */
+  const D = {};
+  D.total = r1(sum(IND.map((i) => i.v)));
+  D.prevTotal = sum(IND.map((i) => i.prevTotal));
+  D.yoyWeighted = 100 * (D.total / D.prevTotal - 1);          /* 分行业加权同比（与全省税收口径 +2.4% 不同口径） */
+  IND.forEach((i) => {
+    i.share = 100 * i.v / D.total;
+    i.delta = i.v - i.prevTotal;
+    i.pull = 100 * i.delta / D.prevTotal;                     /* 对全省税收增量的贡献：拉动 pct */
+  });
+  const ORDER = IND.slice().sort((a, b) => b.v - a.v);
+  IND.forEach((i) => { i.rank = ORDER.indexOf(i) + 1; });
+  D.avgShare = 100 / IND.length;                              /* 13 门类均值占比，KPI 迷你条刻度线 */
+  D.maxShare = Math.max.apply(null, IND.map((i) => i.share));
+
+  /* ===== 5. 时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("sh-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("sh-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 6. KPI 带骨架（★ 先建 DOM 再 init 图表） ===== */
+  const KPI_DEFS = [
+    { icon: "¥", key: "val", label: "该行业税收", unit: "亿元", dec: 0 },
+    { icon: "△", key: "yoy", label: "同比增速", unit: "%", dec: 1, sign: true },
+    { icon: "◑", key: "share", label: "占全省税收比重", unit: "%", dec: 1, progress: true },
+    { icon: "◆", key: "rank", label: "全省位次", unit: "/ 13 门类", dec: 0 },
+    { icon: "◈", key: "pull", label: "对全省税收增量贡献", unit: "pct", dec: 2, sign: true }
+  ];
+  const band = $("sh-band");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "sh-kpi";
+    card.innerHTML =
+      '<div class="sh-kpi-icon">' + k.icon + '</div>' +
+      '<div class="sh-kpi-main">' +
+        '<div class="sh-kpi-label">' + k.label + '</div>' +
+        '<div class="sh-kpi-num"><span class="sh-kpi-val">0</span><span class="sh-kpi-unit">' + k.unit + '</span></div>' +
+        (k.progress
+          ? '<div class="sh-mini-track"><div class="sh-mini-fill"></div><div class="sh-mini-tick" style="left:' +
+            (100 * D.avgShare / D.maxShare).toFixed(2) + '%"></div></div><div class="sh-kpi-sub"></div>'
+          : '<div class="sh-kpi-sub"></div>') +
+      '</div>';
+    band.appendChild(card);
+    k.node = card.querySelector(".sh-kpi-val");
+    k.subNode = card.querySelector(".sh-kpi-sub");
+    k.fill = card.querySelector(".sh-mini-fill");
+    k.cur = 0; k.target = 0;
+  });
+  /* 翻牌缓动：截图里可能是中途值，收敛后才是终值 */
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) k.cur = k.target; else k.cur += diff * 0.14;
+      k.node.textContent = (k.sign && k.cur >= 0 ? "+" : "") + fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+
+  /* ===== 7. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(8, 26, 50, 0.93)", borderColor: "rgba(240, 192, 96, 0.45)",
+    textStyle: { color: "#e2eeff", fontSize: 12 }
+  }, extra || {});
+  const vGrad = (a, b) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: a }, { offset: 1, color: b }]);
+  const hGrad = (a, b) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: a }, { offset: 1, color: b }]);
+  const AXIS_LINE = { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } };
+  const SPLIT_LINE = { lineStyle: { color: "rgba(92, 156, 226, 0.13)" } };
+  /* ★ 图表实例只创建一次，切换行业时只 setOption，绝不重新 init */
+  const monthChart = echarts.init($("sh-chart-month"));
+  const mixChart = echarts.init($("sh-chart-mix"));
+  const firmChart = echarts.init($("sh-chart-firm"));
+
+  /* ===== 8. 各视图的 option 工厂（入参为当前行业） ===== */
+  function monthOption(o) {
+    /* 累计同比副轴范围随行业增速自适应（房地产 -9.6 与信息软件 +11.4 不可共用固定区间） */
+    const lo = Math.min.apply(null, o.cum), hi = Math.max.apply(null, o.cum);
+    const padv = Math.max(1.5, (hi - lo) * 0.5);
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(240, 192, 96, 0.08)" } },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return '<b style="color:#ffdc8f">' + o.mid + " · " + MONTHS[i] + "</b><br/>本年 " + fmtDec(o.cur[i], 1) +
+            " 亿元<br/>上年同期 " + fmtDec(o.pre[i], 1) + " 亿元<br/>当月同比 " + signed(100 * (o.cur[i] / o.pre[i] - 1)) +
+            '%<br/>累计同比 <b style="color:' + (o.cum[i] >= 0 ? "#33e0a6" : "#ff5f6e") + '">' + signed(o.cum[i]) + "%</b>";
+        }
+      }),
+      legend: { top: 8, right: 14, itemWidth: 12, itemHeight: 8, itemGap: 16, textStyle: { color: "#c6dcf5", fontSize: 12 } },
+      grid: { left: 16, right: 16, top: 46, bottom: 8, containLabel: true },
+      xAxis: { type: "category", data: MONTHS, axisLine: AXIS_LINE, axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 12 } },
+      yAxis: [
+        { type: "value", name: "亿元", nameTextStyle: { color: "#5f88b8", fontSize: 11 }, splitLine: SPLIT_LINE,
+          axisLabel: { color: C.muted, fontSize: 11 } },
+        { type: "value", name: "累计同比 %", nameTextStyle: { color: "#5f88b8", fontSize: 11 },
+          min: +(lo - padv).toFixed(1), max: +(hi + padv).toFixed(1),
+          splitLine: { show: false }, axisLabel: { color: C.muted, fontSize: 11, formatter: (v) => v.toFixed(1) + "%" } }
+      ],
+      series: [
+        /* 上年柱比本年宽 8px 作参照底；负增长行业本年柱更矮，仍能露出上年一圈边 */
+        { name: "上年同期", type: "bar", barWidth: 28, barGap: "-100%", z: 1,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: "rgba(92, 156, 226, 0.28)", borderColor: "rgba(92, 156, 226, 0.45)", borderWidth: 1 },
+          data: o.pre },
+        { name: "本年当月", type: "bar", barWidth: 20, z: 2,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad(C.goldSoft, "rgba(184, 134, 58, 0.35)"), shadowColor: "rgba(240, 192, 96, 0.4)", shadowBlur: 10 },
+          label: { show: true, position: "top", fontSize: 11, color: C.goldSoft, formatter: (p) => fmtDec(p.value, o.dec) },
+          data: o.cur },
+        { name: "累计同比", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 8, z: 3,
+          lineStyle: { width: 3, color: o.yoy >= 0 ? C.green : C.red, shadowColor: "rgba(0, 0, 0, 0.4)", shadowBlur: 10 },
+          itemStyle: { color: o.yoy >= 0 ? C.green : C.red, borderColor: "#06202a", borderWidth: 2 },
+          areaStyle: { color: o.yoy >= 0 ? vGrad("rgba(51, 224, 166, 0.2)", "rgba(51, 224, 166, 0)") : vGrad("rgba(255, 95, 110, 0.2)", "rgba(255, 95, 110, 0)") },
+          /* 折线 label 会被自身面积压住，加深色底 + 上移 */
+          label: { show: true, position: "top", distance: 10, fontSize: 11, fontWeight: 700,
+            color: o.yoy >= 0 ? C.green : C.red, backgroundColor: "rgba(8, 26, 50, 0.75)", padding: [2, 4], borderRadius: 3,
+            formatter: (p) => signed(p.value) + "%" },
+          data: o.cum }
+      ],
+      animationDurationUpdate: 700
+    };
+  }
+
+  function mixOption(o) {
+    return {
+      tooltip: tip({ formatter: (p) => p.name + "<br/>" + fmtDec(p.value, 1) + " 亿元 · " + p.percent.toFixed(1) + "%" }),
+      color: [C.goldSoft, C.gold, C.cyan, C.blue, C.green, C.orange, C.steel],
+      graphic: [
+        { type: "text", left: "center", top: "41%", style: { text: fmtDec(o.mixSum, o.dec), fill: C.goldSoft, fontSize: 24, fontWeight: 700, textAlign: "center" } },
+        { type: "text", left: "center", top: "54%", style: { text: o.short + " · 亿元", fill: "#8ea9cc", fontSize: 10.5, textAlign: "center" } }
+      ],
+      series: [{
+        type: "pie", radius: ["46%", "68%"], center: ["50%", "50%"],
+        itemStyle: { borderColor: "rgba(8, 26, 50, 0.9)", borderWidth: 2 },
+        label: { color: "#cfe2f8", fontSize: 10.5, formatter: (p) => p.name + " " + p.percent.toFixed(0) + "%" },
+        labelLine: { length: 6, length2: 8, lineStyle: { color: "rgba(142, 169, 204, 0.5)" } },
+        emphasis: { scaleSize: 6, itemStyle: { shadowBlur: 16, shadowColor: "rgba(240, 192, 96, 0.45)" } },
+        data: o.mix
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  function firmOption(o) {
+    const rows = o.firms.slice().reverse();      /* y 轴自下而上，反转后第一名在最上 */
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(240, 192, 96, 0.08)" } },
+        formatter: (ps) => {
+          const f = rows[ps[0].dataIndex];
+          return '<b style="color:#ffdc8f">' + f.name + "</b><br/>入库税收 " + fmtDec(f.value, 1) +
+            " 亿元<br/>占该行业 " + (100 * f.value / o.v).toFixed(2) + "%";
+        }
+      }),
+      grid: { left: 8, right: 52, top: 14, bottom: 6, containLabel: true },
+      xAxis: { type: "value", splitLine: SPLIT_LINE, axisLabel: { color: C.muted, fontSize: 10 } },
+      yAxis: {
+        type: "category", data: rows.map((f) => f.name),
+        axisLine: AXIS_LINE, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 11, width: 92, overflow: "truncate" }
+      },
+      series: [{
+        type: "bar", barWidth: 14,
+        showBackground: true, backgroundStyle: { color: "rgba(63, 120, 200, 0.14)", borderRadius: 5 },
+        itemStyle: { borderRadius: 5, color: hGrad("rgba(184, 134, 58, 0.8)", C.goldSoft) },
+        label: { show: true, position: "right", fontSize: 10.5, fontWeight: 700, color: "#dcebff",
+          formatter: (p) => fmtDec(p.value, 1) },
+        data: rows.map((f) => f.value)
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 9. 左表与表尾（切换行业时整体重写） ===== */
+  function renderTable(o) {
+    const body = $("sh-tbody");
+    body.innerHTML = o.sorted.map((r, i) =>
+      '<li class="' + (i === 0 ? "is-lead" : "") + '">' +
+        '<span class="sh-td-no">' + (i + 1) + '</span>' +
+        '<span class="sh-td-name">' + r.city + '</span>' +
+        '<span class="sh-td-val">' + fmtDec(r.v, 1) + '</span>' +
+        '<span class="sh-td-yoy" style="color:' + (r.y >= 0 ? C.green : C.red) + '">' + signed(r.y) + '%</span>' +
+        '<span class="sh-td-bar"><u><b style="width:0"></b></u><s>' + r.share.toFixed(1) + '%</s></span>' +
+        '<span class="sh-td-share">' + r.cityShare.toFixed(1) + '%</span>' +
+      '</li>').join("");
+    const maxShare = o.sorted[0].share;
+    const bars = body.querySelectorAll(".sh-td-bar u b");
+    setTimeout(() => {
+      o.sorted.forEach((r, i) => { if (bars[i]) bars[i].style.width = (100 * r.share / maxShare).toFixed(1) + "%"; });
+    }, 60);
+
+    $("sh-tfoot").innerHTML =
+      '<span></span><span>合计（13 市）</span>' +
+      '<span><b>' + fmtDec(o.citySum, o.dec) + '</b></span>' +
+      '<span style="color:' + (o.yoy >= 0 ? C.green : C.red) + ';font-weight:700">' + signed(o.yoy) + '%</span>' +
+      '<span class="sh-tie' + (o.tie ? "" : " is-bad") + '">' + (o.tie ? "与父页一致 ✓" : "口径不符 ✗") + '</span>' +
+      '<span>' + (100 * o.v / CITY_TAX_TOTAL).toFixed(1) + '%</span>';
+    $("sh-tbl-scope").textContent = "13 市 · 合计 " + fmtDec(o.citySum, o.dec) + " 亿元";
+  }
+
+  /* ===== 10. 跑马灯（数字与上方图表同源现算） ===== */
+  function renderMarquee(o) {
+    const t1 = o.sorted[0], t2 = o.sorted[1], t3 = o.sorted[2];
+    const news = [
+      o.mid + " 1-7 月全省税收 <b>" + fmtDec(o.v) + " 亿元</b>，同比 <b>" + signed(o.yoy) + "%</b>，规模居 13 个门类第 <b>" + o.rank + "</b> 位",
+      "占全省税收 <b>" + o.share.toFixed(1) + "%</b>；13 个设区市之和 <b>" + fmtDec(o.citySum, o.dec) + " 亿元</b>，与「税收分行业」页门类值一致",
+      "首位 <b>" + t1.city + " " + fmtDec(t1.v, 1) + " 亿元</b>（占该行业 " + t1.share.toFixed(1) + "%），" +
+        "前三市 " + t1.city + "、" + t2.city + "、" + t3.city + " 合计 <b>" + fmtDec(o.top3, 1) + " 亿元</b>、占 <b>" +
+        (100 * o.top3 / o.v).toFixed(1) + "%</b>",
+      "行业集中度看，<b>" + o.peak.city + "</b> 的该行业税收占其全部税收 <b>" + o.peak.cityShare.toFixed(1) +
+        "%</b>，高于全省 " + o.share.toFixed(1) + "% 的水平 <b>" + (o.peak.cityShare - o.share).toFixed(1) + " pct</b>",
+      "较上年同期 <b>" + fmtDec(o.prevTotal, 1) + " 亿元</b> " + (o.delta >= 0 ? "增收" : "减收") + " <b>" +
+        fmtDec(Math.abs(o.delta), 1) + " 亿元</b>，拉动全省税收 <b>" + signed(o.pull, 2) + " pct</b>",
+      "构成看，" + o.mix[0].name + " <b>" + fmtDec(o.mix[0].value, 1) + " 亿元</b>，占该行业 <b>" +
+        (100 * o.mix[0].value / o.v).toFixed(1) + "%</b>（" + o.mixNote + "合计 " + fmtDec(o.mixSum, o.dec) + " 亿元）",
+      "重点纳税企业 TOP8 合计 <b>" + fmtDec(o.firmSum, 1) + " 亿元</b>，占该行业 <b>" + o.firmShare.toFixed(1) +
+        "%</b>，首户 " + o.firms[0].name + " <b>" + fmtDec(o.firms[0].value, 1) + " 亿元</b>",
+      "月度看，7 月入库 <b>" + fmtDec(o.cur[6], 1) + " 亿元</b>，当月同比 <b>" + signed(100 * (o.cur[6] / o.pre[6] - 1)) +
+        "%</b>；1-7 月累计同比收敛于 <b>" + signed(o.cum[6]) + "%</b>",
+      "口径提示：13 门类<b>分行业加权同比 " + signed(D.yoyWeighted, 2) + "%</b>，全省税收口径同比为 <b>" +
+        signed(YOY_TAX_OFFICIAL) + "%</b>，两者不可混用"
+    ];
+    const html = news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("sh-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+
+  /* ===== 11. 切换行业：整页重设（图表只 setOption，不重新 init） ===== */
+  let idx = 0;
+  function applyIndustry(i) {
+    idx = (i + IND.length) % IND.length;
+    const o = IND[idx];
+    $("sh-crumb-obj").textContent = o.mid;
+    $("sh-title").textContent = o.mid + " 税收详情";
+    $("sh-sw-name").textContent = o.short;
+    $("sh-sw-idx").textContent = (idx + 1) + " / " + IND.length;
+    document.title = "大屏样板间 · 公共资金行业税收详情 · " + o.mid;
+
+    const vals = { val: o.v, yoy: o.yoy, share: o.share, rank: o.rank, pull: o.pull };
+    KPI_DEFS.forEach((k) => { k.target = vals[k.key]; });
+    KPI_DEFS[0].subNode.innerHTML = "13 市之和 <b>" + fmtDec(o.citySum, o.dec) + "</b> 亿元 " + (o.tie ? "✓" : "✗");
+    KPI_DEFS[1].subNode.innerHTML = "上年同期 <b>" + fmtDec(o.prevTotal, 1) + "</b> 亿元 · " +
+      '<b class="' + (o.delta >= 0 ? "sh-up" : "sh-down") + '">' + (o.delta >= 0 ? "增收 " : "减收 ") + fmtDec(Math.abs(o.delta), 1) + "</b>";
+    KPI_DEFS[2].subNode.innerHTML = "全省税收 <b>" + fmtDec(D.total) + "</b> 亿元 · 白线为 13 门类均值 <b>" + D.avgShare.toFixed(1) + "%</b>";
+    KPI_DEFS[3].subNode.innerHTML = "首位 <b>" + ORDER[0].short + " " + fmtDec(ORDER[0].v) + "</b> 亿元 · 末位 <b>" +
+      ORDER[ORDER.length - 1].short + " " + fmtDec(ORDER[ORDER.length - 1].v) + "</b>";
+    KPI_DEFS[4].subNode.innerHTML = "口径：增减额 ÷ 上年同期税收合计 <b>" + fmtDec(D.prevTotal, 0) + "</b> 亿元";
+    KPI_DEFS[2].fill.style.width = "0%";
+    setTimeout(() => { KPI_DEFS[2].fill.style.width = (100 * o.share / D.maxShare).toFixed(2) + "%"; }, 120);
+
+    renderTable(o);
+    monthChart.setOption(monthOption(o), true);
+    mixChart.setOption(mixOption(o), true);
+    firmChart.setOption(firmOption(o), true);
+    $("sh-month-scope").textContent = "7 个月合计 " + fmtDec(o.curSum, o.dec) + " 亿元 · 累计同比收敛于 " + signed(o.yoy) + "%";
+    $("sh-mix-scope").textContent = o.mixNote + " · 合计 " + fmtDec(o.mixSum, o.dec) + " 亿元";
+    $("sh-firm-scope").textContent = "模拟名录 · 合计 " + fmtDec(o.firmSum, 1) + " 亿元 · 占 " + o.firmShare.toFixed(1) + "%";
+    renderMarquee(o);
+
+    history.replaceState(null, "", "#" + encodeURIComponent(o.name));
+  }
+
+  /* ===== 12. 交互：切换器 / 返回父页 / 键盘 / hash 定位 / kiosk 自动轮换 ===== */
+  $("sh-sw-prev").addEventListener("click", () => { applyIndustry(idx - 1); restart(); });
+  $("sh-sw-next").addEventListener("click", () => { applyIndustry(idx + 1); restart(); });
+  $("sh-back").addEventListener("click", () => { location.href = PARENT; });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyIndustry(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyIndustry(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* 打开时按 hash 定位（父页下钻传参用），全名 / 中名 / 短名均可命中，未命中取第 0 个 */
+  const hash = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+  const hit = IND.findIndex((o) => o.name === hash || o.mid === hash || o.short === hash);
+  applyIndustry(hit >= 0 ? hit : 0);
+
+  /* kiosk 常驻：每 12 秒切下一行业；鼠标停在切换器上时暂停 */
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => applyIndustry(idx + 1), 12000); }
+  restart();
+  const sw = $("sh-switcher");
+  sw.addEventListener("mouseenter", () => clearInterval(timer));
+  sw.addEventListener("mouseleave", restart);
+
+  /* ===== 13. 勾稽自检：任一条不过就点亮告警条 ===== */
+  const CHECKS = [
+    ["13 个门类之和 = 税收收入 5760", Math.round(D.total) === TAX_TOTAL, D.total],
+    ["分地市矩阵列合计 = 5760", Math.round(CITY_TAX_TOTAL) === TAX_TOTAL, CITY_TAX_TOTAL],
+    ["制造业 7 个细分之和 = 1560", Math.round(sum(MFG_SUB.map((s) => s.v))) === 1560, sum(MFG_SUB.map((s) => s.v))]
+  ];
+  IND.forEach((o) => {
+    CHECKS.push([o.short + " 13 市之和 = " + o.v, o.tie, o.citySum]);
+    CHECKS.push([o.short + " 月度 7 项之和 = " + o.v, o.monthTie, o.curSum]);
+    CHECKS.push([o.short + " 构成之和 = " + o.v, Math.round(o.mixSum * 10) === Math.round(o.v * 10), o.mixSum]);
+    CHECKS.push([o.short + " 分市上年同期之和 = 门类上年同期", Math.abs(sum(o.rows.map((r) => r.prev)) - o.prevTotal) < 1e-6, o.prevTotal]);
+    CHECKS.push([o.short + " TOP8 合计 ≤ 门类值 35%", o.firmShare <= 35 + 1e-9, o.firmShare]);
+  });
+  const failed = CHECKS.filter((c) => !c[1]);
+  if (failed.length) {
+    errorNode.textContent = "勾稽自检未通过：" + failed.map((c) => c[0] + "（实得 " + c[2] + "）").join("；");
+    errorNode.classList.add("is-visible");
+  }
+  if (window.console && console.table) {
+    console.table(CHECKS.map((c) => ({ 校验项: c[0], 通过: c[1] ? "✓" : "✗", 实得: c[2] })));
+  }
+})();
+</script>
+</body>
+</html>

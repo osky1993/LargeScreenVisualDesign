@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 公共资金主体税种月度走势</title>
+<style>
+  :root {
+    --ym-bg: #08203f;
+    --ym-panel: rgba(11, 38, 72, 0.72);
+    --ym-border: rgba(92, 156, 226, 0.28);
+    --ym-text: #e8f2ff;
+    --ym-muted: #8ea9cc;
+    --ym-gold: #f0c060;
+    --ym-gold-soft: #ffdc8f;
+    --ym-blue: #3d9cff;
+    --ym-cyan: #39d0d8;
+    --ym-green: #33e0a6;
+    --ym-red: #ff5f6e;
+    --ym-orange: #ff9d4d;
+    --ym-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--ym-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 =====
+     高度预算：12(上内边距) + 80(页头) + 14 + 96(KPI 带) + 14 + 594(主图行) + 14 + 240(热力表) + 16(下内边距) = 1080 */
+  .ym-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(240, 192, 96, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(57, 208, 216, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 60, 120, 0.34), transparent 56%),
+      linear-gradient(rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      var(--ym-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    grid-template-rows: 80px 96px 594px 240px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .ym-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    max-width: 1400px; padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.9);
+    color: #ffd9d9; font-size: 15px; line-height: 1.6;
+  }
+  .ym-error.is-visible { display: block; }
+
+  /* ===== 页头：三级面包屑 + 返回 + 时钟 ===== */
+  .ym-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .ym-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(240, 192, 96, 0.6) 16%, rgba(57, 208, 216, 0.85) 50%, rgba(240, 192, 96, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.4);
+  }
+  .ym-head-left { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .ym-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--ym-muted); }
+  .ym-crumb b { font-weight: 400; color: var(--ym-gold); }
+  .ym-crumb i { font-style: normal; color: rgba(142, 169, 204, 0.55); }
+  .ym-crumb em { font-style: normal; color: #d7e8ff; }
+  .ym-crumb-up { color: #a8c2e0; text-decoration: none; transition: color 0.18s, text-shadow 0.18s; }
+  .ym-crumb-up:hover { color: var(--ym-gold-soft); text-decoration: underline; text-shadow: 0 0 10px rgba(240, 192, 96, 0.5); }
+  .ym-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .ym-head-title {
+    font-size: 29px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--ym-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(240, 192, 96, 0.35));
+  }
+  .ym-head-meta { display: flex; align-items: center; gap: 13px; font-size: 12.5px; color: var(--ym-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .ym-head-meta b { font-weight: 400; color: var(--ym-gold-soft); }
+  .ym-head-meta i { font-style: normal; color: rgba(142, 169, 204, 0.4); }
+
+  .ym-head-right { display: flex; align-items: center; gap: 18px; flex: none; }
+  .ym-tie {
+    display: flex; flex-direction: column; gap: 3px; padding: 6px 14px; border-radius: 10px;
+    border: 1px solid rgba(57, 208, 216, 0.34); background: rgba(14, 52, 74, 0.5);
+    font-variant-numeric: tabular-nums;
+  }
+  .ym-tie-t { font-size: 10.5px; letter-spacing: 0.22em; color: #5f9fb8; }
+  .ym-tie-v { font-size: 13px; color: #b9ecef; }
+  .ym-tie-v b { color: var(--ym-cyan); font-weight: 700; }
+  .ym-back {
+    display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 14px; cursor: pointer;
+    border-radius: 10px; font-family: inherit; font-size: 13px; letter-spacing: 0.08em;
+    border: 1px solid rgba(92, 156, 226, 0.45); background: rgba(16, 46, 86, 0.6); color: #cfe6ff;
+    transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .ym-back:hover { color: #fff; border-color: rgba(57, 208, 216, 0.8); box-shadow: 0 0 14px rgba(57, 208, 216, 0.35); }
+  .ym-back svg { width: 16px; height: 16px; }
+  .ym-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 18px; border-left: 1px solid rgba(92, 156, 226, 0.25); }
+  .ym-clock-time { font: 700 23px/1 var(--ym-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(57, 208, 216, 0.4); }
+  .ym-clock-date { font-size: 12px; color: var(--ym-muted); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .ym-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .ym-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--ym-border); border-radius: 12px; background: var(--ym-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 15px 0 17px;
+  }
+  .ym-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--ym-gold), transparent); }
+  .ym-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(240, 192, 96, 0.13), transparent 68%);
+  }
+  .ym-kpi-icon {
+    flex: none; width: 42px; height: 42px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 19px;
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.28), rgba(57, 208, 216, 0.12));
+    border: 1px solid rgba(240, 192, 96, 0.35); box-shadow: inset 0 0 12px rgba(240, 192, 96, 0.14);
+  }
+  .ym-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .ym-kpi-label { font-size: 12.5px; letter-spacing: 0.09em; color: var(--ym-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ym-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .ym-kpi-val { font: 700 27px/1 var(--ym-mono); color: var(--ym-gold-soft); text-shadow: 0 0 14px rgba(240, 192, 96, 0.45); }
+  .ym-kpi-unit { font-size: 12px; color: #b39a5e; }
+  .ym-kpi-sub { font-size: 11.5px; color: var(--ym-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ym-kpi-sub b { font-weight: 700; color: #cfe2f8; }
+  .ym-up { color: var(--ym-green); }
+  .ym-down { color: var(--ym-red); }
+
+  /* ===== 面板通用 ===== */
+  .ym-panel {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--ym-border); border-radius: 12px; background: var(--ym-panel);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .ym-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 36px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(240, 192, 96, 0.22), rgba(57, 208, 216, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .ym-panel-head i { flex: none; width: 5px; height: 16px; background: var(--ym-gold); box-shadow: 0 0 8px var(--ym-gold); transform: skewX(-12deg); }
+  .ym-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.12em; color: #f4f9ff; white-space: nowrap; }
+  .ym-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+  .ym-panel-scope { margin-left: auto; font-size: 12px; color: var(--ym-gold-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+
+  /* ===== 主图面板（本页主角，594px ≈ 舞台 55%） =====
+     内部：面板头 38 + 视图切换条 38 + 图表 484 + 解读条 34 = 594 */
+  .ym-main { grid-column: 1; grid-row: 3; }
+  .ym-main > .ym-panel-head { height: 38px; }
+  .ym-chipbar {
+    flex: none; height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 14px;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.16); background: rgba(63, 120, 200, 0.07);
+  }
+  .ym-chip-label { font-size: 11.5px; letter-spacing: 0.18em; color: #5f88b8; flex: none; padding-right: 2px; }
+  .ym-chip {
+    display: flex; align-items: baseline; gap: 6px; height: 26px; padding: 0 13px; cursor: pointer;
+    border-radius: 13px; font-family: inherit; font-size: 12.5px; letter-spacing: 0.06em; white-space: nowrap;
+    border: 1px solid rgba(92, 156, 226, 0.34); background: rgba(16, 46, 86, 0.55); color: #b6cbe4;
+    transition: color 0.18s, border-color 0.18s, box-shadow 0.18s, background 0.18s;
+  }
+  .ym-chip i { font-style: normal; font-size: 10.5px; color: #5f88b8; }
+  .ym-chip:hover { color: #eaf4ff; border-color: rgba(57, 208, 216, 0.7); }
+  .ym-chip.is-on {
+    color: #2a1c05; font-weight: 700;
+    background: linear-gradient(120deg, var(--ym-gold-soft), #d8a03c 90%);
+    border-color: rgba(240, 192, 96, 0.9); box-shadow: 0 0 14px rgba(240, 192, 96, 0.42);
+  }
+  .ym-chip.is-on i { color: rgba(42, 28, 5, 0.66); }
+  .ym-focus {
+    display: none; align-items: center; gap: 7px; height: 26px; padding: 0 8px 0 12px; margin-left: 6px;
+    border-radius: 13px; font-size: 12.5px; letter-spacing: 0.06em; white-space: nowrap;
+    border: 1px solid rgba(57, 208, 216, 0.6); background: rgba(14, 52, 74, 0.7); color: #b9ecef;
+  }
+  .ym-focus.is-visible { display: flex; }
+  .ym-focus b { color: var(--ym-cyan); font-weight: 700; }
+  .ym-focus u {
+    cursor: pointer; text-decoration: none; width: 17px; height: 17px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+    background: rgba(57, 208, 216, 0.2); color: #d8f6f8;
+  }
+  .ym-focus u:hover { background: rgba(57, 208, 216, 0.5); color: #fff; }
+  .ym-chip-hint { margin-left: auto; font-size: 11.5px; color: #5f88b8; letter-spacing: 0.05em; white-space: nowrap; flex: none; }
+  .ym-chart { flex: 1; min-height: 0; }
+  .ym-note {
+    flex: none; height: 34px; display: flex; align-items: center; gap: 9px; padding: 0 14px;
+    border-top: 1px solid rgba(240, 192, 96, 0.22); background: rgba(72, 56, 24, 0.22);
+    font-size: 12.5px; color: #cadcf2; letter-spacing: 0.03em; white-space: nowrap; overflow: hidden;
+  }
+  .ym-note::before {
+    content: "读法"; flex: none; font-size: 10px; letter-spacing: 0.2em; color: #2a1c05; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px; background: linear-gradient(120deg, var(--ym-gold-soft), #d8a03c);
+  }
+  .ym-note b { color: var(--ym-gold-soft); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .ym-note em { font-style: normal; color: var(--ym-cyan); font-weight: 700; }
+
+  /* ===== 右列：诊断 + 口径说明 ===== */
+  .ym-side { grid-column: 2; grid-row: 3; display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .ym-side-diag { flex: none; height: 288px; }
+  .ym-side-doc { flex: 1; min-height: 0; }
+
+  .ym-dg { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+  .ym-dg li {
+    flex: 1; min-height: 0; display: grid;
+    grid-template-columns: 90px 52px 52px 1fr 44px;
+    align-items: center; gap: 6px; padding: 0 12px; cursor: pointer;
+    font-size: 11.5px; font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.09);
+    transition: background 0.25s ease, box-shadow 0.25s ease;
+  }
+  .ym-dg li:nth-child(odd) { background: rgba(63, 120, 200, 0.07); }
+  .ym-dg li:hover { background: rgba(57, 208, 216, 0.12); }
+  .ym-dg li.is-focus { background: rgba(240, 192, 96, 0.15); box-shadow: inset 3px 0 0 var(--ym-gold); }
+  .ym-dg-name { display: flex; align-items: center; gap: 6px; color: #eaf4ff; font-weight: 700; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ym-dg-dot { flex: none; width: 9px; height: 9px; border-radius: 2px; }
+  .ym-dg-pk { color: var(--ym-green); text-align: center; }
+  .ym-dg-tr { color: var(--ym-orange); text-align: center; }
+  .ym-dg-bar { position: relative; height: 8px; border-radius: 4px; background: rgba(63, 120, 200, 0.2); }
+  .ym-dg-bar u {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 4px;
+    background: linear-gradient(90deg, rgba(184, 134, 58, 0.8), var(--ym-gold-soft));
+    box-shadow: 0 0 8px rgba(240, 192, 96, 0.4); transition: width 1s cubic-bezier(0.22, 0.8, 0.3, 1);
+  }
+  .ym-dg-cv { text-align: right; font: 700 12px/1 var(--ym-mono); color: var(--ym-gold-soft); }
+  .ym-dg-head {
+    flex: none; display: grid; grid-template-columns: 90px 52px 52px 1fr 44px; align-items: center; gap: 6px;
+    height: 26px; padding: 0 12px; font-size: 10.5px; letter-spacing: 0.08em; color: #6f93bd;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.22); background: rgba(63, 120, 200, 0.08);
+  }
+  .ym-dg-head span:nth-child(2), .ym-dg-head span:nth-child(3) { text-align: center; }
+  .ym-dg-head span:nth-child(5) { text-align: right; }
+
+  .ym-doc { flex: 1; min-height: 0; margin: 0; padding: 7px 12px 5px; list-style: none; display: flex; flex-direction: column; justify-content: space-between; }
+  .ym-doc li { display: flex; gap: 7px; font-size: 11px; line-height: 1.42; color: #b6cbe4; letter-spacing: 0.01em; }
+  .ym-doc li s { flex: none; text-decoration: none; width: 15px; height: 15px; margin-top: 1px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font: 700 9px/1 var(--ym-mono); color: #2a1c05; background: linear-gradient(140deg, var(--ym-gold-soft), #d8a03c); }
+  .ym-doc li b { color: var(--ym-gold-soft); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .ym-doc li em { font-style: normal; color: var(--ym-cyan); }
+
+  /* ===== 底部：月度热力明细表（CSS grid，非 table） =====
+     内部：面板头 36 + 表头 28 + 6 行 × 25 + 合计行 26 = 240 */
+  .ym-tbl { grid-column: 1 / -1; grid-row: 4; }
+  .ym-thead, .ym-tbody li, .ym-tfoot {
+    display: grid;
+    grid-template-columns: 150px repeat(7, 1fr) 108px 92px;
+    align-items: center; gap: 8px; padding: 0 14px;
+  }
+  .ym-thead {
+    flex: none; height: 28px; font-size: 11px; letter-spacing: 0.08em; color: #6f93bd;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.22); background: rgba(63, 120, 200, 0.08);
+  }
+  .ym-thead span:nth-child(n+2) { text-align: center; }
+  .ym-thead span:nth-child(9), .ym-thead span:nth-child(10) { text-align: right; }
+  .ym-tbody { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+  .ym-tbody li {
+    flex: 1; min-height: 0; cursor: pointer;
+    font-size: 12.5px; font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.08);
+    transition: box-shadow 0.25s ease;
+  }
+  .ym-tbody li.is-focus { box-shadow: inset 3px 0 0 var(--ym-gold), inset 0 0 0 1px rgba(240, 192, 96, 0.28); }
+  .ym-td-name { display: flex; align-items: center; gap: 7px; color: #eaf4ff; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ym-td-dot { flex: none; width: 9px; height: 9px; border-radius: 2px; }
+  .ym-hc {
+    display: flex; align-items: center; justify-content: center; height: 21px; border-radius: 5px;
+    font: 700 12.5px/1 var(--ym-mono); color: #e9f3ff; border: 1px solid transparent;
+  }
+  .ym-hc.is-peak { border-color: rgba(51, 224, 166, 0.85); color: #ffffff; }
+  .ym-hc.is-low { border-color: rgba(255, 157, 77, 0.6); }
+  .ym-td-cum { text-align: right; font: 700 13.5px/1 var(--ym-mono); color: var(--ym-gold-soft); }
+  .ym-td-yoy { text-align: right; font-size: 12px; font-weight: 700; }
+  .ym-tfoot {
+    flex: none; height: 26px; border-top: 1px solid rgba(240, 192, 96, 0.32); background: rgba(72, 56, 24, 0.34);
+    font-size: 12px; color: var(--ym-muted); font-variant-numeric: tabular-nums;
+  }
+  .ym-tfoot span { text-align: center; }
+  .ym-tfoot span:first-child { text-align: left; letter-spacing: 0.06em; color: #cfe2f8; font-weight: 700; }
+  .ym-tfoot span:nth-child(9), .ym-tfoot span:nth-child(10) { text-align: right; }
+  .ym-tfoot b { font: 700 13px/1 var(--ym-mono); color: var(--ym-gold-soft); }
+
+  @keyframes ym-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .ym-live { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ym-cyan); box-shadow: 0 0 8px var(--ym-cyan); animation: ym-pulse 1.8s ease-in-out infinite; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .ym-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="ym-stage" id="ym-stage">
+    <!-- mockflag:begin --><div class="ym-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="ym-error" id="ym-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- ===== 页头 ===== -->
+    <header class="ym-header">
+      <div class="ym-head-left">
+        <div class="ym-crumb">
+          <b>公共资金</b><i>›</i>
+          <a class="ym-crumb-up" href="大屏样板间-公共资金收入分项目1920.html">收入分项目</a><i>›</i>
+          <em id="ym-crumb-obj">主体税种月度走势</em>
+        </div>
+        <div class="ym-head-title-row">
+          <div class="ym-head-title">主体税种月度走势 · 六税叠加</div>
+          <div class="ym-head-meta">
+            <span>口径 <b>地方一般公共预算收入 · 主体税种</b></span><i>|</i>
+            <span>区间 <b>2026 年 1-7 月</b></span><i>|</i>
+            <span>时间进度 <b id="ym-timeprog">--%</b></span><i>|</i>
+            <span>视图 <b id="ym-viewname">原值</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="ym-head-right">
+        <div class="ym-tie" aria-label="与父页对账">
+          <span class="ym-tie-t"><span class="ym-live"></span> TIE TO PARENT</span>
+          <span class="ym-tie-v" id="ym-tie-v">6 税种合计 <b>--</b> 亿元 · 占税收 <b>--</b></span>
+        </div>
+        <button class="ym-back" id="ym-back" type="button" title="返回收入分项目（Esc）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/><path d="M7 12 H20"/></svg>
+          返回
+        </button>
+        <div class="ym-clock" aria-label="实时时钟">
+          <span class="ym-clock-time" id="ym-clock-time">--:--:--</span>
+          <span class="ym-clock-date" id="ym-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===== KPI 带 ===== -->
+    <section class="ym-band" id="ym-band" aria-label="主体税种核心指标"></section>
+
+    <!-- ===== 主图：6 税种叠加折线 ===== -->
+    <section class="ym-panel ym-main">
+      <header class="ym-panel-head"><i></i><h2>六个主体税种月度叠加走势</h2><span class="ym-panel-en">SIX MAJOR TAXES OVERLAID</span><span class="ym-panel-scope" id="ym-main-scope">原值 · 亿元</span></header>
+      <div class="ym-chipbar" id="ym-chipbar" aria-label="视图切换">
+        <span class="ym-chip-label">视图</span>
+        <button class="ym-chip is-on" type="button" data-view="0">原值<i>亿元</i></button>
+        <button class="ym-chip" type="button" data-view="1">指数化<i>1月=100</i></button>
+        <button class="ym-chip" type="button" data-view="2">月度占比<i>%</i></button>
+        <button class="ym-chip" type="button" data-view="3">累计<i>亿元</i></button>
+        <span class="ym-focus" id="ym-focus">聚焦 <b id="ym-focus-name">--</b><u id="ym-focus-clear" title="取消聚焦">×</u></span>
+        <span class="ym-chip-hint">← → 切视图 · 点图例可隐藏单条 · 点右侧诊断行或下方表格行可聚焦该税种</span>
+      </div>
+      <div class="ym-chart" id="ym-chart-main" role="img" aria-label="六个主体税种 1 至 7 月叠加折线图"></div>
+      <div class="ym-note" id="ym-note">—</div>
+    </section>
+
+    <!-- ===== 右列：节奏诊断 + 口径说明 ===== -->
+    <div class="ym-side">
+      <section class="ym-panel ym-side-diag">
+        <header class="ym-panel-head"><i></i><h2>节奏诊断</h2><span class="ym-panel-en">RHYTHM</span><span class="ym-panel-scope" id="ym-diag-scope">按变异系数降序</span></header>
+        <div class="ym-dg-head"><span>税种</span><span>峰值月</span><span>谷值月</span><span>月度变异系数</span><span>CV</span></div>
+        <ul class="ym-dg" id="ym-dg"></ul>
+      </section>
+      <section class="ym-panel ym-side-doc">
+        <header class="ym-panel-head"><i></i><h2>口径与结论</h2><span class="ym-panel-en">NOTES</span><span class="ym-panel-scope">现算</span></header>
+        <ul class="ym-doc" id="ym-doc"></ul>
+      </section>
+    </div>
+
+    <!-- ===== 底部：月度热力明细表 ===== -->
+    <section class="ym-panel ym-tbl">
+      <header class="ym-panel-head"><i></i><h2>主体税种月度明细（热力）</h2><span class="ym-panel-en">MONTHLY HEAT LEDGER</span><span class="ym-panel-scope" id="ym-tbl-scope">--</span></header>
+      <div class="ym-thead">
+        <span>税种</span><span>1月</span><span>2月</span><span>3月</span><span>4月</span><span>5月</span><span>6月</span><span>7月</span><span>1-7月累计</span><span>同比</span>
+      </div>
+      <ul class="ym-tbody" id="ym-tbody"></ul>
+      <div class="ym-tfoot" id="ym-tfoot"></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口） ===== */
+  const stage = document.getElementById("ym-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("ym-error");
+  function fail(msg) { errorNode.textContent = msg; errorNode.classList.add("is-visible"); }
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e8f2ff", muted: "#8ea9cc",
+    gold: "#f0c060", goldSoft: "#ffdc8f", goldDeep: "#b8863a",
+    blue: "#3d9cff", cyan: "#39d0d8", green: "#33e0a6", red: "#ff5f6e", orange: "#ff9d4d"
+  };
+  const PARENT = "大屏样板间-公共资金收入分项目1920.html";
+  const pad2 = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = Number(n).toFixed(dec == null ? 0 : dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const signed = (v, d) => (v >= 0 ? "+" : "") + fmtDec(v, d == null ? 1 : d);
+
+  /* ===== 3. 数据源（与父页「收入分项目」TAX_MONTHLY / TAX_DEF 逐字一致，不得改动）
+     锚点：6 个主体税种 1-7 月累计 4,840 亿元；税收收入 5,760 亿元；占比 84.03% ===== */
+  const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月"];
+  const TAX_REVENUE = 5760;                       /* 父页 12 个税种合计（税收收入） */
+  const DAY_OF_YEAR = 212, DAYS_IN_YEAR = 365;
+  const TIME_PROG = 100 * DAY_OF_YEAR / DAYS_IN_YEAR;
+
+  const TAXES = [
+    { name: "增值税",         short: "增值税",   yoy: 4.4,  expect: 1980, color: C.goldSoft, m: [340, 218, 254, 346, 268, 306, 248] },
+    { name: "企业所得税",     short: "企业所得税", yoy: 1.9,  expect: 1120, color: C.blue,     m: [180,  96, 132, 268, 156, 172, 116] },
+    { name: "个人所得税",     short: "个人所得税", yoy: 7.4,  expect: 480,  color: C.green,    m: [ 78,  52,  60,  84,  64,  76,  66] },
+    { name: "契税",           short: "契税",     yoy: -8.4, expect: 460,  color: C.orange,   m: [ 86,  74,  70,  66,  60,  54,  50] },
+    { name: "土地增值税",     short: "土地增值税", yoy: -6.2, expect: 420,  color: C.red,      m: [ 76,  68,  64,  60,  56,  52,  44] },
+    { name: "城市维护建设税", short: "城建税",   yoy: 3.4,  expect: 380,  color: C.cyan,     m: [ 62,  44,  50,  66,  52,  58,  48] }
+  ];
+
+  /* ===== 4. 派生量：全部现算，一个数不写死 ===== */
+  const N = MONTHS.length;
+  TAXES.forEach((t) => {
+    t.total = sum(t.m);
+    t.tie = t.total === t.expect;                          /* 逐个断言：7 月之和 = 累计 */
+    t.mean = t.total / N;
+    t.sd = Math.sqrt(sum(t.m.map((v) => (v - t.mean) * (v - t.mean))) / N);
+    t.cv = 100 * t.sd / t.mean;                            /* 月度变异系数 */
+    t.idx = t.m.map((v) => 100 * v / t.m[0]);              /* 指数化：1 月 = 100 */
+    t.share = t.m.map((v) => 100 * v / t.total);           /* 月度占比：7 点之和恒 = 100 */
+    t.cum = t.m.map((v, i) => sum(t.m.slice(0, i + 1)));   /* 累计：末点 = 累计数 */
+    t.peak = t.m.indexOf(Math.max.apply(null, t.m));
+    t.trough = t.m.indexOf(Math.min.apply(null, t.m));
+    t.pre = t.total / (1 + t.yoy / 100);
+    t.big = t.mean >= 100;                                 /* 量级分组：大税种 vs 小税种 */
+  });
+  const TAX_BY_NAME = {};
+  TAXES.forEach((t) => { TAX_BY_NAME[t.name] = t; });
+
+  const TOTAL = sum(TAXES.map((t) => t.total));                                  /* 4,840 */
+  const SHARE_OF_TAX = 100 * TOTAL / TAX_REVENUE;                                /* 84.03% */
+  const MT = MONTHS.map((_, i) => sum(TAXES.map((t) => t.m[i])));                /* 月度合计 */
+  const MTC = MT.map((_, i) => sum(MT.slice(0, i + 1)));                         /* 月度累计合计 */
+  const MT_MEAN = TOTAL / N;
+  const PEAK_M = MT.indexOf(Math.max.apply(null, MT));
+  const LOW_M = MT.indexOf(Math.min.apply(null, MT));
+  const PRE_TOTAL = sum(TAXES.map((t) => t.pre));
+  const YOY_TOTAL = 100 * (TOTAL / PRE_TOTAL - 1);
+  const CV_SORTED = TAXES.slice().sort((a, b) => b.cv - a.cv);
+  const CV_MAX = CV_SORTED[0], CV_MIN = CV_SORTED[CV_SORTED.length - 1];
+  const CV_TOP = Math.max.apply(null, TAXES.map((t) => t.cv));
+  const BIG = TAXES.filter((t) => t.big).sort((a, b) => b.mean - a.mean)[0];
+  const SMALL = TAXES.filter((t) => !t.big).sort((a, b) => a.mean - b.mean)[0];
+  const MAG_RATIO = BIG.mean / SMALL.mean;
+  const SMALL_CAP = 100;                                                          /* 小税种密集带上沿（亿元） */
+
+  /* ===== 5. 四种视图定义：口径 / y 轴单位 / 小数位 / 取数 ===== */
+  const VIEWS = [
+    { key: "原值",   label: "原值",             en: "RAW",           yName: "亿元",                unit: "亿元", suffix: "",  dec: 0, min0: true,  get: (t) => t.m },
+    { key: "指数化", label: "指数化（1月=100）", en: "INDEX 1M=100",  yName: "指数（1月=100）",      unit: "",     suffix: "",  dec: 1, min0: false, get: (t) => t.idx },
+    { key: "占比",   label: "月度占比",         en: "MONTHLY SHARE", yName: "占本税种 1-7 月累计 %", unit: "%",    suffix: "%", dec: 2, min0: true,  get: (t) => t.share },
+    { key: "累计",   label: "累计",             en: "CUMULATIVE",    yName: "累计 亿元",            unit: "亿元", suffix: "",  dec: 0, min0: true,  get: (t) => t.cum }
+  ];
+  let viewIdx = 0;
+  let focusTax = null;
+  let legendSel = null;
+
+  /* ===== 6. 时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("ym-clock-time").textContent = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+    $("ym-clock-date").textContent = d.getFullYear() + "年" + pad2(d.getMonth() + 1) + "月" + pad2(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("ym-timeprog").textContent = TIME_PROG.toFixed(2) + "%";
+  $("ym-tie-v").innerHTML = "6 税种合计 <b>" + fmtDec(TOTAL) + "</b> 亿元 · 占税收 <b>" + SHARE_OF_TAX.toFixed(2) + "%</b>";
+
+  /* ===== 7. ★ 所有 flex:none 的同级块先落地，最后才 echarts.init ===== */
+
+  /* 7.1 KPI 带 */
+  const KPI_DEFS = [
+    { icon: "¥", label: "6 个主体税种合计", unit: "亿元", dec: 0, val: TOTAL,
+      sub: "占税收收入 <b>" + SHARE_OF_TAX.toFixed(2) + "%</b> · 同比 <b class=\"" + (YOY_TOTAL >= 0 ? "ym-up" : "ym-down") + "\">" + signed(YOY_TOTAL, 2) + "%</b>" },
+    { icon: "%", label: "占税收收入比重", unit: "%", dec: 2, val: SHARE_OF_TAX,
+      sub: "税收收入 <b>" + fmtDec(TAX_REVENUE) + "</b> 亿元 · 其余 6 税种 <b>" + fmtDec(TAX_REVENUE - TOTAL) + "</b> 亿元" },
+    { icon: "▲", label: "峰值月 · " + MONTHS[PEAK_M], unit: "亿元", dec: 0, val: MT[PEAK_M],
+      sub: "高于月均 <b>" + signed(100 * (MT[PEAK_M] / MT_MEAN - 1), 1) + "%</b> · 占 1-7 月 <b>" + (100 * MT[PEAK_M] / TOTAL).toFixed(2) + "%</b>" },
+    { icon: "▼", label: "谷值月 · " + MONTHS[LOW_M], unit: "亿元", dec: 0, val: MT[LOW_M],
+      sub: "低于月均 <b>" + signed(100 * (MT[LOW_M] / MT_MEAN - 1), 1) + "%</b> · 峰谷差 <b>" + fmtDec(MT[PEAK_M] - MT[LOW_M]) + "</b> 亿元" },
+    { icon: "∿", label: "波动最大 · " + CV_MAX.name, unit: "%", dec: 2, val: CV_MAX.cv,
+      sub: "月度变异系数 · 最平稳 <b>" + CV_MIN.short + " " + CV_MIN.cv.toFixed(2) + "%</b>" }
+  ];
+  const band = $("ym-band");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "ym-kpi";
+    card.innerHTML =
+      '<div class="ym-kpi-icon">' + k.icon + '</div>' +
+      '<div class="ym-kpi-main">' +
+        '<div class="ym-kpi-label">' + k.label + '</div>' +
+        '<div class="ym-kpi-num"><span class="ym-kpi-val">0</span><span class="ym-kpi-unit">' + k.unit + '</span></div>' +
+        '<div class="ym-kpi-sub">' + k.sub + '</div>' +
+      '</div>';
+    band.appendChild(card);
+    k.node = card.querySelector(".ym-kpi-val");
+  });
+  /* 翻牌缓动：按 performance.now() 算进度（不按帧步进），setInterval 驱动（rAF 在后台会停摆） */
+  const FLIP_MS = 1200, flipT0 = performance.now();
+  const flipTimer = setInterval(() => {
+    const p = Math.min(1, (performance.now() - flipT0) / FLIP_MS);
+    const e = 1 - Math.pow(1 - p, 3);
+    KPI_DEFS.forEach((k) => { k.node.textContent = fmtDec(k.val * e, k.dec); });
+    if (p >= 1) clearInterval(flipTimer);
+  }, 60);
+
+  /* 7.2 右列诊断表 */
+  function renderDiag() {
+    $("ym-dg").innerHTML = CV_SORTED.map((t) =>
+      '<li data-tax="' + t.name + '">' +
+        '<span class="ym-dg-name"><i class="ym-dg-dot" style="background:' + t.color + '"></i>' + t.short + '</span>' +
+        '<span class="ym-dg-pk">' + MONTHS[t.peak] + " " + fmtDec(t.m[t.peak]) + '</span>' +
+        '<span class="ym-dg-tr">' + MONTHS[t.trough] + " " + fmtDec(t.m[t.trough]) + '</span>' +
+        '<span class="ym-dg-bar"><u style="width:0"></u></span>' +
+        '<span class="ym-dg-cv">' + t.cv.toFixed(1) + '%</span>' +
+      '</li>').join("");
+    const bars = $("ym-dg").querySelectorAll(".ym-dg-bar u");
+    setTimeout(() => {
+      CV_SORTED.forEach((t, i) => { if (bars[i]) bars[i].style.width = (100 * t.cv / CV_TOP).toFixed(1) + "%"; });
+    }, 80);
+  }
+  renderDiag();
+  $("ym-diag-scope").textContent = "CV = 月度标准差 ÷ 月均";
+
+  /* 7.3 右列口径说明（全部由数据现算，不写死） */
+  const CT = TAX_BY_NAME["企业所得税"], QS = TAX_BY_NAME["契税"], TZ = TAX_BY_NAME["土地增值税"];
+  const V_SHAPE = TAXES.filter((t) => t.peak === PEAK_M && t.trough === LOW_M).length;
+  const DOC = [
+    "口径：地方一般公共预算收入 · 6 个主体税种，2026 年 1-7 月。合计 <b>" + fmtDec(TOTAL) +
+      "</b> 亿元，占税收收入 <b>" + fmtDec(TAX_REVENUE) + "</b> 亿元的 <b>" + SHARE_OF_TAX.toFixed(2) + "%</b>，与父页逐数对账。",
+    "<em>" + MONTHS[PEAK_M] + "高点</em>：上年度企业所得税汇算清缴集中申报入库，" + CT.name + " " + MONTHS[CT.peak] +
+      " <b>" + fmtDec(CT.m[CT.peak]) + "</b> 亿元＝月均的 <b>" + (CT.m[CT.peak] / CT.mean).toFixed(2) +
+      " 倍</b>，单月把六税推到 <b>" + fmtDec(MT[PEAK_M]) + "</b> 亿元。",
+    "<em>" + MONTHS[LOW_M] + "低点</em>：春节工作日少、申报期顺延，六税合计 <b>" + fmtDec(MT[LOW_M]) +
+      "</b> 亿元，较峰值月低 <b>" + fmtDec(MT[PEAK_M] - MT[LOW_M]) + "</b> 亿元（<b>" +
+      (100 * (1 - MT[LOW_M] / MT[PEAK_M])).toFixed(1) + "%</b>）。",
+    "<em>反向节奏</em>：" + QS.short + "、" + TZ.short + " 自 1 月单调回落至指数 <b>" +
+      QS.idx[N - 1].toFixed(1) + "</b>/<b>" + TZ.idx[N - 1].toFixed(1) + "</b>（同比 " + signed(QS.yoy) + "%/" +
+      signed(TZ.yoy) + "%），土地市场降温；其余 " + V_SHAPE + " 税均为「" + MONTHS[LOW_M] + "探底—" + MONTHS[PEAK_M] + "冲高」。",
+    "<em>量级差</em>：" + BIG.short + "月均 <b>" + BIG.mean.toFixed(1) + "</b> 亿元＝" + SMALL.short + " <b>" +
+      SMALL.mean.toFixed(1) + "</b> 亿元的 <b>" + MAG_RATIO.toFixed(2) + " 倍</b>，原值视图只能读高低，节奏形状看「指数化」。"
+  ];
+  $("ym-doc").innerHTML = DOC.map((d, i) => '<li><s>' + (i + 1) + '</s><span>' + d + '</span></li>').join("");
+
+  /* 7.4 底部月度热力表（CSS grid，非 <table>；单元格按行内数值深浅着色） */
+  function heatBg(v, lo, hi) {
+    const t = hi > lo ? (v - lo) / (hi - lo) : 0.5;
+    return "rgba(240, 192, 96, " + (0.07 + 0.44 * t).toFixed(3) + ")";
+  }
+  function renderTable() {
+    $("ym-tbody").innerHTML = TAXES.map((t) => {
+      const lo = t.m[t.trough], hi = t.m[t.peak];
+      const cells = t.m.map((v, i) =>
+        '<span class="ym-hc' + (i === t.peak ? " is-peak" : (i === t.trough ? " is-low" : "")) +
+        '" style="background:' + heatBg(v, lo, hi) + '">' + fmtDec(v) + '</span>').join("");
+      return '<li data-tax="' + t.name + '">' +
+        '<span class="ym-td-name"><i class="ym-td-dot" style="background:' + t.color + '"></i>' + t.name + '</span>' +
+        cells +
+        '<span class="ym-td-cum">' + fmtDec(t.total) + '</span>' +
+        '<span class="ym-td-yoy" style="color:' + (t.yoy >= 0 ? C.green : C.red) + '">' + signed(t.yoy) + '%</span>' +
+      '</li>';
+    }).join("");
+    const lo = MT[LOW_M], hi = MT[PEAK_M];
+    $("ym-tfoot").innerHTML =
+      '<span>月度合计（6 税种）</span>' +
+      MT.map((v, i) =>
+        '<span><b style="color:' + (i === PEAK_M ? C.green : (i === LOW_M ? C.orange : C.goldSoft)) + '">' + fmtDec(v) + '</b></span>').join("") +
+      '<span><b>' + fmtDec(sum(MT)) + '</b></span>' +
+      '<span style="color:' + (YOY_TOTAL >= 0 ? C.green : C.red) + ';font-weight:700">' + signed(YOY_TOTAL, 2) + '%</span>';
+    void lo; void hi;
+    $("ym-tbl-scope").textContent = "6 税种 × 7 个月 · 合计 " + fmtDec(TOTAL) + " 亿元 · 底色深浅 = 该税种行内高低";
+  }
+  renderTable();
+
+  /* ===== 8. ★ 至此所有 flex:none 区块已落地，图表只 init 一次，且全程不调 resize ===== */
+  const chart = echarts.init($("ym-chart-main"));
+  chart.on("legendselectchanged", (e) => { legendSel = Object.assign({}, e.selected); });
+
+  const tipBase = {
+    trigger: "axis", confine: true,
+    axisPointer: { type: "line", lineStyle: { color: "rgba(240, 192, 96, 0.45)", width: 1, type: [4, 4] } },
+    backgroundColor: "rgba(8, 26, 50, 0.94)", borderColor: "rgba(240, 192, 96, 0.45)",
+    textStyle: { color: "#e2eeff", fontSize: 12 }
+  };
+  const AXIS_LINE = { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } };
+  const SPLIT_LINE = { lineStyle: { color: "rgba(92, 156, 226, 0.13)" } };
+
+  function yBounds(V) {
+    let lo = Infinity, hi = -Infinity;
+    TAXES.forEach((t) => { V.get(t).forEach((v) => { if (v < lo) lo = v; if (v > hi) hi = v; }); });
+    if (V.min0) return { min: 0, max: null };
+    const step = 20;
+    return { min: Math.floor((lo - 6) / step) * step, max: Math.ceil((hi + 6) / step) * step };
+  }
+
+  function buildOption() {
+    const V = VIEWS[viewIdx];
+    const yb = yBounds(V);
+    const fmtV = (v) => fmtDec(v, V.dec) + V.suffix;
+
+    const series = TAXES.map((t) => {
+      const dimmed = focusTax && focusTax !== t.name;
+      const hot = focusTax === t.name;
+      /* ★ 原值视图下小税种被大税种压平的对策：小税种线更粗、色更亮并带辉光，
+         大税种降到 0.76 不透明度退为背景；四个视图统一挂端点标注，避免只靠图例认线。 */
+      const baseW = (V.key === "原值") ? (t.big ? 2.2 : 3.4) : 2.6;
+      return {
+        name: t.name, type: "line", smooth: 0.26,
+        symbol: "circle", showSymbol: false, symbolSize: 7,   /* ★ 绝不写 symbol:"none"，否则 markPoint 会抛错 */
+        z: hot ? 12 : (t.big ? 3 : 5),
+        lineStyle: {
+          width: hot ? 4.4 : baseW, color: t.color,
+          opacity: dimmed ? 0.13 : (V.key === "原值" && t.big ? 0.76 : 1),
+          shadowColor: t.color, shadowBlur: hot ? 18 : (!t.big && V.key === "原值" ? 10 : 0)
+        },
+        itemStyle: { color: t.color, borderColor: "#062036", borderWidth: 2, opacity: dimmed ? 0.13 : 1 },
+        endLabel: {
+          show: true, distance: 7, fontSize: 11, fontWeight: 700, color: t.color,
+          opacity: dimmed ? 0.18 : 1,
+          formatter: () => t.short + " " + fmtV(V.get(t)[N - 1])
+        },
+        /* 小税种末点值挨得极近（原值视图 44/48/50/66），端点标注必须让引擎纵向错开 */
+        labelLayout: { moveOverlap: "shiftY", hideOverlap: false },
+        emphasis: { focus: "series", lineStyle: { width: baseW + 1.6 } },
+        blur: { lineStyle: { opacity: 0.1 }, itemStyle: { opacity: 0.1 }, endLabel: { opacity: 0.12 } },
+        data: V.get(t)
+      };
+    });
+
+    /* markPoint：无聚焦时标「波动最大税种」的峰值月；聚焦时补标谷值月。
+       累计视图单调递增，「峰/谷」无意义 —— 改标末点，直接读出 1-7 月累计数。 */
+    const mp = focusTax ? TAX_BY_NAME[focusTax] : CV_MAX;
+    const mpi = TAXES.indexOf(mp);
+    const isCum = V.key === "累计";
+    /* 首末月的标注若还挂 top/bottom 会被画布左右边缘切掉，改挂内侧 */
+    const mpPos = (i, prefer) => (i === 0 ? "right" : (i === N - 1 ? "left" : prefer));
+    /* 挂到内侧时再纵向抬/压一档，免得标签压在曲线上 */
+    const mpOff = (i, dy) => (i === 0 || i === N - 1 ? [0, dy] : [0, 0]);
+    const mpData = [{
+      coord: isCum ? [N - 1, V.get(mp)[N - 1]] : [mp.peak, V.get(mp)[mp.peak]],
+      value: isCum
+        ? mp.short + " 末点 = 累计 " + fmtV(V.get(mp)[N - 1])
+        : mp.short + " 峰 " + MONTHS[mp.peak] + " " + fmtV(V.get(mp)[mp.peak]),
+      itemStyle: { color: mp.color, borderColor: "#04101f", borderWidth: 2, shadowColor: mp.color, shadowBlur: 12 },
+      label: {
+        position: isCum ? "left" : mpPos(mp.peak, "top"), borderColor: mp.color,
+        offset: isCum ? [0, -18] : mpOff(mp.peak, -16)
+      }
+    }];
+    if (focusTax && !isCum) {
+      mpData.push({
+        coord: [mp.trough, V.get(mp)[mp.trough]],
+        value: mp.short + " 谷 " + MONTHS[mp.trough] + " " + fmtV(V.get(mp)[mp.trough]),
+        itemStyle: { color: "#04101f", borderColor: mp.color, borderWidth: 2 },
+        label: { position: mpPos(mp.trough, "bottom"), borderColor: mp.color, offset: mpOff(mp.trough, 16) }
+      });
+    }
+    series[mpi].markPoint = {
+      silent: true, symbol: "circle", symbolSize: 11,
+      label: {
+        show: true, distance: 9, fontSize: 10.5, fontWeight: 700, color: "#ffffff",
+        backgroundColor: "rgba(8, 26, 50, 0.86)", borderWidth: 1, borderRadius: 4, padding: [3, 6],
+        formatter: (p) => p.value
+      },
+      data: mpData
+    };
+
+    /* markArea / markLine 挂在第 0 条上，随视图切换（notMerge 保证不残留） */
+    if (V.key === "原值" && !focusTax) {
+      series[0].markArea = {
+        silent: true,
+        itemStyle: { color: "rgba(57, 208, 216, 0.055)", borderColor: "rgba(57, 208, 216, 0.22)", borderWidth: 1 },
+        label: {
+          show: true, position: "insideTopLeft", distance: 6, color: "#6f9fc4", fontSize: 10.5,
+          formatter: "小税种密集区 0 - " + SMALL_CAP + " 亿元（4 条曲线落在此带内）"
+        },
+        data: [[{ yAxis: 0 }, { yAxis: SMALL_CAP }]]
+      };
+    }
+    if (V.key === "指数化") {
+      series[0].markLine = {
+        silent: true, symbol: "none",
+        lineStyle: { color: "rgba(255, 255, 255, 0.6)", width: 1.4, type: [5, 4] },
+        label: { show: true, position: "insideEndTop", color: "#cfe2f8", fontSize: 10.5, formatter: "1 月基期 = 100" },
+        data: [{ yAxis: 100 }]
+      };
+    }
+    if (V.key === "占比") {
+      series[0].markLine = {
+        silent: true, symbol: "none",
+        lineStyle: { color: "rgba(255, 255, 255, 0.6)", width: 1.4, type: [5, 4] },
+        label: { show: true, position: "insideEndTop", color: "#cfe2f8", fontSize: 10.5, formatter: "均匀分布 " + (100 / N).toFixed(2) + "%" },
+        data: [{ yAxis: 100 / N }]
+      };
+    }
+
+    return {
+      color: TAXES.map((t) => t.color),
+      tooltip: Object.assign({}, tipBase, {
+        formatter: (ps) => {
+          if (!ps || !ps.length) return "";
+          const i = ps[0].dataIndex;
+          const rows = ps.slice().sort((a, b) => b.value - a.value);
+          let html = '<div style="font-weight:700;color:#ffdc8f;margin-bottom:5px">' + MONTHS[i] + " · " + V.label + "</div>";
+          rows.forEach((p) => {
+            const t = TAX_BY_NAME[p.seriesName];
+            if (!t) return;
+            html += '<div style="display:flex;align-items:center;gap:10px;line-height:1.75">' +
+              '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + t.color + '"></span>' +
+              '<span style="min-width:88px">' + p.seriesName + "</span>" +
+              '<b style="color:' + t.color + ';margin-left:auto">' + fmtV(p.value) + "</b>" +
+              (V.key === "指数化" ? '<span style="color:#8ea9cc">(' + fmtDec(t.m[i]) + " 亿元)</span>"
+               : (V.key === "占比" ? '<span style="color:#8ea9cc">(' + fmtDec(t.m[i]) + " 亿元)</span>" : "")) +
+              "</div>";
+          });
+          if (V.key === "原值") html += '<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(240,192,96,0.3)">当月六税合计 <b style="color:#ffdc8f">' + fmtDec(MT[i]) + '</b> 亿元 · 占 1-7 月 ' + (100 * MT[i] / TOTAL).toFixed(2) + '%</div>';
+          if (V.key === "累计") html += '<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(240,192,96,0.3)">累计六税合计 <b style="color:#ffdc8f">' + fmtDec(MTC[i]) + '</b> 亿元 · 进度 ' + (100 * MTC[i] / TOTAL).toFixed(2) + '%</div>';
+          return html;
+        }
+      }),
+      /* 图例靠右：左上角要留给 y 轴单位名，两者同排会叠字 */
+      legend: {
+        top: 7, right: 14, itemWidth: 18, itemHeight: 4, itemGap: 20, icon: "roundRect",
+        textStyle: { color: "#c6dcf5", fontSize: 12.5 }, inactiveColor: "#3f5a7a",
+        selected: legendSel || undefined
+      },
+      grid: { left: 20, right: 128, top: 48, bottom: 12, containLabel: true },
+      xAxis: {
+        type: "category", data: MONTHS, boundaryGap: false,
+        axisLine: AXIS_LINE, axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 12.5 },
+        splitLine: { show: true, lineStyle: { color: "rgba(92, 156, 226, 0.08)" } }
+      },
+      yAxis: {
+        type: "value", name: V.yName, nameGap: 14,
+        nameTextStyle: { color: "#7fa6cf", fontSize: 11.5, align: "left", padding: [0, 0, 0, -4] },
+        min: yb.min, max: yb.max, splitLine: SPLIT_LINE, axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 11.5, formatter: (v) => fmtDec(v, V.dec === 2 ? 0 : V.dec) + V.suffix }
+      },
+      series: series,
+      animationDuration: 680, animationDurationUpdate: 620
+    };
+  }
+
+  /* ===== 9. 解读文案：每个视图一句，全部现算 ===== */
+  function noteHtml() {
+    const V = VIEWS[viewIdx];
+    if (V.key === "原值") {
+      const inBand = TAXES.filter((t) => Math.max.apply(null, t.m) <= SMALL_CAP).length;
+      return "y 轴 <b>亿元</b>（原始规模）。" + BIG.short + " 月均 <b>" + BIG.mean.toFixed(1) + "</b> 亿元是 " +
+        SMALL.short + " <b>" + SMALL.mean.toFixed(1) + "</b> 亿元的 <b>" + MAG_RATIO.toFixed(2) + " 倍</b>，" +
+        "<em>" + inBand + " 条曲线被压在 0-" + SMALL_CAP + " 亿元带内</em>——已用粗线+亮色+端点标注把小税种拉出，形状对比请切「指数化」。";
+    }
+    if (V.key === "指数化") {
+      return "y 轴 <b>指数（1月=100）</b>，量级差已消除，只看节奏形状。" +
+        "<em>" + CT.short + " " + MONTHS[CT.peak] + "冲到 " + CT.idx[CT.peak].toFixed(1) + "</em>（汇算清缴），" +
+        "而 " + QS.short + " / " + TZ.short + " 单调下行至 <b>" + QS.idx[N - 1].toFixed(1) + "</b> / <b>" +
+        TZ.idx[N - 1].toFixed(1) + "</b>，两类节奏完全反向。";
+    }
+    if (V.key === "占比") {
+      const best = TAXES.slice().sort((a, b) => b.share[PEAK_M] - a.share[PEAK_M])[0];
+      return "y 轴 <b>占本税种 1-7 月累计 %</b>，<em>每条线 7 个点之和恒为 100.00%</em>。" +
+        MONTHS[PEAK_M] + "占比最高的是 <b>" + best.short + " " + best.share[PEAK_M].toFixed(2) + "%</b>；" +
+        QS.short + " / " + TZ.short + " 的占比高点落在 " + MONTHS[QS.peak] + " <b>" + QS.share[QS.peak].toFixed(2) +
+        "%</b> / <b>" + TZ.share[TZ.peak].toFixed(2) + "%</b>，均匀分布参考线为 " + (100 / N).toFixed(2) + "%。";
+    }
+    const names = TAXES.map((t) => t.short + " " + fmtDec(t.total)).join("、");
+    return "y 轴 <b>累计 亿元</b>，<em>末点即 1-7 月累计数</em>：" + names + "，合计 <b>" + fmtDec(TOTAL) +
+      "</b> 亿元，占税收收入 <b>" + SHARE_OF_TAX.toFixed(2) + "%</b>（时间进度 " + TIME_PROG.toFixed(2) + "%）。";
+  }
+
+  /* ===== 10. 应用视图 / 聚焦（图表只 setOption，绝不重新 init、绝不 resize） ===== */
+  const chips = Array.prototype.slice.call($("ym-chipbar").querySelectorAll(".ym-chip"));
+  function apply() {
+    const V = VIEWS[viewIdx];
+    chips.forEach((c) => c.classList.toggle("is-on", Number(c.getAttribute("data-view")) === viewIdx));
+    $("ym-viewname").textContent = V.label;
+    $("ym-main-scope").textContent = V.key + " · y 轴 " + V.yName + (focusTax ? " · 聚焦 " + focusTax : "");
+    $("ym-crumb-obj").textContent = "主体税种月度走势 · " + V.key + (focusTax ? " · " + focusTax : "");
+    document.title = "大屏样板间 · 公共资金主体税种月度走势 · " + V.key;
+    $("ym-note").innerHTML = noteHtml();
+
+    const fnode = $("ym-focus");
+    fnode.classList.toggle("is-visible", !!focusTax);
+    if (focusTax) $("ym-focus-name").textContent = focusTax;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-tax]"), (el) => {
+      el.classList.toggle("is-focus", el.getAttribute("data-tax") === focusTax);
+    });
+
+    /* notMerge：视图间 markPoint / markArea / markLine 结构不同，合并会残留旧标注。
+       代价是图例勾选态会被重置，所以每次重建前从图表模型里取回当前勾选态再下发。
+       （只监听 legendselectchanged 不够：dispatchAction 触发的选择变更不一定走该事件） */
+    const prevOpt = chart.getOption();
+    if (prevOpt && prevOpt.legend && prevOpt.legend[0] && prevOpt.legend[0].selected) {
+      legendSel = Object.assign({}, prevOpt.legend[0].selected);
+    }
+    chart.setOption(buildOption(), { notMerge: true });
+
+    history.replaceState(null, "", "#" + encodeURIComponent(focusTax || V.key));
+  }
+
+  function setView(i, byUser) {
+    viewIdx = (i + VIEWS.length) % VIEWS.length;
+    apply();
+    if (byUser) restart();
+  }
+  function setFocus(name, byUser) {
+    focusTax = (focusTax === name) ? null : name;
+    apply();
+    if (byUser) restart();
+  }
+
+  chips.forEach((c) => c.addEventListener("click", () => setView(Number(c.getAttribute("data-view")), true)));
+  $("ym-focus-clear").addEventListener("click", () => { focusTax = null; apply(); restart(); });
+  $("ym-dg").addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-tax]");
+    if (li) setFocus(li.getAttribute("data-tax"), true);
+  });
+  $("ym-tbody").addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-tax]");
+    if (li) setFocus(li.getAttribute("data-tax"), true);
+  });
+  $("ym-back").addEventListener("click", () => { location.href = PARENT; });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") setView(viewIdx - 1, true);
+    else if (e.key === "ArrowRight") setView(viewIdx + 1, true);
+    else if (e.key === "Escape") { if (focusTax) { focusTax = null; apply(); restart(); } else location.href = PARENT; }
+    else if (e.key >= "1" && e.key <= "4") setView(Number(e.key) - 1, true);
+  });
+
+  /* ===== 11. hash 定位：#原值/#指数化/#占比/#累计 切视图；#增值税 等税种名聚焦该条线 ===== */
+  const hash = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+  if (hash) {
+    const vi = VIEWS.findIndex((v) => v.key === hash || v.label === hash);
+    if (vi >= 0) viewIdx = vi;
+    else {
+      const ti = TAXES.findIndex((t) => t.name === hash || t.short === hash);
+      if (ti >= 0) focusTax = TAXES[ti].name;
+    }
+  }
+  apply();
+
+  /* kiosk 常驻：每 15 秒切下一视图；鼠标停在切换条上时暂停 */
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => setView(viewIdx + 1, false), 15000); }
+  restart();
+  $("ym-chipbar").addEventListener("mouseenter", () => clearInterval(timer));
+  $("ym-chipbar").addEventListener("mouseleave", restart);
+
+  /* ===== 12. 勾稽自检：任一条不闭合即点亮告警条 ===== */
+  const problems = [];
+  TAXES.forEach((t) => {
+    if (!t.tie) problems.push(t.name + " 月度之和 " + t.total + " ≠ 累计 " + t.expect);
+    if (Math.abs(sum(t.share) - 100) > 1e-6) problems.push(t.name + " 月度占比之和 " + sum(t.share).toFixed(4) + " ≠ 100.00%");
+    if (t.cum[N - 1] !== t.expect) problems.push(t.name + " 累计末点 " + t.cum[N - 1] + " ≠ " + t.expect);
+    if (Math.abs(t.idx[0] - 100) > 1e-9) problems.push(t.name + " 指数化基期 ≠ 100");
+  });
+  if (TOTAL !== 4840) problems.push("6 税种合计 " + TOTAL + " ≠ 4,840");
+  if (SHARE_OF_TAX.toFixed(2) !== "84.03") problems.push("占税收收入 " + SHARE_OF_TAX.toFixed(2) + "% ≠ 84.03%");
+  const MT_EXPECT = [822, 552, 630, 890, 656, 718, 572];
+  MT.forEach((v, i) => { if (v !== MT_EXPECT[i]) problems.push(MONTHS[i] + " 合计 " + v + " ≠ " + MT_EXPECT[i]); });
+  if (sum(MT) !== TOTAL) problems.push("月度合计之和 " + sum(MT) + " ≠ " + TOTAL);
+  if (TIME_PROG.toFixed(2) !== "58.08") problems.push("时间进度 " + TIME_PROG.toFixed(2) + "% ≠ 58.08%");
+  if (problems.length) fail("勾稽自检未通过（" + problems.length + " 项）：" + problems.slice(0, 4).join("；"));
+})();
+</script>
+</body>
+</html>

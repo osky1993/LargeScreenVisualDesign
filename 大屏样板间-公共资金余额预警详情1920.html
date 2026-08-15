@@ -1,0 +1,1010 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 公共资金余额预警详情</title>
+<style>
+  :root {
+    --sn-bg: #08203f;
+    --sn-panel: rgba(11, 38, 72, 0.72);
+    --sn-border: rgba(92, 156, 226, 0.28);
+    --sn-text: #e8f2ff;
+    --sn-muted: #8ea9cc;
+    --sn-gold: #f0c060;
+    --sn-gold-soft: #ffdc8f;
+    --sn-blue: #3d9cff;
+    --sn-cyan: #39d0d8;
+    --sn-green: #33e0a6;
+    --sn-red: #ff5f6e;
+    --sn-orange: #ff9d4d;
+    --sn-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--sn-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 ===== */
+  .sn-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(240, 192, 96, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(57, 208, 216, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 60, 120, 0.34), transparent 56%),
+      linear-gradient(rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      var(--sn-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    grid-template-rows: 84px 128px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+  /* 预警地区：整台压一层暗红氛围（仅在 lv < 0.30 时挂 is-alarm） */
+  .sn-stage.is-alarm::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(255, 95, 110, 0.10), transparent 52%);
+  }
+  .sn-stage > * { position: relative; z-index: 1; }
+
+  .sn-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .sn-error.is-visible { display: block; }
+
+  /* ===== 顶栏：三级面包屑 + 切换器 + 返回 + 时钟 ===== */
+  .sn-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .sn-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(240, 192, 96, 0.6) 16%, rgba(57, 208, 216, 0.85) 50%, rgba(240, 192, 96, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.4);
+  }
+  /* 预警态：页头光带转红 */
+  .sn-stage.is-alarm .sn-header::after {
+    background: linear-gradient(90deg, transparent, rgba(255, 95, 110, 0.7) 16%, rgba(255, 157, 77, 0.85) 50%, rgba(255, 95, 110, 0.7) 84%, transparent);
+    box-shadow: 0 0 14px rgba(255, 95, 110, 0.45);
+  }
+  .sn-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .sn-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--sn-muted); }
+  .sn-crumb b { font-weight: 400; color: var(--sn-gold); }
+  .sn-crumb i { font-style: normal; color: rgba(142, 169, 204, 0.55); }
+  .sn-crumb em { font-style: normal; color: #d7e8ff; }
+  .sn-crumb-up { color: #a8c2e0; text-decoration: none; transition: color 0.18s, text-shadow 0.18s; }
+  .sn-crumb-up:hover { color: var(--sn-gold-soft); text-decoration: underline; text-shadow: 0 0 10px rgba(240, 192, 96, 0.5); }
+  .sn-head-title-row { display: flex; align-items: baseline; gap: 14px; white-space: nowrap; }
+  .sn-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--sn-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(240, 192, 96, 0.35));
+  }
+  /* 对象名后的状态徽章：预警红且呼吸 / 关注橙 */
+  .sn-alarm-tag {
+    flex: none; align-self: center; padding: 3px 11px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.18em; white-space: nowrap;
+    border: 1px solid rgba(255, 157, 77, 0.7); color: #2a1206;
+    background: linear-gradient(120deg, var(--sn-orange), #ffc48e);
+  }
+  .sn-alarm-tag.is-bad {
+    color: #fff0f1; border-color: rgba(255, 95, 110, 0.8);
+    background: linear-gradient(120deg, #b3273a, var(--sn-red));
+    animation: snBreathe 2.4s ease-in-out infinite;
+  }
+  @keyframes snBreathe {
+    0%, 100% { box-shadow: 0 0 0 rgba(255, 95, 110, 0), inset 0 0 8px rgba(255, 95, 110, 0.12); }
+    50% { box-shadow: 0 0 18px rgba(255, 95, 110, 0.62), inset 0 0 18px rgba(255, 95, 110, 0.3); }
+  }
+  .sn-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--sn-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .sn-head-meta b { font-weight: 400; color: var(--sn-gold-soft); }
+  .sn-head-meta i { font-style: normal; color: rgba(142, 169, 204, 0.4); }
+
+  .sn-head-right { display: flex; align-items: center; gap: 18px; flex: none; }
+  .sn-switcher { display: flex; align-items: stretch; gap: 8px; }
+  .sn-sw-btn {
+    display: flex; align-items: center; gap: 6px; padding: 0 14px; cursor: pointer; user-select: none;
+    border-radius: 9px; font-family: inherit; font-size: 13px; letter-spacing: 0.06em;
+    border: 1px solid rgba(240, 192, 96, 0.34);
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.15), rgba(16, 46, 86, 0.6));
+    color: #ffdc8f; transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .sn-sw-btn:hover { color: #fff6e2; border-color: rgba(240, 192, 96, 0.85); box-shadow: 0 0 14px rgba(240, 192, 96, 0.4); }
+  .sn-sw-btn b { font-weight: 700; font-size: 16px; }
+  .sn-sw-box {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-width: 138px; padding: 6px 18px; border-radius: 9px;
+    border: 1px solid rgba(240, 192, 96, 0.5); background: rgba(72, 56, 24, 0.42);
+    box-shadow: inset 0 0 14px rgba(240, 192, 96, 0.1);
+  }
+  .sn-sw-name { font-size: 18px; font-weight: 700; letter-spacing: 0.14em; color: var(--sn-gold-soft); }
+  .sn-sw-idx { font-size: 11px; letter-spacing: 0.26em; color: rgba(240, 192, 96, 0.7); font-variant-numeric: tabular-nums; }
+  .sn-back {
+    display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 14px; cursor: pointer;
+    border-radius: 10px; font-family: inherit; font-size: 13px; letter-spacing: 0.08em;
+    border: 1px solid rgba(92, 156, 226, 0.45); background: rgba(16, 46, 86, 0.6); color: #cfe6ff;
+    transition: border-color 0.18s, box-shadow 0.18s, color 0.18s;
+  }
+  .sn-back:hover { color: #fff; border-color: rgba(57, 208, 216, 0.8); box-shadow: 0 0 14px rgba(57, 208, 216, 0.35); }
+  .sn-back svg { width: 16px; height: 16px; }
+  .sn-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 18px; border-left: 1px solid rgba(92, 156, 226, 0.25); }
+  .sn-clock-time { font: 700 24px/1 var(--sn-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(57, 208, 216, 0.4); }
+  .sn-clock-date { font-size: 12px; color: var(--sn-muted); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带（6 枚） ===== */
+  .sn-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .sn-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--sn-border); border-radius: 12px; background: var(--sn-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 14px 0 16px;
+  }
+  .sn-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--sn-gold), transparent); }
+  .sn-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(240, 192, 96, 0.13), transparent 68%);
+  }
+  .sn-kpi.is-hero { border-color: rgba(240, 192, 96, 0.55); box-shadow: inset 0 0 26px rgba(240, 192, 96, 0.12); }
+  .sn-kpi.is-hero .sn-kpi-val { font-size: 38px; }
+  /* 预警地区：整条 KPI 带描边转红 */
+  .sn-kpi.is-alarm { border-color: rgba(255, 95, 110, 0.55); box-shadow: inset 0 0 22px rgba(255, 95, 110, 0.1); }
+  .sn-kpi.is-alarm::before { background: linear-gradient(90deg, var(--sn-red), transparent); }
+  .sn-kpi.is-alarm::after { background: radial-gradient(circle, rgba(255, 95, 110, 0.16), transparent 68%); }
+  .sn-kpi.is-alarm .sn-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 95, 110, 0.32), rgba(255, 157, 77, 0.12));
+    border-color: rgba(255, 95, 110, 0.45); box-shadow: inset 0 0 12px rgba(255, 95, 110, 0.18);
+  }
+  .sn-kpi.is-alarm.is-hero { box-shadow: inset 0 0 26px rgba(255, 95, 110, 0.16); }
+  .sn-kpi.is-alarm.is-hero .sn-kpi-icon { animation: snBreathe 2.4s ease-in-out infinite; }
+  .sn-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.28), rgba(57, 208, 216, 0.12));
+    border: 1px solid rgba(240, 192, 96, 0.35); box-shadow: inset 0 0 12px rgba(240, 192, 96, 0.14);
+  }
+  .sn-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .sn-kpi-label { font-size: 12.5px; letter-spacing: 0.08em; color: var(--sn-muted); white-space: nowrap; }
+  .sn-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .sn-kpi-val { font: 700 28px/1 var(--sn-mono); color: var(--sn-gold-soft); text-shadow: 0 0 14px rgba(240, 192, 96, 0.45); }
+  .sn-kpi-val.is-red { color: #ff9aa4; text-shadow: 0 0 16px rgba(255, 95, 110, 0.5); }
+  .sn-kpi-val.is-orange { color: #ffc48e; text-shadow: 0 0 16px rgba(255, 157, 77, 0.45); }
+  .sn-kpi-unit { font-size: 12px; color: #b39a5e; }
+  .sn-kpi-sub { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--sn-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sn-kpi-sub b { font-weight: 700; }
+  .sn-up { color: var(--sn-green); }
+  .sn-down { color: var(--sn-red); }
+
+  /* ===== 面板通用 ===== */
+  .sn-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .sn-panel {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--sn-border); border-radius: 12px; background: var(--sn-panel);
+    display: flex; flex-direction: column;
+  }
+  .sn-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(240, 192, 96, 0.22), rgba(57, 208, 216, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .sn-panel-head i { flex: none; width: 5px; height: 16px; background: var(--sn-gold); box-shadow: 0 0 8px var(--sn-gold); transform: skewX(-12deg); }
+  .sn-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f4f9ff; white-space: nowrap; }
+  .sn-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+  .sn-panel-scope { margin-left: auto; font-size: 11.5px; color: var(--sn-gold-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .sn-panel-scope.is-alert { color: #ffb3bb; }
+  /* 预警面板头改红 */
+  .sn-panel.is-alarm .sn-panel-head { background: linear-gradient(90deg, rgba(255, 95, 110, 0.24), rgba(255, 157, 77, 0.05) 62%, transparent); }
+  .sn-panel.is-alarm .sn-panel-head i { background: var(--sn-red); box-shadow: 0 0 8px var(--sn-red); }
+  .sn-chart { flex: 1; min-height: 0; }
+
+  /* 右列两块图：55% / 45% */
+  .sn-main { flex: 55 1 0; }
+  .sn-sub { flex: 45 1 0; }
+  /* 左列两块：概况卡 / 处置记录 */
+  .sn-ovp { flex: 46 1 0; }
+  .sn-tlp { flex: 54 1 0; }
+
+  /* ===== 左①：地区预警概况卡 ===== */
+  .sn-ov { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 10px; }
+  .sn-ov-hero { flex: none; display: flex; align-items: flex-end; gap: 12px; }
+  .sn-ov-lv { font: 700 52px/0.92 var(--sn-mono); color: var(--sn-gold-soft); text-shadow: 0 0 20px rgba(240, 192, 96, 0.45); font-variant-numeric: tabular-nums; }
+  .sn-ov-lv.is-red { color: #ff9aa4; text-shadow: 0 0 22px rgba(255, 95, 110, 0.55); }
+  .sn-ov-lv.is-orange { color: #ffc48e; text-shadow: 0 0 22px rgba(255, 157, 77, 0.45); }
+  .sn-ov-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding-bottom: 4px; }
+  .sn-ov-meta em { font-style: normal; font-size: 11.5px; letter-spacing: 0.1em; color: var(--sn-muted); }
+  /* 区间尺：预警 / 合理 / 偏高 三段 + 当前游标 */
+  .sn-ov-gauge { flex: none; display: flex; flex-direction: column; gap: 5px; }
+  .sn-zone { position: relative; height: 9px; border-radius: 5px; display: flex; }
+  .sn-zone u { display: block; height: 100%; }
+  .sn-zone u:first-child { border-radius: 5px 0 0 5px; }
+  .sn-zone u:last-child { border-radius: 0 5px 5px 0; }
+  .sn-zone-cursor {
+    position: absolute; top: -4px; bottom: -4px; width: 3px; border-radius: 2px; left: 0;
+    background: #ffffff; box-shadow: 0 0 9px rgba(255, 255, 255, 0.9);
+    transition: left 1.2s cubic-bezier(0.22, 0.8, 0.3, 1);
+  }
+  .sn-zone-axis { display: flex; justify-content: space-between; font-size: 10px; color: #6f8bb0; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .sn-ov-rows { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+  .sn-ov-rows li {
+    flex: 1; min-height: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    border-bottom: 1px solid rgba(92, 156, 226, 0.12); font-size: 12px; color: var(--sn-muted);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .sn-ov-rows li:last-child { border-bottom: none; }
+  .sn-ov-rows li b { font: 700 15px/1 var(--sn-mono); color: var(--sn-gold-soft); }
+  .sn-ov-rows li b.is-red { color: #ff9aa4; }
+  .sn-ov-rows li b.is-orange { color: #ffc48e; }
+  .sn-ov-rows li b i { font-style: normal; font-size: 10.5px; font-weight: 400; color: #7f9dc0; margin-left: 3px; }
+  .sn-ov-note { flex: none; margin: 0; font-size: 10px; line-height: 1.5; color: #6f8bb0; letter-spacing: 0.01em; }
+
+  /* ===== 左②：调度处置记录（DOM 时间线） ===== */
+  .sn-tl { flex: 1; min-height: 0; margin: 0; padding: 10px 14px 10px 16px; list-style: none; display: flex; flex-direction: column; }
+  .sn-tl li { position: relative; flex: 1; min-height: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+  .sn-tl li::before {
+    content: ""; position: absolute; left: 4px; top: 0; bottom: 0; width: 1px;
+    background: linear-gradient(180deg, rgba(92, 156, 226, 0.35), rgba(92, 156, 226, 0.12));
+  }
+  .sn-tl li:first-child::before { top: 50%; }
+  .sn-tl li:last-child::before { bottom: 50%; }
+  .sn-tl li i {
+    position: absolute; left: 0; top: 50%; margin-top: -4.5px; width: 9px; height: 9px; border-radius: 50%;
+    background: #6f93c4; box-shadow: 0 0 0 3px rgba(11, 38, 72, 0.9);
+  }
+  .sn-tl li.is-hot i { background: var(--sn-red); box-shadow: 0 0 0 3px rgba(11, 38, 72, 0.9), 0 0 10px var(--sn-red); }
+  .sn-tl-top { display: flex; align-items: center; gap: 8px; }
+  .sn-tl-date { font: 700 12.5px/1 var(--sn-mono); color: var(--sn-gold-soft); letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+  .sn-tl-txt { font-size: 12px; line-height: 1.45; color: #cfe2f8; letter-spacing: 0.01em; }
+  .sn-badge {
+    flex: none; padding: 2px 7px; border-radius: 999px;
+    font-size: 10px; letter-spacing: 0.04em; white-space: nowrap; border: 1px solid transparent;
+  }
+  .sn-badge.is-done { color: #0a2b2d; background: linear-gradient(120deg, #39d0d8, #9fe8ec); }
+  .sn-badge.is-warn { color: #2a1206; background: linear-gradient(120deg, var(--sn-orange), #ffc48e); }
+  .sn-badge.is-bad {
+    color: #fff0f1; border-color: rgba(255, 95, 110, 0.75);
+    background: linear-gradient(120deg, #b3273a, var(--sn-red)); animation: snBlink 1.6s ease-in-out infinite;
+  }
+  @keyframes snBlink { 0%, 100% { opacity: 1; box-shadow: 0 0 10px rgba(255, 95, 110, 0.6); } 50% { opacity: 0.55; box-shadow: 0 0 0 rgba(255, 95, 110, 0); } }
+
+  /* ===== 底部跑马灯 ===== */
+  .sn-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--sn-border); border-radius: 12px; background: var(--sn-panel);
+  }
+  .sn-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2a1c05;
+    background: linear-gradient(120deg, var(--sn-gold-soft), #d8a03c 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .sn-stage.is-alarm .sn-marquee-tag { color: #fff0f1; background: linear-gradient(120deg, var(--sn-red), #b3273a 85%); }
+  .sn-stage.is-alarm .sn-marquee-tag i { background: #fff0f1; }
+  .sn-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2a1c05; animation: snDot 1.6s ease-in-out infinite; }
+  @keyframes snDot { 50% { opacity: 0.25; } }
+  .sn-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .sn-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: snMarquee 54s linear infinite; font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .sn-marquee-track b { color: var(--sn-gold-soft); font-weight: 700; }
+  .sn-marquee-track b.is-red { color: #ff9aa4; }
+  .sn-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(240, 192, 96, 0.5); }
+  @keyframes snMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .sn-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="sn-stage" id="sn-stage">
+    <!-- mockflag:begin --><div class="sn-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="sn-error" id="sn-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <header class="sn-header">
+      <div class="sn-head-left">
+        <div class="sn-crumb">
+          <b>公共资金</b><i>›</i>
+          <a class="sn-crumb-up" href="大屏样板间-公共资金余额分析1920.html">资金余额分析</a><i>›</i>
+          <em id="sn-crumb-obj">--</em>
+        </div>
+        <div class="sn-head-title-row">
+          <div class="sn-head-title" id="sn-title">-- 资金运行详情</div>
+          <span class="sn-alarm-tag" id="sn-alarm-tag">--</span>
+          <div class="sn-head-meta">
+            <span>口径 <b>公共资金余额与资金保障水平</b></span><i>|</i>
+            <span>截至 <b>2026-07-31</b></span><i>|</i>
+            <span>阈值 <b>预警 0.30 · 合理区间 0.30–0.80</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="sn-head-right">
+        <div class="sn-switcher" id="sn-switcher" aria-label="地区切换">
+          <button class="sn-sw-btn" id="sn-sw-prev" type="button" title="上一地区（← 方向键）"><b>‹</b>上一地区</button>
+          <div class="sn-sw-box">
+            <span class="sn-sw-name" id="sn-sw-name">--</span>
+            <span class="sn-sw-idx" id="sn-sw-idx">-- / --</span>
+          </div>
+          <button class="sn-sw-btn" id="sn-sw-next" type="button" title="下一地区（→ 方向键）">下一地区<b>›</b></button>
+        </div>
+        <button class="sn-back" id="sn-back" type="button" title="返回资金余额分析（Esc）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/><path d="M7 12 H20"/></svg>
+          返回
+        </button>
+        <div class="sn-clock" aria-label="实时时钟">
+          <span class="sn-clock-time" id="sn-clock-time">--:--:--</span>
+          <span class="sn-clock-date" id="sn-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="sn-band" id="sn-band" aria-label="当前地区资金核心指标"></section>
+
+    <!-- 左列：预警概况卡 + 调度处置记录 -->
+    <div class="sn-col">
+      <section class="sn-panel sn-ovp" id="sn-ov-panel">
+        <header class="sn-panel-head"><i></i><h2>地区预警概况</h2><span class="sn-panel-en">AREA PROFILE</span><span class="sn-panel-scope" id="sn-ov-scope">--</span></header>
+        <div class="sn-ov">
+          <div class="sn-ov-hero">
+            <div class="sn-ov-lv" id="sn-ov-lv">0.00</div>
+            <div class="sn-ov-meta">
+              <span class="sn-badge is-warn" id="sn-ov-badge">--</span>
+              <em>资金保障水平</em>
+            </div>
+          </div>
+          <div class="sn-ov-gauge">
+            <div class="sn-zone">
+              <u style="flex:30;background:linear-gradient(90deg,rgba(255,95,110,0.5),rgba(255,95,110,0.9))"></u>
+              <u style="flex:50;background:linear-gradient(90deg,rgba(240,192,96,0.5),rgba(240,192,96,0.9))"></u>
+              <u style="flex:20;background:linear-gradient(90deg,rgba(255,157,77,0.5),rgba(255,157,77,0.85))"></u>
+              <span class="sn-zone-cursor" id="sn-ov-cursor"></span>
+            </div>
+            <div class="sn-zone-axis"><span>0</span><span>0.30 预警线</span><span>0.80</span><span>1.00</span></div>
+          </div>
+          <ul class="sn-ov-rows" id="sn-ov-rows"></ul>
+          <p class="sn-ov-note" id="sn-ov-note">--</p>
+        </div>
+      </section>
+
+      <section class="sn-panel sn-tlp" id="sn-tl-panel">
+        <header class="sn-panel-head"><i></i><h2>调度处置记录</h2><span class="sn-panel-en">DISPATCH LOG</span><span class="sn-panel-scope" id="sn-tl-scope">--</span></header>
+        <ol class="sn-tl" id="sn-tl"></ol>
+      </section>
+    </div>
+
+    <!-- 右列：日余额主图（55%）+ 月度收支柱线（45%） -->
+    <div class="sn-col">
+      <section class="sn-panel sn-main" id="sn-main-panel">
+        <header class="sn-panel-head"><i></i><h2>近 90 天日资金余额与保障水平</h2><span class="sn-panel-en">DAILY BALANCE &amp; SAFEGUARD</span><span class="sn-panel-scope" id="sn-main-scope">--</span></header>
+        <div class="sn-chart" id="sn-chart-daily" role="img" aria-label="该地区近 90 天日资金余额折线与保障水平副轴折线，红色区为低于 0.30 预警阈值的危险区"></div>
+      </section>
+      <section class="sn-panel sn-sub">
+        <header class="sn-panel-head"><i></i><h2>1-7 月收支与月末保障水平</h2><span class="sn-panel-en">MONTHLY FLOW</span><span class="sn-panel-scope" id="sn-sub-scope">--</span></header>
+        <div class="sn-chart" id="sn-chart-month" role="img" aria-label="该地区 1-7 月收入柱、支出柱与月末保障水平折线，横轴下方标注每月收支缺口"></div>
+      </section>
+    </div>
+
+    <section class="sn-marquee" aria-label="资金研判与处置提示">
+      <div class="sn-marquee-tag"><i></i>资金研判</div>
+      <div class="sn-marquee-view"><div class="sn-marquee-track" id="sn-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("sn-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("sn-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e8f2ff", muted: "#8ea9cc",
+    gold: "#f0c060", goldSoft: "#ffdc8f", goldDeep: "#b8863a",
+    blue: "#3d9cff", cyan: "#39d0d8", green: "#33e0a6", red: "#ff5f6e", orange: "#ff9d4d", steel: "#6f93c4"
+  };
+  const PARENT = "大屏样板间-公共资金余额分析1920.html";
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = Number(n).toFixed(dec == null ? 0 : dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const signed = (v, d) => (v >= 0 ? "+" : "") + fmtDec(v, d == null ? 1 : d);
+
+  /* ===== 3. 数据源
+     父页锚点（不得改动）：资金余额 / 保障水平 / 连续低于阈值月数 取自「资金余额分析」页预警清单，
+     全省口径锚点：全省资金余额 2,180 亿元、月均支出 3,516 亿元、保障水平 0.62、合理区间 0.30-0.80。 ===== */
+
+  /* 3.1 分档阈值：< 0.30 预警 / 0.30 - 0.40 关注 / >= 0.40 合理（与父页 stateOf 同源） */
+  const TH = { alert: 0.30, watch: 0.40, high: 0.80 };
+  const stateOf = (lv) => (lv < TH.alert ? { cls: "is-bad", tone: "is-red", txt: "预警", color: C.red }
+    : lv < TH.watch ? { cls: "is-warn", tone: "is-orange", txt: "关注", color: C.orange }
+    : { cls: "is-good", tone: "", txt: "合理", color: C.gold });
+
+  /* 3.2 全省 14 个地区对照锚点（父页原值）：用于校验合计 2,180、算全省位次、算预警地区数 */
+  const PROV = [
+    { name: "省本级", bal: 486, lv: 0.68 }, { name: "苏州", bal: 268, lv: 0.74 },
+    { name: "南京", bal: 226, lv: 0.66 }, { name: "无锡", bal: 168, lv: 0.71 },
+    { name: "常州", bal: 126, lv: 0.58 }, { name: "镇江", bal: 74, lv: 0.38 },
+    { name: "南通", bal: 142, lv: 0.54 }, { name: "扬州", bal: 96, lv: 0.46 },
+    { name: "泰州", bal: 88, lv: 0.42 }, { name: "徐州", bal: 132, lv: 0.34 },
+    { name: "盐城", bal: 118, lv: 0.41 }, { name: "淮安", bal: 82, lv: 0.31 },
+    { name: "宿迁", bal: 92, lv: 0.28 }, { name: "连云港", bal: 82, lv: 0.26 }
+  ];
+  const PROV_BAL = sum(PROV.map((a) => a.bal));            /* 须 = 2180 */
+  const PROV_MAE = 3516;                                   /* 全省月均支出（父页独立常量） */
+  const PROV_LV = PROV_BAL / PROV_MAE;                     /* 须 ≈ 0.62 */
+  const PROV_ALERT = PROV.filter((a) => a.lv < TH.alert).length;   /* 须 = 2 */
+  /* 全省位次：按保障水平降序，1 = 最安全 */
+  const PROV_RANK = PROV.slice().sort((a, b) => b.lv - a.lv).map((a) => a.name);
+
+  /* 3.3 月度权重（全省 1-7 月节奏，父页 §7.2 / §7.12），各地区按此权重拆分月度收支 */
+  const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月"];
+  const REV_W = [1280, 820, 960, 1310, 1010, 1160, 940];
+  const EXP_W = [1420, 980, 1180, 1360, 1240, 1520, 1180];
+
+  /* 3.4 月均支出口径说明（独立常量，与 1-7 月一般公共预算支出不同口径） */
+  const MAE_NOTE = "近 12 个月全口径财政支出月均（含一般公共预算 + 政府性基金 + 国有资本经营）";
+
+  /* 3.5 5 个关注/预警地区（按保障水平升序）
+         bal / lvRef / monthsRef 取自父页，不得改动；
+         mae = 月均支出（由 bal ÷ lvRef 反推后取整），保障水平由 bal ÷ mae 现算并回校到 lvRef；
+         maeM = 1-7 月滚动月均支出（末值 = mae），月末保障水平 = eom[m] ÷ maeM[m]；
+         eom = [上年末, 1月末 ... 7月末] 资金余额，eom[7] 须 = bal；
+         rev / exp = 1-7 月一般公共预算收入 / 支出合计，缺口 = exp - rev。 */
+  const AREAS = [
+    {
+      name: "连云港", bal: 82, lvRef: 0.26, monthsRef: 5, mae: 315,
+      rev: 190, exp: 336,
+      eom: [112, 106, 98, 92, 89, 86, 84, 82],
+      maeM: [305, 307, 309, 311, 312, 313, 315],
+      advice: "建议压实县区资金主体责任，暂停非急需支出预算下达，并请示省级资金周转金支持",
+      acts: [
+        { d: "03-06", t: "资金保障水平跌破 0.30，系统触发二级预警", s: "done" },
+        { d: "04-12", t: "市财政局报送资金周转情况说明及压降计划", s: "done" },
+        { d: "05-20", t: "省财政厅约谈并下达资金调度提示函", s: "done" },
+        { d: "06-18", t: "暂停新增非急需、非刚性支出预算下达", s: "run" },
+        { d: "07-24", t: "省财政厅下达资金调度函，调增转移支付拨付进度", s: "run" },
+        { d: "07-30", t: "拟提请省级资金周转金支持，待省厅批复", s: "wait" }
+      ]
+    },
+    {
+      name: "宿迁", bal: 92, lvRef: 0.28, monthsRef: 3, mae: 328,
+      rev: 200, exp: 342,
+      eom: [124, 118, 112, 104, 100, 96, 94, 92],
+      maeM: [316, 318, 321, 323, 325, 326, 328],
+      advice: "建议维持资金日报机制，加快非税收入清缴入库，同步压减一般性支出 5% 以上",
+      acts: [
+        { d: "05-09", t: "资金保障水平跌破 0.30，系统触发二级预警", s: "done" },
+        { d: "05-28", t: "市本级启动资金日报与旬度调度机制", s: "done" },
+        { d: "06-16", t: "压减一般性支出，暂缓非刚性项目付款", s: "run" },
+        { d: "07-10", t: "省财政厅提前下达均衡性转移支付资金", s: "done" },
+        { d: "07-26", t: "纳入省级资金重点监测名单，按周报送", s: "run" }
+      ]
+    },
+    {
+      name: "淮安", bal: 82, lvRef: 0.31, monthsRef: 0, mae: 265,
+      rev: 240, exp: 386,
+      eom: [100, 96, 92, 90, 87, 85, 84, 82],
+      maeM: [255, 257, 259, 261, 262, 264, 265],
+      advice: "月末保障水平尚在阈值之上但持续下行，建议提前做好三季度支出错峰与资金调度预案",
+      acts: [
+        { d: "04-15", t: "资金保障水平降至 0.33，纳入省级关注名单", s: "done" },
+        { d: "05-22", t: "市财政局开展资金运行月度分析并报省厅", s: "done" },
+        { d: "06-20", t: "加强非税收入与国有资源收益清缴入库调度", s: "run" },
+        { d: "07-18", t: "省财政厅下达资金调度提示函，要求错峰支付", s: "run" }
+      ]
+    },
+    {
+      name: "徐州", bal: 132, lvRef: 0.34, monthsRef: 0, mae: 388,
+      rev: 380, exp: 560,
+      eom: [158, 152, 146, 142, 139, 136, 134, 132],
+      maeM: [376, 378, 381, 383, 385, 386, 388],
+      advice: "体量居苏北首位但缺口最大，建议加快专项债券资金拨付、盘活存量资金对冲支出高峰",
+      acts: [
+        { d: "04-08", t: "一季度资金运行分析报送省财政厅", s: "done" },
+        { d: "05-15", t: "建立重点支出与资金联动调度机制", s: "done" },
+        { d: "06-25", t: "加快专项债券资金拨付使用，减少资金沉淀", s: "run" },
+        { d: "07-20", t: "资金保障水平预警提示（关注档），按月跟踪", s: "run" }
+      ]
+    },
+    {
+      name: "镇江", bal: 74, lvRef: 0.38, monthsRef: 0, mae: 195,
+      rev: 230, exp: 318,
+      eom: [90, 86, 83, 81, 79, 77, 76, 74],
+      maeM: [187, 189, 190, 192, 193, 194, 195],
+      advice: "苏南唯一进入关注区间的地区，建议完善公共资金现金流预测模型，控制债务还本付息集中度",
+      acts: [
+        { d: "03-28", t: "资金保障水平回落至 0.40 以下关注区间", s: "done" },
+        { d: "05-10", t: "清理盘活财政存量资金 4.6 亿元补充资金", s: "done" },
+        { d: "06-12", t: "完善公共资金现金流预测模型，滚动测算 90 天", s: "run" },
+        { d: "07-22", t: "月度资金运行例会提示保障水平持续下行", s: "run" }
+      ]
+    }
+  ];
+
+  /* 3.6 处置状态映射 */
+  const ACT_STATE = { done: { cls: "is-done", txt: "已办结" }, run: { cls: "is-warn", txt: "执行中" }, wait: { cls: "is-bad", txt: "待批复" } };
+
+  /* ===== 4. 派生量：全部由 §3 现算，不复制数字 =====
+     日序列锚点：上年末(0) / 1月末(31) / 2月末(59) / 3月末(90) / 4月末(120) / 5月末(151) / 6月末(181) / 7月末(212)
+     （2026 非闰年：31+28+31+30+31+30+31 = 212 天） */
+  const ANCH = [0, 31, 59, 90, 120, 151, 181, 212];
+  const WIN = 90;                                   /* 展示窗口：最后 90 天 = 05-03 ~ 07-31 */
+  const WIN_FROM = ANCH[7] - WIN + 1;               /* 123 */
+  const DAY0 = Date.UTC(2025, 11, 31);              /* 序列第 0 天 = 2025-12-31 */
+  const dateOf = (i) => new Date(DAY0 + i * 86400000);
+  const mmdd = (i) => { const d = dateOf(i); return pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate()); };
+
+  /* 4.1 日余额建模：月末锚点线性趋势 + 月内波形（月初高 → 20 日前后集中支付触底 → 月末回补）+ 确定性微扰
+         波形与微扰在锚点处恒为 0，故每个月末的日值精确等于 eom，与下方月度图完全同源。 */
+  const PHASE = Math.sin(0.3 * Math.PI);            /* 0.809017：使波形在 u=0 与 u=1 处归零 */
+  function buildDaily(a) {
+    const A = 0.045 * a.bal;                        /* 波幅取余额的 4.5% */
+    const out = [], mIdx = [];
+    for (let i = 0; i <= ANCH[7]; i++) {
+      let s = 0;
+      while (s < ANCH.length - 2 && i > ANCH[s + 1]) s++;
+      const u = (i - ANCH[s]) / (ANCH[s + 1] - ANCH[s]);
+      const trend = a.eom[s] + (a.eom[s + 1] - a.eom[s]) * u;
+      const wave = A * (Math.sin(2 * Math.PI * (u + 0.15)) - PHASE);
+      const jit = A * 0.16 * Math.sin(i * 2.3999 + a.bal) * Math.sin(Math.PI * u);
+      out.push(+(trend + wave + jit).toFixed(2));
+      mIdx.push(s);                                 /* s = 0..6 → 该日所属月份（1-7 月） */
+    }
+    out[ANCH[7]] = a.eom[7];                        /* 末值精确回到父页余额 */
+    return { bal: out, mIdx: mIdx };
+  }
+
+  function splitByWeight(total, w) {
+    const s = sum(w);
+    const out = w.map((x) => +(total * x / s).toFixed(1));
+    out[out.length - 1] = +(total - sum(out.slice(0, -1))).toFixed(1);   /* 末月吸收舍入残差，保证求和精确 */
+    return out;
+  }
+
+  AREAS.forEach((a) => {
+    a.lv = a.bal / a.mae;                                              /* 保障水平现算 */
+    a.lvTie = Math.round(a.lv * 100) / 100 === a.lvRef;                /* 回校父页值 */
+    a.state = stateOf(a.lv);
+    a.rank = PROV_RANK.indexOf(a.name) + 1;                            /* 全省 14 个地区中的位次 */
+    a.gap = a.exp - a.rev;                                             /* 1-7 月收支缺口 */
+    a.revM = splitByWeight(a.rev, REV_W);
+    a.expM = splitByWeight(a.exp, EXP_W);
+    a.gapM = a.revM.map((v, i) => +(a.expM[i] - v).toFixed(1));
+    a.lvM = a.maeM.map((m, i) => a.eom[i + 1] / m);                    /* 月末保障水平 */
+    /* 连续低于阈值月数：自 7 月末向前数连续 lv < 0.30 的月份 */
+    let k = 0;
+    for (let i = a.lvM.length - 1; i >= 0 && a.lvM[i] < TH.alert; i--) k++;
+    a.months = k;
+    a.monthsTie = k === a.monthsRef;
+    a.mom = +(a.eom[7] - a.eom[6]).toFixed(1);                         /* 较上月增减 */
+    a.momPct = 100 * a.mom / a.eom[6];
+    a.ytd = +(a.eom[7] - a.eom[0]).toFixed(1);                         /* 较上年末净减 */
+    a.netIn = +(a.ytd + a.gap).toFixed(1);                             /* 上级补助及债务资金等净补充 */
+    /* 日序列 */
+    const d = buildDaily(a);
+    a.daily = d.bal;
+    a.dailyLv = d.bal.map((v, i) => v / a.maeM[d.mIdx[i]]);
+    a.win = { bal: a.daily.slice(WIN_FROM), lv: a.dailyLv.slice(WIN_FROM), date: [] };
+    for (let i = WIN_FROM; i <= ANCH[7]; i++) a.win.date.push(mmdd(i));
+    /* 年内最低点（全 1-7 月序列上求，故「年内最低」是算出来的，不是宣称的） */
+    let lo = 0;
+    for (let i = 1; i <= ANCH[7]; i++) if (a.dailyLv[i] < a.dailyLv[lo]) lo = i;
+    a.loIdx = lo; a.loInWin = lo >= WIN_FROM;
+    a.loBal = a.daily[lo]; a.loLv = a.dailyLv[lo]; a.loDate = mmdd(lo);
+    a.loWinIdx = lo - WIN_FROM;
+    /* 勾稽自检项 */
+    a.tieRev = Math.abs(sum(a.revM) - a.rev) < 0.05;
+    a.tieExp = Math.abs(sum(a.expM) - a.exp) < 0.05;
+    a.tieEnd = a.daily[ANCH[7]] === a.bal;
+    a.tieProv = PROV.some((p) => p.name === a.name && p.bal === a.bal && p.lv === a.lvRef);
+  });
+
+  /* ===== 5. 时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("sn-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("sn-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 6. KPI 带骨架：6 枚（★ 先建全部同级 DOM，再 echarts.init） ===== */
+  const KPI_DEFS = [
+    { icon: "¥", key: "bal", label: "资金余额", unit: "亿元", dec: 0 },
+    { icon: "⇅", key: "mom", label: "较上月增减", unit: "亿元", dec: 0, sign: true },
+    { icon: "◉", key: "lv", label: "资金保障水平", unit: "", dec: 2, hero: true },
+    { icon: "⚠", key: "months", label: "连续低于阈值月数", unit: "个月", dec: 0 },
+    { icon: "◐", key: "gap", label: "1-7 月收支缺口", unit: "亿元", dec: 0 },
+    { icon: "#", key: "rank", label: "全省位次（14 个地区）", unit: "位", dec: 0 }
+  ];
+  const band = $("sn-band");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "sn-kpi" + (k.hero ? " is-hero" : "");
+    card.innerHTML =
+      '<div class="sn-kpi-icon">' + k.icon + '</div>' +
+      '<div class="sn-kpi-main">' +
+        '<div class="sn-kpi-label">' + k.label + '</div>' +
+        '<div class="sn-kpi-num"><span class="sn-kpi-val">0</span><span class="sn-kpi-unit">' + k.unit + '</span></div>' +
+        '<div class="sn-kpi-sub"></div>' +
+      '</div>';
+    band.appendChild(card);
+    k.card = card;
+    k.node = card.querySelector(".sn-kpi-val");
+    k.subNode = card.querySelector(".sn-kpi-sub");
+    k.cur = 0; k.target = 0;
+  });
+  /* 翻牌缓动：截图时可能是中途值，收敛后才判勾稽 */
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) k.cur = k.target; else k.cur += diff * 0.14;
+      k.node.textContent = (k.sign && k.cur > 0 ? "+" : "") + fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+
+  /* ===== 7. ECharts 公共构件（实例只创建一次） ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(8, 26, 50, 0.93)", borderColor: "rgba(240, 192, 96, 0.45)",
+    textStyle: { color: "#e2eeff", fontSize: 12 }
+  }, extra || {});
+  const vGrad = (a, b) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: a }, { offset: 1, color: b }]);
+  const AXIS_LINE = { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } };
+  const SPLIT_LINE = { lineStyle: { color: "rgba(92, 156, 226, 0.13)" } };
+  /* ★ 切换地区时只 setOption，绝不重新 init */
+  const dailyChart = echarts.init($("sn-chart-daily"));
+  const monthChart = echarts.init($("sn-chart-month"));
+
+  /* ===== 8. 主图：近 90 天日余额 + 保障水平副轴 ===== */
+  function dailyOption(a) {
+    const bal = a.win.bal, lv = a.win.lv, date = a.win.date;
+    const bMin = Math.min.apply(null, bal), bMax = Math.max.apply(null, bal);
+    const bSpan = Math.max(bMax - bMin, 1);
+    const yMin = Math.floor(bMin - bSpan * 0.24);
+    const yMax = Math.ceil(bMax + bSpan * 0.14);
+    const lMin = Math.min.apply(null, lv), lMax = Math.max.apply(null, lv);
+    /* 副轴下界压到 0.28 以下，保证 0.30 预警线与危险区始终在视野内 */
+    const y2Min = +Math.min(lMin - 0.02, TH.alert - 0.03).toFixed(2);
+    const y2Max = +(lMax + 0.03).toFixed(2);
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "line", lineStyle: { color: "rgba(240, 192, 96, 0.45)", width: 1 } },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const st = stateOf(lv[i]);
+          return '<b style="color:#ffdc8f">2026-' + date[i] + "</b><br/>资金余额 " + fmtDec(bal[i], 1) +
+            " 亿元<br/>保障水平 <b style=\"color:" + st.color + '">' + lv[i].toFixed(3) + "</b>（" + st.txt + "）<br/>距 0.30 阈值 " +
+            signed(lv[i] - TH.alert, 3) + "<br/>当月滚动月均支出 " + fmtDec(a.maeM[Math.min(6, a.win.date.length && 0 + monthOfWin(a, i))], 0) + " 亿元";
+        }
+      }),
+      legend: { top: 6, right: 14, itemWidth: 12, itemHeight: 8, itemGap: 16, textStyle: { color: "#c6dcf5", fontSize: 12 } },
+      grid: { left: 16, right: 20, top: 44, bottom: 6, containLabel: true },
+      /* 只给保障水平序列染色：低于 0.30 转红 */
+      xAxis: {
+        type: "category", data: date, boundaryGap: false,
+        axisLine: AXIS_LINE, axisTick: { show: false },
+        axisLabel: { color: C.muted, fontSize: 11, interval: (i) => i % 9 === 0 || i === date.length - 1 }
+      },
+      yAxis: [
+        { type: "value", name: "亿元", nameTextStyle: { color: "#5f88b8", fontSize: 11 },
+          min: yMin, max: yMax, splitLine: SPLIT_LINE, axisLabel: { color: C.muted, fontSize: 11 } },
+        { type: "value", name: "保障水平", nameTextStyle: { color: "#5f88b8", fontSize: 11 },
+          min: y2Min, max: y2Max, splitLine: { show: false },
+          axisLabel: { color: C.muted, fontSize: 11, formatter: (v) => v.toFixed(2) } }
+      ],
+      series: [
+        {
+          name: "日资金余额", type: "line", yAxisIndex: 0, smooth: 0.28, showSymbol: false, z: 3,
+          lineStyle: { width: 2.4, color: C.goldSoft, shadowColor: "rgba(240, 192, 96, 0.5)", shadowBlur: 12 },
+          areaStyle: { color: vGrad("rgba(240, 192, 96, 0.32)", "rgba(240, 192, 96, 0)") },
+          data: bal,
+          markPoint: {
+            symbol: "circle", symbolSize: 11, z: 8,
+            itemStyle: { color: C.red, borderColor: "#fff0f1", borderWidth: 2, shadowColor: "rgba(255, 95, 110, 0.8)", shadowBlur: 12 },
+            label: {
+              show: true, position: "bottom", distance: 10, fontSize: 11, fontWeight: 700, color: "#ffd9dd",
+              backgroundColor: "rgba(60, 14, 24, 0.9)", borderColor: "rgba(255, 95, 110, 0.6)", borderWidth: 1,
+              padding: [3, 6], borderRadius: 4,
+              formatter: () => "年内最低 " + a.loDate + " · " + fmtDec(a.loBal, 1) + " 亿元 · 保障水平 " + a.loLv.toFixed(3)
+            },
+            /* 年内最低点可能落在 90 天窗口之外（loWinIdx 为负），此时解析 coord 会抛错 */
+            data: a.loInWin ? [{ coord: [a.loWinIdx, a.loBal] }] : []
+          }
+        },
+        {
+          name: "资金保障水平", type: "line", yAxisIndex: 1, smooth: 0.28, showSymbol: false, z: 4,
+          lineStyle: { width: 2.6, color: C.cyan, shadowColor: "rgba(57, 208, 216, 0.4)", shadowBlur: 10 },
+          data: lv.map((v) => +v.toFixed(4)),
+          /* 危险区：副轴 0.30 以下整条铺红 */
+          markArea: {
+            silent: true, z: 0,
+            itemStyle: { color: "rgba(255, 95, 110, 0.11)", borderColor: "rgba(255, 95, 110, 0.28)", borderWidth: 1 },
+            label: { show: true, position: "insideBottomLeft", color: "#ff9aa4", fontSize: 10.5, distance: 6,
+              formatter: "危险区 · 保障水平 < " + TH.alert.toFixed(2) },
+            data: [[{ yAxis: y2Min }, { yAxis: TH.alert }]]
+          },
+          /* 水平 markLine 可正常挂 label（竖直 markLine 才会把 label 旋成竖排） */
+          markLine: {
+            silent: true, symbol: "none",
+            lineStyle: { color: "rgba(255, 95, 110, 0.9)", width: 1.8, type: [6, 5] },
+            label: { color: "#ff9aa4", fontSize: 10.5, position: "insideEndTop", formatter: "预警线 " + TH.alert.toFixed(2) },
+            data: [{ yAxis: TH.alert }]
+          }
+        },
+        {
+          /* 越界变色：只保留低于 0.30 的点，其余置 null，红线叠在青线之上。
+             原写法用 visualMap 分段着色，但 ECharts 6 下它会在渲染管线抛 "reading 'coord'"，
+             异常中断整个 setOption —— 日线只画出一小段、后面的月度图根本执行不到。 */
+          name: "低于预警线", type: "line", yAxisIndex: 1, smooth: 0.28, showSymbol: false, z: 6,
+          silent: true, connectNulls: false, legendHoverLink: false,
+          lineStyle: { width: 3.2, color: C.red, shadowColor: "rgba(255, 95, 110, 0.55)", shadowBlur: 12 },
+          data: lv.map((v) => (v < TH.alert ? +v.toFixed(4) : null))
+        }
+      ],
+      animationDuration: 900,
+      animationDurationUpdate: 700
+    };
+  }
+  /* 窗口内第 i 天所属月份序号（0 = 1月 … 6 = 7月） */
+  function monthOfWin(a, i) {
+    const g = WIN_FROM + i;
+    let s = 0;
+    while (s < ANCH.length - 2 && g > ANCH[s + 1]) s++;
+    return s;
+  }
+
+  /* ===== 9. 下图：1-7 月收支柱线混合 + 月末保障水平副轴 ===== */
+  function monthOption(a) {
+    const lvM = a.lvM.map((v) => +v.toFixed(4));
+    const lMin = Math.min.apply(null, lvM), lMax = Math.max.apply(null, lvM);
+    const y2Min = +Math.min(lMin - 0.02, TH.alert - 0.03).toFixed(2);
+    const y2Max = +(lMax + 0.04).toFixed(2);
+    return {
+      tooltip: tip({
+        trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(240, 192, 96, 0.08)" } },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const st = stateOf(a.lvM[i]);
+          return '<b style="color:#ffdc8f">' + a.name + " · " + MONTHS[i] + "</b><br/>收入 " + fmtDec(a.revM[i], 1) +
+            " 亿元<br/>支出 " + fmtDec(a.expM[i], 1) + " 亿元<br/>当月缺口 <b style=\"color:#ff9aa4\">" + fmtDec(a.gapM[i], 1) +
+            "</b> 亿元<br/>月末资金 " + fmtDec(a.eom[i + 1], 0) + " 亿元<br/>滚动月均支出 " + fmtDec(a.maeM[i], 0) +
+            " 亿元<br/>月末保障水平 <b style=\"color:" + st.color + '">' + a.lvM[i].toFixed(3) + "</b>（" + st.txt + "）";
+        }
+      }),
+      legend: { top: 6, right: 14, itemWidth: 12, itemHeight: 8, itemGap: 16, textStyle: { color: "#c6dcf5", fontSize: 12 } },
+      grid: { left: 16, right: 20, top: 44, bottom: 4, containLabel: true },
+      xAxis: {
+        type: "category", data: MONTHS, axisLine: AXIS_LINE, axisTick: { show: false },
+        /* 柱下方标注每月缺口（rich 两行，避免额外 series 抢高度） */
+        axisLabel: {
+          color: C.muted, fontSize: 12, lineHeight: 15,
+          formatter: (v, i) => "{m|" + v + "}\n{g|缺口 " + fmtDec(a.gapM[i], 0) + "}",
+          rich: { m: { color: C.muted, fontSize: 12, lineHeight: 16 }, g: { color: "#ff9aa4", fontSize: 10.5, lineHeight: 14 } }
+        }
+      },
+      yAxis: [
+        { type: "value", name: "亿元", nameTextStyle: { color: "#5f88b8", fontSize: 11 }, splitLine: SPLIT_LINE,
+          axisLabel: { color: C.muted, fontSize: 11 } },
+        { type: "value", name: "月末保障水平", nameTextStyle: { color: "#5f88b8", fontSize: 11 },
+          min: y2Min, max: y2Max, splitLine: { show: false },
+          axisLabel: { color: C.muted, fontSize: 11, formatter: (v) => v.toFixed(2) } }
+      ],
+      series: [
+        { name: "一般公共预算收入", type: "bar", barWidth: 20, barGap: "24%", z: 2,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad(C.goldSoft, "rgba(184, 134, 58, 0.35)") },
+          data: a.revM },
+        { name: "一般公共预算支出", type: "bar", barWidth: 20, z: 2,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad(C.blue, "rgba(61, 156, 255, 0.2)") },
+          data: a.expM },
+        { name: "月末保障水平", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 9, z: 5,
+          lineStyle: { width: 3, color: C.cyan, shadowColor: "rgba(57, 208, 216, 0.5)", shadowBlur: 12 },
+          itemStyle: { color: (o) => (a.lvM[o.dataIndex] < TH.alert ? C.red : a.lvM[o.dataIndex] < TH.watch ? C.orange : C.gold),
+            borderColor: "#062036", borderWidth: 2 },
+          /* 折线 label 需深底打底，否则被自身 line 压住看不清 */
+          label: { show: true, position: "top", distance: 9, fontSize: 10.5, fontWeight: 700,
+            color: "#dff6f8", backgroundColor: "rgba(8, 26, 50, 0.78)", padding: [2, 4], borderRadius: 3,
+            formatter: (o) => o.value.toFixed(3) },
+          markLine: {
+            silent: true, symbol: "none",
+            lineStyle: { color: "rgba(255, 95, 110, 0.85)", width: 1.6, type: [6, 5] },
+            label: { color: "#ff9aa4", fontSize: 10.5, position: "insideEndTop", formatter: "预警线 " + TH.alert.toFixed(2) },
+            data: [{ yAxis: TH.alert }]
+          },
+          data: lvM }
+      ],
+      animationDuration: 900,
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 10. 左①：预警概况卡 ===== */
+  function renderOverview(a) {
+    const lvNode = $("sn-ov-lv");
+    lvNode.className = "sn-ov-lv " + a.state.tone;
+    lvNode.textContent = a.lv.toFixed(2);
+    const badge = $("sn-ov-badge");
+    badge.className = "sn-badge " + a.state.cls;
+    badge.textContent = a.state.txt;
+    $("sn-ov-cursor").style.left = (100 * Math.min(1, a.lv)).toFixed(2) + "%";
+    const diff = a.lv - TH.alert;
+    const rows = [
+      { k: "资金余额", v: fmtDec(a.bal) + '<i>亿元</i>', c: "" },
+      { k: "月均支出", v: fmtDec(a.mae) + '<i>亿元</i>', c: "" },
+      { k: "连续低于阈值", v: a.months + '<i>个月</i>', c: a.months > 0 ? "is-red" : "" },
+      { k: "距 0.30 阈值", v: signed(diff, 2), c: diff < 0 ? "is-red" : "is-orange" },
+      { k: "全省位次", v: a.rank + '<i>/ 14</i>', c: a.rank > 12 ? "is-red" : "" }
+    ];
+    $("sn-ov-rows").innerHTML = rows.map((r) =>
+      '<li><span>' + r.k + '</span><b class="' + r.c + '">' + r.v + '</b></li>').join("");
+    $("sn-ov-note").innerHTML = "口径：保障水平 = 资金余额 ÷ 月均支出；月均支出为" + MAE_NOTE + "，与下图 1-7 月一般公共预算支出不同口径。";
+    $("sn-ov-scope").textContent = a.bal + " ÷ " + a.mae + " = " + a.lv.toFixed(3);
+    $("sn-ov-panel").classList.toggle("is-alarm", a.lv < TH.alert);
+  }
+
+  /* ===== 11. 左②：调度处置记录时间线 ===== */
+  function renderTimeline(a) {
+    $("sn-tl").innerHTML = a.acts.map((it) => {
+      const s = ACT_STATE[it.s];
+      return '<li class="' + (it.s === "wait" ? "is-hot" : "") + '"><i></i>' +
+        '<div class="sn-tl-top"><span class="sn-tl-date">2026-' + it.d + '</span>' +
+        '<span class="sn-badge ' + s.cls + '">' + s.txt + '</span></div>' +
+        '<div class="sn-tl-txt">' + it.t + '</div></li>';
+    }).join("");
+    const nRun = a.acts.filter((x) => x.s !== "done").length;
+    $("sn-tl-scope").textContent = a.acts.length + " 条 · 在办 " + nRun + " 条";
+    $("sn-tl-panel").classList.toggle("is-alarm", a.lv < TH.alert);
+  }
+
+  /* ===== 12. 跑马灯：该地区资金研判与处置提示 ===== */
+  function renderMarquee(a) {
+    const red = (t) => '<b class="is-red">' + t + "</b>";
+    const news = [
+      a.name + " 资金余额 <b>" + fmtDec(a.bal) + " 亿元</b>，资金保障水平 " +
+        (a.lv < TH.alert ? red(a.lv.toFixed(2)) : "<b>" + a.lv.toFixed(2) + "</b>") + "（" + a.state.txt +
+        "），全省 14 个地区中列第 <b>" + a.rank + "</b> 位",
+      "口径：保障水平 = 资金余额 <b>" + fmtDec(a.bal) + "</b> ÷ 月均支出 <b>" + fmtDec(a.mae) + "</b> 亿元（" + MAE_NOTE + "）",
+      (a.months > 0
+        ? "月末保障水平已连续 " + red(a.months + " 个月") + "低于 0.30 预警阈值，最近一次跌破为 <b>2026-" + pad(7 - a.months + 1) + "</b>"
+        : "月末保障水平尚未跌破 0.30 预警阈值，但已连续 <b>7 个月</b>下行，累计回落 <b>" + fmtDec(a.lvM[0] - a.lvM[6], 3) + "</b>"),
+      "1-7 月一般公共预算收入 <b>" + fmtDec(a.rev) + " 亿元</b>、支出 <b>" + fmtDec(a.exp) + " 亿元</b>，收支缺口 " + red(fmtDec(a.gap) + " 亿元"),
+      "缺口由上级补助及债务资金等净补充 <b>" + fmtDec(a.netIn, 1) + " 亿元</b>弥合，资金余额较上年末净减 <b>" + fmtDec(-a.ytd, 1) + " 亿元</b>",
+      "近 90 天最低点 <b>2026-" + a.loDate + "</b>，余额 <b>" + fmtDec(a.loBal, 1) + " 亿元</b>，保障水平 " + red(a.loLv.toFixed(3)) + "（年内最低）",
+      "全省资金余额 <b>" + fmtDec(PROV_BAL) + " 亿元</b>、保障水平 <b>" + PROV_LV.toFixed(2) + "</b>，合理区间 <b>0.30–0.80</b>，预警地区 " + red(PROV_ALERT + " 个"),
+      "处置建议：" + a.advice
+    ];
+    const html = news.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("sn-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+
+  /* ===== 13. 切换地区：整页重设（图表只 setOption，不重新 init） ===== */
+  let idx = 0;
+  function applyArea(i) {
+    idx = (i + AREAS.length) % AREAS.length;
+    const a = AREAS[idx];
+    const isAlarm = a.lv < TH.alert;
+
+    stage.classList.toggle("is-alarm", isAlarm);
+    $("sn-crumb-obj").textContent = a.name;
+    $("sn-title").textContent = a.name + " 资金运行详情";
+    const tag = $("sn-alarm-tag");
+    tag.textContent = a.state.txt;
+    tag.className = "sn-alarm-tag" + (isAlarm ? " is-bad" : "");
+    $("sn-sw-name").textContent = a.name;
+    $("sn-sw-idx").textContent = (idx + 1) + " / " + AREAS.length;
+    document.title = "大屏样板间 · 公共资金余额预警详情 · " + a.name;
+
+    /* KPI：先写 DOM 文案与状态色，再喂翻牌目标值 */
+    const vals = { bal: a.bal, mom: a.mom, lv: a.lv, months: a.months, gap: a.gap, rank: a.rank };
+    KPI_DEFS.forEach((k) => {
+      k.target = vals[k.key];
+      k.card.classList.toggle("is-alarm", isAlarm);
+    });
+    KPI_DEFS[0].node.className = "sn-kpi-val";
+    KPI_DEFS[0].subNode.innerHTML = "占全省 <b>" + (100 * a.bal / PROV_BAL).toFixed(1) + "%</b>";
+    KPI_DEFS[1].node.className = "sn-kpi-val " + (a.mom < 0 ? "is-red" : "");
+    KPI_DEFS[1].subNode.innerHTML = '环比 <b class="' + (a.mom >= 0 ? "sn-up" : "sn-down") + '">' + signed(a.momPct) + "%</b>";
+    KPI_DEFS[2].node.className = "sn-kpi-val " + a.state.tone;
+    KPI_DEFS[2].subNode.innerHTML = '<span class="sn-badge ' + a.state.cls + '">' + a.state.txt + "</span>距阈值 <b>" + signed(a.lv - TH.alert, 2) + "</b>";
+    KPI_DEFS[3].node.className = "sn-kpi-val " + (a.months > 0 ? "is-red" : "");
+    KPI_DEFS[3].subNode.innerHTML = a.months > 0
+      ? "自 <b>2026-" + pad(7 - a.months + 1) + "</b> 起连续"
+      : "月末未跌破 <b>0.30</b>";
+    KPI_DEFS[4].node.className = "sn-kpi-val is-red";
+    KPI_DEFS[4].subNode.innerHTML = "支出 <b>" + fmtDec(a.exp) + "</b> / 收入 <b>" + fmtDec(a.rev) + "</b>";
+    KPI_DEFS[5].node.className = "sn-kpi-val " + (a.rank > 12 ? "is-red" : "is-orange");
+    KPI_DEFS[5].subNode.innerHTML = "全省 <b>" + PROV_LV.toFixed(2) + "</b> · 预警 <b>" + PROV_ALERT + "</b> 个";
+
+    renderOverview(a);
+    renderTimeline(a);
+    renderMarquee(a);
+
+    dailyChart.setOption(dailyOption(a), true);
+    monthChart.setOption(monthOption(a), true);
+    $("sn-main-scope").textContent = "05-03 ~ 07-31 · 末值 " + fmtDec(a.bal) + " 亿元 · 最低 " + a.loDate + " " + a.loLv.toFixed(3);
+    $("sn-main-scope").className = "sn-panel-scope" + (isAlarm ? " is-alert" : "");
+    $("sn-sub-scope").textContent = "收入 " + fmtDec(a.rev) + " · 支出 " + fmtDec(a.exp) + " · 缺口 " + fmtDec(a.gap) + " 亿元";
+    $("sn-main-panel").classList.toggle("is-alarm", isAlarm);
+
+    history.replaceState(null, "", "#" + encodeURIComponent(a.name));
+  }
+
+  /* ===== 14. 交互：切换器 / 返回父页 / 键盘 / hash 定位 / kiosk 自动轮换 ===== */
+  $("sn-sw-prev").addEventListener("click", () => { applyArea(idx - 1); restart(); });
+  $("sn-sw-next").addEventListener("click", () => { applyArea(idx + 1); restart(); });
+  $("sn-back").addEventListener("click", () => { location.href = PARENT; });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyArea(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyArea(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* 打开时按 hash 定位（父页下钻传参用），未命中取第 0 个 */
+  const hash = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+  const hit = AREAS.findIndex((a) => a.name === hash);
+  applyArea(hit >= 0 ? hit : 0);
+
+  /* kiosk 常驻：每 12 秒切下一地区；鼠标停在切换器上暂停 */
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => applyArea(idx + 1), 12000); }
+  restart();
+  const sw = $("sn-switcher");
+  sw.addEventListener("mouseenter", () => clearInterval(timer));
+  sw.addEventListener("mouseleave", restart);
+
+  /* ===== 15. 勾稽自检：任一条不过就点亮告警条 ===== */
+  const errs = [];
+  AREAS.forEach((a) => {
+    if (!a.tieProv) errs.push(a.name + " 余额/保障水平与父页预警清单不符");
+    if (!a.lvTie) errs.push(a.name + " 保障水平现算 " + a.lv.toFixed(4) + " ≠ 父页 " + a.lvRef);
+    if (!a.monthsTie) errs.push(a.name + " 连续低于阈值月数现算 " + a.months + " ≠ 父页 " + a.monthsRef);
+    if (!a.tieRev) errs.push(a.name + " 月度收入 7 项之和 ≠ " + a.rev);
+    if (!a.tieExp) errs.push(a.name + " 月度支出 7 项之和 ≠ " + a.exp);
+    if (!a.tieEnd) errs.push(a.name + " 日序列末值 ≠ 资金余额 " + a.bal);
+    if (!a.loInWin) errs.push(a.name + " 年内最低点不在近 90 天窗口内");
+    if (a.loLv > a.lv) errs.push(a.name + " 最低点保障水平未低于期末水平");
+  });
+  if (PROV_BAL !== 2180) errs.push("全省 14 地区余额之和 " + PROV_BAL + " ≠ 2180");
+  if (Math.round(PROV_LV * 100) / 100 !== 0.62) errs.push("全省保障水平现算 " + PROV_LV.toFixed(4) + " ≠ 0.62");
+  if (PROV_ALERT !== 2) errs.push("全省预警地区数 " + PROV_ALERT + " ≠ 2");
+  if (errs.length) {
+    errorNode.textContent = "勾稽自检未通过：" + errs.slice(0, 3).join("；") + (errs.length > 3 ? " 等 " + errs.length + " 项" : "");
+    errorNode.classList.add("is-visible");
+  }
+})();
+</script>
+</body>
+</html>

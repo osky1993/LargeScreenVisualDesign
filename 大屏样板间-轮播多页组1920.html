@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 轮播多页组</title>
+<style>
+  :root {
+    --ms-bg: #0a1e3c;
+    --ms-panel: rgba(13, 34, 64, 0.72);
+    --ms-border: rgba(86, 150, 224, 0.28);
+    --ms-text: #e6f1ff;
+    --ms-muted: #8fa7c8;
+    --ms-cyan: #3fe1ff;
+    --ms-blue: #4b7dff;
+    --ms-green: #38e6b0;
+    --ms-gold: #ffc857;
+    --ms-red: #ff6680;
+    --ms-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--ms-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .ms-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(63, 225, 255, 0.10), transparent 42%),
+      radial-gradient(circle at 88% 12%, rgba(255, 200, 87, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(35, 96, 172, 0.28), transparent 55%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--ms-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-rows: 78px 1fr 60px;
+    gap: 14px;
+    padding: 14px 18px 16px;
+  }
+
+  .ms-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .ms-error.is-visible { display: block; }
+
+  /* ===== 公共顶栏（不随页切换） ===== */
+  .ms-header {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px;
+  }
+  .ms-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 200, 87, 0.55) 18%, rgba(63, 225, 255, 0.9) 50%, rgba(255, 200, 87, 0.55) 82%, transparent);
+    box-shadow: 0 0 14px rgba(63, 225, 255, 0.5);
+  }
+  .ms-head-left { display: flex; align-items: baseline; gap: 18px; white-space: nowrap; }
+  .ms-head-title {
+    font-size: 32px; font-weight: 700; letter-spacing: 0.18em;
+    background: linear-gradient(180deg, #ffffff 25%, #ffd98a 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(255, 200, 87, 0.3));
+  }
+  .ms-head-page {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; letter-spacing: 0.14em; color: #9fd7ef;
+  }
+  .ms-head-page::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ms-cyan); box-shadow: 0 0 8px var(--ms-cyan);
+    animation: msDot 2s ease-in-out infinite;
+  }
+  @keyframes msDot { 50% { opacity: 0.3; } }
+  .ms-head-right { display: flex; align-items: center; gap: 22px; }
+  .ms-badge {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 13px; color: #ffe3a6; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid rgba(255, 200, 87, 0.38); background: rgba(60, 46, 16, 0.4);
+  }
+  .ms-badge i {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--ms-green);
+    box-shadow: 0 0 0 3px rgba(56, 230, 176, 0.15), 0 0 10px var(--ms-green);
+    animation: msBreath 2s ease-in-out infinite;
+  }
+  @keyframes msBreath { 50% { opacity: 0.35; transform: scale(0.82); } }
+  .ms-clock { display: flex; align-items: baseline; gap: 12px; font-variant-numeric: tabular-nums; }
+  .ms-clock-time { font: 700 28px/1 var(--ms-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 14px rgba(63, 225, 255, 0.45); }
+  .ms-clock-date { font-size: 13px; color: var(--ms-muted); letter-spacing: 0.08em; }
+
+  /* ===== 多页机制核心：三个 .ms-page 层叠，class 切换驱动转场 =====
+     旧页：移除 .is-active → 回到基态（淡出 + 下移 20px）
+     新页：加上 .is-active → 从下方 20px 淡入上移至原位 */
+  .ms-pages { position: relative; min-height: 0; }
+  .ms-page {
+    position: absolute; inset: 0;
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.6s cubic-bezier(0.22, 0.61, 0.36, 1), transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+    pointer-events: none;
+    display: grid; gap: 14px; min-height: 0;
+  }
+  .ms-page.is-active { opacity: 1; transform: translateY(0); pointer-events: auto; z-index: 2; }
+
+  /* ===== 页签指示器（右下角固定，浮于跑马灯上方） ===== */
+  .ms-tabs {
+    position: absolute; right: 18px; bottom: 92px; z-index: 10;
+    display: flex; gap: 10px; padding: 8px 10px; border-radius: 999px;
+    border: 1px solid var(--ms-border); background: rgba(9, 24, 48, 0.88);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+  }
+  .ms-tab {
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 18px; border-radius: 999px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(86, 150, 224, 0.35); background: rgba(20, 48, 88, 0.5);
+    color: #cfe6ff; font-size: 13px; letter-spacing: 0.12em; font-family: inherit;
+    transition: border-color 0.25s, color 0.25s, box-shadow 0.25s;
+  }
+  .ms-tab:hover { color: #fff; border-color: rgba(63, 225, 255, 0.7); }
+  .ms-tab b { font-weight: 400; font-size: 11px; color: rgba(143, 167, 200, 0.75); font-variant-numeric: tabular-nums; }
+  .ms-tab.is-active {
+    color: #06182f; font-weight: 700;
+    border-color: rgba(63, 225, 255, 0.9);
+    background: linear-gradient(120deg, #7deaff, #29b6de);
+    box-shadow: 0 0 16px rgba(63, 225, 255, 0.45);
+  }
+  .ms-tab.is-active b { color: rgba(6, 24, 47, 0.6); }
+  /* 自动轮播进度条：激活页签底部 15s 线性充满，与轮播计时同步 */
+  .ms-tab-prog {
+    position: absolute; left: 0; bottom: 0; height: 3px; width: 0;
+    background: linear-gradient(90deg, var(--ms-gold), #ffeab0);
+    border-radius: 2px;
+  }
+  .ms-tab.is-active .ms-tab-prog { animation: msTabFill 15s linear forwards; }
+  @keyframes msTabFill { from { width: 0; } to { width: 100%; } }
+  /* 鼠标悬停舞台 → 轮播暂停，进度条同步冻结 */
+  .ms-tabs.is-paused .ms-tab-prog { animation-play-state: paused; }
+
+  /* ===== 面板通用 ===== */
+  .ms-panel {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--ms-border); border-radius: 12px; background: var(--ms-panel);
+    display: flex; flex-direction: column;
+  }
+  .ms-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(63, 225, 255, 0.22), rgba(63, 225, 255, 0.04) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .ms-panel-head i { flex: none; width: 5px; height: 16px; background: var(--ms-cyan); box-shadow: 0 0 8px var(--ms-cyan); transform: skewX(-12deg); }
+  .ms-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .ms-panel-head .ms-panel-en { font-size: 10px; letter-spacing: 0.22em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ms-panel-head .ms-panel-scope { margin-left: auto; font-size: 12px; color: var(--ms-gold); white-space: nowrap; padding-right: 2px; }
+  .ms-chart { flex: 1; min-height: 0; }
+
+  /* ===== 内容页面包屑行（P2 / P3 页头，风格随分行经营详情） ===== */
+  .ms-crumb-row { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 0; }
+  .ms-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--ms-muted); }
+  .ms-crumb b { font-weight: 400; color: #6fb9e8; }
+  .ms-crumb i { font-style: normal; color: rgba(143, 167, 200, 0.55); }
+  .ms-crumb em { font-style: normal; color: #d7e8ff; }
+  .ms-crumb-note { font-size: 12px; letter-spacing: 0.1em; color: #5f88b8; }
+
+  /* ===== P1 经营总览 ===== */
+  .ms-p1 { grid-template-rows: 104px 1fr 300px; grid-template-columns: 1fr 1fr; }
+  .ms-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .ms-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--ms-border); border-radius: 12px; background: var(--ms-panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  }
+  .ms-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 42px; height: 3px;
+    background: linear-gradient(90deg, var(--ms-gold), transparent);
+  }
+  .ms-kpi-label { font-size: 13px; letter-spacing: 0.14em; color: var(--ms-muted); }
+  .ms-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .ms-kpi-val { font: 700 30px/1 var(--ms-mono); color: #f4faff; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(63, 225, 255, 0.4); }
+  .ms-kpi-unit { font-size: 12px; color: #6fb9e8; }
+  .ms-kpi-delta { font-size: 12px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .ms-kpi-delta.is-good { color: var(--ms-green); }
+  .ms-kpi-delta.is-bad { color: var(--ms-red); }
+  .ms-p1-bottom { grid-column: 1 / -1; }
+
+  /* ===== P2 渠道专题 ===== */
+  .ms-p2 { grid-template-rows: 24px 1fr 1fr; grid-template-columns: 1.25fr 1fr; }
+  .ms-p2 .ms-crumb-row { grid-column: 1 / -1; }
+  .ms-news-list { margin: 0; padding: 6px 0 4px; list-style: none; flex: 1; min-height: 0; overflow: hidden; }
+  .ms-news-list li {
+    display: flex; align-items: center; gap: 12px;
+    height: 44px; padding: 0 18px; font-size: 13px; color: #cfe3fa;
+    border-bottom: 1px dashed rgba(86, 150, 224, 0.12);
+  }
+  .ms-news-list li:nth-child(odd) { background: rgba(24, 56, 100, 0.25); }
+  .ms-news-time { flex: none; font-variant-numeric: tabular-nums; color: var(--ms-muted); }
+  .ms-news-tag {
+    flex: none; padding: 2px 9px; border-radius: 999px; font-size: 11px; letter-spacing: 0.08em;
+    border: 1px solid rgba(63, 225, 255, 0.4); color: #9feaff; background: rgba(23, 68, 110, 0.5);
+  }
+  .ms-news-tag.is-gold { border-color: rgba(255, 200, 87, 0.45); color: #ffe3a6; background: rgba(60, 46, 16, 0.45); }
+  .ms-news-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ms-news-text b { color: var(--ms-gold); font-weight: 700; }
+
+  /* ===== P3 风险专题 ===== */
+  .ms-p3 { grid-template-rows: 24px 1fr 1fr; grid-template-columns: 1.25fr 1fr; }
+  .ms-p3 .ms-crumb-row { grid-column: 1 / -1; }
+  .ms-warn-head, .ms-warn-list li {
+    display: grid; grid-template-columns: 0.8fr 1.6fr 1fr 1fr 0.9fr 0.7fr; gap: 8px;
+    padding: 0 18px; align-items: center; font-variant-numeric: tabular-nums;
+  }
+  .ms-warn-head {
+    flex: none; height: 34px; font-size: 12px; letter-spacing: 0.12em; color: #6fb9e8;
+    border-bottom: 1px solid rgba(86, 150, 224, 0.25);
+  }
+  .ms-warn-head span:nth-child(5), .ms-warn-list .ms-warn-amt { text-align: right; }
+  .ms-warn-list { margin: 0; padding: 0; list-style: none; flex: 1; min-height: 0; overflow: hidden; }
+  .ms-warn-list li { height: 42px; font-size: 13px; color: #cfe3fa; border-bottom: 1px dashed rgba(86, 150, 224, 0.12); }
+  .ms-warn-list li:nth-child(odd) { background: rgba(24, 56, 100, 0.25); }
+  .ms-warn-time { color: var(--ms-muted); }
+  .ms-warn-amt { color: var(--ms-gold); font-weight: 700; }
+  .ms-warn-lv { justify-self: start; padding: 2px 10px; border-radius: 999px; font-size: 11px; letter-spacing: 0.1em; }
+  .ms-warn-lv.is-red { color: #ffb3c0; border: 1px solid rgba(255, 102, 128, 0.5); background: rgba(96, 26, 38, 0.5); }
+  .ms-warn-lv.is-gold { color: #ffe3a6; border: 1px solid rgba(255, 200, 87, 0.45); background: rgba(60, 46, 16, 0.45); }
+  .ms-warn-lv.is-cyan { color: #9feaff; border: 1px solid rgba(63, 225, 255, 0.4); background: rgba(23, 68, 110, 0.5); }
+
+  /* ===== 底部公共跑马灯（不随页切换） ===== */
+  .ms-marquee {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--ms-border); border-radius: 12px; background: var(--ms-panel);
+  }
+  .ms-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #06182f;
+    background: linear-gradient(120deg, var(--ms-gold), #e8a83a 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .ms-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #06182f; animation: msDot 1.6s ease-in-out infinite; }
+  .ms-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .ms-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: msMarquee 46s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .ms-marquee-track b { color: var(--ms-gold); font-weight: 700; }
+  .ms-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(63, 225, 255, 0.55); }
+  @keyframes msMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .ms-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="ms-stage" id="ms-stage">
+    <!-- mockflag:begin --><div class="ms-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="ms-error" id="ms-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 公共顶栏：标题 + 当前页名（随页切换）| 状态徽章 + 时钟 -->
+    <header class="ms-header">
+      <div class="ms-head-left">
+        <div class="ms-head-title">零售银行驾驶舱</div>
+        <div class="ms-head-page" id="ms-head-page">经营总览</div>
+      </div>
+      <div class="ms-head-right">
+        <div class="ms-badge"><i></i>自动轮播中 · 演示数据</div>
+        <div class="ms-clock" aria-label="实时时钟">
+          <span class="ms-clock-time" id="ms-clock-time">--:--:--</span>
+          <span class="ms-clock-date" id="ms-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 多页容器：三页层叠，同一时刻仅激活页可见 -->
+    <div class="ms-pages" id="ms-pages">
+
+      <!-- ===== P1 经营总览（首页范式） ===== -->
+      <section class="ms-page ms-p1 is-active" data-page="0" aria-label="经营总览页">
+        <div class="ms-kpis" id="ms-kpis"></div>
+        <section class="ms-panel">
+          <header class="ms-panel-head"><i></i><h2>存贷款月度趋势</h2><span class="ms-panel-en">DEPOSIT &amp; LOAN TREND</span><span class="ms-panel-scope">近 12 月</span></header>
+          <div class="ms-chart" id="ms-chart-trend" role="img" aria-label="近12月新增存贷款柱线混合图"></div>
+        </section>
+        <section class="ms-panel">
+          <header class="ms-panel-head"><i></i><h2>渠道交易占比</h2><span class="ms-panel-en">CHANNEL MIX</span><span class="ms-panel-scope">本月</span></header>
+          <div class="ms-chart" id="ms-chart-donut" role="img" aria-label="渠道交易占比环形图"></div>
+        </section>
+        <section class="ms-panel ms-p1-bottom">
+          <header class="ms-panel-head"><i></i><h2>分行业绩排行 TOP5</h2><span class="ms-panel-en">BRANCH TOP5</span><span class="ms-panel-scope">本月营收</span></header>
+          <div class="ms-chart" id="ms-chart-top5" role="img" aria-label="分行业绩TOP5横向条形图"></div>
+        </section>
+      </section>
+
+      <!-- ===== P2 渠道专题（内容页范式：面包屑页头） ===== -->
+      <section class="ms-page ms-p2" data-page="1" aria-label="渠道专题页">
+        <div class="ms-crumb-row">
+          <div class="ms-crumb"><b>驾驶舱</b><i>›</i><em>渠道专题</em></div>
+          <div class="ms-crumb-note">CHANNEL SPECIAL · 口径：全渠道 · 本月</div>
+        </div>
+        <section class="ms-panel">
+          <header class="ms-panel-head"><i></i><h2>手机银行 MAU 趋势</h2><span class="ms-panel-en">MOBILE BANKING MAU</span><span class="ms-panel-scope">近 12 月</span></header>
+          <div class="ms-chart" id="ms-chart-mau" role="img" aria-label="手机银行月活趋势面积图"></div>
+        </section>
+        <section class="ms-panel">
+          <header class="ms-panel-head"><i></i><h2>各渠道交易占比</h2><span class="ms-panel-en">CHANNEL SHARE</span><span class="ms-panel-scope">本月</span></header>
+          <div class="ms-chart" id="ms-chart-rose" role="img" aria-label="各渠道交易占比玫瑰图"></div>
+        </section>
+        <section class="ms-panel">
+          <header class="ms-panel-head"><i></i><h2>渠道交易成功率</h2><span class="ms-panel-en">SUCCESS RATE</span><span class="ms-panel-scope">今日实时</span></header>
+          <div class="ms-chart" id="ms-chart-succ" role="img" aria-label="各渠道交易成功率横向条形图"></div>
+        </section>
+        <section class="ms-panel">
+          <header class="ms-panel-head"><i></i><h2>渠道快讯</h2><span class="ms-panel-en">CHANNEL FEED</span><span class="ms-panel-scope" id="ms-news-count">--</span></header>
+          <ul class="ms-news-list" id="ms-news-list"></ul>
+        </section>
+      </section>
+
+      <!-- ===== P3 风险专题（内容页范式：面包屑页头） ===== -->
+      <section class="ms-page ms-p3" data-page="2" aria-label="风险专题页">
+        <div class="ms-crumb-row">
+          <div class="ms-crumb"><b>驾驶舱</b><i>›</i><em>风险专题</em></div>
+          <div class="ms-crumb-note">RISK SPECIAL · 口径：全行信贷 · 月末时点</div>
+        </div>
+        <section class="ms-panel">
+          <header class="ms-panel-head"><i></i><h2>不良率与关注率趋势</h2><span class="ms-panel-en">NPL &amp; SML TREND</span><span class="ms-panel-scope">近 12 月</span></header>
+          <div class="ms-chart" id="ms-chart-npl" role="img" aria-label="不良率与关注率双线趋势图"></div>
+        </section>
+        <section class="ms-panel">
+          <header class="ms-panel-head"><i></i><h2>五级分类结构</h2><span class="ms-panel-en">LOAN CLASSIFICATION</span><span class="ms-panel-scope">按条线</span></header>
+          <div class="ms-chart" id="ms-chart-class" role="img" aria-label="各条线贷款五级分类堆叠条形图"></div>
+        </section>
+        <section class="ms-panel">
+          <header class="ms-panel-head"><i></i><h2>风险预警清单</h2><span class="ms-panel-en">RISK WATCHLIST</span><span class="ms-panel-scope">待处置 6 项</span></header>
+          <div class="ms-warn-head"><span>时间</span><span>客户</span><span>分行</span><span>预警类型</span><span>敞口（万元）</span><span>等级</span></div>
+          <ul class="ms-warn-list" id="ms-warn-list"></ul>
+        </section>
+        <section class="ms-panel">
+          <header class="ms-panel-head"><i></i><h2>拨备覆盖率</h2><span class="ms-panel-en">PROVISION COVERAGE</span><span class="ms-panel-scope">监管线 150%</span></header>
+          <div class="ms-chart" id="ms-chart-gauge" role="img" aria-label="拨备覆盖率仪表盘"></div>
+        </section>
+      </section>
+    </div>
+
+    <!-- 页签指示器：右下角固定，胶囊 + 轮播进度条 -->
+    <nav class="ms-tabs" id="ms-tabs" aria-label="页面切换">
+      <button class="ms-tab is-active" type="button" data-page="0"><span>经营总览</span><b>01</b><i class="ms-tab-prog"></i></button>
+      <button class="ms-tab" type="button" data-page="1"><span>渠道专题</span><b>02</b><i class="ms-tab-prog"></i></button>
+      <button class="ms-tab" type="button" data-page="2"><span>风险专题</span><b>03</b><i class="ms-tab-prog"></i></button>
+    </nav>
+
+    <!-- 底部公共跑马灯（不随页切换） -->
+    <section class="ms-marquee" aria-label="全行快讯">
+      <div class="ms-marquee-tag"><i></i>全行快讯</div>
+      <div class="ms-marquee-view"><div class="ms-marquee-track" id="ms-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("ms-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("ms-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  /* ===== 3. 公共工具 ===== */
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    gold: "#ffc857", red: "#ff6680", violet: "#9870ff"
+  };
+  const rnd = (min, max) => Math.round(min + Math.random() * (max - min));
+  const rndf = (min, max) => min + Math.random() * (max - min);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(102, 178, 255, 0.4)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+
+  /* ===== 4. 静态业务数据（中型零售银行 · 演示口径） ===== */
+  const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
+  const DEP_ADD = [46.2, 31.8, 51.4, 38.5, 42.1, 55.3, 48.6, 35.9, 44.2, 57.8, 49.5, 62.3];
+  const LOAN_ADD = [37.6, 25.4, 41.2, 30.8, 34.5, 43.9, 38.7, 27.6, 35.8, 46.4, 40.6, 51.8];
+  const LDR = [72.4, 72.1, 72.6, 72.3, 72.8, 73.2, 73.0, 72.7, 73.1, 73.5, 73.4, 73.6];
+  const CHANNELS = [
+    { name: "手机银行", value: 58.2 }, { name: "网上银行", value: 15.4 },
+    { name: "第三方支付", value: 12.6 }, { name: "柜面", value: 8.2 }, { name: "ATM", value: 5.6 }
+  ];
+  const TOP5 = [
+    { name: "城南分行", value: 9862 }, { name: "高新分行", value: 9347 },
+    { name: "滨江分行", value: 8925 }, { name: "城北分行", value: 8462 },
+    { name: "开发区分行", value: 7938 }
+  ];
+  const MAU = [412.5, 420.8, 431.2, 438.6, 447.3, 456.1, 463.8, 471.2, 480.5, 492.4, 503.6, 512.3];
+  const SUCC = [
+    { name: "手机银行", value: 99.62 }, { name: "网上银行", value: 99.41 },
+    { name: "第三方支付", value: 99.18 }, { name: "柜面", value: 99.87 }, { name: "ATM", value: 98.64 }
+  ];
+  const NPL = [1.21, 1.19, 1.18, 1.16, 1.15, 1.13, 1.12, 1.11, 1.10, 1.09, 1.08, 1.08];
+  const SML = [2.36, 2.32, 2.30, 2.24, 2.21, 2.18, 2.14, 2.12, 2.08, 2.05, 2.02, 1.98];
+  const CLASS_LINES = ["对公", "零售", "小微", "信用卡"];
+  const CLASS_DATA = { /* 五级分类占比（%），每行合计 100 */
+    "正常": [96.4, 97.1, 95.2, 94.6],
+    "关注": [2.2, 1.8, 3.0, 3.2],
+    "次级": [0.7, 0.6, 1.0, 1.2],
+    "可疑": [0.4, 0.3, 0.5, 0.6],
+    "损失": [0.3, 0.2, 0.3, 0.4]
+  };
+  const WARNS = [
+    { time: "09:12", cust: "**建材贸易有限公司", branch: "城北分行", type: "对外担保激增", amt: 5800, lv: ["高", "is-red"] },
+    { time: "09:47", cust: "**置业发展有限公司", branch: "滨江分行", type: "销售回款异常", amt: 12600, lv: ["高", "is-red"] },
+    { time: "10:23", cust: "**机械制造有限公司", branch: "开发区分行", type: "利息逾期 7 天", amt: 3400, lv: ["中", "is-gold"] },
+    { time: "11:05", cust: "张*明（个体经营贷）", branch: "城南分行", type: "征信新增查询", amt: 380, lv: ["低", "is-cyan"] },
+    { time: "13:36", cust: "**能源科技有限公司", branch: "高新分行", type: "环保处罚公示", amt: 7200, lv: ["中", "is-gold"] },
+    { time: "14:18", cust: "**供应链管理有限公司", branch: "临港分行", type: "关联方涉诉", amt: 4600, lv: ["中", "is-gold"] }
+  ];
+  const NEWS_FEED = [
+    { tag: ["活动", ""], text: "手机银行 8.0 版「财富专区」上线首周访问 <b>86 万人次</b>" },
+    { tag: ["里程碑", "is-gold"], text: "手机银行月活突破 <b>512 万户</b>，同比增长 18.4%" },
+    { tag: ["运营", ""], text: "第三方支付渠道单日交易峰值 <b>142 万笔</b>，系统平稳" },
+    { tag: ["活动", ""], text: "「周五立减金」活动拉动绑卡交易环比提升 <b>23.6%</b>" },
+    { tag: ["里程碑", "is-gold"], text: "远程银行视频柜员服务满意度达 <b>98.2%</b>" },
+    { tag: ["运营", ""], text: "ATM 渠道完成清机巡检 286 台，可用率 <b>99.1%</b>" }
+  ];
+  const NEWS = [
+    "手机银行月活突破 <b>512 万户</b>，同比增长 18.4%",
+    "不良贷款率连续 6 个月保持 <b>1.10%</b> 以下，资产质量持续向好",
+    "城南分行零售 AUM 提前 38 天完成季度目标，达成率 <b>112.6%</b>",
+    "绿色信贷余额突破 <b>300 亿元</b>，较年初增长 21.7%",
+    "拨备覆盖率 <b>286%</b>，风险抵补能力保持充足",
+    "普惠小微贷款余额 <b>428 亿元</b>，完成年度序时进度 108%"
+  ];
+
+  /* ===== 5. 公共顶栏时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    document.getElementById("ms-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    document.getElementById("ms-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* =====================================================================
+     6. 多页轮播引擎（本样板间核心示范）
+     - 三个 .ms-page 层叠：切页只增删 .is-active，转场全部交给 CSS 过渡
+     - 自动轮播 15s 一页；鼠标移入舞台暂停、移出恢复（大屏演示惯例）
+     - 页签点击手动跳页并重置 15s 计时；激活页签底部进度条与计时同步
+     - ECharts 懒初始化：页面首次激活时才 init 该页图表，避免开屏
+       一次性初始化全部实例（多页大屏的性能惯例；隐藏页仅 opacity:0
+       而非 display:none，容器始终有尺寸，init 不会得到 0x0 画布）
+     ===================================================================== */
+  const ROTATE_MS = 15000;
+  const pages = Array.from(document.querySelectorAll(".ms-page"));
+  const tabs = Array.from(document.querySelectorAll(".ms-tab"));
+  const tabsBox = document.getElementById("ms-tabs");
+  const headPage = document.getElementById("ms-head-page");
+  const PAGE_NAMES = ["经营总览", "渠道专题", "风险专题"];
+  const pageInited = [false, false, false];
+  let pageInits = [];            /* 惰性填充：见第 7 节 */
+  let current = 0;
+  let rotateTimer = null;
+
+  /* 重启激活页签的进度条动画（移除 class → 强制回流 → 加回） */
+  function restartProgress() {
+    const prog = tabs[current].querySelector(".ms-tab-prog");
+    tabs[current].classList.remove("is-active");
+    void prog.offsetWidth;
+    tabs[current].classList.add("is-active");
+  }
+
+  function activatePage(idx) {
+    if (idx === current && pageInited[idx]) { restartProgress(); return; }
+    pages.forEach((p, i) => p.classList.toggle("is-active", i === idx));   /* 旧页淡出下移，新页淡入上移 */
+    tabs.forEach((t, i) => t.classList.toggle("is-active", i === idx));
+    headPage.textContent = PAGE_NAMES[idx];
+    current = idx;
+    if (!pageInited[idx]) {          /* 懒初始化：首次激活才建图表 */
+      pageInited[idx] = true;
+      pageInits[idx]();
+    }
+    restartProgress();
+  }
+
+  function startRotate() {
+    stopRotate();
+    rotateTimer = setInterval(() => activatePage((current + 1) % pages.length), ROTATE_MS);
+  }
+  function stopRotate() {
+    if (rotateTimer !== null) { clearInterval(rotateTimer); rotateTimer = null; }
+  }
+
+  /* 页签点击：手动跳页 + 重置轮播计时 */
+  tabs.forEach((t) => {
+    t.addEventListener("click", () => {
+      activatePage(Number(t.getAttribute("data-page")));
+      if (rotateTimer !== null) startRotate();   /* 悬停暂停期间点击则保持暂停 */
+    });
+  });
+
+  /* 鼠标移入舞台暂停轮播（进度条冻结），移出恢复（计时与进度条同步归零重走） */
+  stage.addEventListener("mouseenter", () => {
+    stopRotate();
+    tabsBox.classList.add("is-paused");
+  });
+  stage.addEventListener("mouseleave", () => {
+    tabsBox.classList.remove("is-paused");
+    restartProgress();
+    startRotate();
+  });
+
+  /* ===== 7. 各页初始化（懒执行，图表实例只建一次） ===== */
+
+  /* --- P1 经营总览 --- */
+  let trendChart = null, donutChart = null, top5Chart = null;
+  function initP1() {
+    /* KPI 行 4 枚（缓动跳变 + 同比箭头） */
+    const KPIS = [
+      { label: "存款余额", unit: "亿元", target: 4286.5, dec: 1, jit: [0.2, 1.4], delta: "▲ 同比 +8.6%", good: true },
+      { label: "贷款余额", unit: "亿元", target: 3152.8, dec: 1, jit: [0.1, 1.0], delta: "▲ 同比 +11.2%", good: true },
+      { label: "营业收入", unit: "亿元", target: 152.6, dec: 1, jit: [0.02, 0.12], delta: "▲ 同比 +7.3%", good: true },
+      { label: "客户总数", unit: "万户", target: 524.3, dec: 1, jit: [0.01, 0.08], delta: "▲ 环比 +0.7%", good: true }
+    ];
+    const kpiWrap = document.getElementById("ms-kpis");
+    KPIS.forEach((k) => {
+      const card = document.createElement("article");
+      card.className = "ms-kpi";
+      card.innerHTML =
+        '<div class="ms-kpi-label">' + k.label + '</div>' +
+        '<div class="ms-kpi-num"><span class="ms-kpi-val">0</span><span class="ms-kpi-unit">' + k.unit + '</span></div>' +
+        '<div class="ms-kpi-delta ' + (k.good ? "is-good" : "is-bad") + '">' + k.delta + '</div>';
+      kpiWrap.appendChild(card);
+      k.node = card.querySelector(".ms-kpi-val");
+      k.cur = 0;
+    });
+    setInterval(() => {
+      KPIS.forEach((k) => {
+        const diff = k.target - k.cur;
+        if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) { k.cur = k.target; } else { k.cur += diff * 0.12; }
+        k.node.textContent = fmtDec(k.cur, k.dec);
+      });
+    }, 80);
+    setInterval(() => {
+      KPIS.forEach((k) => { k.target = Math.max(0, k.target + rndf(k.jit[0], k.jit[1])); });
+    }, 6000);
+
+    /* 存贷趋势柱线（双轴） */
+    trendChart = echarts.init(document.getElementById("ms-chart-trend"));
+    trendChart.setOption({
+      tooltip: tip({ trigger: "axis", valueFormatter: (v) => (typeof v === "number" ? fmtDec(v, 1) : v) }),
+      legend: { top: 6, itemWidth: 12, itemHeight: 8, itemGap: 16, textStyle: { color: "#cfe6ff", fontSize: 11 } },
+      grid: { left: 12, right: 14, top: 40, bottom: 6, containLabel: true },
+      xAxis: {
+        type: "category", data: MONTHS,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+        axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      yAxis: [
+        { type: "value", name: "亿元", nameTextStyle: { color: C.muted, fontSize: 10 },
+          splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } }, axisLabel: { color: C.muted, fontSize: 11 } },
+        { type: "value", name: "%", min: 68, max: 78, nameTextStyle: { color: C.muted, fontSize: 10 },
+          splitLine: { show: false }, axisLabel: { color: C.muted, fontSize: 11 } }
+      ],
+      series: [
+        { name: "新增存款", type: "bar", barWidth: 9, data: DEP_ADD,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad(C.cyan, "#155a8f") } },
+        { name: "新增贷款", type: "bar", barWidth: 9, data: LOAN_ADD,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad(C.gold, "#8a5f18") } },
+        { name: "存贷比", type: "line", yAxisIndex: 1, smooth: true, data: LDR,
+          symbol: "circle", symbolSize: 5,
+          lineStyle: { width: 2.5, color: C.green, shadowColor: "rgba(56, 230, 176, 0.6)", shadowBlur: 10 },
+          itemStyle: { color: "#eafff6", borderColor: C.green, borderWidth: 2 } }
+      ],
+      animationDurationUpdate: 600
+    });
+
+    /* 渠道占比环形 */
+    donutChart = echarts.init(document.getElementById("ms-chart-donut"));
+    donutChart.setOption({
+      tooltip: tip({ valueFormatter: (v) => fmtDec(v, 1) + "%" }),
+      legend: {
+        orient: "vertical", right: 14, top: "middle", itemWidth: 10, itemHeight: 10,
+        textStyle: { color: "#cfe6ff", fontSize: 12 },
+        formatter: (name) => {
+          const d = CHANNELS.find((x) => x.name === name);
+          return name + "  " + fmtDec(d.value, 1) + "%";
+        }
+      },
+      color: [C.cyan, C.blue, C.gold, C.green, C.violet],
+      series: [{
+        type: "pie", radius: ["52%", "74%"], center: ["36%", "52%"],
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+        label: { show: false },
+        emphasis: { label: { show: true, color: "#eaf6ff", fontSize: 13, fontWeight: 700, formatter: "{b}\n{d}%" } },
+        data: CHANNELS
+      }, {
+        type: "pie", radius: ["82%", "83%"], center: ["36%", "52%"], silent: true,
+        label: { show: false }, itemStyle: { color: "rgba(255, 200, 87, 0.3)" }, data: [1]
+      }],
+      animationDurationUpdate: 600
+    });
+
+    /* 分行 TOP5 横条（前三金银铜） */
+    const RANK_GRADS = [hGrad("#8a5f18", "#ffc857"), hGrad("#5d6f85", "#dfeaf6"), hGrad("#7a4218", "#e89a5c")];
+    top5Chart = echarts.init(document.getElementById("ms-chart-top5"));
+    top5Chart.setOption({
+      tooltip: tip({ valueFormatter: (v) => fmt(v) + " 万元" }),
+      grid: { left: 14, right: 70, top: 14, bottom: 8, containLabel: true },
+      xAxis: { type: "value", show: false },
+      yAxis: {
+        type: "category", inverse: true, data: TOP5.map((b) => b.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      series: [{
+        type: "bar", barWidth: 14,
+        data: TOP5.map((b, i) => ({
+          value: b.value,
+          itemStyle: { borderRadius: 7, color: i < 3 ? RANK_GRADS[i] : hGrad("#1d5d9e", C.cyan) }
+        })),
+        label: { show: true, position: "right", fontSize: 12, color: C.gold, formatter: (p) => fmt(p.value) },
+        showBackground: true,
+        backgroundStyle: { color: "rgba(63, 120, 200, 0.12)", borderRadius: 7 }
+      }],
+      animationDurationUpdate: 600
+    });
+  }
+
+  /* --- P2 渠道专题 --- */
+  let mauChart = null, roseChart = null, succChart = null;
+  function initP2() {
+    /* 手机银行 MAU 面积 */
+    mauChart = echarts.init(document.getElementById("ms-chart-mau"));
+    mauChart.setOption({
+      tooltip: tip({ trigger: "axis", valueFormatter: (v) => fmtDec(v, 1) + " 万户" }),
+      grid: { left: 12, right: 16, top: 26, bottom: 6, containLabel: true },
+      xAxis: {
+        type: "category", boundaryGap: false, data: MONTHS,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+        axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      yAxis: {
+        type: "value", min: 380, name: "万户", nameTextStyle: { color: C.muted, fontSize: 10 },
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      series: [{
+        type: "line", smooth: true, data: MAU,
+        symbol: "circle", symbolSize: 5,
+        lineStyle: { width: 2.5, color: C.cyan, shadowColor: "rgba(63, 225, 255, 0.55)", shadowBlur: 10 },
+        itemStyle: { color: "#eafbff", borderColor: C.cyan, borderWidth: 2 },
+        areaStyle: { color: vGrad("rgba(63, 225, 255, 0.32)", "rgba(63, 225, 255, 0.02)") },
+        markPoint: {
+          symbolSize: 52,
+          itemStyle: { color: "rgba(255, 200, 87, 0.9)" },
+          label: { color: "#06182f", fontSize: 11, fontWeight: 700 },
+          data: [{ type: "max", name: "峰值" }]
+        }
+      }],
+      animationDurationUpdate: 600
+    });
+
+    /* 各渠道交易占比玫瑰 */
+    roseChart = echarts.init(document.getElementById("ms-chart-rose"));
+    roseChart.setOption({
+      tooltip: tip({ valueFormatter: (v) => fmtDec(v, 1) + "%" }),
+      color: [C.cyan, C.blue, C.gold, C.green, C.violet],
+      series: [{
+        type: "pie", roseType: "radius",
+        radius: ["16%", "72%"], center: ["50%", "54%"],
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 2, borderRadius: 4 },
+        label: { color: "#cfe6ff", fontSize: 11, formatter: "{b}\n{d}%" },
+        labelLine: { length: 8, length2: 8, lineStyle: { color: "rgba(102, 178, 255, 0.4)" } },
+        data: CHANNELS
+      }],
+      animationDurationUpdate: 600
+    });
+
+    /* 渠道成功率横条（起点 98，凸显差异） */
+    succChart = echarts.init(document.getElementById("ms-chart-succ"));
+    succChart.setOption({
+      tooltip: tip({ valueFormatter: (v) => fmtDec(v, 2) + "%" }),
+      grid: { left: 14, right: 74, top: 14, bottom: 8, containLabel: true },
+      xAxis: { type: "value", min: 98, max: 100, show: false },
+      yAxis: {
+        type: "category", inverse: true, data: SUCC.map((s) => s.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      series: [{
+        type: "bar", barWidth: 12,
+        data: SUCC.map((s) => ({
+          value: s.value,
+          itemStyle: { borderRadius: 6, color: s.value >= 99 ? hGrad("#137a5c", C.green) : hGrad("#8a5f18", C.gold) }
+        })),
+        label: { show: true, position: "right", fontSize: 12, color: "#cfe6ff", formatter: (p) => fmtDec(p.value, 2) + "%" },
+        showBackground: true,
+        backgroundStyle: { color: "rgba(63, 120, 200, 0.12)", borderRadius: 6 }
+      }],
+      animationDurationUpdate: 600
+    });
+
+    /* 渠道快讯 DOM 列表（定时置顶新条目） */
+    const newsList = document.getElementById("ms-news-list");
+    const newsCount = document.getElementById("ms-news-count");
+    let newsTotal = rnd(120, 160);
+    function makeNewsRow(item) {
+      const d = new Date();
+      const li = document.createElement("li");
+      li.innerHTML =
+        '<span class="ms-news-time">' + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()) + '</span>' +
+        '<span class="ms-news-tag ' + item.tag[1] + '">' + item.tag[0] + '</span>' +
+        '<span class="ms-news-text">' + item.text + '</span>';
+      return li;
+    }
+    NEWS_FEED.slice(0, 6).forEach((n) => newsList.appendChild(makeNewsRow(n)));
+    newsCount.textContent = "今日 " + newsTotal + " 条";
+    setInterval(() => {
+      newsTotal += 1;
+      newsCount.textContent = "今日 " + newsTotal + " 条";
+      newsList.insertBefore(makeNewsRow(NEWS_FEED[rnd(0, NEWS_FEED.length - 1)]), newsList.firstChild);
+      while (newsList.children.length > 7) newsList.removeChild(newsList.lastChild);
+    }, 5000);
+  }
+
+  /* --- P3 风险专题 --- */
+  let nplChart = null, classChart = null, gaugeChart = null;
+  function initP3() {
+    /* 不良率 + 关注率双线 */
+    nplChart = echarts.init(document.getElementById("ms-chart-npl"));
+    nplChart.setOption({
+      tooltip: tip({ trigger: "axis", valueFormatter: (v) => fmtDec(v, 2) + "%" }),
+      legend: { top: 6, itemWidth: 14, itemHeight: 3, itemGap: 18, textStyle: { color: "#cfe6ff", fontSize: 11 } },
+      grid: { left: 12, right: 16, top: 40, bottom: 6, containLabel: true },
+      xAxis: {
+        type: "category", boundaryGap: false, data: MONTHS,
+        axisLine: { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } },
+        axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      yAxis: {
+        type: "value", min: 0.8, max: 2.6, name: "%", nameTextStyle: { color: C.muted, fontSize: 10 },
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+        axisLabel: { color: C.muted, fontSize: 11 }
+      },
+      series: [
+        { name: "不良贷款率", type: "line", smooth: true, data: NPL,
+          symbol: "circle", symbolSize: 5,
+          lineStyle: { width: 2.5, color: C.red, shadowColor: "rgba(255, 102, 128, 0.5)", shadowBlur: 10 },
+          itemStyle: { color: "#fff0f3", borderColor: C.red, borderWidth: 2 },
+          areaStyle: { color: vGrad("rgba(255, 102, 128, 0.18)", "rgba(255, 102, 128, 0.01)") },
+          markLine: {
+            silent: true, symbol: "none",
+            lineStyle: { type: "dashed", color: "rgba(255, 200, 87, 0.6)" },
+            label: { color: C.gold, fontSize: 11, formatter: "警戒 1.30%" },
+            data: [{ yAxis: 1.3 }]
+          } },
+        { name: "关注类占比", type: "line", smooth: true, data: SML,
+          symbol: "circle", symbolSize: 5,
+          lineStyle: { width: 2.5, color: C.gold, shadowColor: "rgba(255, 200, 87, 0.5)", shadowBlur: 10 },
+          itemStyle: { color: "#fff8ea", borderColor: C.gold, borderWidth: 2 } }
+      ],
+      animationDurationUpdate: 600
+    });
+
+    /* 五级分类堆叠条（按条线） */
+    classChart = echarts.init(document.getElementById("ms-chart-class"));
+    classChart.setOption({
+      tooltip: tip({ trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: (v) => fmtDec(v, 1) + "%" }),
+      legend: { top: 6, itemWidth: 12, itemHeight: 8, itemGap: 14, textStyle: { color: "#cfe6ff", fontSize: 11 } },
+      grid: { left: 12, right: 20, top: 36, bottom: 6, containLabel: true },
+      xAxis: {
+        type: "value", max: 100,
+        splitLine: { lineStyle: { color: "rgba(86, 150, 224, 0.14)" } },
+        axisLabel: { color: C.muted, fontSize: 11, formatter: "{value}%" }
+      },
+      yAxis: {
+        type: "category", inverse: true, data: CLASS_LINES,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#cfe6ff", fontSize: 12 }
+      },
+      color: [C.green, C.gold, "#ff9a62", C.red, "#b04a6a"],
+      series: Object.keys(CLASS_DATA).map((k) => ({
+        name: k, type: "bar", stack: "cls", barWidth: 16,
+        data: CLASS_DATA[k],
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 1 }
+      })),
+      animationDurationUpdate: 600
+    });
+
+    /* 预警清单 DOM 表（6 行） */
+    const warnList = document.getElementById("ms-warn-list");
+    WARNS.forEach((w) => {
+      const li = document.createElement("li");
+      li.innerHTML =
+        '<span class="ms-warn-time">' + w.time + '</span>' +
+        '<span>' + w.cust + '</span>' +
+        '<span>' + w.branch + '</span>' +
+        '<span>' + w.type + '</span>' +
+        '<span class="ms-warn-amt">' + fmt(w.amt) + '</span>' +
+        '<span class="ms-warn-lv ' + w.lv[1] + '">' + w.lv[0] + '</span>';
+      warnList.appendChild(li);
+    });
+
+    /* 拨备覆盖率仪表 */
+    gaugeChart = echarts.init(document.getElementById("ms-chart-gauge"));
+    gaugeChart.setOption({
+      series: [{
+        type: "gauge",
+        min: 0, max: 400, splitNumber: 4,
+        center: ["50%", "58%"], radius: "88%",
+        startAngle: 205, endAngle: -25,
+        progress: { show: true, width: 14, roundCap: true, itemStyle: { color: hGrad(C.blue, C.cyan) } },
+        axisLine: { lineStyle: { width: 14, color: [[1, "rgba(63, 120, 200, 0.16)"]] } },
+        axisTick: { distance: -22, length: 4, lineStyle: { color: "rgba(143, 167, 200, 0.5)" } },
+        splitLine: { distance: -26, length: 9, lineStyle: { color: "rgba(143, 167, 200, 0.7)", width: 2 } },
+        axisLabel: { distance: -42, color: C.muted, fontSize: 11, formatter: "{value}%" },
+        pointer: { length: "58%", width: 4, itemStyle: { color: C.cyan } },
+        anchor: { show: true, size: 10, itemStyle: { color: "#eaf6ff", borderColor: C.cyan, borderWidth: 2 } },
+        title: { offsetCenter: [0, "34%"], color: C.muted, fontSize: 13 },
+        detail: {
+          offsetCenter: [0, "58%"], color: "#f4faff", fontSize: 28, fontWeight: 700,
+          fontFamily: "Bahnschrift, 'DIN Alternate', sans-serif",
+          formatter: (v) => fmtDec(v, 1) + "%"
+        },
+        data: [{ value: 286.4, name: "拨备覆盖率（监管线 150%）" }]
+      }],
+      animationDurationUpdate: 800
+    });
+  }
+
+  pageInits = [initP1, initP2, initP3];
+
+  /* 启动：P1 立即初始化并进入轮播（P2/P3 待首次激活时再 init） */
+  pageInited[0] = true;
+  initP1();
+  restartProgress();
+  startRotate();
+
+  /* ===== 8. 底部公共跑马灯（内容 x2 无缝循环） ===== */
+  const marqueeTrack = document.getElementById("ms-marquee-track");
+  const marqueeHtml = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  marqueeTrack.innerHTML = marqueeHtml + marqueeHtml;
+
+  /* ===== 9. 数据微刷新（仅刷新已初始化的实例，实时感） ===== */
+  setInterval(() => {
+    const last = MONTHS.length - 1;
+    if (trendChart) {
+      DEP_ADD[last] = Math.max(20, DEP_ADD[last] + rndf(-1.2, 1.6));
+      LOAN_ADD[last] = Math.max(15, LOAN_ADD[last] + rndf(-1.0, 1.4));
+      LDR[last] = Math.min(76, Math.max(70, LDR[last] + rndf(-0.08, 0.1)));
+      trendChart.setOption({ series: [{ data: DEP_ADD }, { data: LOAN_ADD }, { data: LDR }] });
+    }
+    if (mauChart) {
+      MAU[last] = Math.max(490, MAU[last] + rndf(-0.6, 1.1));
+      mauChart.setOption({ series: [{ data: MAU }] });
+    }
+    if (succChart) {
+      SUCC.forEach((s) => { s.value = Math.min(99.95, Math.max(98.2, s.value + rndf(-0.06, 0.06))); });
+      succChart.setOption({
+        series: [{
+          data: SUCC.map((s) => ({
+            value: s.value,
+            itemStyle: { borderRadius: 6, color: s.value >= 99 ? hGrad("#137a5c", C.green) : hGrad("#8a5f18", C.gold) }
+          }))
+        }]
+      });
+    }
+    if (gaugeChart) {
+      gaugeChart.setOption({ series: [{ data: [{ value: Math.min(320, Math.max(250, 286.4 + rndf(-6, 6))), name: "拨备覆盖率（监管线 150%）" }] }] });
+    }
+  }, 9000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 支行绩效龙虎榜</title>
+<style>
+  :root {
+    --rk-bg: #0a1e3c;
+    --rk-panel: rgba(13, 32, 56, 0.72);
+    --rk-border: rgba(126, 178, 226, 0.26);
+    --rk-text: #e8f4ff;
+    --rk-muted: #8fa7c8;
+    --rk-ice: #9fd0ff;
+    --rk-silver: #e8f4ff;
+    --rk-steel: #5d89b8;
+    --rk-green: #37e6a8;
+    --rk-red: #ff6680;
+    --rk-gold: #ffd97a;
+    --rk-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 10 列表格模板：排名 | 支行 | 存款 | 贷款 | 中收 | 不良率 | 达成率 | 较上期 | 综合得分 | 评级 */
+    --rk-cols: 72px 200px repeat(6, 1fr) 140px 110px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--rk-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .rk-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(159, 208, 255, 0.11), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(232, 244, 255, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(52, 96, 150, 0.28), transparent 56%),
+      linear-gradient(rgba(126, 178, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(126, 178, 226, 0.05) 1px, transparent 1px),
+      var(--rk-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 84px 60px 1fr 54px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  /* 资源守卫告警条（本页纯 CSS/DOM 表格、零外链，常隐；保留范式供未来接入图表库） */
+  .rk-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .rk-error.is-visible { display: block; }
+
+  /* ===== 页头 84px：面包屑 + 渐变大标题 + 徽章 | 口径 meta + 走秒时钟 ===== */
+  .rk-header {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .rk-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(159, 208, 255, 0.55) 16%, rgba(232, 244, 255, 0.9) 50%, rgba(159, 208, 255, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(159, 208, 255, 0.45);
+  }
+  .rk-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .rk-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rk-muted); }
+  .rk-crumb b { font-weight: 400; color: #6fb9e8; }
+  .rk-crumb i { font-style: normal; color: rgba(143, 167, 200, 0.55); }
+  .rk-crumb em { font-style: normal; color: #d7e8ff; }
+  .rk-head-title-row { display: flex; align-items: center; gap: 16px; white-space: nowrap; }
+  .rk-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--rk-ice) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(159, 208, 255, 0.35));
+  }
+  .rk-head-badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 14px; border-radius: 999px;
+    border: 1px solid rgba(159, 208, 255, 0.5); background: rgba(30, 62, 100, 0.5);
+    box-shadow: inset 0 0 12px rgba(159, 208, 255, 0.12);
+    font-size: 13px; letter-spacing: 0.14em; color: #cfe6ff; font-variant-numeric: tabular-nums;
+  }
+  .rk-head-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--rk-ice); box-shadow: 0 0 8px var(--rk-ice); animation: rkDot 1.6s ease-in-out infinite; }
+  @keyframes rkDot { 50% { opacity: 0.3; } }
+
+  .rk-head-right { display: flex; align-items: center; gap: 24px; flex: none; }
+  .rk-head-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; font-size: 13px; color: var(--rk-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .rk-head-meta b { font-weight: 400; color: #cfe6ff; }
+  .rk-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 24px; border-left: 1px solid rgba(126, 178, 226, 0.25); }
+  .rk-clock-time { font: 700 26px/1 var(--rk-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(159, 208, 255, 0.45); }
+  .rk-clock-date { font-size: 12px; color: var(--rk-muted); letter-spacing: 0.08em; }
+
+  /* ===== 第二行 60px：tabs + 表头合并条（tabs 居左 / 口径小字居右，下半为列头） ===== */
+  .rk-topbar {
+    display: flex; flex-direction: column; overflow: hidden;
+    border: 1px solid var(--rk-border); border-radius: 12px; background: var(--rk-panel);
+  }
+  .rk-tabsline { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 18px; }
+  .rk-tabs { display: flex; align-items: center; gap: 8px; }
+  .rk-tab {
+    padding: 3px 18px; border-radius: 7px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(126, 178, 226, 0.4); background: rgba(22, 48, 80, 0.55);
+    color: #cfe6ff; font-size: 13px; letter-spacing: 0.08em; font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s, background 0.2s;
+  }
+  .rk-tab:hover { color: #fff; border-color: rgba(159, 208, 255, 0.8); box-shadow: 0 0 10px rgba(159, 208, 255, 0.3); }
+  .rk-tab.is-active {
+    color: #082033; font-weight: 700;
+    background: linear-gradient(180deg, #e8f4ff, #9fd0ff);
+    border-color: rgba(232, 244, 255, 0.9);
+    box-shadow: 0 0 14px rgba(159, 208, 255, 0.5), inset 0 0 6px rgba(255, 255, 255, 0.5);
+  }
+  .rk-caliber { font-size: 11.5px; letter-spacing: 0.06em; color: var(--rk-steel); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rk-caliber b { font-weight: 400; color: #a9c8e8; }
+  .rk-thead {
+    flex: none; height: 28px;
+    display: grid; grid-template-columns: var(--rk-cols); align-items: center;
+    padding: 0 18px;
+    background: linear-gradient(90deg, rgba(159, 208, 255, 0.16), rgba(159, 208, 255, 0.04) 60%, transparent);
+    border-top: 1px solid rgba(126, 178, 226, 0.2);
+    font-size: 12px; letter-spacing: 0.1em; color: #a9c8e8; white-space: nowrap;
+  }
+
+  /* ===== 主体：龙虎榜大表（26 行 ×2 无缝轮播） ===== */
+  .rk-board {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--rk-border); border-radius: 12px; background: var(--rk-panel);
+  }
+  .rk-board::before, .rk-board::after {
+    content: ""; position: absolute; left: 0; right: 0; height: 26px; z-index: 5; pointer-events: none;
+  }
+  .rk-board::before { top: 0; background: linear-gradient(180deg, rgba(10, 30, 60, 0.85), transparent); }
+  .rk-board::after { bottom: 0; background: linear-gradient(0deg, rgba(10, 30, 60, 0.85), transparent); }
+  .rk-track { margin: 0; padding: 0; list-style: none; will-change: transform; }
+  .rk-row {
+    height: 50px;
+    display: grid; grid-template-columns: var(--rk-cols); align-items: center;
+    padding: 0 18px;
+    font-size: 14px; font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(126, 178, 226, 0.08);
+  }
+  .rk-row:nth-child(odd) { background: rgba(159, 208, 255, 0.045); }
+  .rk-row.is-top1 {
+    background: linear-gradient(90deg, rgba(255, 217, 122, 0.10), rgba(159, 208, 255, 0.07) 55%, transparent);
+    animation: rkBreath 3.2s ease-in-out infinite;
+  }
+  @keyframes rkBreath {
+    0%, 100% { box-shadow: inset 0 0 0 rgba(159, 208, 255, 0); }
+    50% { box-shadow: inset 0 0 26px rgba(159, 208, 255, 0.22), inset 3px 0 0 rgba(255, 217, 122, 0.75); }
+  }
+  .rk-row.is-flash .rk-c-mid, .rk-row.is-flash .rk-achv { color: #ffffff; text-shadow: 0 0 10px rgba(159, 208, 255, 0.9); }
+  .rk-c { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t-r { text-align: right; padding-right: 26px; }
+  .t-c { text-align: center; }
+
+  .rk-medal {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 50%;
+    font: 700 15px/1 var(--rk-mono); color: #3a2a08;
+  }
+  .rk-medal.m1 { background: linear-gradient(160deg, #ffe9a8, #d9a437); box-shadow: 0 0 12px rgba(255, 217, 122, 0.55), inset 0 0 6px rgba(255, 255, 255, 0.55); }
+  .rk-medal.m2 { background: linear-gradient(160deg, #f2f8ff, #93aac4); color: #24344a; box-shadow: 0 0 10px rgba(232, 244, 255, 0.45), inset 0 0 6px rgba(255, 255, 255, 0.55); }
+  .rk-medal.m3 { background: linear-gradient(160deg, #ffcfa4, #b06a35); color: #3c2308; box-shadow: 0 0 10px rgba(240, 181, 138, 0.4), inset 0 0 6px rgba(255, 255, 255, 0.4); }
+  .rk-rankno { display: inline-block; width: 30px; text-align: center; font: 600 14px/1 var(--rk-mono); color: var(--rk-muted); }
+
+  .rk-c-name { font-size: 15px; letter-spacing: 0.06em; color: var(--rk-silver); }
+  .rk-c-num { font-family: var(--rk-mono); font-size: 14.5px; color: #d5e8fb; letter-spacing: 0.02em; }
+  .rk-npl { font-family: var(--rk-mono); font-size: 14px; color: #b9d2f2; }
+
+  .rk-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 46px; padding: 2px 10px; border-radius: 999px;
+    font: 700 13px/1.5 var(--rk-mono); letter-spacing: 0.05em;
+  }
+  .rk-badge.is-risk { color: #ffd9d9; border: 1px solid rgba(255, 102, 128, 0.6); background: rgba(96, 26, 38, 0.6); box-shadow: 0 0 10px rgba(255, 102, 128, 0.25); }
+  .rk-badge.is-ap { color: #082033; background: linear-gradient(180deg, #f4faff, #9fd0ff); box-shadow: 0 0 12px rgba(159, 208, 255, 0.5); }
+  .rk-badge.is-a { color: #d5ecff; border: 1px solid rgba(159, 208, 255, 0.55); background: rgba(46, 88, 132, 0.45); }
+  .rk-badge.is-b { color: #b9d2f2; border: 1px solid rgba(126, 178, 226, 0.35); background: rgba(24, 50, 82, 0.5); }
+  .rk-badge.is-c { color: #ffc9a8; border: 1px solid rgba(240, 160, 110, 0.45); background: rgba(88, 48, 26, 0.45); }
+
+  .rk-c-ach { display: flex; align-items: center; gap: 10px; padding-right: 16px; }
+  .rk-bar { flex: none; width: 118px; height: 8px; border-radius: 5px; background: rgba(159, 208, 255, 0.14); overflow: hidden; }
+  .rk-bar i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, #3e6f9e, var(--rk-ice)); box-shadow: 0 0 8px rgba(159, 208, 255, 0.5); transition: width 0.5s ease; }
+  .rk-bar.is-over i { background: linear-gradient(90deg, #6fa8d8, #f4faff); box-shadow: 0 0 10px rgba(232, 244, 255, 0.7); }
+  .rk-achv { font: 700 14px/1 var(--rk-mono); color: #e8f4ff; }
+
+  .rk-delta { font: 600 14px/1 var(--rk-mono); letter-spacing: 0.04em; }
+  .rk-delta.is-up { color: var(--rk-green); text-shadow: 0 0 8px rgba(55, 230, 168, 0.35); }
+  .rk-delta.is-down { color: var(--rk-red); text-shadow: 0 0 8px rgba(255, 102, 128, 0.3); }
+  .rk-delta.is-flat { color: var(--rk-muted); }
+
+  .rk-score { font: 700 17px/1 var(--rk-mono); color: var(--rk-silver); text-shadow: 0 0 10px rgba(159, 208, 255, 0.4); }
+
+  /* ===== 底部跑马灯 54px ===== */
+  .rk-marquee {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--rk-border); border-radius: 12px; background: var(--rk-panel);
+  }
+  .rk-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #06131f;
+    background: linear-gradient(120deg, #cfe6ff, #7fb2e0 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .rk-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #06131f; animation: rkDot 1.6s ease-in-out infinite; }
+  .rk-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .rk-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: rkMarquee 46s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .rk-marquee-track b { color: var(--rk-ice); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rk-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(159, 208, 255, 0.5); }
+  @keyframes rkMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .rk-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="rk-stage" id="rk-stage">
+    <!-- mockflag:begin --><div class="rk-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="rk-error" id="rk-error" role="alert">数据模块加载失败，请检查文件完整性后重新打开。</div>
+
+    <!-- 页头 -->
+    <header class="rk-header">
+      <div class="rk-head-left">
+        <div class="rk-crumb"><b>绩效管理</b><i>›</i><em>支行龙虎榜</em></div>
+        <div class="rk-head-title-row">
+          <div class="rk-head-title">支行绩效龙虎榜</div>
+          <span class="rk-head-badge"><i></i>2026 · 07 考核期</span>
+        </div>
+      </div>
+      <div class="rk-head-right">
+        <div class="rk-head-meta">
+          <span>样本支行 <b>26</b> 家 · 存款合计 <b>9,826</b> 亿元</span>
+          <span>数据口径 <b>月度 T+1</b> · 发布 <b>绩效考核办公室</b></span>
+        </div>
+        <div class="rk-clock" aria-label="实时时钟">
+          <span class="rk-clock-time" id="rk-clock-time">--:--:--</span>
+          <span class="rk-clock-date" id="rk-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- tabs + 表头合并条 -->
+    <section class="rk-topbar" aria-label="榜单排序与表头">
+      <div class="rk-tabsline">
+        <div class="rk-tabs" id="rk-tabs" role="tablist">
+          <button class="rk-tab is-active" type="button" data-key="score" role="tab">按综合得分</button>
+          <button class="rk-tab" type="button" data-key="dep" role="tab">按存款</button>
+          <button class="rk-tab" type="button" data-key="mid" role="tab">按中收</button>
+        </div>
+        <div class="rk-caliber">综合得分 = <b>40% 达成率 + 30% 存款分位 + 30% 中收分位</b> · 较上期 = 综合榜名次变动</div>
+      </div>
+      <div class="rk-thead">
+        <span class="t-c">排名</span>
+        <span>支行名称</span>
+        <span class="t-r">存款余额（亿元）</span>
+        <span class="t-r">贷款余额（亿元）</span>
+        <span class="t-r">中间业务收入（万元）</span>
+        <span class="t-c">不良率</span>
+        <span>营收达成率</span>
+        <span class="t-c">较上期</span>
+        <span class="t-r">综合得分</span>
+        <span class="t-c">评级</span>
+      </div>
+    </section>
+
+    <!-- 龙虎榜大表 -->
+    <section class="rk-board" aria-label="支行绩效龙虎榜大表，自动轮播">
+      <ul class="rk-track" id="rk-track"></ul>
+    </section>
+
+    <!-- 底部跑马灯 -->
+    <section class="rk-marquee" aria-label="绩效播报">
+      <div class="rk-marquee-tag"><i></i>绩效播报</div>
+      <div class="rk-marquee-view"><div class="rk-marquee-track" id="rk-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("rk-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 公共工具 + 色板镜像（本页零外链，rk-error 常隐保留范式） ===== */
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e8f4ff", muted: "#8fa7c8",
+    ice: "#9fd0ff", silver: "#e8f4ff", steel: "#5d89b8",
+    green: "#37e6a8", red: "#ff6680", gold: "#ffd97a"
+  };
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 内联数据：26 家样本支行（存款合计 ≈ 9,826 亿元，口径：样本支行、月度 T+1）
+         dep=存款余额(亿) loan=贷款余额(亿) mid=中间业务收入(万) npl=不良率% ach=营收达成率% prev=综合榜上期名次 ===== */
+  const BRANCHES = [
+    { name: "金融城支行", dep: 738.2, loan: 569.4, mid: 50260, npl: 0.78, ach: 121.6, prev: 1 },
+    { name: "城东支行",   dep: 685.4, loan: 545.2, mid: 46820, npl: 0.92, ach: 117.2, prev: 3 },
+    { name: "高新支行",   dep: 633.1, loan: 515.8, mid: 48340, npl: 0.71, ach: 119.8, prev: 2 },
+    { name: "滨江支行",   dep: 600.8, loan: 470.3, mid: 41060, npl: 0.85, ach: 112.4, prev: 4 },
+    { name: "科技园支行", dep: 553.6, loan: 447.6, mid: 43280, npl: 0.66, ach: 114.9, prev: 6 },
+    { name: "开发区支行", dep: 521.3, loan: 416.9, mid: 36540, npl: 1.08, ach: 108.3, prev: 5 },
+    { name: "空港支行",   dep: 489.7, loan: 390.2, mid: 33210, npl: 0.94, ach: 105.6, prev: 8 },
+    { name: "城西支行",   dep: 465.2, loan: 366.5, mid: 30880, npl: 1.21, ach: 101.2, prev: 7 },
+    { name: "大学城支行", dep: 434.9, loan: 341.8, mid: 28460, npl: 0.88, ach: 106.8, prev: 11 },
+    { name: "临港支行",   dep: 412.5, loan: 328.4, mid: 31520, npl: 1.02, ach: 99.4,  prev: 9 },
+    { name: "未来城支行", dep: 387.8, loan: 311.6, mid: 26890, npl: 0.79, ach: 103.7, prev: 14 },
+    { name: "望江支行",   dep: 370.4, loan: 290.7, mid: 24760, npl: 1.16, ach: 97.8,  prev: 10 },
+    { name: "运河支行",   dep: 354.6, loan: 278.3, mid: 23480, npl: 0.98, ach: 100.6, prev: 12 },
+    { name: "老城支行",   dep: 339.2, loan: 266.1, mid: 21930, npl: 1.34, ach: 94.2,  prev: 13 },
+    { name: "湖畔支行",   dep: 321.7, loan: 249.8, mid: 22850, npl: 0.91, ach: 98.9,  prev: 17 },
+    { name: "星海支行",   dep: 305.3, loan: 239.5, mid: 19870, npl: 1.12, ach: 96.1,  prev: 15 },
+    { name: "凤凰支行",   dep: 290.8, loan: 226.2, mid: 18420, npl: 1.05, ach: 95.3,  prev: 16 },
+    { name: "南湖支行",   dep: 274.5, loan: 214.7, mid: 17660, npl: 1.27, ach: 92.6,  prev: 19 },
+    { name: "车站支行",   dep: 259.1, loan: 203.4, mid: 15930, npl: 1.58, ach: 89.8,  prev: 18 },
+    { name: "白云支行",   dep: 245.6, loan: 191.8, mid: 16780, npl: 1.19, ach: 93.4,  prev: 21 },
+    { name: "河东支行",   dep: 229.4, loan: 178.6, mid: 14520, npl: 1.43, ach: 90.7,  prev: 20 },
+    { name: "青山支行",   dep: 214.8, loan: 167.3, mid: 13260, npl: 1.66, ach: 87.2,  prev: 22 },
+    { name: "北辰支行",   dep: 199.3, loan: 154.9, mid: 12480, npl: 1.31, ach: 91.5,  prev: 24 },
+    { name: "铁西支行",   dep: 182.7, loan: 140.6, mid: 10940, npl: 1.74, ach: 85.6,  prev: 23 },
+    { name: "曙光支行",   dep: 166.5, loan: 128.2, mid: 9860,  npl: 1.48, ach: 86.9,  prev: 26 },
+    { name: "长风支行",   dep: 149.2, loan: 112.8, mid: 8240,  npl: 1.83, ach: 83.1,  prev: 25 }
+  ];
+
+  /* ===== 4. 勾稽计算（得分/排名/评级唯一来源：现算，不硬编码） ===== */
+  function pctRank(values, v) {
+    let below = 0;
+    for (const x of values) { if (x < v) below++; }
+    return below / (values.length - 1) * 100;
+  }
+  function gradeOf(s) { return s >= 95 ? "A+" : s >= 75 ? "A" : s >= 55 ? "B" : "C"; }
+  function buildScored(list) {
+    const deps = list.map((b) => b.dep);
+    const mids = list.map((b) => b.mid);
+    const scored = list.map((b, i) => {
+      const depPct = pctRank(deps, b.dep);
+      const midPct = pctRank(mids, b.mid);
+      const score = +(0.4 * b.ach + 0.3 * depPct + 0.3 * midPct).toFixed(1);
+      return Object.assign({}, b, {
+        id: i, depPct, midPct, score, grade: gradeOf(score),
+        midLive: b.mid, achLive: b.ach
+      });
+    });
+    scored.sort((a, b) => b.score - a.score);
+    scored.forEach((r, i) => { r.rank = i + 1; r.delta = r.prev - r.rank; });
+    return scored;
+  }
+
+  /* ===== 5. 渲染：行模板 + 全表（×2 拼接供无缝轮播） ===== */
+  const SCORED = buildScored(BRANCHES);
+  const ROW_H = 50, LOOP_H = ROW_H * SCORED.length;
+  const track = $("rk-track");
+  const GRADE_CLS = { "A+": "is-ap", "A": "is-a", "B": "is-b", "C": "is-c" };
+  const barW = (v) => (Math.min(v, 125) / 125 * 100).toFixed(1);
+
+  function rowHTML(r, pos) {
+    const rankCell = pos <= 3
+      ? '<span class="rk-medal m' + pos + '">' + pos + "</span>"
+      : '<span class="rk-rankno">' + pos + "</span>";
+    const nplCell = r.npl > 1.5
+      ? '<span class="rk-badge is-risk">' + r.npl.toFixed(2) + "%</span>"
+      : '<span class="rk-npl">' + r.npl.toFixed(2) + "%</span>";
+    const deltaCell = r.delta > 0
+      ? '<span class="rk-delta is-up">↑ ' + r.delta + "</span>"
+      : r.delta < 0
+        ? '<span class="rk-delta is-down">↓ ' + (-r.delta) + "</span>"
+        : '<span class="rk-delta is-flat">→</span>';
+    return '<li class="rk-row' + (pos === 1 ? " is-top1" : "") + '" data-b="' + r.id + '">' +
+      '<div class="rk-c t-c">' + rankCell + "</div>" +
+      '<div class="rk-c"><span class="rk-c-name">' + r.name + "</span></div>" +
+      '<div class="rk-c t-r rk-c-num">' + fmt(r.dep, 1) + "</div>" +
+      '<div class="rk-c t-r rk-c-num">' + fmt(r.loan, 1) + "</div>" +
+      '<div class="rk-c t-r rk-c-num rk-c-mid">' + fmt(r.midLive, 0) + "</div>" +
+      '<div class="rk-c t-c">' + nplCell + "</div>" +
+      '<div class="rk-c rk-c-ach"><span class="rk-bar' + (r.achLive >= 110 ? " is-over" : "") + '"><i style="width:' + barW(r.achLive) + '%"></i></span><b class="rk-achv">' + r.achLive.toFixed(1) + "%</b></div>" +
+      '<div class="rk-c t-c">' + deltaCell + "</div>" +
+      '<div class="rk-c t-r"><b class="rk-score">' + r.score.toFixed(1) + "</b></div>" +
+      '<div class="rk-c t-c"><span class="rk-badge ' + GRADE_CLS[r.grade] + '">' + r.grade + "</span></div>" +
+      "</li>";
+  }
+
+  const SORTS = {
+    score: (a, b) => b.score - a.score,
+    dep: (a, b) => b.dep - a.dep,
+    mid: (a, b) => b.mid - a.mid
+  };
+  let curKey = "score";
+  let offset = 0;
+
+  function renderTable() {
+    const view = SCORED.slice().sort(SORTS[curKey]);
+    const half = view.map((r, i) => rowHTML(r, i + 1)).join("");
+    track.innerHTML = half + half; /* ×2 拼接，无缝回卷 */
+    offset = 0;
+    track.style.transition = "none";
+    track.style.transform = "translateY(0)";
+  }
+  renderTable();
+
+  /* ===== 6. tabs 切换：重排序全表并重置滚动位置 ===== */
+  const tabsBox = $("rk-tabs");
+  tabsBox.addEventListener("click", (e) => {
+    const btn = e.target.closest(".rk-tab");
+    if (!btn || btn.dataset.key === curKey) return;
+    curKey = btn.dataset.key;
+    tabsBox.querySelectorAll(".rk-tab").forEach((t) => t.classList.toggle("is-active", t === btn));
+    renderTable();
+  });
+
+  /* ===== 7. 无缝滚动轮播：4.5s 步进一行，滚满一轮平滑回卷 ===== */
+  setInterval(() => {
+    offset += ROW_H;
+    track.style.transition = "transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)";
+    track.style.transform = "translateY(" + (-offset) + "px)";
+    if (offset >= LOOP_H) {
+      setTimeout(() => {
+        track.style.transition = "none";
+        offset -= LOOP_H;
+        track.style.transform = "translateY(" + (-offset) + "px)";
+        void track.offsetHeight;
+      }, 760);
+    }
+  }, 4500);
+
+  /* ===== 8. 活性：每 6s 随机一行 ±0.2% 微扰动，重算该行达成率显示（不动排名口径） ===== */
+  const jitter = () => 1 + (Math.random() * 0.4 - 0.2) / 100;
+  setInterval(() => {
+    const r = SCORED[Math.floor(Math.random() * SCORED.length)];
+    r.midLive = r.midLive * jitter();
+    r.achLive = Math.min(129, r.achLive * jitter());
+    document.querySelectorAll('.rk-row[data-b="' + r.id + '"]').forEach((li) => {
+      li.querySelector(".rk-c-mid").textContent = fmt(r.midLive, 0);
+      li.querySelector(".rk-achv").textContent = r.achLive.toFixed(1) + "%";
+      li.querySelector(".rk-bar i").style.width = barW(r.achLive) + "%";
+      li.classList.add("is-flash");
+      setTimeout(() => li.classList.remove("is-flash"), 1200);
+    });
+  }, 6000);
+
+  /* ===== 9. 底部跑马灯：绩效播报（内容 ×2 无缝循环） ===== */
+  const NEWS = [
+    "金融城支行 连续 3 期蝉联综合榜首，营收达成率 <b>121.6%</b>",
+    "科技园支行 综合名次上升 2 位至第 <b>4</b>，营收达成率 <b>114.9%</b> 全辖第三",
+    "未来城支行 / 湖畔支行 名次均跃升 <b>3</b> 位，零售转型贡献显著",
+    "全辖 26 家样本支行存款合计 <b>9,826 亿元</b>，环比 +1.2%",
+    "车站 / 青山 / 铁西 / 长风 4 家支行不良率超 <b>1.5%</b> 红线，已列入重点督导名单",
+    "下期考核口径提示：绿色信贷加分项权重上调至 <b>5%</b>，请各支行关注申报窗口"
+  ];
+  const newsHTML = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  $("rk-marquee-track").innerHTML = newsHTML + newsHTML;
+
+  /* ===== 10. 页头走秒时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("rk-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("rk-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+})();
+</script>
+</body>
+</html>

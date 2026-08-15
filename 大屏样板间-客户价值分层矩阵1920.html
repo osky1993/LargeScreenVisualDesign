@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 客户价值分层矩阵</title>
+<style>
+  :root {
+    --qd-bg: #0a1a34;
+    --qd-panel: rgba(14, 32, 62, 0.72);
+    --qd-border: rgba(150, 96, 214, 0.26);
+    --qd-text: #e9eefc;
+    --qd-muted: #93a4c8;
+    --qd-fuchsia: #d946ef;
+    --qd-fuchsia-soft: #f0abfc;
+    --qd-fuchsia-deep: #7b1f9e;
+    --qd-cyan: #3fe1ff;
+    --qd-blue: #4b7dff;
+    --qd-gold: #ffc857;
+    --qd-slate: #7d8fb3;
+    --qd-green: #38e6b0;
+    --qd-red: #ff6680;
+    --qd-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--qd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 舞台 + 等比缩放 ===== */
+  .qd-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% -2%, rgba(217, 70, 239, 0.16), transparent 44%),
+      radial-gradient(circle at 90% 8%, rgba(63, 225, 255, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 120%, rgba(123, 31, 158, 0.28), transparent 56%),
+      linear-gradient(rgba(120, 90, 200, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(120, 90, 200, 0.05) 1px, transparent 1px),
+      var(--qd-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-rows: 84px 148px 1fr 54px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .qd-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .qd-error.is-visible { display: block; }
+
+  /* ===== 页头 84px ===== */
+  .qd-header { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px; }
+  .qd-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(217, 70, 239, 0.6) 16%, rgba(63, 225, 255, 0.8) 50%, rgba(217, 70, 239, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(217, 70, 239, 0.45);
+  }
+  .qd-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .qd-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--qd-muted); }
+  .qd-crumb b { font-weight: 400; color: #6fb9e8; }
+  .qd-crumb i { font-style: normal; color: rgba(147, 164, 200, 0.5); }
+  .qd-crumb em { font-style: normal; color: #e0d0f5; }
+  .qd-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .qd-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--qd-fuchsia-soft) 96%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(217, 70, 239, 0.38));
+  }
+  .qd-badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 999px;
+    font-size: 12px; letter-spacing: 0.14em; color: #f3d9ff;
+    border: 1px solid rgba(217, 70, 239, 0.5); background: rgba(123, 31, 158, 0.3);
+    box-shadow: inset 0 0 12px rgba(217, 70, 239, 0.16);
+  }
+  .qd-badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--qd-fuchsia); box-shadow: 0 0 8px var(--qd-fuchsia); }
+
+  .qd-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .qd-tabs { display: flex; align-items: stretch; gap: 8px; }
+  .qd-tab {
+    padding: 7px 18px; border-radius: 9px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(120, 90, 200, 0.4); background: rgba(24, 44, 82, 0.5);
+    color: #cfe0ff; font-size: 14px; letter-spacing: 0.1em; font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s, background 0.2s;
+  }
+  .qd-tab:hover { color: #fff; border-color: rgba(217, 70, 239, 0.7); }
+  .qd-tab.is-active {
+    color: #fff; border-color: rgba(217, 70, 239, 0.9);
+    background: linear-gradient(160deg, rgba(217, 70, 239, 0.4), rgba(123, 31, 158, 0.35));
+    box-shadow: 0 0 14px rgba(217, 70, 239, 0.4), inset 0 0 10px rgba(217, 70, 239, 0.14);
+  }
+  .qd-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(120, 90, 200, 0.28); }
+  .qd-clock-time { font: 700 26px/1 var(--qd-mono); color: #f6f0ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(217, 70, 239, 0.4); }
+  .qd-clock-date { font-size: 12px; color: var(--qd-muted); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 148px ===== */
+  .qd-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; min-height: 0; }
+  .qd-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--qd-border); border-radius: 12px; background: var(--qd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 0 24px;
+  }
+  .qd-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--qd-fuchsia), transparent); }
+  .qd-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -30px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(217, 70, 239, 0.1), transparent 70%);
+  }
+  .qd-kpi-label { font-size: 13px; letter-spacing: 0.12em; color: var(--qd-muted); }
+  .qd-kpi-num { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+  .qd-kpi-val { font: 700 34px/1 var(--qd-mono); color: #f7f2ff; letter-spacing: 0.01em; text-shadow: 0 0 14px rgba(217, 70, 239, 0.4); }
+  .qd-kpi-unit { font-size: 13px; color: #c79ae8; }
+  .qd-kpi-sub { font-size: 12px; letter-spacing: 0.03em; color: var(--qd-muted); font-variant-numeric: tabular-nums; }
+  .qd-kpi-sub b { color: var(--qd-fuchsia-soft); font-weight: 700; }
+  .qd-kpi.is-hero { border-color: rgba(217, 70, 239, 0.5); box-shadow: inset 0 0 24px rgba(217, 70, 239, 0.08); }
+
+  /* 活跃率 DOM 翻牌 */
+  .qd-flip { display: flex; align-items: baseline; gap: 3px; }
+  .qd-flip-d {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 0.66em;
+    font: 700 34px/1 var(--qd-mono); color: #f7f2ff; text-shadow: 0 0 14px rgba(217, 70, 239, 0.45);
+    transform-origin: center center; backface-visibility: hidden;
+  }
+  .qd-flip-d.is-sep { min-width: auto; color: #c79ae8; }
+  .qd-flip-d.is-flip { animation: qdFlip 0.5s ease; }
+  @keyframes qdFlip { 0% { transform: rotateX(0); } 45% { transform: rotateX(-90deg); opacity: 0.25; } 100% { transform: rotateX(0); opacity: 1; } }
+
+  /* ===== 工作区 1fr ===== */
+  .qd-work { display: grid; grid-template-columns: 1fr 420px; gap: 18px; min-height: 0; }
+  .qd-col { display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+
+  .qd-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--qd-border); border-radius: 12px; background: var(--qd-panel);
+    display: flex; flex-direction: column;
+  }
+  .qd-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(217, 70, 239, 0.26), rgba(63, 225, 255, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .qd-panel-head i { flex: none; width: 5px; height: 16px; background: var(--qd-fuchsia); box-shadow: 0 0 8px var(--qd-fuchsia); transform: skewX(-12deg); }
+  .qd-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f4f0ff; white-space: nowrap; }
+  .qd-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #7a6ba8; align-self: flex-end; padding-bottom: 7px; white-space: nowrap; }
+  .qd-panel-scope { margin-left: auto; font-size: 12px; color: var(--qd-fuchsia-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+
+  /* 散点矩阵容器（chart 绝对定位铺满，规避 flex 高度坑；角标覆盖） */
+  .qd-scatter-wrap { position: relative; flex: 1; min-height: 0; }
+  .qd-scatter { position: absolute; inset: 0; }
+  .qd-quad-label {
+    position: absolute; z-index: 4; display: flex; flex-direction: column; gap: 2px; pointer-events: none;
+    padding: 6px 12px; border-radius: 9px; background: rgba(8, 20, 42, 0.55);
+    border: 1px solid rgba(120, 90, 200, 0.2); backdrop-filter: blur(2px);
+    transition: box-shadow 0.3s, border-color 0.3s, background 0.3s;
+  }
+  .qd-quad-label .qd-ql-name { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 700; letter-spacing: 0.06em; }
+  .qd-quad-label .qd-ql-name i { width: 9px; height: 9px; border-radius: 2px; }
+  .qd-quad-label .qd-ql-desc { font-size: 11px; letter-spacing: 0.08em; color: var(--qd-muted); }
+  .qd-quad-label.is-scan { border-color: rgba(217, 70, 239, 0.7); box-shadow: 0 0 18px rgba(217, 70, 239, 0.4); background: rgba(28, 16, 48, 0.7); }
+  .qd-ql-tl { left: 14px; top: 50px; }
+  .qd-ql-tr { right: 14px; top: 50px; text-align: right; }
+  .qd-ql-tr .qd-ql-name { flex-direction: row-reverse; }
+  .qd-ql-bl { left: 14px; bottom: 44px; }
+  .qd-ql-br { right: 14px; bottom: 44px; text-align: right; }
+  .qd-ql-br .qd-ql-name { flex-direction: row-reverse; }
+
+  /* 右上：象限明细表 */
+  .qd-detail { flex: 1.05; }
+  .qd-table { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 12px 12px; }
+  .qd-thead, .qd-trow {
+    display: grid; grid-template-columns: 1.5fr 0.9fr 0.9fr 0.9fr 1fr; align-items: center; gap: 6px;
+  }
+  .qd-thead { flex: none; padding: 0 8px 8px; font-size: 11px; letter-spacing: 0.06em; color: #7a8dba; }
+  .qd-thead span:not(:first-child) { text-align: right; }
+  .qd-tbody { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+  .qd-trow {
+    position: relative; flex: 1; padding: 0 8px; border-radius: 9px;
+    border: 1px solid rgba(120, 90, 200, 0.14); background: rgba(18, 36, 68, 0.36);
+    font-variant-numeric: tabular-nums; transition: box-shadow 0.3s, border-color 0.3s, transform 0.3s;
+  }
+  .qd-trow:nth-child(even) { background: rgba(24, 46, 86, 0.5); }
+  .qd-trow.is-scan { border-color: rgba(217, 70, 239, 0.65); box-shadow: 0 0 16px rgba(217, 70, 239, 0.3); transform: translateX(2px); }
+  .qd-tq { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #eaf0ff; }
+  .qd-tq i { flex: none; width: 10px; height: 10px; border-radius: 3px; box-shadow: 0 0 8px currentColor; }
+  .qd-tc { text-align: right; font-size: 15px; font-weight: 700; color: #f2f6ff; font-family: var(--qd-mono); }
+  .qd-tc em { font-style: normal; font-size: 10px; color: var(--qd-muted); margin-left: 2px; font-weight: 400; }
+  .qd-tp { text-align: right; font-size: 14px; color: #cfe0ff; font-family: var(--qd-mono); }
+  .qd-tstrat { justify-self: end; display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; letter-spacing: 0.04em; white-space: nowrap; }
+  .qd-tfoot {
+    flex: none; display: grid; grid-template-columns: 1.5fr 0.9fr 0.9fr 0.9fr 1fr; align-items: center; gap: 6px;
+    margin-top: 8px; padding: 8px; border-radius: 9px;
+    border: 1px solid rgba(217, 70, 239, 0.4); background: rgba(123, 31, 158, 0.18);
+    font-variant-numeric: tabular-nums;
+  }
+  .qd-tfoot .qd-tq { color: var(--qd-fuchsia-soft); }
+  .qd-tfoot .qd-tc { color: #fff; }
+
+  /* 右下：象限占比 donut */
+  .qd-donut { flex: 1; min-height: 0; }
+
+  /* ===== 跑马灯 54px ===== */
+  .qd-marquee {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--qd-border); border-radius: 12px; background: var(--qd-panel);
+  }
+  .qd-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #fbeeff;
+    background: linear-gradient(120deg, var(--qd-fuchsia), #6a1a8c 88%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .qd-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #fbeeff; animation: qdDot 1.6s ease-in-out infinite; }
+  @keyframes qdDot { 50% { opacity: 0.3; } }
+  .qd-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .qd-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: qdMarquee 46s linear infinite; font-size: 15px; letter-spacing: 0.06em; color: #dfe8ff;
+  }
+  .qd-marquee-track b { color: var(--qd-fuchsia-soft); font-weight: 700; }
+  .qd-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(217, 70, 239, 0.55); }
+  @keyframes qdMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .qd-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="qd-stage" id="qd-stage">
+    <!-- mockflag:begin --><div class="qd-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="qd-error" id="qd-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 页头 -->
+    <header class="qd-header">
+      <div class="qd-head-left">
+        <div class="qd-crumb"><b>客户管理</b><i>›</i><em>价值分层</em></div>
+        <div class="qd-head-title-row">
+          <div class="qd-head-title">客户价值分层矩阵</div>
+          <span class="qd-badge"><i></i>波士顿矩阵 · BCG MATRIX</span>
+        </div>
+      </div>
+      <div class="qd-head-right">
+        <div class="qd-tabs" id="qd-tabs" aria-label="客群口径切换">
+          <button class="qd-tab is-active" data-scope="all" type="button">全量</button>
+          <button class="qd-tab" data-scope="corp" type="button">对公</button>
+          <button class="qd-tab" data-scope="retail" type="button">零售</button>
+          <button class="qd-tab" data-scope="private" type="button">私行</button>
+        </div>
+        <div class="qd-clock" aria-label="实时时钟">
+          <span class="qd-clock-time" id="qd-clock-time">--:--:--</span>
+          <span class="qd-clock-date" id="qd-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <section class="qd-kpis" id="qd-kpis" aria-label="客户价值核心指标"></section>
+
+    <!-- 工作区 -->
+    <section class="qd-work">
+      <!-- 左：散点气泡矩阵 -->
+      <div class="qd-panel">
+        <header class="qd-panel-head">
+          <i></i><h2>客户价值四象限散点矩阵</h2>
+          <span class="qd-panel-en">VALUE QUADRANT MATRIX</span>
+          <span class="qd-panel-scope">X 月均交易频次 · Y 客均资产 · 气泡=客户数</span>
+        </header>
+        <div class="qd-scatter-wrap">
+          <div class="qd-scatter" id="qd-chart-scatter" role="img" aria-label="客户价值四象限气泡散点矩阵"></div>
+          <div class="qd-quad-label qd-ql-tr" data-q="star"><div class="qd-ql-name"><i style="background:#d946ef"></i>明星客群</div><div class="qd-ql-desc">高活跃 · 高AUM</div></div>
+          <div class="qd-quad-label qd-ql-tl" data-q="cow"><div class="qd-ql-name"><i style="background:#ffc857"></i>金牛客群</div><div class="qd-ql-desc">低活跃 · 高AUM</div></div>
+          <div class="qd-quad-label qd-ql-br" data-q="pot"><div class="qd-ql-name"><i style="background:#3fe1ff"></i>潜力客群</div><div class="qd-ql-desc">高活跃 · 低AUM</div></div>
+          <div class="qd-quad-label qd-ql-bl" data-q="dog"><div class="qd-ql-name"><i style="background:#7d8fb3"></i>瘦狗客群</div><div class="qd-ql-desc">低活跃 · 低AUM</div></div>
+        </div>
+      </div>
+
+      <!-- 右：象限明细 + 占比 donut -->
+      <div class="qd-col">
+        <section class="qd-panel qd-detail">
+          <header class="qd-panel-head"><i></i><h2>象限客群明细</h2><span class="qd-panel-en">QUADRANT DETAIL</span><span class="qd-panel-scope">四象限分层策略</span></header>
+          <div class="qd-table">
+            <div class="qd-thead"><span>象限客群</span><span>客户数</span><span>AUM占比</span><span>户均AUM</span><span>经营策略</span></div>
+            <div class="qd-tbody" id="qd-tbody"></div>
+            <div class="qd-tfoot" id="qd-tfoot"></div>
+          </div>
+        </section>
+        <section class="qd-panel">
+          <header class="qd-panel-head"><i></i><h2>象限客户数占比</h2><span class="qd-panel-en">SHARE BY QUADRANT</span><span class="qd-panel-scope">合计 = 客户总数</span></header>
+          <div class="qd-donut" id="qd-chart-donut" role="img" aria-label="四象限客户数占比环形图"></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- 跑马灯 -->
+    <section class="qd-marquee" aria-label="客户经营播报">
+      <div class="qd-marquee-tag"><i></i>客户经营播报</div>
+      <div class="qd-marquee-view"><div class="qd-marquee-track" id="qd-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("qd-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("qd-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const C = {
+    text: "#e9eefc", muted: "#93a4c8",
+    fuchsia: "#d946ef", fuchsiaSoft: "#f0abfc", fuchsiaDeep: "#7b1f9e",
+    cyan: "#3fe1ff", blue: "#4b7dff", gold: "#ffc857", slate: "#7d8fb3",
+    green: "#38e6b0", red: "#ff6680"
+  };
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n, dec) => {
+    const parts = (+n).toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 象限元数据（四象限固定语义，X=活跃 Y=AUM） ===== */
+  const QUAD = {
+    star: { key: "star", name: "明星客群", color: C.fuchsia, strat: "深耕维护", stratCss: { color: "#fbeaff", bd: "rgba(217,70,239,0.6)", bg: "rgba(123,31,158,0.35)" } },
+    cow:  { key: "cow",  name: "金牛客群", color: C.gold,    strat: "激活提频", stratCss: { color: "#fff2d2", bd: "rgba(255,200,87,0.5)", bg: "rgba(158,120,20,0.28)" } },
+    pot:  { key: "pot",  name: "潜力客群", color: C.cyan,    strat: "资产提升", stratCss: { color: "#d6f6ff", bd: "rgba(63,225,255,0.5)", bg: "rgba(20,110,140,0.28)" } },
+    dog:  { key: "dog",  name: "瘦狗客群", color: C.slate,   strat: "降本增效", stratCss: { color: "#dbe4f2", bd: "rgba(125,143,179,0.5)", bg: "rgba(60,78,110,0.3)" } }
+  };
+  const QUAD_ORDER = ["star", "cow", "pot", "dog"];
+  function quadKey(x, y, s) {
+    const hiA = x >= s.xT, hiY = y >= s.yT;
+    return hiA && hiY ? "star" : hiY ? "cow" : hiA ? "pot" : "dog";
+  }
+
+  /* ===== 4. 四套口径的客群气泡（单一数据源，KPI/明细/donut 全部现算派生） =====
+     每个气泡 = [名称, x 月均交易频次(笔), y 客均资产(万元), 客户数(万户)] */
+  const BUBBLES = {
+      all: [
+        ["私行家族客群",30,320,1.2],
+        ["财富管理主力",26,120,6.8],
+        ["高净值企业主",24,180,3.4],
+        ["活跃金卡客群",22,72,14.6],
+        ["双卡高频客群",20,88,9.2],
+        ["商旅精英客群",19,96,5.6],
+        ["存款沉淀客群",8,140,7.4],
+        ["养老金领取客群",6,66,22.4],
+        ["大额定存客群",5,110,4.8],
+        ["休眠财富客群",9,84,6.2],
+        ["拆迁安置客群",7,158,2.6],
+        ["Z世代新锐客群",28,8,40.6],
+        ["代发工资客群",24,26,68.2],
+        ["消费信贷客群",22,14,52.4],
+        ["移动支付重度",26,6,72.4],
+        ["小微经营客群",18,38,31.6],
+        ["理财尝鲜客群",20,42,26.4],
+        ["信用卡活跃客群",21,22,48.2],
+        ["长尾睡眠客群",3,4,96.2],
+        ["单卡低频客群",5,12,58.4],
+        ["一次性开户客群",2,2,70.4],
+        ["流失预警客群",4,9,42.6],
+        ["代扣代缴客群",6,18,36.8],
+        ["异地闲置客群",3,6,54.2],
+        ["低效柜面客群",7,28,19.4],
+        ["空挂账户客群",1,1,66.8]
+      ],
+      retail: [
+        ["零售私行客群",28,280,0.9],
+        ["财富金葵客群",25,96,5.4],
+        ["白金卡客群",22,64,11.8],
+        ["活跃钻石客群",20,78,4.2],
+        ["高频理财客群",18,58,8.6],
+        ["存款稳富客群",8,120,6.2],
+        ["银发养老客群",6,52,24.6],
+        ["定存偏好客群",5,88,4.4],
+        ["休眠高值客群",9,70,5.1],
+        ["Z世代客群",27,7,42.6],
+        ["代发白领客群",23,24,64.4],
+        ["消费分期客群",21,13,52.2],
+        ["扫码支付客群",26,5,70.2],
+        ["理财新客群",19,34,28.6],
+        ["信用卡客群",20,19,52.4],
+        ["长尾睡眠客群",3,4,100.4],
+        ["单卡低频客群",5,11,60.2],
+        ["开户即走客群",2,2,72.6],
+        ["流失预警客群",4,8,46.2],
+        ["代扣绑定客群",6,16,39.4],
+        ["异地闲置客群",3,6,38.4],
+        ["空挂账户客群",1,1,44.2]
+      ],
+      corp: [
+        ["核心大型集团",22,9800,0.18],
+        ["优质上市公司",20,5200,0.42],
+        ["政务平台客群",18,6400,0.24],
+        ["活跃供应链核企",24,2600,0.86],
+        ["机构同业客群",16,3800,0.31],
+        ["沉淀财政专户",6,7200,0.22],
+        ["国企定存客群",5,4400,0.36],
+        ["低频大额客群",8,2200,0.54],
+        ["休眠集团客群",7,3100,0.28],
+        ["活跃中小企客群",26,180,3.6],
+        ["贸易结算客群",22,240,2.4],
+        ["代发企业客群",20,90,5.8],
+        ["票据高频客群",24,320,1.6],
+        ["小微活跃客群",28,120,4.2],
+        ["个体工商客群",21,60,6.4],
+        ["长尾小微客群",4,45,7.8],
+        ["睡眠对公客群",5,86,3.2],
+        ["一次结算客群",3,30,5.4],
+        ["低效开户客群",6,52,4.6],
+        ["流失企业客群",4,74,2.8],
+        ["空转账户客群",2,22,4.1]
+      ],
+      private: [
+        ["超高净值家族",34,6800,0.06],
+        ["家族办公室客群",30,3200,0.14],
+        ["企业家私行",28,2400,0.22],
+        ["活跃投资客群",26,1500,0.34],
+        ["跨境配置客群",24,1900,0.18],
+        ["权益重仓客群",22,1200,0.28],
+        ["稳健配置客群",10,2600,0.16],
+        ["传承规划客群",8,3800,0.11],
+        ["大额存续客群",6,1600,0.24],
+        ["休眠私行客群",9,1400,0.19],
+        ["新晋私行客群",28,620,0.46],
+        ["权益尝鲜客群",24,540,0.38],
+        ["活跃升级客群",22,700,0.31],
+        ["高频交易客群",30,480,0.42],
+        ["理财过渡客群",20,660,0.29],
+        ["观望私行客群",5,520,0.33],
+        ["降级预警客群",4,440,0.27],
+        ["低频存续客群",6,700,0.21],
+        ["流失挽留客群",3,580,0.16]
+      ]
+  };
+
+  /* 口径元信息：阈值 / 坐标轴上限 / 播报 */
+  const SCOPES = {
+    all:     { label: "全量客户", xT: 15, yT: 50,  xMax: 40, yMax: 360,   yFmt: 0,
+      news: ["瘦狗客群客户数占比最高，宜以数字化<b>降本增效</b>压降柜面依赖", "潜力客群<b>高活跃低AUM</b>，代发工资与移动支付人群资产提升空间大", "金牛客群户均AUM居前列，须防休眠流失、以专属权益<b>激活提频</b>"] },
+    corp:    { label: "对公客户", xT: 12, yT: 600, xMax: 32, yMax: 10500, yFmt: 0,
+      news: ["核心大型集团单户AUM近<b>9800 万元</b>，明星象限贡献对公 AUM 主体", "活跃中小企与小微活跃客群构成潜力盘，交易结算高频、结算性存款可深挖", "沉淀财政专户等金牛客群交易低频，宜绑定代发与票据场景<b>激活提频</b>"] },
+    retail:  { label: "零售客户", xT: 15, yT: 45,  xMax: 40, yMax: 300,   yFmt: 0,
+      news: ["零售长尾睡眠与开户即走客群规模庞大，是<b>降本增效</b>核心对象", "扫码支付与代发白领属潜力象限，交叉持有理财基金可推动<b>资产提升</b>", "银发养老、存款稳富等金牛客群户均资产高，须适老化服务防流失"] },
+    private: { label: "私行客户", xT: 18, yT: 800, xMax: 40, yMax: 7200,  yFmt: 0,
+      news: ["超高净值家族户均AUM达<b>6800 万元</b>，家办与传承服务深耕维护", "新晋私行与权益尝鲜客群交易活跃、资产待跃迁，属核心潜力盘", "降级预警与流失挽留客群须专属客户经理干预，守住存量AUM"] }
+  };
+
+  /* ===== 5. 从气泡派生全部聚合（勾稽单一数据源） ===== */
+  function derive(scopeKey) {
+    const s = SCOPES[scopeKey];
+    const bs = BUBBLES[scopeKey];
+    const q = {}; QUAD_ORDER.forEach((k) => q[k] = { cust: 0, aum: 0, idx: [] });
+    let totCust = 0, totAum = 0, hvCust = 0, actCust = 0;
+    const points = bs.map((b, i) => {
+      const k = quadKey(b[1], b[2], s);
+      const aum = b[3] * b[2];             /* 万户×万元 = 亿元 */
+      q[k].cust += b[3]; q[k].aum += aum; q[k].idx.push(i);
+      totCust += b[3]; totAum += aum;
+      if (b[2] >= s.yT) hvCust += b[3];    /* 高价值 = 高AUM象限 */
+      if (b[1] >= s.xT) actCust += b[3];   /* 活跃 = 高活跃象限 */
+      return { b, k, aum };
+    });
+    return { s, bs, points, q, totCust, totAum, hvCust, actCust,
+      houjun: totAum / totCust, actRate: actCust / totCust * 100 };
+  }
+
+  /* ===== 6. 时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("qd-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("qd-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock(); setInterval(tickClock, 500);
+
+  /* ===== 7. KPI 卡 5 枚（前四缓动跳变，活跃率 DOM 翻牌） ===== */
+  const KPI_DEFS = [
+    { key: "cust",   label: "客户总数",      unit: "万户", dec: 0, sub: (d) => "高价值 <b>" + fmt(d.hvCust, 1) + "</b> 万户" },
+    { key: "hv",     label: "高价值客户数",  unit: "万户", dec: 1, sub: (d) => "占比 <b>" + fmt(d.hvCust / d.totCust * 100, 1) + "%</b>" },
+    { key: "aum",    label: "管理资产 AUM",  unit: "亿元", dec: 0, sub: (d) => "覆盖 <b>" + d.bs.length + "</b> 个客群细分" },
+    { key: "houjun", label: "户均 AUM",      unit: "万元", dec: 1, sub: (d) => "= AUM ÷ 客户总数" },
+    { key: "act",    label: "活跃率",        unit: "%",   dec: 1, flip: true, sub: (d) => "活跃 <b>" + fmt(d.actCust, 1) + "</b> 万户" }
+  ];
+  const kpisWrap = $("qd-kpis");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "qd-kpi" + (k.key === "cust" ? " is-hero" : "");
+    if (k.flip) {
+      card.innerHTML = '<div class="qd-kpi-label">' + k.label + '</div>' +
+        '<div class="qd-kpi-num"><div class="qd-flip" data-flip="1"></div><span class="qd-kpi-unit">' + k.unit + '</span></div>' +
+        '<div class="qd-kpi-sub">--</div>';
+      k.flipNode = card.querySelector(".qd-flip");
+    } else {
+      card.innerHTML = '<div class="qd-kpi-label">' + k.label + '</div>' +
+        '<div class="qd-kpi-num"><span class="qd-kpi-val">0</span><span class="qd-kpi-unit">' + k.unit + '</span></div>' +
+        '<div class="qd-kpi-sub">--</div>';
+      k.node = card.querySelector(".qd-kpi-val");
+    }
+    k.subNode = card.querySelector(".qd-kpi-sub");
+    kpisWrap.appendChild(card);
+    k.cur = 0; k.target = 0;
+  });
+  function kpiValue(k, d) {
+    return k.key === "cust" ? d.totCust : k.key === "hv" ? d.hvCust :
+           k.key === "aum" ? d.totAum : k.key === "houjun" ? d.houjun : d.actRate;
+  }
+  function setKpiTargets(d) {
+    KPI_DEFS.forEach((k) => { k.target = kpiValue(k, d); k.subNode.innerHTML = k.sub(d); });
+  }
+  /* 翻牌渲染：逐字符 tile，值变化时触发 rotateX 动画 */
+  function renderFlip(node, str) {
+    const chars = str.split("");
+    let tiles = node.children;
+    if (tiles.length !== chars.length) {
+      node.innerHTML = "";
+      chars.forEach((c) => {
+        const sp = document.createElement("span");
+        sp.className = "qd-flip-d" + (/[.,%]/.test(c) ? " is-sep" : "");
+        sp.textContent = c;
+        node.appendChild(sp);
+      });
+      return;
+    }
+    for (let i = 0; i < chars.length; i++) {
+      if (tiles[i].textContent !== chars[i]) {
+        tiles[i].textContent = chars[i];
+        tiles[i].classList.remove("is-flip");
+        void tiles[i].offsetWidth;
+        tiles[i].classList.add("is-flip");
+      }
+    }
+  }
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      const diff = k.target - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) k.cur = k.target; else k.cur += diff * 0.16;
+      if (k.flip) renderFlip(k.flipNode, fmt(k.cur, k.dec)); else k.node.textContent = fmt(k.cur, k.dec);
+    });
+  }, 80);
+
+  /* ===== 8. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 20, 44, 0.94)", borderColor: "rgba(217, 70, 239, 0.45)",
+    textStyle: { color: "#f0e6ff", fontSize: 12 }
+  }, extra || {});
+  const radial = (from, to) => new echarts.graphic.RadialGradient(0.36, 0.32, 0.9, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const hex2rgba = (hex, a) => {
+    const n = parseInt(hex.slice(1), 16);
+    return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+  };
+  const scatterChart = echarts.init($("qd-chart-scatter"));
+  const donutChart = echarts.init($("qd-chart-donut"));
+
+  /* ===== 9. 散点气泡矩阵 ===== */
+  function scatterOption(D) {
+    const s = D.s;
+    const maxCust = Math.max.apply(null, D.bs.map((b) => b[3]));
+    const data = D.points.map((p, i) => {
+      const Q = QUAD[p.k];
+      return {
+        name: p.b[0], value: [p.b[1], p.b[2], p.b[3]], q: p.k,
+        symbolSize: 15 + Math.sqrt(p.b[3] / maxCust) * 46,
+        itemStyle: {
+          color: radial(hex2rgba(Q.color, 0.95), hex2rgba(Q.color, 0.32)),
+          borderColor: hex2rgba(Q.color, 0.9), borderWidth: 1,
+          shadowBlur: 10, shadowColor: hex2rgba(Q.color, 0.5), opacity: 0.9
+        }
+      };
+    });
+    return {
+      grid: { left: 20, right: 22, top: 22, bottom: 30, containLabel: true },
+      tooltip: tip({
+        formatter: (o) => {
+          const Q = QUAD[o.data.q];
+          return '<b style="color:' + Q.color + '">' + o.name + '</b> · ' + Q.name + "<br/>" +
+            "月均交易频次 <b>" + o.value[0] + "</b> 笔<br/>" +
+            "客均资产 <b>" + fmt(o.value[1], 0) + "</b> 万元<br/>" +
+            "客户数 <b>" + fmt(o.value[2], 1) + "</b> 万户";
+        }
+      }),
+      xAxis: {
+        type: "value", min: 0, max: s.xMax, name: "月均交易频次 (笔) →", nameLocation: "end",
+        nameGap: 6, nameTextStyle: { color: "#7a8dba", fontSize: 11, align: "right" },
+        splitLine: { lineStyle: { color: "rgba(120, 90, 200, 0.1)" } },
+        axisLine: { lineStyle: { color: "rgba(120, 140, 200, 0.3)" } },
+        axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 10 }
+      },
+      yAxis: {
+        type: "value", min: 0, max: s.yMax, name: "客均资产 (万元) ↑", nameGap: 10,
+        nameTextStyle: { color: "#7a8dba", fontSize: 11, align: "left" },
+        splitLine: { lineStyle: { color: "rgba(120, 90, 200, 0.1)" } },
+        axisLine: { lineStyle: { color: "rgba(120, 140, 200, 0.3)" } },
+        axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 10 }
+      },
+      series: [{
+        type: "scatter", data: data,
+        emphasis: { scale: 1.28, focus: "self", itemStyle: { opacity: 1, shadowBlur: 22 },
+          label: { show: true, formatter: (o) => o.name, position: "top", color: "#fff", fontSize: 12, fontWeight: 700, textShadowColor: "#000", textShadowBlur: 6 } },
+        markLine: {
+          silent: true, symbol: "none", animation: false,
+          lineStyle: { color: "rgba(240, 171, 252, 0.5)", type: "dashed", width: 1.4 },
+          label: { show: false },
+          data: [{ xAxis: s.xT }, { yAxis: s.yT }]
+        },
+        markArea: {
+          silent: true, label: { show: false },
+          data: [
+            [{ coord: [s.xT, s.yT], itemStyle: { color: hex2rgba(C.fuchsia, 0.07) } }, { coord: [s.xMax, s.yMax] }],
+            [{ coord: [0, s.yT], itemStyle: { color: hex2rgba(C.gold, 0.06) } }, { coord: [s.xT, s.yMax] }],
+            [{ coord: [s.xT, 0], itemStyle: { color: hex2rgba(C.cyan, 0.055) } }, { coord: [s.xMax, s.yT] }],
+            [{ coord: [0, 0], itemStyle: { color: hex2rgba(C.slate, 0.05) } }, { coord: [s.xT, s.yT] }]
+          ]
+        }
+      }],
+      animationDurationUpdate: 700
+    };
+  }
+
+  /* ===== 10. 象限占比 donut ===== */
+  function donutOption(D) {
+    const data = QUAD_ORDER.map((k) => ({
+      name: QUAD[k].name, value: +D.q[k].cust.toFixed(1),
+      itemStyle: { color: hex2rgba(QUAD[k].color, 0.9) }
+    }));
+    return {
+      tooltip: tip({ valueFormatter: (v) => fmt(v, 1) + " 万户" }),
+      title: {
+        text: "客户总数", subtext: fmt(D.totCust, 0) + " 万户",
+        left: "center", top: "40%", textAlign: "center",
+        textStyle: { color: C.muted, fontSize: 12, fontWeight: 400 },
+        subtextStyle: { color: C.fuchsiaSoft, fontSize: 22, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" }
+      },
+      legend: {
+        orient: "horizontal", bottom: 6, itemWidth: 11, itemHeight: 11,
+        textStyle: { color: "#cfe0ff", fontSize: 12 },
+        formatter: (name) => {
+          const d = data.find((x) => x.name === name);
+          const pct = (d.value / D.totCust * 100).toFixed(1);
+          return name + "  " + pct + "%";
+        }
+      },
+      series: [{
+        type: "pie", radius: ["50%", "72%"], center: ["50%", "46%"],
+        itemStyle: { borderColor: "#0a1a34", borderWidth: 2 },
+        label: { show: false },
+        emphasis: { label: { show: true, color: "#fff", fontSize: 13, fontWeight: 700, formatter: "{b}\n{d}%" }, scaleSize: 6 },
+        data: data
+      }, {
+        type: "pie", radius: ["80%", "81%"], center: ["50%", "46%"], silent: true,
+        label: { show: false }, itemStyle: { color: "rgba(217, 70, 239, 0.28)" }, data: [1]
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 11. 象限明细表（象限|客户数|AUM占比|户均AUM|策略 badge，斑马纹） ===== */
+  function renderTable(D) {
+    const body = $("qd-tbody");
+    body.innerHTML = "";
+    QUAD_ORDER.forEach((k) => {
+      const Q = QUAD[k], q = D.q[k];
+      const houjun = q.cust ? q.aum / q.cust : 0;
+      const row = document.createElement("div");
+      row.className = "qd-trow";
+      row.dataset.q = k;
+      row.innerHTML =
+        '<div class="qd-tq"><i style="background:' + Q.color + ';color:' + Q.color + '"></i>' + Q.name + '</div>' +
+        '<div class="qd-tc">' + fmt(q.cust, 1) + '<em>万</em></div>' +
+        '<div class="qd-tp">' + fmt(q.aum / D.totAum * 100, 1) + '%</div>' +
+        '<div class="qd-tc">' + fmt(houjun, houjun >= 100 ? 0 : 1) + '<em>万</em></div>' +
+        '<div class="qd-tstrat" style="color:' + Q.stratCss.color + ';border:1px solid ' + Q.stratCss.bd + ';background:' + Q.stratCss.bg + '">' + Q.strat + '</div>';
+      body.appendChild(row);
+    });
+    const foot = $("qd-tfoot");
+    foot.innerHTML =
+      '<div class="qd-tq">合计 · 客户总数</div>' +
+      '<div class="qd-tc">' + fmt(D.totCust, 1) + '<em>万</em></div>' +
+      '<div class="qd-tp">100.0%</div>' +
+      '<div class="qd-tc">' + fmt(D.houjun, D.houjun >= 100 ? 0 : 1) + '<em>万</em></div>' +
+      '<div class="qd-tstrat" style="color:#fbeaff;border:1px solid rgba(217,70,239,0.5);background:rgba(123,31,158,0.3)">分层经营</div>';
+  }
+
+  /* ===== 12. 跑马灯 ===== */
+  function renderMarquee(D) {
+    const items = D.s.news.concat([
+      "明星客群户均AUM <b>" + fmt(D.q.star.cust ? D.q.star.aum / D.q.star.cust : 0, 0) + "</b> 万元，深耕维护稳住存量价值",
+      "本口径客户总数 <b>" + fmt(D.totCust, 1) + "</b> 万户，管理资产 <b>" + fmt(D.totAum, 0) + "</b> 亿元"
+    ]);
+    const html = items.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+    const track = $("qd-marquee-track");
+    track.innerHTML = html + html;
+    track.style.animation = "none"; void track.offsetWidth; track.style.animation = "";
+  }
+
+  /* ===== 13. 口径切换：全页派生 + 重绘 ===== */
+  let curScope = "all";
+  let curD = null;
+  function applyScope(scopeKey) {
+    curScope = scopeKey;
+    curD = derive(scopeKey);
+    document.querySelectorAll(".qd-tab").forEach((t) => t.classList.toggle("is-active", t.dataset.scope === scopeKey));
+    setKpiTargets(curD);
+    scatterChart.setOption(scatterOption(curD), true);
+    donutChart.setOption(donutOption(curD));
+    renderTable(curD);
+    renderMarquee(curD);
+  }
+  document.querySelectorAll(".qd-tab").forEach((t) => {
+    t.addEventListener("click", () => applyScope(t.dataset.scope));
+  });
+  applyScope("all");
+
+  /* ===== 14. 动效 A：气泡轮流 highlight + showTip ===== */
+  let bubbleI = 0;
+  setInterval(() => {
+    const n = curD.bs.length;
+    scatterChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    const idx = bubbleI % n;
+    scatterChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: idx });
+    scatterChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: idx });
+    bubbleI++;
+  }, 2600);
+
+  /* ===== 动效 B：象限扫描高亮（明细行 + 角标 + donut 扇区 + 该象限气泡） ===== */
+  const quadLabels = {};
+  document.querySelectorAll(".qd-quad-label").forEach((el) => quadLabels[el.dataset.q] = el);
+  let scanI = 0;
+  setInterval(() => {
+    const k = QUAD_ORDER[scanI % QUAD_ORDER.length];
+    QUAD_ORDER.forEach((qk) => {
+      if (quadLabels[qk]) quadLabels[qk].classList.toggle("is-scan", qk === k);
+      const row = document.querySelector('.qd-trow[data-q="' + qk + '"]');
+      if (row) row.classList.toggle("is-scan", qk === k);
+    });
+    /* donut 扇区高亮 */
+    donutChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    donutChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: QUAD_ORDER.indexOf(k) });
+    scanI++;
+  }, 3400);
+
+  /* ===== 动效 C：客户数微增长（实时感，派生量整体缓动跟随） ===== */
+  setInterval(() => {
+    if (curScope !== "all") return;
+    const bs = BUBBLES.all;
+    const j = Math.floor(Math.random() * bs.length);
+    bs[j][3] = +Math.max(0.5, bs[j][3] + (Math.random() * 0.6 - 0.24)).toFixed(1);
+    curD = derive("all");
+    setKpiTargets(curD);
+    scatterChart.setOption(scatterOption(curD));
+    donutChart.setOption(donutOption(curD));
+    renderTable(curD);
+  }, 6000);
+
+  window.addEventListener("resize", () => { scatterChart.resize(); donutChart.resize(); });
+})();
+</script>
+</body>
+</html>

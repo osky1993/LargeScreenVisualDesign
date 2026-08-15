@@ -1,0 +1,1185 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 公共资金土地出让形势</title>
+<style>
+  :root {
+    --td-bg: #08203f;
+    --td-panel: rgba(11, 38, 72, 0.72);
+    --td-border: rgba(92, 156, 226, 0.28);
+    --td-text: #e8f2ff;
+    --td-muted: #8ea9cc;
+    /* 本页为全系列唯一「下行叙事」页：主强调色反转为暖橙 + 告警红，金色降级为系列识别点缀 */
+    --td-gold: #f0c060;
+    --td-gold-soft: #ffdc8f;
+    --td-orange: #ff9d4d;
+    --td-orange-soft: #ffc48e;
+    --td-orange-deep: #c9682a;
+    --td-red: #ff5f6e;
+    --td-red-deep: #a03444;
+    --td-steel: #5f88b8;        /* 灰蓝：历史基准 / 上年同期 */
+    --td-blue: #3d9cff;
+    --td-cyan: #39d0d8;
+    --td-green: #33e0a6;
+    --td-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body { color: var(--td-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .td-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(255, 157, 77, 0.12), transparent 44%),
+      radial-gradient(circle at 88% 8%, rgba(255, 95, 110, 0.10), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 60, 120, 0.34), transparent 56%),
+      linear-gradient(rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92, 156, 226, 0.05) 1px, transparent 1px),
+      var(--td-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 430px 1fr 430px;
+    grid-template-rows: 84px 132px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .td-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .td-error.is-visible { display: block; }
+
+  /* ===== 顶栏（金色仅保留在标题渐变，下划光带改暖橙→告警红） ===== */
+  .td-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .td-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 77, 0.6) 16%, rgba(255, 95, 110, 0.9) 50%, rgba(255, 157, 77, 0.6) 84%, transparent);
+    box-shadow: 0 0 14px rgba(255, 122, 90, 0.42);
+  }
+  .td-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .td-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--td-muted); }
+  .td-crumb b { font-weight: 400; color: var(--td-gold); }
+  .td-crumb i { font-style: normal; color: rgba(142, 169, 204, 0.55); }
+  .td-crumb em { font-style: normal; color: #d7e8ff; }
+  .td-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .td-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--td-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(240, 192, 96, 0.32));
+  }
+  .td-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--td-muted); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .td-head-meta b { font-weight: 400; color: var(--td-orange-soft); }
+  .td-head-meta i { font-style: normal; color: rgba(142, 169, 204, 0.4); }
+
+  .td-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .td-chips { display: flex; align-items: center; gap: 9px; }
+  .td-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid rgba(92, 156, 226, 0.4); background: rgba(16, 46, 86, 0.55);
+  }
+  .td-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: var(--td-steel); }
+  .td-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #d6e9ff; font-variant-numeric: tabular-nums; }
+  .td-chip.is-alert { border-color: rgba(255, 95, 110, 0.55); background: rgba(86, 26, 38, 0.45); box-shadow: inset 0 0 14px rgba(255, 95, 110, 0.12); }
+  .td-chip.is-alert b { color: #ffb3bb; }
+  .td-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(92, 156, 226, 0.25); }
+  .td-clock-time { font: 700 26px/1 var(--td-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(255, 157, 77, 0.4); }
+  .td-clock-date { font-size: 12px; color: var(--td-muted); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带（5 枚，数字全部暖橙，同比一律红色向下） ===== */
+  .td-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .td-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--td-border); border-radius: 12px; background: var(--td-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .td-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--td-orange), transparent); }
+  .td-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 157, 77, 0.14), transparent 68%);
+  }
+  .td-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px; color: #ffd9b8;
+    background: linear-gradient(160deg, rgba(255, 157, 77, 0.3), rgba(255, 95, 110, 0.12));
+    border: 1px solid rgba(255, 157, 77, 0.38); box-shadow: inset 0 0 12px rgba(255, 157, 77, 0.16);
+  }
+  .td-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .td-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--td-muted); white-space: nowrap; }
+  .td-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .td-kpi-val { font: 700 29px/1 var(--td-mono); color: var(--td-orange-soft); letter-spacing: 0.01em; text-shadow: 0 0 14px rgba(255, 157, 77, 0.45); }
+  .td-kpi-unit { font-size: 12px; color: #b3835e; }
+  .td-kpi-sub { display: flex; align-items: center; gap: 8px; font-size: 11.5px; letter-spacing: 0.02em; color: var(--td-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .td-kpi-sub b { font-weight: 700; }
+  .td-down { color: var(--td-red); }
+  .td-up { color: var(--td-green); }
+  .td-warn { color: var(--td-orange); }
+
+  /* KPI 卡内嵌阈值条（占政府性基金比重专用，超阈值转红） */
+  .td-mini-track { position: relative; height: 6px; border-radius: 3px; background: rgba(63, 120, 200, 0.2); overflow: visible; }
+  .td-mini-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, var(--td-orange-deep), var(--td-red)); box-shadow: 0 0 10px rgba(255, 95, 110, 0.5); transition: width 1.1s ease; }
+  .td-mini-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.8); }
+
+  /* ===== 面板通用 ===== */
+  .td-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .td-panel {
+    position: relative; flex: 1; min-height: 0; overflow: hidden;
+    border: 1px solid var(--td-border); border-radius: 12px; background: var(--td-panel);
+    display: flex; flex-direction: column;
+  }
+  .td-panel-head {
+    position: relative; flex: none; display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(255, 157, 77, 0.2), rgba(95, 136, 184, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  /* 竖标保留琥珀金：全系列识别符 */
+  .td-panel-head i { flex: none; width: 5px; height: 16px; background: var(--td-gold); box-shadow: 0 0 8px var(--td-gold); transform: skewX(-12deg); }
+  .td-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f4f9ff; white-space: nowrap; }
+  .td-panel-en { font-size: 10px; letter-spacing: 0.2em; color: var(--td-steel); align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .td-panel-scope { margin-left: auto; font-size: 12px; color: var(--td-orange-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .td-chart { flex: 1; min-height: 0; }
+
+  .td-main { flex: 1.5; }
+  .td-gauge-panel { flex: 1.06; }
+
+  /* ===== 右①附：仪表盘分区图例（DOM，避免 ECharts graphic 百分比定位漂移） ===== */
+  .td-gauge-legend {
+    flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; padding: 0 12px 9px;
+  }
+  .td-gl-col { display: flex; flex-direction: column; gap: 3px; }
+  .td-gl-row { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #b9cee6; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+  .td-gl-row i { flex: none; width: 12px; height: 4px; border-radius: 2px; }
+  .td-gl-row.is-on { color: #ffd9b8; font-weight: 700; }
+  .td-gl-note { grid-column: 1 / -1; font-size: 10.5px; font-weight: 700; color: #ff8f99; text-align: center; letter-spacing: 0.04em; padding-top: 2px; }
+
+  /* ===== 右②：关键指标同比一览（DOM 卡片列表） ===== */
+  .td-cmp { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 7px; padding: 9px 14px 12px; }
+  .td-cmp-head {
+    flex: none; display: grid; grid-template-columns: 92px 1fr 1fr 86px; align-items: center; gap: 0 8px;
+    padding: 0 11px 5px; font-size: 10.5px; letter-spacing: 0.14em; color: var(--td-steel); white-space: nowrap;
+    border-bottom: 1px solid rgba(126, 178, 226, 0.18);
+  }
+  .td-cmp-head span:nth-child(2), .td-cmp-head span:nth-child(3) { text-align: right; }
+  .td-cmp-head span:nth-child(4) { text-align: right; }
+  .td-cmp-row {
+    position: relative; flex: 1; min-height: 0;
+    display: grid; grid-template-columns: 92px 1fr 1fr 86px; align-items: center; gap: 0 8px;
+    padding: 0 11px; border-radius: 8px;
+    border: 1px solid rgba(255, 157, 77, 0.14); background: rgba(63, 120, 200, 0.08);
+    font-variant-numeric: tabular-nums;
+  }
+  .td-cmp-row::before {
+    content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 2px;
+    background: linear-gradient(180deg, var(--td-orange), var(--td-red));
+  }
+  .td-cmp-row.is-active { background: linear-gradient(90deg, rgba(255, 95, 110, 0.2), rgba(255, 157, 77, 0.04) 78%, transparent); border-color: rgba(255, 95, 110, 0.4); }
+  .td-cmp-name { font-size: 13.5px; font-weight: 700; letter-spacing: 0.06em; color: #eaf4ff; white-space: nowrap; }
+  .td-cmp-name em { display: block; font-style: normal; font-size: 10px; font-weight: 400; letter-spacing: 0.04em; color: var(--td-steel); }
+  .td-cmp-cur { text-align: right; }
+  .td-cmp-cur b { font: 700 18px/1 var(--td-mono); color: var(--td-orange-soft); }
+  .td-cmp-cur span { font-size: 10.5px; color: #b3835e; margin-left: 3px; }
+  .td-cmp-pre { text-align: right; }
+  .td-cmp-pre b { font: 700 15px/1 var(--td-mono); color: #9fb8d4; }
+  .td-cmp-pre span { font-size: 10.5px; color: var(--td-steel); margin-left: 3px; }
+  .td-cmp-yoy { text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+  .td-cmp-yoy b { font: 700 15px/1 var(--td-mono); color: var(--td-red); }
+  .td-cmp-yoy u { text-decoration: none; font-size: 13px; color: var(--td-red); }
+  .td-cmp-flag {
+    font-size: 9.5px; letter-spacing: 0.04em; padding: 1px 5px; border-radius: 999px;
+    color: #ffd0b0; border: 1px solid rgba(255, 157, 77, 0.5); background: rgba(120, 58, 20, 0.4);
+  }
+  .td-cmp-foot { flex: none; display: flex; align-items: center; gap: 8px; font-size: 10.5px; color: var(--td-steel); letter-spacing: 0.05em; padding: 2px 11px 0; }
+  .td-cmp-foot i { width: 14px; height: 2px; background: linear-gradient(90deg, var(--td-orange), var(--td-red)); display: inline-block; }
+
+  /* ===== 底部跑马灯（标签条由琥珀金改暖橙→告警红） ===== */
+  .td-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--td-border); border-radius: 12px; background: var(--td-panel);
+  }
+  .td-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #2b1105;
+    background: linear-gradient(120deg, var(--td-orange-soft), #e2612f 85%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .td-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #2b1105; animation: tdDot 1.6s ease-in-out infinite; }
+  @keyframes tdDot { 50% { opacity: 0.25; } }
+  .td-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .td-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: tdMarquee 56s linear infinite; font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .td-marquee-track b { color: var(--td-orange-soft); font-weight: 700; }
+  .td-marquee-track b.is-bad { color: #ffa8b1; }
+  .td-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(255, 157, 77, 0.5); }
+  @keyframes tdMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* subnav:begin —— 由 tools/inject_subnav.py 注入，勿手改 */
+  .td-subnav {
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; flex: none;
+    min-width: 176px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(92, 156, 226, 0.4); background: rgba(16, 46, 86, 0.55);
+  }
+  .td-subnav > span { font-size: 10.5px; letter-spacing: 0.16em; color: #5f88b8; white-space: nowrap; }
+  .td-subnav > u { display: flex; align-items: baseline; gap: 6px; text-decoration: none; white-space: nowrap; }
+  .td-subnav b { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; color: #9fb6d4; }
+  .td-subnav i { font-style: normal; font-size: 10.5px; color: #5f88b8; }
+  /* 有子页：转青色并可点击 */
+  .td-subnav.is-on {
+    cursor: pointer; border-color: rgba(57, 208, 216, 0.55);
+    background: linear-gradient(160deg, rgba(57, 208, 216, 0.16), rgba(16, 46, 86, 0.6));
+    box-shadow: inset 0 0 14px rgba(57, 208, 216, 0.1);
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .td-subnav.is-on b { color: #9fe8ec; }
+  .td-subnav.is-on i { color: #7fb8c8; }
+  .td-subnav.is-on:hover { border-color: rgba(57, 208, 216, 0.95); box-shadow: 0 0 16px -2px rgba(57, 208, 216, 0.7); }
+  /* subnav:end */
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .td-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+  /* carousel:begin —— 由 tools/inject_carousel.py 注入，勿手改，改脚本后重跑 */
+  .td-carousel {
+    display: flex; align-items: center; gap: 9px; flex: none;
+    padding-left: 18px; margin-left: 2px;
+    border-left: 1px solid rgba(92, 156, 226, 0.25);
+  }
+  .td-cbtn {
+    width: 36px; height: 36px; flex: none; padding: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px; font-family: inherit;
+    border: 1px solid rgba(240, 192, 96, 0.34);
+    background: linear-gradient(160deg, rgba(240, 192, 96, 0.17), rgba(16, 46, 86, 0.6));
+    color: #ffdc8f;
+    transition: border-color .18s, box-shadow .18s, color .18s, transform .18s;
+  }
+  .td-cbtn svg { width: 18px; height: 18px; display: block; }
+  .td-cbtn:hover {
+    color: #fff6e2; border-color: rgba(240, 192, 96, 0.85);
+    box-shadow: 0 0 14px rgba(240, 192, 96, 0.42), inset 0 0 12px rgba(240, 192, 96, 0.14);
+  }
+  .td-cbtn:active { transform: scale(0.93); }
+  .td-cmeta { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 62px; }
+  .td-cidx { font: 700 15px/1 var(--td-mono); color: #ffdc8f; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+  .td-cidx i { font-style: normal; font-size: 11px; font-weight: 400; color: #8ea9cc; margin-left: 1px; }
+  .td-cbar { width: 58px; height: 3px; border-radius: 2px; background: rgba(63, 120, 200, 0.28); overflow: hidden; }
+  .td-cbar u {
+    display: block; height: 100%; width: 0; border-radius: 2px;
+    background: linear-gradient(90deg, #b8863a, #ffdc8f);
+    box-shadow: 0 0 8px rgba(240, 192, 96, 0.55);
+  }
+  /* 暂停态：进度条停在原地并转灰，播放键换成三角、按钮描边转青，一眼可辨 */
+  .td-carousel.is-paused .td-cbar u { background: linear-gradient(90deg, #4a6c96, #8ea9cc); box-shadow: none; }
+  .td-cplay .td-ic-play { display: none; }
+  .td-carousel.is-paused .td-cplay .td-ic-pause { display: none; }
+  .td-carousel.is-paused .td-cplay .td-ic-play { display: block; }
+  .td-carousel.is-paused .td-cplay {
+    color: #9fe8ec; border-color: rgba(57, 208, 216, 0.6);
+    background: linear-gradient(160deg, rgba(57, 208, 216, 0.2), rgba(16, 46, 86, 0.6));
+    box-shadow: 0 0 12px rgba(57, 208, 216, 0.34);
+  }
+  /* carousel:end */
+  /* drill:begin —— 由 tools/inject_drilldown.py 注入，勿手改 */
+  .td-drill { cursor: pointer; position: relative; }
+  .td-drill::after {
+    content: "↗"; position: absolute; right: 6px; top: 50%; transform: translateY(-50%) translateX(-3px);
+    font-size: 11px; font-weight: 700; line-height: 1; color: var(--td-gold-soft);
+    opacity: 0; transition: opacity .2s ease, transform .2s ease; pointer-events: none; z-index: 3;
+  }
+  .td-drill:hover::after { opacity: 0.95; transform: translateY(-50%) translateX(0); }
+  .td-drill:hover {
+    background: rgba(240, 192, 96, 0.16) !important;
+    box-shadow: inset 0 0 0 1px rgba(240, 192, 96, 0.5), 0 0 16px -4px rgba(240, 192, 96, 0.6);
+  }
+  .td-drill-hint {
+    margin-left: 10px; font-size: 10.5px; letter-spacing: 0.04em; color: #b39a5e;
+    padding: 1px 7px; border-radius: 999px; border: 1px dashed rgba(240, 192, 96, 0.5); white-space: nowrap;
+  }
+  /* 面板级入口：子页是全量台账、无切换对象时用它，挂在相关面板头上 */
+  .td-drill-entry {
+    margin-left: 10px; cursor: pointer; white-space: nowrap;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; line-height: 1;
+    padding: 4px 9px; border-radius: 999px; color: #06182c;
+    background: linear-gradient(140deg, #9fe8ec, #39d0d8);
+    box-shadow: 0 0 9px -1px rgba(57, 208, 216, 0.75);
+    transition: filter .18s ease, box-shadow .18s ease;
+  }
+  .td-drill-entry:hover { filter: brightness(1.12); box-shadow: 0 0 16px -1px rgba(57, 208, 216, 0.95); }
+  /* drill:end */
+</style>
+</head>
+<body>
+  <div class="td-stage" id="td-stage">
+    <!-- mockflag:begin --><div class="td-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="td-error" id="td-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="td-header">
+      <div class="td-head-left">
+        <div class="td-crumb"><b>公共资金</b><i>›</i><em>土地出让形势</em></div>
+        <div class="td-head-title-row">
+          <div class="td-head-title">江苏省土地出让收入形势</div>
+          <div class="td-head-meta">
+            <span>口径 <b>国有土地使用权出让收入</b></span><i>|</i>
+            <span><b>政府性基金预算</b></span><i>|</i>
+            <span>区间 <b>2026 年 1-7 月累计</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="td-head-right">
+<!-- subnav:begin -->
+<!--ORIG
+        <div class="td-chips">
+          <div class="td-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="td-chip is-alert"><span>YOY 累计同比</span><b id="td-chip-yoy">--%</b></div>
+        </div>
+ORIG-->
+        <a class="td-subnav is-on" href="大屏样板间-公共资金土地成交台账1920.html" title="点击进入子页：土地成交台账（页内入口：地市面板头入口）"><span>二级子页 · SUB-PAGE</span><u><b>土地成交台账</b><i>· 地市面板头入口</i></u></a><span id="td-chip-yoy" hidden></span>
+        <!-- subnav:end -->
+        <div class="td-clock" aria-label="实时时钟">
+          <span class="td-clock-time" id="td-clock-time">--:--:--</span>
+          <span class="td-clock-date" id="td-clock-date">----年--月--日 星期-</span>
+        </div>
+<!-- carousel:begin -->
+        <nav class="td-carousel" id="td-carousel" aria-label="专题轮播导航">
+          <button class="td-cbtn" id="td-c-prev" type="button" aria-label="上一页" title="上一页（← 方向键）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/></svg>
+          </button>
+          <div class="td-cmeta">
+            <span class="td-cidx"><b id="td-c-cur">--</b><i>/ 13</i></span>
+            <span class="td-cbar" aria-hidden="true"><u id="td-c-bar"></u></span>
+          </div>
+          <button class="td-cbtn" id="td-c-next" type="button" aria-label="下一页" title="下一页（→ 方向键）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 L17 12 L9 20"/></svg>
+          </button>
+          <button class="td-cbtn td-cplay" id="td-c-play" type="button" aria-label="暂停轮播" aria-pressed="false" title="暂停 / 继续（空格键）">
+            <svg class="td-ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.4"/><rect x="13.5" y="5" width="4" height="14" rx="1.4"/></svg>
+            <svg class="td-ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2 L19 12 L8 18.8 Z"/></svg>
+          </button>
+        </nav>
+        <!-- carousel:end -->
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <section class="td-band" id="td-band" aria-label="核心指标"></section>
+
+    <!-- 左列 -->
+    <div class="td-col">
+      <section class="td-panel">
+        <header class="td-panel-head"><i></i><h2>用地结构</h2><span class="td-panel-en">LAND USE MIX</span><span class="td-panel-scope" id="td-mix-scope">合计 -- 亿元</span></header>
+        <div class="td-chart" id="td-chart-mix" role="img" aria-label="住宅商服工业其他用地出让金环形占比图"></div>
+      </section>
+      <section class="td-panel">
+        <header class="td-panel-head"><i></i><h2>占政府性基金预算比重</h2><span class="td-panel-en">FUND DEPENDENCE</span><span class="td-panel-scope">近 6 期</span></header>
+        <div class="td-chart" id="td-chart-dep" role="img" aria-label="土地出让收入占政府性基金预算收入比重近六期折线与依赖阈值"></div>
+      </section>
+    </div>
+
+    <!-- 中央 -->
+    <div class="td-col">
+      <section class="td-panel td-main">
+        <header class="td-panel-head"><i></i><h2>月度出让金三年对比与历史区间</h2><span class="td-panel-en">3-YEAR MONTHLY BAND</span><span class="td-panel-scope" id="td-main-scope">灰带 = 2024-2025 历史区间</span></header>
+        <div class="td-chart" id="td-chart-main" role="img" aria-label="2026年月度出让金柱状图叠加2024至2025历史区间带与累计同比折线"></div>
+      </section>
+      <section class="td-panel">
+        <header class="td-panel-head"><i></i><h2>13 设区市出让金与同比</h2><span class="td-panel-en">CITY HEAT BARS</span><span class="td-panel-scope">条色深浅 = 同比降幅</span></header>
+        <div class="td-chart" id="td-chart-city" role="img" aria-label="13个设区市土地出让金横向热力条形图"></div>
+      </section>
+    </div>
+
+    <!-- 右列 -->
+    <div class="td-col">
+      <section class="td-panel td-gauge-panel">
+        <header class="td-panel-head"><i></i><h2>市场温度计</h2><span class="td-panel-en">MARKET THERMOMETER</span><span class="td-panel-scope" id="td-gauge-scope">承压区间</span></header>
+        <div class="td-chart" id="td-chart-gauge" role="img" aria-label="流拍撤牌率与底价成交占比双仪表盘"></div>
+        <div class="td-gauge-legend" id="td-gauge-legend"></div>
+      </section>
+      <section class="td-panel">
+        <header class="td-panel-head"><i></i><h2>关键指标同比一览</h2><span class="td-panel-en">KEY METRICS YOY</span><span class="td-panel-scope">本期 vs 上年同期</span></header>
+        <div class="td-cmp" id="td-cmp">
+          <div class="td-cmp-head"><span>指标</span><span>本期</span><span>上年同期</span><span>同比</span></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="td-marquee" aria-label="形势研判">
+      <div class="td-marquee-tag"><i></i>形势研判</div>
+      <div class="td-marquee-view"><div class="td-marquee-track" id="td-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("td-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("td-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  /* 色板镜像：本页反转——暖橙/告警红为主，灰蓝为历史基准，金色仅作系列识别点缀 */
+  const C = {
+    text: "#e8f2ff", muted: "#8ea9cc", steel: "#5f88b8",
+    gold: "#f0c060", goldSoft: "#ffdc8f",
+    orange: "#ff9d4d", orangeSoft: "#ffc48e", orangeDeep: "#c9682a",
+    red: "#ff5f6e", redDeep: "#a03444",
+    blue: "#3d9cff", cyan: "#39d0d8", green: "#33e0a6"
+  };
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => {
+    const parts = Number(n).toFixed(dec == null ? 0 : dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  /* 十六进制色插值：降幅越深越红 */
+  const hex2rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const mixHex = (a, b, t) => {
+    const x = hex2rgb(a), y = hex2rgb(b);
+    return "rgb(" + x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(",") + ")";
+  };
+
+  /* ===== 3. 数据源（模拟，口径 2026 年 1-7 月累计 · 国有土地使用权出让收入 · 亿元）
+         合计一律由分项求和，比率 / 同比 / 楼面价全部现算，不复制数字 ===== */
+  const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月"];
+  /* 3.1 月度出让金三年序列 */
+  const M2026 = [380, 262, 346, 482, 398, 546, 446];
+  const M2025 = [462, 318, 428, 588, 486, 672, 551];
+  const M2024 = [536, 372, 498, 684, 562, 780, 640];
+
+  /* 3.2 13 设区市（亿元 / 同比%），已按金额降序 */
+  const CITIES = [
+    { name: "苏州", val: 620, yoy: -14.2 },
+    { name: "南京", val: 486, yoy: -22.6 },
+    { name: "无锡", val: 342, yoy: -16.8 },
+    { name: "南通", val: 236, yoy: -12.4 },
+    { name: "常州", val: 198, yoy: -19.2 },
+    { name: "徐州", val: 176, yoy: -24.6 },
+    { name: "盐城", val: 158, yoy: -15.8 },
+    { name: "扬州", val: 142, yoy: -18.6 },
+    { name: "泰州", val: 128, yoy: -13.2 },
+    { name: "淮安", val: 98, yoy: -26.4 },
+    { name: "镇江", val: 96, yoy: -21.8 },
+    { name: "宿迁", val: 92, yoy: -11.6 },
+    { name: "连云港", val: 88, yoy: -20.4 }
+  ];
+
+  /* 3.3 用地结构（亿元） */
+  const LAND = [
+    { name: "住宅用地", val: 1860, c1: "#ffc48e", c2: "#c9682a" },
+    { name: "商服用地", val: 486, c1: "#ff8f7a", c2: "#a8422f" },
+    { name: "工业用地", val: 372, c1: "#8fb4dd", c2: "#3f6690" },
+    { name: "其他用地", val: 142, c1: "#6d8db0", c2: "#31506f" }
+  ];
+
+  /* 3.4 面积 / 溢价 / 市场温度（本期与上年同期，比率与楼面价现算） */
+  const AREA_CUR = 3240, AREA_PRE = 3706;         /* 万㎡ */
+  const PREMIUM_CUR = 4.2, PREMIUM_PRE = 8.6;      /* 平均溢价率 % */
+  const FAIL_CUR = 8.6, FAIL_PRE = 4.8;            /* 流拍撤牌率 %（逆向指标） */
+  const FLOOR_DEAL = 63.4;                          /* 底价成交占比 % */
+  const GOV_FUND_CUR = 3318;                        /* 政府性基金预算收入（亿元），比重由此现算 */
+  const DEP_THRESHOLD = 80;                         /* 高度依赖阈值 % */
+
+  /* 3.5 占政府性基金预算比重历年（%），末位由本期现算 */
+  const DEP_YEARS = ["2021", "2022", "2023", "2024", "2025", "2026\n1-7月"];
+  const DEP_VALS = [92.6, 91.2, 89.8, 88.4, 87.5, 0];
+
+  /* 3.6 派生量：全部由上面的数组现算 */
+  const D = {};
+  D.total = sum(CITIES.map((c) => c.val));       /* 13 市之和 */
+  D.totalM = sum(M2026);                          /* 月度七项之和（应与 D.total 相等） */
+  D.totalLand = sum(LAND.map((l) => l.val));      /* 用地结构四项之和（应与 D.total 相等） */
+  D.pre = sum(M2025);
+  D.pre24 = sum(M2024);
+  D.yoy = 100 * (D.totalM / D.pre - 1);
+  D.areaYoy = 100 * (AREA_CUR / AREA_PRE - 1);
+  /* 楼面价 = 出让金(亿元→元) / 成交面积(万㎡→㎡) */
+  D.floorPrice = (D.total * 1e8) / (AREA_CUR * 1e4);
+  D.floorPricePre = (D.pre * 1e8) / (AREA_PRE * 1e4);
+  D.floorYoy = 100 * (D.floorPrice / D.floorPricePre - 1);
+  D.premiumGap = PREMIUM_CUR - PREMIUM_PRE;
+  D.failGap = FAIL_CUR - FAIL_PRE;
+  D.dep = 100 * D.total / GOV_FUND_CUR;
+  D.depGap = D.dep - DEP_THRESHOLD;
+  D.resiShare = 100 * LAND[0].val / D.totalLand;
+  DEP_VALS[DEP_VALS.length - 1] = +D.dep.toFixed(1);
+  /* 上半年累计同比，用于研判「降幅是收窄还是扩大」 */
+  D.h1Yoy = 100 * (sum(M2026.slice(0, 6)) / sum(M2025.slice(0, 6)) - 1);
+  D.yoyDelta = D.yoy - D.h1Yoy;
+  D.julMom = 100 * (M2026[6] / M2026[5] - 1);
+  D.julYoy = 100 * (M2026[6] / M2025[6] - 1);
+
+  /* ===== 4. 顶部时钟 + 累计同比标签 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("td-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("td-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("td-chip-yoy").textContent = signed(D.yoy) + "%";
+
+  /* ===== 5. KPI 带：5 枚（翻牌缓动，末枚内嵌依赖阈值条） ===== */
+  const KPI_DEFS = [
+    { icon: "¥", label: "土地出让收入累计", val: D.total, unit: "亿元", dec: 0,
+      sub: () => '同比 <b class="td-down">▼ ' + signed(D.yoy) + '%</b> · 上年同期 ' + fmtDec(D.pre) },
+    { icon: "▤", label: "成交面积", val: AREA_CUR, unit: "万㎡", dec: 0,
+      sub: () => '同比 <b class="td-down">▼ ' + signed(D.areaYoy) + '%</b> · 上年同期 ' + fmtDec(AREA_PRE) },
+    { icon: "◱", label: "平均楼面价", val: D.floorPrice, unit: "元/㎡", dec: 0,
+      sub: () => '同比 <b class="td-down">▼ ' + signed(D.floorYoy) + '%</b> · 出让金 ÷ 成交面积' },
+    { icon: "△", label: "平均溢价率", val: PREMIUM_CUR, unit: "%", dec: 1,
+      sub: () => '较上年同期 <b class="td-down">▼ ' + fmtDec(D.premiumGap, 1) + ' pct</b> · 上年 ' + PREMIUM_PRE.toFixed(1) + "%" },
+    { icon: "◐", label: "占政府性基金预算比重", val: D.dep, unit: "%", dec: 1, threshold: true }
+  ];
+  const band = $("td-band");
+  KPI_DEFS.forEach((k) => {
+    const card = document.createElement("article");
+    card.className = "td-kpi";
+    card.innerHTML =
+      '<div class="td-kpi-icon">' + k.icon + '</div>' +
+      '<div class="td-kpi-main">' +
+        '<div class="td-kpi-label">' + k.label + '</div>' +
+        '<div class="td-kpi-num"><span class="td-kpi-val">0</span><span class="td-kpi-unit">' + k.unit + '</span></div>' +
+        (k.threshold
+          ? '<div class="td-mini-track"><div class="td-mini-fill" id="td-mini-fill"></div><div class="td-mini-tick" style="left:' + DEP_THRESHOLD.toFixed(2) + '%"></div></div>' +
+            '<div class="td-kpi-sub">依赖阈值 <b>' + DEP_THRESHOLD.toFixed(0) + '%</b> · <b class="td-down">高出 ' +
+            fmtDec(D.depGap, 1) + " pct</b></div>"
+          : '<div class="td-kpi-sub">' + k.sub() + '</div>') +
+      '</div>';
+    band.appendChild(card);
+    k.node = card.querySelector(".td-kpi-val");
+    k.cur = 0;
+  });
+  setInterval(() => {
+    KPI_DEFS.forEach((k) => {
+      const diff = k.val - k.cur;
+      if (Math.abs(diff) < Math.pow(10, -k.dec) / 2) k.cur = k.val; else k.cur += diff * 0.13;
+      k.node.textContent = fmtDec(k.cur, k.dec);
+    });
+  }, 80);
+  setTimeout(() => { $("td-mini-fill").style.width = Math.min(100, D.dep).toFixed(2) + "%"; }, 320);
+
+  /* ===== 6. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(8, 26, 50, 0.93)",
+    borderColor: "rgba(255, 157, 77, 0.45)",
+    textStyle: { color: "#e2eeff", fontSize: 12 }
+  }, extra || {});
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: from }, { offset: 1, color: to }]);
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: from }, { offset: 1, color: to }]);
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LINE = { lineStyle: { color: "rgba(102, 178, 255, 0.3)" } };
+  const SPLIT_LINE = { lineStyle: { color: "rgba(92, 156, 226, 0.13)" } };
+
+  /* ===== 7. 中①主图：2026 月度柱 + 2024/2025 历史区间带 + 累计同比副轴 =====
+         区间带用两条堆叠折线实现：下界 = min(24,25)，上叠差值 = |24-25| */
+  const mainChart = makeChart("td-chart-main");
+  const bandLow = M2024.map((v, i) => Math.min(v, M2025[i]));
+  const bandSpan = M2024.map((v, i) => Math.abs(v - M2025[i]));
+  const cumYoy = M2026.map((_, i) => {
+    const a = sum(M2026.slice(0, i + 1));
+    const b = sum(M2025.slice(0, i + 1));
+    return +(100 * (a / b - 1)).toFixed(2);
+  });
+  /* 2026 各月落在历史区间下沿之下多少（用于 tooltip 佐证「跌破历史区间」） */
+  const belowBand = M2026.map((v, i) => 100 * (v / bandLow[i] - 1));
+  mainChart.setOption({
+    tooltip: tip({
+      trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(255, 157, 77, 0.08)" } },
+      formatter: (ps) => {
+        const i = ps[0].dataIndex;
+        return '<b style="color:#ffc48e">' + MONTHS[i] + "</b><br/>" +
+          "2026 年 <b>" + fmtDec(M2026[i]) + "</b> 亿元<br/>" +
+          "2025 年 " + fmtDec(M2025[i]) + " 亿元 · 2024 年 " + fmtDec(M2024[i]) + " 亿元<br/>" +
+          "当月同比 <b style=\"color:#ff5f6e\">" + signed(100 * (M2026[i] / M2025[i] - 1)) + "%</b><br/>" +
+          "低于历史区间下沿 <b style=\"color:#ff5f6e\">" + fmtDec(belowBand[i], 1) + "%</b><br/>" +
+          "累计同比 <b style=\"color:#ff5f6e\">" + signed(cumYoy[i]) + "%</b>";
+      }
+    }),
+    legend: {
+      top: 8, right: 14, itemWidth: 12, itemHeight: 8, itemGap: 14,
+      textStyle: { color: "#c6dcf5", fontSize: 11.5 },
+      data: [
+        "2026 年当月", "2025 年同期", "2024 年同期",
+        { name: "历史区间 24-25", icon: "rect", itemStyle: { color: "rgba(95, 136, 184, 0.45)", opacity: 1 }, lineStyle: { opacity: 0 } },
+        "累计同比"
+      ]
+    },
+    grid: { left: 16, right: 16, top: 48, bottom: 8, containLabel: true },
+    xAxis: {
+      type: "category", data: MONTHS, boundaryGap: true,
+      axisLine: AXIS_LINE, axisTick: { show: false },
+      axisLabel: { color: C.muted, fontSize: 12 }
+    },
+    yAxis: [
+      { type: "value", name: "亿元", max: 900, nameTextStyle: { color: C.steel, fontSize: 11, padding: [0, 0, 0, -24] },
+        splitLine: SPLIT_LINE, axisLabel: { color: C.muted, fontSize: 11, formatter: (v) => fmtDec(v) } },
+      { type: "value", name: "累计同比 %", nameTextStyle: { color: C.steel, fontSize: 11 },
+        min: -50, max: -10, interval: 10, splitLine: { show: false },
+        axisLabel: { color: C.muted, fontSize: 11, formatter: "{value}%" } }
+    ],
+    series: [
+      /* 区间带下界（透明占位，不参与图例与提示） */
+      { name: "__bandLow", type: "line", stack: "hband", symbol: "none", silent: true, z: 1,
+        lineStyle: { opacity: 0 }, areaStyle: { opacity: 0 }, tooltip: { show: false }, data: bandLow },
+      { name: "历史区间 24-25", type: "line", stack: "hband", symbol: "none", silent: true, z: 1,
+        lineStyle: { opacity: 0 }, tooltip: { show: false },
+        areaStyle: { color: "rgba(95, 136, 184, 0.22)" },
+        itemStyle: { color: "rgba(95, 136, 184, 0.5)" }, data: bandSpan },
+      /* 2024 / 2025 历史基准线：灰蓝虚线，2024 更淡 */
+      { name: "2024 年同期", type: "line", smooth: true, symbol: "none", z: 3,
+        lineStyle: { width: 1.8, color: "rgba(95, 136, 184, 0.5)", type: "dotted" },
+        itemStyle: { color: "rgba(95, 136, 184, 0.5)" }, data: M2024 },
+      { name: "2025 年同期", type: "line", smooth: true, symbol: "circle", symbolSize: 6, z: 4,
+        lineStyle: { width: 2.4, color: C.steel, type: "dashed" },
+        itemStyle: { color: C.steel }, data: M2025 },
+      /* 2026 当月柱：暖橙，明显落在区间带下沿之下 */
+      { name: "2026 年当月", type: "bar", barWidth: 26, z: 5,
+        itemStyle: { borderRadius: [4, 4, 0, 0], color: vGrad(C.orangeSoft, "rgba(201, 104, 42, 0.32)"), shadowColor: "rgba(255, 157, 77, 0.4)", shadowBlur: 10 },
+        label: { show: true, position: "top", fontSize: 11, fontWeight: 700, color: C.orangeSoft, formatter: (o) => fmtDec(o.value) },
+        data: M2026 },
+      /* 累计同比：全程为负，告警红 */
+      { name: "累计同比", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 8, z: 6,
+        lineStyle: { width: 3, color: C.red, shadowColor: "rgba(255, 95, 110, 0.55)", shadowBlur: 12 },
+        itemStyle: { color: C.red, borderColor: "#2a0d14", borderWidth: 2 },
+        label: { show: true, position: "top", distance: 10, fontSize: 11, fontWeight: 700, color: "#ffa8b1",
+          backgroundColor: "rgba(8, 26, 50, 0.8)", padding: [2, 4], borderRadius: 3,
+          formatter: (o) => signed(o.value) + "%" },
+        data: cumYoy }
+    ]
+  });
+
+  /* ===== 8. 中②：13 设区市横向热力条（金额降序，条色按同比降幅深浅染色） ===== */
+  const cityChart = makeChart("td-chart-city");
+  const dropAbs = CITIES.map((c) => Math.abs(c.yoy));
+  const dropMin = Math.min.apply(null, dropAbs), dropMax = Math.max.apply(null, dropAbs);
+  const heatOf = (yoy) => {
+    const t = (Math.abs(yoy) - dropMin) / (dropMax - dropMin || 1);
+    return { t: t, mild: mixHex("#ffb877", "#ff6a52", t), deep: mixHex("#c9682a", "#c11f3a", t) };
+  };
+  const cityMax = Math.max.apply(null, CITIES.map((c) => c.val));
+  cityChart.setOption({
+    tooltip: tip({
+      trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(255, 157, 77, 0.08)" } },
+      formatter: (ps) => {
+        const i = ps[ps.length - 1].dataIndex, c = CITIES[i];
+        const pre = c.val / (1 + c.yoy / 100);
+        return '<b style="color:#ffc48e">' + c.name + "</b><br/>出让金 <b>" + fmtDec(c.val) + "</b> 亿元<br/>" +
+          "同比 <b style=\"color:#ff5f6e\">" + signed(c.yoy) + "%</b><br/>" +
+          "上年同期 " + fmtDec(pre, 1) + " 亿元 · 减收 " + fmtDec(pre - c.val, 1) + " 亿元<br/>" +
+          "占全省 " + (100 * c.val / D.total).toFixed(1) + "%";
+      }
+    }),
+    grid: { left: 8, right: 88, top: 26, bottom: 6, containLabel: true },
+    xAxis: { type: "value", max: cityMax, splitLine: SPLIT_LINE, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false } },
+    yAxis: {
+      type: "category", inverse: true, data: CITIES.map((c) => c.name),
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: "#cfe2f8", fontSize: 11.5, margin: 8 }
+    },
+    series: [
+      { name: "槽", type: "bar", barWidth: 11, barGap: "-100%", silent: true, z: 1,
+        itemStyle: { borderRadius: 6, color: "rgba(63, 120, 200, 0.11)" }, data: CITIES.map(() => cityMax) },
+      { name: "出让金", type: "bar", barWidth: 11, z: 2,
+        itemStyle: { borderRadius: 6 },
+        data: CITIES.map((c) => {
+          const h = heatOf(c.yoy);
+          return { value: c.val, itemStyle: { color: hGrad(h.deep, h.mild), shadowColor: h.mild, shadowBlur: 6 } };
+        }),
+        label: {
+          show: true, position: "right", distance: 8, fontSize: 10.5, fontWeight: 700,
+          formatter: (o) => "{v|" + fmtDec(o.value) + "}  {y|" + signed(CITIES[o.dataIndex].yoy) + "%}",
+          rich: { v: { color: "#ffd9b8", fontSize: 11.5, fontWeight: 700 }, y: { color: "#ff8f99", fontSize: 10.5, fontWeight: 700 } }
+        }
+      }
+    ]
+  });
+  /* 逐市轮播聚焦（blur 透明度保持在可读量级，避免 kiosk 大屏长时间发暗） */
+  let cityIdx = -1;
+  setInterval(() => {
+    cityChart.dispatchAction({ type: "downplay", seriesIndex: 1 });
+    cityIdx = (cityIdx + 1) % CITIES.length;
+    cityChart.dispatchAction({ type: "highlight", seriesIndex: 1, dataIndex: cityIdx });
+  }, 2600);
+
+  /* ===== 9. 左①：用地结构环形（中心显示合计，住宅占比现算） ===== */
+  const mixChart = makeChart("td-chart-mix");
+  $("td-mix-scope").textContent = "合计 " + fmtDec(D.totalLand) + " 亿元";
+  mixChart.setOption({
+    tooltip: tip({
+      formatter: (p) => '<b style="color:#ffc48e">' + p.name + "</b><br/>" + fmtDec(p.value) + " 亿元<br/>占比 <b>" + p.percent.toFixed(1) + "%</b>"
+    }),
+    series: [{
+      name: "用地结构", type: "pie", center: ["50%", "48%"], radius: ["40%", "60%"],
+      avoidLabelOverlap: true, minAngle: 6,
+      itemStyle: { borderColor: "rgba(8, 32, 63, 0.9)", borderWidth: 2 },
+      label: {
+        color: "#d8e8fa", fontSize: 11, lineHeight: 15,
+        formatter: (p) => "{n|" + p.name + "}\n{v|" + fmtDec(p.value) + " 亿}  {p|" + p.percent.toFixed(1) + "%}",
+        rich: { n: { color: "#e8f2ff", fontSize: 11.5, fontWeight: 700 }, v: { color: "#ffc48e", fontSize: 11 }, p: { color: "#9fb8d4", fontSize: 10.5 } }
+      },
+      labelLine: { length: 12, length2: 16, lineStyle: { color: "rgba(142, 169, 204, 0.5)" } },
+      emphasis: { scaleSize: 8, itemStyle: { shadowBlur: 16, shadowColor: "rgba(255, 157, 77, 0.5)" } },
+      blur: { itemStyle: { opacity: 0.55 }, label: { opacity: 0.62 } },
+      data: LAND.map((l) => ({ name: l.name, value: l.val, itemStyle: { color: vGrad(l.c1, l.c2) } }))
+    }],
+    graphic: [
+      { type: "text", left: "center", top: "39%", style: { text: fmtDec(D.totalLand), fill: "#ffc48e", fontSize: 26, fontWeight: 700, textAlign: "center" } },
+      { type: "text", left: "center", top: "50%", style: { text: "出让金合计 · 亿元", fill: "#8ea9cc", fontSize: 10.5, textAlign: "center" } },
+      { type: "text", left: "center", top: "57%", style: { text: "住宅占 " + D.resiShare.toFixed(1) + "%", fill: "#ff8f99", fontSize: 11, fontWeight: 700, textAlign: "center" } }
+    ]
+  });
+  let landIdx = -1;
+  setInterval(() => {
+    mixChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    landIdx = (landIdx + 1) % LAND.length;
+    mixChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: landIdx });
+  }, 3200);
+
+  /* ===== 10. 左②：占政府性基金预算比重趋势（高位回落，80% 依赖阈值 markLine） ===== */
+  const depChart = makeChart("td-chart-dep");
+  depChart.setOption({
+    tooltip: tip({ trigger: "axis", valueFormatter: (v) => v.toFixed(1) + "%" }),
+    grid: { left: 10, right: 40, top: 30, bottom: 4, containLabel: true },
+    xAxis: {
+      type: "category", data: DEP_YEARS, boundaryGap: false,
+      axisLine: AXIS_LINE, axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 11, lineHeight: 13 }
+    },
+    yAxis: { type: "value", min: 74, max: 96, splitLine: SPLIT_LINE, axisLabel: { color: C.muted, fontSize: 10, formatter: "{value}%" } },
+    series: [{
+      name: "占政府性基金预算比重", type: "line", smooth: true, symbol: "circle", symbolSize: 9,
+      lineStyle: { width: 3, color: hGrad(C.steel, C.red), shadowColor: "rgba(255, 95, 110, 0.35)", shadowBlur: 12 },
+      itemStyle: { color: C.orangeSoft, borderColor: "#12325c", borderWidth: 2 },
+      areaStyle: { color: vGrad("rgba(255, 157, 77, 0.24)", "rgba(255, 95, 110, 0)") },
+      label: { show: true, position: "top", distance: 8, fontSize: 10.5, fontWeight: 700, color: C.orangeSoft,
+        backgroundColor: "rgba(8, 26, 50, 0.75)", padding: [2, 4], borderRadius: 3,
+        formatter: (o) => o.value.toFixed(1) + "%" },
+      /* 水平 markLine 可安全带 label（竖直 markLine 的 label 会旋转成竖排，本页规避） */
+      markLine: {
+        silent: true, symbol: "none",
+        lineStyle: { color: "rgba(255, 95, 110, 0.75)", type: "dashed", width: 1.6 },
+        label: { color: "#ffa8b1", fontSize: 10.5, position: "insideStartBottom", formatter: "高度依赖阈值 " + DEP_THRESHOLD + "%" },
+        data: [{ yAxis: DEP_THRESHOLD }]
+      },
+      data: DEP_VALS
+    }],
+    graphic: [{
+      type: "text", right: 12, top: 4,
+      style: { text: "当前高出阈值 " + fmtDec(D.depGap, 1) + " pct", fill: "#ff8f99", fontSize: 10.5, fontWeight: 700 }
+    }]
+  });
+
+  /* ===== 11. 右①：市场温度计（双仪表盘，指针缓动，每 20 秒回零重播） ===== */
+  const GAUGES = [
+    { name: "流拍撤牌率", val: FAIL_CUR, max: 20, unit: "%", cx: "23%",
+      bands: [[0.25, "rgba(95, 136, 184, 0.75)"], [0.5, "rgba(255, 157, 77, 0.85)"], [1, "rgba(255, 95, 110, 0.9)"]],
+      zones: [
+        { lt: 5, t: "正常", r: "< 5%", c: "#5f88b8" },
+        { lt: 10, t: "承压", r: "5 - 10%", c: "#ff9d4d" },
+        { lt: Infinity, t: "遇冷", r: "> 10%", c: "#ff5f6e" }
+      ] },
+    { name: "底价成交占比", val: FLOOR_DEAL, max: 100, unit: "%", cx: "77%",
+      bands: [[0.5, "rgba(95, 136, 184, 0.75)"], [0.7, "rgba(255, 157, 77, 0.85)"], [1, "rgba(255, 95, 110, 0.9)"]],
+      zones: [
+        { lt: 50, t: "活跃", r: "< 50%", c: "#5f88b8" },
+        { lt: 70, t: "转冷", r: "50 - 70%", c: "#ff9d4d" },
+        { lt: Infinity, t: "低迷", r: "> 70%", c: "#ff5f6e" }
+      ] }
+  ];
+  const zoneOf = (g) => { for (let i = 0; i < g.zones.length; i++) { if (g.val < g.zones[i].lt) return g.zones[i].t; } return g.zones[g.zones.length - 1].t; };
+  const zoneColor = (g) => { const z = zoneOf(g); return z === "正常" || z === "活跃" ? C.steel : (z === "承压" || z === "转冷" ? C.orange : C.red); };
+  $("td-gauge-scope").textContent = zoneOf(GAUGES[0]) + " / " + zoneOf(GAUGES[1]);
+  const gaugeSeries = (g, value) => ({
+    type: "gauge", min: 0, max: g.max, startAngle: 212, endAngle: -32,
+    /* 半径收一档，把弧外让给刻度数字；gauge 的 distance 为负 = 画在弧外侧 */
+    center: [g.cx, "48%"], radius: "52%", splitNumber: 4,
+    progress: { show: false },
+    axisLine: { roundCap: true, lineStyle: { width: 12, color: g.bands } },
+    pointer: { show: true, length: "58%", width: 4, itemStyle: { color: "#f4f9ff", shadowBlur: 12, shadowColor: zoneColor(g) } },
+    anchor: { show: true, size: 12, itemStyle: { color: "#0b2648", borderColor: zoneColor(g), borderWidth: 3 } },
+    axisTick: { show: true, distance: -19, splitNumber: 5, lineStyle: { color: "rgba(232, 242, 255, 0.4)", width: 1 }, length: 4 },
+    splitLine: { show: true, distance: -21, length: 9, lineStyle: { color: "rgba(232, 242, 255, 0.55)", width: 1 } },
+    /* 刻度数字移到弧与刻度线之外：原先 distance:18 压在色带上，暗色小字几乎不可读 */
+    axisLabel: { show: true, distance: -22, color: "#a8c2e0", fontSize: 11, fontWeight: 700 },
+    /* 指针扫过圆心，读数不能放中心：移到底部弧口内（212° → -32° 在下方留了 116° 缺口） */
+    title: { show: true, offsetCenter: [0, "98%"], color: "#cfe2f8", fontSize: 12, fontWeight: 700 },
+    detail: { show: true, valueAnimation: true, offsetCenter: [0, "66%"], color: zoneColor(g), fontSize: 24, fontWeight: 700,
+      formatter: (v) => v.toFixed(1) + g.unit },
+    data: [{ value: value, name: g.name + " · " + zoneOf(g) }],
+    animationDuration: 1700, animationEasing: "cubicOut", z: 3
+  });
+  /* ★ 顺序不可颠倒：图例是 flex:none 且由 JS 生成，必须先于 echarts.init 落地。
+     先 init 会让画布锁定在图例尚未插入时量到的高度，本系列又不调 chart.resize()，
+     画布随即下溢盖住图例（本页实测溢出 70px）。 */
+  /* 分区图例走 DOM，避免 ECharts graphic 百分比定位在不同尺寸下漂移 */
+  const glBox = $("td-gauge-legend");
+  GAUGES.forEach((g) => {
+    const col = document.createElement("div");
+    col.className = "td-gl-col";
+    col.innerHTML = g.zones.map((z) =>
+      '<div class="td-gl-row' + (z.t === zoneOf(g) ? " is-on" : "") + '">' +
+        '<i style="background:' + z.c + '"></i>' + z.t + ' ' + z.r +
+      "</div>").join("");
+    glBox.appendChild(col);
+  });
+  const glNote = document.createElement("div");
+  glNote.className = "td-gl-note";
+  glNote.textContent = "流拍与底价成交同步走高 → 市场处于「" + zoneOf(GAUGES[0]) + "—" + zoneOf(GAUGES[1]) + "」区间";
+  glBox.appendChild(glNote);
+  const gaugeChart = makeChart("td-chart-gauge");
+  gaugeChart.setOption({
+    tooltip: tip({ formatter: (p) => p.name + "<br/><b>" + p.value.toFixed(1) + "%</b>" }),
+    series: GAUGES.map((g) => gaugeSeries(g, 0))
+  });
+  function playGauges() {
+    gaugeChart.setOption({ series: GAUGES.map((g) => ({ data: [{ value: 0, name: g.name + " · " + zoneOf(g) }] })) });
+    setTimeout(() => {
+      gaugeChart.setOption({ series: GAUGES.map((g) => ({ data: [{ value: g.val, name: g.name + " · " + zoneOf(g) }] })) });
+    }, 280);
+  }
+  playGauges();
+  setInterval(playGauges, 20000);
+
+  /* ===== 12. 右②：关键指标同比一览（DOM 卡片列表，全部红色劣化） ===== */
+  const CMP_ROWS = [
+    { name: "出让收入", scope: "亿元", cur: D.total, pre: D.pre, dec: 0, yoy: D.yoy, mode: "pct" },
+    { name: "成交面积", scope: "万㎡", cur: AREA_CUR, pre: AREA_PRE, dec: 0, yoy: D.areaYoy, mode: "pct" },
+    { name: "平均楼面价", scope: "元/㎡", cur: D.floorPrice, pre: D.floorPricePre, dec: 0, yoy: D.floorYoy, mode: "pct" },
+    { name: "平均溢价率", scope: "%", cur: PREMIUM_CUR, pre: PREMIUM_PRE, dec: 1, yoy: D.premiumGap, mode: "pt" },
+    { name: "流拍撤牌率", scope: "% · 逆向指标", cur: FAIL_CUR, pre: FAIL_PRE, dec: 1, yoy: D.failGap, mode: "pt", inverse: true }
+  ];
+  const cmpBox = $("td-cmp");
+  CMP_ROWS.forEach((r) => {
+    /* 逆向指标（流拍率）数值上升即劣化：箭头随数据方向，颜色统一告警红，并挂「逆向」标记 */
+    const worse = r.inverse ? r.yoy > 0 : r.yoy < 0;
+    const arrow = r.yoy < 0 ? "▼" : "▲";
+    const row = document.createElement("div");
+    row.className = "td-cmp-row";
+    row.innerHTML =
+      '<div class="td-cmp-name">' + r.name + '<em>' + r.scope + '</em></div>' +
+      '<div class="td-cmp-cur"><b>' + fmtDec(r.cur, r.dec) + '</b></div>' +
+      '<div class="td-cmp-pre"><b>' + fmtDec(r.pre, r.dec) + '</b></div>' +
+      '<div class="td-cmp-yoy">' +
+        (r.inverse ? '<span class="td-cmp-flag">逆向</span>' : '') +
+        '<u>' + arrow + '</u><b>' + signed(r.yoy, 1) + (r.mode === "pt" ? "pt" : "%") + '</b>' +
+      '</div>';
+    cmpBox.appendChild(row);
+    r.node = row;
+    r.worse = worse;
+  });
+  const cmpFoot = document.createElement("div");
+  cmpFoot.className = "td-cmp-foot";
+  cmpFoot.innerHTML = '<i></i>5 项指标全部劣化：量、价、热度三线同步下行，' +
+    '<b style="color:#ff8f99">' + CMP_ROWS.filter((r) => r.worse).length + ' / ' + CMP_ROWS.length + '</b> 项处于承压状态';
+  cmpBox.appendChild(cmpFoot);
+  let cmpIdx = -1;
+  setInterval(() => {
+    CMP_ROWS.forEach((r) => r.node.classList.remove("is-active"));
+    cmpIdx = (cmpIdx + 1) % CMP_ROWS.length;
+    CMP_ROWS[cmpIdx].node.classList.add("is-active");
+  }, 2600);
+
+  /* ===== 13. 底部跑马灯：土地出让形势研判（数字与上方图表同源现算） ===== */
+  const worstCity = CITIES.slice().sort((a, b) => a.yoy - b.yoy)[0];
+  const bestCity = CITIES.slice().sort((a, b) => b.yoy - a.yoy)[0];
+  const negCount = CITIES.filter((c) => c.yoy < 0).length;
+  const NEWS = [
+    "1-7 月全省国有土地使用权出让收入 <b>" + fmtDec(D.total) + " 亿元</b>，同比 <b class=\"is-bad\">" + signed(D.yoy) + "%</b>，上年同期为 " + fmtDec(D.pre) + " 亿元",
+    "累计降幅较上半年（" + signed(D.h1Yoy) + "%）" + (D.yoyDelta < 0 ? "扩大" : "收窄") + " <b class=\"is-bad\">" + fmtDec(Math.abs(D.yoyDelta), 2) + " 个百分点</b>，尚未出现企稳信号",
+    "成交面积 <b>" + fmtDec(AREA_CUR) + " 万㎡</b>（" + signed(D.areaYoy) + "%）、平均楼面价 <b>" + fmtDec(D.floorPrice) + " 元/㎡</b>（" + signed(D.floorYoy) + "%），量价双降",
+    "月度出让金全年 7 个月均低于 2024-2025 历史区间下沿，平均低 <b class=\"is-bad\">" + fmtDec(Math.abs(sum(belowBand) / belowBand.length), 1) + "%</b>",
+    "住宅用地 <b>" + fmtDec(LAND[0].val) + " 亿元</b>，占比 <b>" + D.resiShare.toFixed(1) + "%</b>，仍是主体来源，其降幅直接决定全省走势",
+    negCount + " 个设区市出让金<b class=\"is-bad\">全部负增长</b>，" + worstCity.name + " " + signed(worstCity.yoy) + "% 降幅居首，" + bestCity.name + " " + signed(bestCity.yoy) + "% 相对抗跌",
+    "流拍撤牌率 <b class=\"is-bad\">" + FAIL_CUR.toFixed(1) + "%</b>（较上年 " + signed(D.failGap, 1) + "pt）、底价成交占比 <b class=\"is-bad\">" + FLOOR_DEAL.toFixed(1) + "%</b>，土地市场热度显著回落",
+    "土地出让收入占政府性基金预算收入 <b class=\"is-bad\">" + D.dep.toFixed(1) + "%</b>，高于 " + DEP_THRESHOLD + "% 依赖阈值 " + fmtDec(D.depGap, 1) + " pct，需前瞻研判基金预算收支平衡",
+    "7 月当月 <b>" + fmtDec(M2026[6]) + " 亿元</b>，环比 " + signed(D.julMom) + "%、同比 <b class=\"is-bad\">" + signed(D.julYoy) + "%</b>，建议加强供地节奏与偿债资金统筹"
+  ];
+  const track = $("td-marquee-track");
+  const marqueeHTML = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  track.innerHTML = marqueeHTML + marqueeHTML;
+})();
+</script>
+<!-- carousel-js:begin -->
+<script>
+/* ===== 公共资金专题轮播导航（tools/inject_carousel.py 注入） =====
+   独立于主脚本运行：即使 echarts 加载失败，翻页仍然可用。 */
+(() => {
+  "use strict";
+
+  /* —— 可配置项 —— */
+  const SECONDS = 30;              /* ← 每页停留秒数，改这里再重跑 tools/inject_carousel.py */
+
+  /* 轮播页序 = 需求提出的 13 个专题原始顺序 */
+  const PAGES = [
+    {
+        "f": "大屏样板间-公共资金全国收入总览1920.html",
+        "t": "全国地方一般公共预算收入情况"
+    },
+    {
+        "f": "大屏样板间-公共资金分地区收入1920.html",
+        "t": "全国各地区地方一般公共预算收入情况"
+    },
+    {
+        "f": "大屏样板间-公共资金江苏地市收入1920.html",
+        "t": "全省各地市相关收入情况"
+    },
+    {
+        "f": "大屏样板间-公共资金收入分项目1920.html",
+        "t": "一般公共预算收入分项目情况"
+    },
+    {
+        "f": "大屏样板间-公共资金重点城市县区1920.html",
+        "t": "重点城市及县区相关收入"
+    },
+    {
+        "f": "大屏样板间-公共资金税收分行业1920.html",
+        "t": "全省税收分行业情况"
+    },
+    {
+        "f": "大屏样板间-公共资金新动能税收1920.html",
+        "t": "全省新动能企业税收情况"
+    },
+    {
+        "f": "大屏样板间-公共资金土地出让形势1920.html",
+        "t": "江苏省土地出让收入形势"
+    },
+    {
+        "f": "大屏样板间-公共资金国资社保预算1920.html",
+        "t": "江苏省国有资本经营预算收入及社保基金预算收入情况"
+    },
+    {
+        "f": "大屏样板间-公共资金现金管理1920.html",
+        "t": "公共资金现金管理开展情况"
+    },
+    {
+        "f": "大屏样板间-公共资金运行指数1920.html",
+        "t": "资金运行指数"
+    },
+    {
+        "f": "大屏样板间-公共资金政府债券发行1920.html",
+        "t": "地方政府债券发行情况"
+    },
+    {
+        "f": "大屏样板间-公共资金余额分析1920.html",
+        "t": "全省资金余额情况分析"
+    }
+];
+
+  const P = "td";
+  const $ = (id) => document.getElementById(id);
+  const nav = $(P + "-carousel");
+  if (!nav) return;
+
+  /* 当前页在序列中的位置：按文件名匹配，允许带 ?query */
+  const here = decodeURIComponent((location.pathname.split("/").pop() || "")).trim();
+  let idx = PAGES.findIndex((x) => x.f === here);
+  if (idx < 0) idx = 7;      /* 直接从本地打开且路径取不到文件名时的兜底位次 */
+
+  $(P + "-c-cur").textContent = String(idx + 1).padStart(2, "0");
+  nav.title = (idx + 1) + " / " + PAGES.length + "　" + PAGES[idx].t;
+
+  function go(step) {
+    const n = (idx + step + PAGES.length) % PAGES.length;
+    location.href = PAGES[n].f;
+  }
+
+  /* —— 倒计时：累计已用时长，暂停时冻结在原地（不清零），继续时接着走 —— */
+  const bar = $(P + "-c-bar");
+  const playBtn = $(P + "-c-play");
+  let elapsed = 0;               /* 本页已停留毫秒 */
+  let last = Date.now();
+  let userPaused = false;        /* 用户点了暂停 */
+  let hidden = false;            /* 标签页被切到后台 */
+
+  function render() {
+    const pct = Math.min(100, elapsed / (SECONDS * 1000) * 100);
+    bar.style.width = pct.toFixed(2) + "%";
+  }
+  function tick() {
+    const now = Date.now();
+    if (!userPaused && !hidden) {
+      elapsed += now - last;
+      render();
+      if (elapsed >= SECONDS * 1000) go(1);
+    }
+    last = now;
+  }
+  const timer = setInterval(tick, 100);
+
+  function setPaused(v) {
+    userPaused = v;
+    nav.classList.toggle("is-paused", v);
+    playBtn.setAttribute("aria-pressed", v ? "true" : "false");
+    playBtn.setAttribute("aria-label", v ? "继续轮播" : "暂停轮播");
+    last = Date.now();           /* 避免把暂停这段时间补算进 elapsed */
+  }
+
+  playBtn.addEventListener("click", () => setPaused(!userPaused));
+  $(P + "-c-prev").addEventListener("click", () => go(-1));
+  $(P + "-c-next").addEventListener("click", () => go(1));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") go(-1);
+    else if (e.key === "ArrowRight") go(1);
+    else if (e.key === " " || e.code === "Space") { e.preventDefault(); setPaused(!userPaused); }
+  });
+
+  /* 切到后台时冻结计时，回到前台接着走（不重置，也不会补跳好几页） */
+  document.addEventListener("visibilitychange", () => {
+    hidden = document.hidden;
+    last = Date.now();
+  });
+  window.addEventListener("pagehide", () => clearInterval(timer));
+})();
+</script>
+<!-- carousel-js:end -->
+<!-- drill-js:begin -->
+<script>
+/* ===== 下钻入口（tools/inject_drilldown.py 注入） =====
+   独立于父页主脚本：父页表格/卡片由 setInterval 轮播重绘，故用 MutationObserver 持续重新标记。 */
+(() => {
+  "use strict";
+  const P = "td";
+  /* 长名优先匹配，避免「制造业」把「电力热力燃气及水生产供应业」这类含子串的名字截胡 */
+  const TARGETS = [].map((t) => {
+    const match = t.match || t.names;
+    return Object.assign({}, t, {
+      order: match.map((m, i) => ({ m: m, n: t.names[i] })).sort((a, b) => b.m.length - a.m.length)
+    });
+  });
+  const CHARTS = [];
+  const PANELS = [{"panelTitle": "13 设区市出让金与同比", "label": "逐宗台账", "sub": "大屏样板间-公共资金土地成交台账1920.html"}];
+
+  function markOne(t) {
+    document.querySelectorAll(t.rows).forEach((el) => {
+      const txt = (el.textContent || "").replace(/\s+/g, "");
+      let hit = null;
+      for (let i = 0; i < t.order.length; i++) {
+        if (txt.indexOf(t.order[i].m) >= 0) { hit = t.order[i].n; break; }
+      }
+      if (!hit) return;
+      if (el.dataset.drill === hit && el.dataset.drillSub === t.sub) return;  /* 未变则跳过 */
+      el.dataset.drill = hit;
+      el.dataset.drillSub = t.sub;
+      el.classList.add(P + "-drill");
+      el.setAttribute("title", "点击查看「" + hit + "」二级详情");
+    });
+  }
+
+  /* 面板头提示 chip 也放进重扫循环里：父页有些 scope 是被 setInterval 重写 textContent 的，
+     一旦被冲掉，下一次 DOM 变动会把它补回来。 */
+  function chipOne(t) {
+    if (!t.scope || !t.hint) return;
+    const s = document.getElementById(t.scope);
+    if (!s || s.querySelector("." + P + "-drill-hint")) return;
+    const b = document.createElement("span");
+    b.className = P + "-drill-hint";
+    b.textContent = t.hint;
+    s.appendChild(b);
+  }
+
+  function scan() { TARGETS.forEach(markOne); TARGETS.forEach(chipOne); }
+
+  /* 事件委托：行会被父页轮播重绘，委托到 document 上最稳 */
+  document.addEventListener("click", (e) => {
+    const row = e.target.closest ? e.target.closest("." + P + "-drill") : null;
+    if (!row || !row.dataset.drill || !row.dataset.drillSub) return;
+    location.href = row.dataset.drillSub + "#" + encodeURIComponent(row.dataset.drill);
+  });
+
+  /* ECharts 画布下钻：treemap / 环形图的图形块不是 DOM，只能绑图表实例的 click。
+     取 params.name 或 params.data.name 去对象名列表里反查，命中即跳子页。 */
+  CHARTS.forEach((c) => {
+    if (!window.echarts) return;
+    /* 与行级下钻一样支持 match：图上标签常是简称（桑基「国有资源有偿使用」），
+       而子页 hash 要全称（「国有资源（资产）有偿使用收入」），两者需分开。 */
+    const cm = c.match || c.names;
+    const pairs = cm.map((m, i) => ({ m: m, n: c.names[i] })).sort((a, b) => b.m.length - a.m.length);
+    const bind = () => {
+      const el = document.getElementById(c.chartId);
+      const inst = el && echarts.getInstanceByDom(el);
+      if (!inst) return false;
+      if (inst.__drillBound) return true;
+      inst.__drillBound = true;
+      el.style.cursor = "pointer";
+      inst.on("click", (pm) => {
+        /* 取名顺序：seriesName 优先于 name。小多图/折线的 params.name 是 x 轴类目
+           （"1".."7" 这种月份），只有 seriesName 才是税种名；treemap / 环形图则相反，
+           name 才是分块名而 seriesName 是整个系列名。故按配置 by 决定先取哪个。 */
+        const bySeries = c.by === "seriesName";
+        const raw = (pm && (bySeries
+          ? (pm.seriesName || pm.name)
+          : (pm.name || (pm.data && pm.data.name) || pm.seriesName))) || "";
+        if (!raw) return;
+        /* ★ 精确命中优先：行级下钻是拿整行文本去找子串，长名优先才对；但画布点击拿到的
+           就是节点名本身，此时长名优先反而有害——「增值税」是「土地增值税」的子串，
+           点增值税会被截胡跳到土地增值税去（实测 21 个节点里就这一个会错）。 */
+        const hit = pairs.filter((p) => p.m === raw)[0]
+          || pairs.filter((p) => raw.indexOf(p.m) >= 0 || p.m.indexOf(raw) >= 0)[0];
+        if (hit) location.href = c.sub + "#" + encodeURIComponent(hit.n);
+      });
+      return true;
+    };
+    /* 图表可能晚于本脚本 init，轮询几次直到拿到实例 */
+    if (!bind()) {
+      let tries = 0;
+      const iv = setInterval(() => { if (bind() || ++tries > 40) clearInterval(iv); }, 150);
+    }
+  });
+
+  /* 面板级入口：按面板标题文本定位面板头，挂一枚可点 chip（不必改父页标记） */
+  PANELS.forEach((pn) => {
+    const head = Array.prototype.slice.call(document.querySelectorAll("." + P + "-panel-head"))
+      .filter((h) => { const t = h.querySelector("h2"); return t && t.textContent.trim() === pn.panelTitle; })[0];
+    if (!head || head.querySelector("." + P + "-drill-entry")) return;
+    const b = document.createElement("span");
+    b.className = P + "-drill-entry";
+    b.textContent = pn.label + " ↗";
+    b.setAttribute("title", "查看" + pn.label + "（全量明细）");
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); location.href = pn.sub; });
+    head.appendChild(b);
+  });
+
+  if (TARGETS.length) {
+    scan();
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+<!-- drill-js:end -->
+</body>
+</html>

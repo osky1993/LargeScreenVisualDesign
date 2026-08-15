@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 存款结构分析</title>
+<style>
+  :root {
+    --dp-bg: #0a1e3c;
+    --dp-panel: rgba(13, 34, 64, 0.72);
+    --dp-border: rgba(86, 150, 224, 0.28);
+    --dp-text: #e6f1ff;
+    --dp-muted: #8fa7c8;
+    --dp-gold: #f5c34b;
+    --dp-gold-soft: #ffdf9e;
+    --dp-gold-deep: #b8860f;
+    --dp-cyan: #3fe1ff;
+    --dp-blue: #4b7dff;
+    --dp-green: #38e6b0;
+    --dp-red: #ff6680;
+    --dp-violet: #c9b3ff;
+    --dp-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #04101f; }
+  body {
+    color: var(--dp-text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .dp-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(245, 195, 75, 0.12), transparent 42%),
+      radial-gradient(circle at 90% 8%, rgba(63, 225, 255, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 120%, rgba(158, 112, 32, 0.22), transparent 58%),
+      linear-gradient(rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(86, 150, 224, 0.055) 1px, transparent 1px),
+      var(--dp-bg);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1080px 1fr;
+    grid-template-rows: 84px 1fr 54px;
+    gap: 18px;
+    padding: 12px 18px 16px;
+  }
+
+  .dp-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .dp-error.is-visible { display: block; }
+
+  /* ===== 顶栏：面包屑 + 渐变标题 + 徽章 + 口径 tabs + 时钟 ===== */
+  .dp-header {
+    grid-column: 1 / -1;
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 0 10px;
+  }
+  .dp-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(245, 195, 75, 0.62) 16%, rgba(63, 225, 255, 0.8) 50%, rgba(245, 195, 75, 0.62) 84%, transparent);
+    box-shadow: 0 0 14px rgba(245, 195, 75, 0.42);
+  }
+  .dp-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .dp-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--dp-muted); }
+  .dp-crumb b { font-weight: 400; color: #6fb9e8; }
+  .dp-crumb i { font-style: normal; color: rgba(143, 167, 200, 0.55); }
+  .dp-crumb em { font-style: normal; color: #d7e8ff; }
+  .dp-head-title-row { display: flex; align-items: center; gap: 16px; white-space: nowrap; }
+  .dp-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, var(--dp-gold-soft) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(245, 195, 75, 0.35));
+  }
+  .dp-head-chip {
+    flex: none; display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 12px; border-radius: 999px; font-size: 12px; letter-spacing: 0.12em;
+    color: var(--dp-gold-soft); border: 1px solid rgba(245, 195, 75, 0.5);
+    background: rgba(120, 88, 18, 0.28);
+    box-shadow: inset 0 0 10px rgba(245, 195, 75, 0.12);
+  }
+  .dp-head-chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--dp-gold); box-shadow: 0 0 8px var(--dp-gold); animation: dpDot 1.6s ease-in-out infinite; }
+  .dp-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--dp-muted); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dp-head-meta b { font-weight: 400; color: var(--dp-gold-soft); }
+  .dp-head-meta i { font-style: normal; color: rgba(143, 167, 200, 0.4); }
+
+  .dp-head-right { display: flex; align-items: center; gap: 24px; flex: none; }
+  .dp-tabs { display: flex; align-items: stretch; gap: 8px; }
+  .dp-tab {
+    display: flex; align-items: center; justify-content: center;
+    min-width: 92px; padding: 9px 18px; border-radius: 9px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(86, 150, 224, 0.4); background: rgba(20, 48, 88, 0.55);
+    color: #cfe6ff; font-size: 14px; letter-spacing: 0.14em;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s, background 0.2s;
+  }
+  .dp-tab:hover { color: #fff; border-color: rgba(245, 195, 75, 0.7); }
+  .dp-tab.is-active {
+    color: #1b1403; font-weight: 700;
+    background: linear-gradient(160deg, var(--dp-gold-soft), var(--dp-gold) 70%);
+    border-color: rgba(245, 195, 75, 0.9);
+    box-shadow: 0 0 16px rgba(245, 195, 75, 0.45), inset 0 0 8px rgba(255, 255, 255, 0.25);
+  }
+  .dp-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 24px; border-left: 1px solid rgba(86, 150, 224, 0.25); }
+  .dp-clock-time { font: 700 26px/1 var(--dp-mono); color: #f2f9ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(245, 195, 75, 0.4); }
+  .dp-clock-date { font-size: 12px; color: var(--dp-muted); letter-spacing: 0.08em; }
+
+  /* ===== 面板通用 ===== */
+  .dp-panel {
+    position: relative; min-height: 0; overflow: hidden;
+    border: 1px solid var(--dp-border); border-radius: 12px; background: var(--dp-panel);
+    display: flex; flex-direction: column;
+  }
+  .dp-panel-head {
+    position: relative; flex: none;
+    display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 30px 0 14px;
+    background: linear-gradient(90deg, rgba(245, 195, 75, 0.22), rgba(63, 225, 255, 0.05) 62%, transparent);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  }
+  .dp-panel-head i { flex: none; width: 5px; height: 16px; background: var(--dp-gold); box-shadow: 0 0 8px var(--dp-gold); transform: skewX(-12deg); }
+  .dp-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; color: #f0f8ff; white-space: nowrap; }
+  .dp-panel-head .dp-panel-en { font-size: 10px; letter-spacing: 0.2em; color: #5f88b8; align-self: flex-end; padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dp-panel-head .dp-panel-scope { margin-left: auto; font-size: 12px; color: var(--dp-gold-soft); white-space: nowrap; padding-right: 2px; font-variant-numeric: tabular-nums; }
+  .dp-chart { flex: 1; min-height: 0; }
+
+  /* ===== 左：存款产品明细大表（CSS grid 模拟表格） ===== */
+  .dp-table { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 6px 12px 10px; }
+  .dp-thead, .dp-row {
+    display: grid;
+    grid-template-columns: 1.55fr 78px 118px 108px 92px 168px 104px;
+    align-items: center; column-gap: 10px;
+  }
+  .dp-thead {
+    flex: none; padding: 7px 12px;
+    font-size: 12px; letter-spacing: 0.1em; color: #6fa0d0;
+    border-bottom: 1px solid rgba(86, 150, 224, 0.3);
+  }
+  .dp-thead span.is-num, .dp-cell-num { text-align: right; }
+  .dp-tbody { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+  .dp-row {
+    flex: 1; min-height: 0; padding: 0 12px;
+    font-size: 14px; color: #d8e8fb; font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(86, 150, 224, 0.1);
+    transition: background 0.35s, box-shadow 0.35s;
+  }
+  .dp-row:nth-child(odd) { background: rgba(24, 56, 100, 0.22); }
+  .dp-row:last-child { border-bottom: none; }
+  .dp-row.is-scan {
+    background: linear-gradient(90deg, rgba(245, 195, 75, 0.16), rgba(245, 195, 75, 0.04) 70%, transparent);
+    box-shadow: inset 3px 0 0 var(--dp-gold), 0 0 14px rgba(245, 195, 75, 0.12);
+  }
+  .dp-cell-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .dp-cell-name b { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dp-cell-name i { flex: none; font-style: normal; font-size: 10px; color: #5f88b8; letter-spacing: 0.06em; }
+  .dp-cell-bal { font: 700 15px/1.2 var(--dp-mono); color: #f4faff; letter-spacing: 0.02em; }
+  .dp-cell-delta { font-size: 13px; }
+  .dp-cell-delta.is-up { color: var(--dp-green); }
+  .dp-cell-delta.is-down { color: var(--dp-red); }
+  .dp-cell-rate { color: #bcd4ef; }
+
+  .dp-share { display: flex; align-items: center; gap: 8px; }
+  .dp-share-bar { flex: 1; height: 7px; border-radius: 4px; background: rgba(63, 120, 200, 0.16); overflow: hidden; }
+  .dp-share-bar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, rgba(184, 134, 15, 0.9), var(--dp-gold-soft)); box-shadow: 0 0 8px rgba(245, 195, 75, 0.4); }
+  .dp-share-num { flex: none; width: 52px; text-align: right; font-size: 12.5px; color: var(--dp-gold-soft); }
+
+  .dp-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 2px 9px; border-radius: 999px; font-size: 12px; letter-spacing: 0.06em; white-space: nowrap;
+  }
+  .dp-badge.is-corp { color: var(--dp-cyan); border: 1px solid rgba(63, 225, 255, 0.45); background: rgba(21, 74, 110, 0.35); }
+  .dp-badge.is-retail { color: var(--dp-violet); border: 1px solid rgba(201, 179, 255, 0.45); background: rgba(74, 52, 158, 0.3); }
+  .dp-badge.is-grow { color: var(--dp-green); border: 1px solid rgba(56, 230, 176, 0.45); background: rgba(16, 84, 66, 0.35); }
+  .dp-badge.is-flat { color: var(--dp-gold-soft); border: 1px solid rgba(245, 195, 75, 0.45); background: rgba(120, 88, 18, 0.28); }
+  .dp-badge.is-warn { color: var(--dp-red); border: 1px solid rgba(255, 102, 128, 0.5); background: rgba(96, 26, 38, 0.4); }
+
+  /* ===== 右列：上 donut / 下 玫瑰图 ===== */
+  .dp-right { display: grid; grid-template-rows: 600px 1fr; gap: 18px; min-height: 0; }
+  .dp-donut-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .dp-donut-center {
+    position: absolute; left: 50%; top: 51%; transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    pointer-events: none; z-index: 3;
+  }
+  .dp-donut-cap { font-size: 12px; letter-spacing: 0.18em; color: var(--dp-muted); }
+  .dp-flip { display: flex; align-items: baseline; gap: 2px; font-variant-numeric: tabular-nums; perspective: 300px; }
+  .dp-flip-d {
+    display: inline-block; min-width: 0.62em; text-align: center;
+    font: 700 34px/1.15 var(--dp-mono); color: var(--dp-gold-soft);
+    text-shadow: 0 0 16px rgba(245, 195, 75, 0.55);
+  }
+  .dp-flip-d.is-sep { min-width: 0.3em; color: rgba(255, 223, 158, 0.6); }
+  .dp-flip-d.is-flip { animation: dpFlip 0.55s ease; }
+  @keyframes dpFlip { 0% { transform: rotateX(90deg); opacity: 0; } 100% { transform: rotateX(0deg); opacity: 1; } }
+  .dp-flip-unit { font-size: 13px; color: #c8ab6a; margin-left: 3px; }
+  .dp-donut-sub { font-size: 11.5px; letter-spacing: 0.08em; color: #6fa0d0; font-variant-numeric: tabular-nums; }
+
+  /* ===== 底部跑马灯 ===== */
+  .dp-marquee {
+    grid-column: 1 / -1; display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--dp-border); border-radius: 12px; background: var(--dp-panel);
+  }
+  .dp-marquee-tag {
+    flex: none; display: flex; align-items: center; gap: 9px; padding: 0 22px 0 18px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #211602;
+    background: linear-gradient(120deg, var(--dp-gold-soft), var(--dp-gold) 55%, #d99b1d 95%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  }
+  .dp-marquee-tag i { width: 8px; height: 8px; border-radius: 50%; background: #211602; animation: dpDot 1.6s ease-in-out infinite; }
+  @keyframes dpDot { 50% { opacity: 0.3; } }
+  .dp-marquee-view { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+  .dp-marquee-track {
+    display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+    animation: dpMarquee 46s linear infinite;
+    font-size: 15px; letter-spacing: 0.06em; color: #dceaff;
+  }
+  .dp-marquee-track b { color: var(--dp-gold-soft); font-weight: 700; }
+  .dp-marquee-track em { font-style: normal; margin: 0 26px; color: rgba(245, 195, 75, 0.55); }
+  @keyframes dpMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .dp-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="dp-stage" id="dp-stage">
+    <!-- mockflag:begin --><div class="dp-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="dp-error" id="dp-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="dp-header">
+      <div class="dp-head-left">
+        <div class="dp-crumb"><b>负债管理</b><i>›</i><em>存款结构</em></div>
+        <div class="dp-head-title-row">
+          <div class="dp-head-title">存款结构分析</div>
+          <span class="dp-head-chip"><i></i>T+1 日终口径</span>
+          <div class="dp-head-meta">
+            <span>存款总余额 <b id="dp-meta-total">--</b> 亿元</span><i>|</i>
+            <span>加权付息率 <b id="dp-meta-rate">--</b>%</span><i>|</i>
+            <span>产品数 <b id="dp-meta-count">--</b> 项</span>
+          </div>
+        </div>
+      </div>
+      <div class="dp-head-right">
+        <div class="dp-tabs" id="dp-tabs" aria-label="口径切换">
+          <button class="dp-tab is-active" data-scope="all" type="button">全行</button>
+          <button class="dp-tab" data-scope="corp" type="button">对公</button>
+          <button class="dp-tab" data-scope="retail" type="button">零售</button>
+        </div>
+        <div class="dp-clock" aria-label="实时时钟">
+          <span class="dp-clock-time" id="dp-clock-time">--:--:--</span>
+          <span class="dp-clock-date" id="dp-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 左：存款产品明细大表 -->
+    <section class="dp-panel">
+      <header class="dp-panel-head"><i></i><h2>存款产品明细</h2><span class="dp-panel-en">DEPOSIT PRODUCT DETAIL</span><span class="dp-panel-scope" id="dp-table-scope">口径：全行 · 单位：亿元</span></header>
+      <div class="dp-table">
+        <div class="dp-thead">
+          <span>产品名称</span><span>客群</span><span class="is-num">余额(亿)</span><span class="is-num">较年初</span><span class="is-num">付息率%</span><span>占总盘%</span><span>状态</span>
+        </div>
+        <ul class="dp-tbody" id="dp-tbody" aria-label="存款产品明细表"></ul>
+      </div>
+    </section>
+
+    <!-- 右：donut + 玫瑰图 -->
+    <div class="dp-right">
+      <section class="dp-panel">
+        <header class="dp-panel-head"><i></i><h2>存款结构占比</h2><span class="dp-panel-en">DEPOSIT MIX</span><span class="dp-panel-scope" id="dp-donut-scope">全行 · 6 大类</span></header>
+        <div class="dp-donut-wrap">
+          <div class="dp-chart" id="dp-chart-donut" role="img" aria-label="存款结构占比环形图"></div>
+          <div class="dp-donut-center" aria-label="存款总余额翻牌器">
+            <span class="dp-donut-cap" id="dp-flip-cap">全行总余额</span>
+            <span class="dp-flip" id="dp-flip"><span class="dp-flip-unit">亿元</span></span>
+            <span class="dp-donut-sub" id="dp-flip-sub">较年初 ▲ +754 亿</span>
+          </div>
+        </div>
+      </section>
+      <section class="dp-panel">
+        <header class="dp-panel-head"><i></i><h2>期限结构</h2><span class="dp-panel-en">MATURITY STRUCTURE</span><span class="dp-panel-scope" id="dp-rose-scope">全行 · 单位：亿元</span></header>
+        <div class="dp-chart" id="dp-chart-rose" role="img" aria-label="存款期限结构玫瑰图"></div>
+      </section>
+    </div>
+
+    <!-- 底部跑马灯 -->
+    <section class="dp-marquee" aria-label="存款业务播报">
+      <div class="dp-marquee-tag"><i></i>存款播报</div>
+      <div class="dp-marquee-view"><div class="dp-marquee-track" id="dp-marquee-track"></div></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("dp-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("dp-error");
+  if (!window.echarts) {
+    errorNode.classList.add("is-visible");
+    return;
+  }
+
+  const $ = (id) => document.getElementById(id);
+  /* CSS 变量镜像：供 ECharts option 使用（与 :root 保持一致） */
+  const C = {
+    text: "#e6f1ff", muted: "#8fa7c8",
+    gold: "#f5c34b", goldSoft: "#ffdf9e", goldDeep: "#b8860f",
+    cyan: "#3fe1ff", blue: "#4b7dff", green: "#38e6b0",
+    red: "#ff6680", violet: "#c9b3ff"
+  };
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fmtDec = (n, dec) => {
+    const parts = n.toFixed(dec).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  };
+
+  /* ===== 3. 数据（全内联，勾稽自洽） =====
+   * 类别映射（donut 6 大类 = 明细行按 cat 小计）：
+   *   对公活期 = 单位活期存款 3650 + 协定存款 1200                       = 4850
+   *   对公定期 = 单位定期存款 2980 + 协议存款 1460 + 单位通知存款 880     = 5320
+   *   储蓄活期 = 活期储蓄存款 1850 + 薪资代发活期 330                    = 2180
+   *   储蓄定期 = 定期储蓄存款 3240 + 智能通知存款 520 + 专项储蓄 700     = 4460
+   *   结构性存款 = 对公结构性 720 + 个人结构性 400                       = 1120
+   *   大额存单   = 对公大额存单 260 + 个人大额存单 460                   = 720
+   * 全行合计 4850+5320+2180+4460+1120+720 = 18650 亿
+   * 对公子集合计 11150 + 零售子集合计 7500 = 18650（tab 切换勾稽）
+   */
+  const ROWS = [
+    /* —— 对公 7 行，小计 11150 —— */
+    { name: "单位活期存款",     tag: "对公", scope: "corp",   cat: "对公活期",   bal: 3650, delta: +128, rate: 0.85, st: "grow" },
+    { name: "协定存款",         tag: "对公", scope: "corp",   cat: "对公活期",   bal: 1200, delta: +36,  rate: 1.15, st: "flat" },
+    { name: "单位定期存款",     tag: "对公", scope: "corp",   cat: "对公定期",   bal: 2980, delta: +214, rate: 2.60, st: "grow" },
+    { name: "协议存款",         tag: "对公", scope: "corp",   cat: "对公定期",   bal: 1460, delta: -58,  rate: 2.95, st: "warn" },
+    { name: "单位通知存款",     tag: "对公", scope: "corp",   cat: "对公定期",   bal: 880,  delta: +22,  rate: 1.62, st: "flat" },
+    { name: "对公结构性存款",   tag: "对公", scope: "corp",   cat: "结构性存款", bal: 720,  delta: -46,  rate: 3.10, st: "warn" },
+    { name: "对公大额存单",     tag: "对公", scope: "corp",   cat: "大额存单",   bal: 260,  delta: +18,  rate: 2.90, st: "flat" },
+    /* —— 零售 7 行，小计 7500 —— */
+    { name: "活期储蓄存款",     tag: "零售", scope: "retail", cat: "储蓄活期",   bal: 1850, delta: +64,  rate: 0.25, st: "grow" },
+    { name: "薪资代发活期",     tag: "零售", scope: "retail", cat: "储蓄活期",   bal: 330,  delta: +12,  rate: 0.30, st: "flat" },
+    { name: "定期储蓄存款",     tag: "零售", scope: "retail", cat: "储蓄定期",   bal: 3240, delta: +286, rate: 1.95, st: "grow" },
+    { name: "智能通知存款",     tag: "零售", scope: "retail", cat: "储蓄定期",   bal: 520,  delta: +9,   rate: 1.35, st: "flat" },
+    { name: "教育养老专项储蓄", tag: "零售", scope: "retail", cat: "储蓄定期",   bal: 700,  delta: +52,  rate: 2.10, st: "grow" },
+    { name: "个人结构性存款",   tag: "零售", scope: "retail", cat: "结构性存款", bal: 400,  delta: -24,  rate: 2.85, st: "warn" },
+    { name: "个人大额存单",     tag: "零售", scope: "retail", cat: "大额存单",   bal: 460,  delta: +41,  rate: 2.65, st: "grow" }
+  ];
+  const TOTAL_ALL = ROWS.reduce((s, r) => s + r.bal, 0); /* = 18650，占比分母 */
+
+  const CAT_ORDER = ["对公活期", "对公定期", "储蓄活期", "储蓄定期", "结构性存款", "大额存单"];
+  const CAT_COLORS = {
+    "对公活期": C.gold, "对公定期": "#e09a2f",
+    "储蓄活期": C.cyan, "储蓄定期": C.blue,
+    "结构性存款": C.green, "大额存单": C.violet
+  };
+
+  /* 期限结构（单位：亿）。各口径 6 项之和 = 该口径存款总额；
+   * 且 对公 + 零售 逐期限相加 = 全行（如 1年期 1980+1500=3480）。
+   * 活期 = 对公活期/储蓄活期小计；定期各期限为定期+结构性+大额存单的期限摆布。 */
+  const TERMS = ["活期", "3个月", "6个月", "1年", "2年", "3年以上"];
+  const TERM_DATA = {
+    all:    [7030, 1860, 2240, 3480, 2320, 1720], /* 合计 18650 */
+    corp:   [4850, 1180, 1420, 1980, 1120, 600],  /* 合计 11150 */
+    retail: [2180, 680, 820, 1500, 1200, 1120]    /* 合计 7500 */
+  };
+
+  const SCOPE_META = {
+    all:    { label: "全行", crumbNote: "全行" },
+    corp:   { label: "对公", crumbNote: "对公条线" },
+    retail: { label: "零售", crumbNote: "零售条线" }
+  };
+
+  const NEWS = [
+    "全行存款总余额 <b>18,650 亿元</b>，较年初净增 <b>754 亿</b>，完成年度目标 62.8%",
+    "零售定期储蓄较年初 <b>+286 亿</b>，为增量贡献最大单品",
+    "协议存款、结构性存款合计流出 <b>128 亿</b>，高付息产品压降按计划推进",
+    "加权付息率 <b>1.87%</b>，环比下降 3BP，负债成本管控持续见效",
+    "薪资代发活期沉淀 <b>330 亿</b>，代发拓户带动低成本存款稳步提升",
+    "个人大额存单本月发行 <b>3 期</b> 均售罄，1 年期占比升至 43%"
+  ];
+
+  /* 勾稽自检（控制台断言，不影响展示） */
+  console.assert(TOTAL_ALL === 18650, "明细行余额合计应为 18650");
+  Object.keys(TERM_DATA).forEach((k) => {
+    const sub = k === "all" ? ROWS : ROWS.filter((r) => r.scope === k);
+    const bal = sub.reduce((s, r) => s + r.bal, 0);
+    const term = TERM_DATA[k].reduce((s, v) => s + v, 0);
+    console.assert(bal === term, "口径 " + k + " 期限结构合计应等于明细合计", bal, term);
+  });
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("dp-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("dp-clock-date").textContent =
+      d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 5. ECharts 公共构件 ===== */
+  const tip = (extra) => Object.assign({
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(9, 24, 48, 0.92)",
+    borderColor: "rgba(245, 195, 75, 0.45)",
+    textStyle: { color: "#dcedff", fontSize: 12 }
+  }, extra || {});
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+  const vGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: from }, { offset: 1, color: to }
+  ]);
+
+  /* ===== 6. 左表：按口径渲染明细行（占比 = 余额 / 18650 现算） ===== */
+  const ST_TEXT = { grow: "增长", flat: "平稳", warn: "流失预警" };
+  let scanRows = [];
+  let scanIdx = -1;
+  function renderTable(scope) {
+    const rows = scope === "all" ? ROWS : ROWS.filter((r) => r.scope === scope);
+    const maxShare = Math.max.apply(null, rows.map((r) => r.bal / TOTAL_ALL * 100));
+    const box = $("dp-tbody");
+    box.innerHTML = "";
+    rows.forEach((r) => {
+      const share = r.bal / TOTAL_ALL * 100; /* 占全行总盘 18650 的比重，JS 现算 */
+      const up = r.delta >= 0;
+      const li = document.createElement("li");
+      li.className = "dp-row";
+      li.innerHTML =
+        '<span class="dp-cell-name"><b>' + r.name + '</b><i>' + r.cat + '</i></span>' +
+        '<span><span class="dp-badge ' + (r.scope === "corp" ? "is-corp" : "is-retail") + '">' + r.tag + '</span></span>' +
+        '<span class="dp-cell-num dp-cell-bal">' + fmt(r.bal) + '</span>' +
+        '<span class="dp-cell-num dp-cell-delta ' + (up ? "is-up" : "is-down") + '">' + (up ? "▲ +" : "▼ -") + Math.abs(r.delta) + '</span>' +
+        '<span class="dp-cell-num dp-cell-rate">' + r.rate.toFixed(2) + '</span>' +
+        '<span class="dp-share"><span class="dp-share-bar"><i style="width:' + (share / maxShare * 100).toFixed(1) + '%"></i></span><span class="dp-share-num">' + share.toFixed(1) + '%</span></span>' +
+        '<span><span class="dp-badge is-' + r.st + '">' + ST_TEXT[r.st] + '</span></span>';
+      box.appendChild(li);
+    });
+    scanRows = Array.from(box.children);
+    scanIdx = -1;
+    $("dp-table-scope").textContent = "口径：" + SCOPE_META[scope].label + " · 单位：亿元 · " + rows.length + " 产品";
+    return rows;
+  }
+  /* 行扫描高亮轮播 */
+  setInterval(() => {
+    if (!scanRows.length) return;
+    if (scanIdx >= 0 && scanRows[scanIdx]) scanRows[scanIdx].classList.remove("is-scan");
+    scanIdx = (scanIdx + 1) % scanRows.length;
+    scanRows[scanIdx].classList.add("is-scan");
+  }, 3200);
+
+  /* ===== 7. 中心翻牌器（数字变化位翻转） ===== */
+  const flipBox = $("dp-flip");
+  let flipPrev = [];
+  function setFlip(total) {
+    const chars = fmt(total).split("");
+    const spans = chars.map((ch, i) => {
+      const flip = flipPrev[i] !== ch;
+      return '<span class="dp-flip-d' + (ch === "," ? " is-sep" : "") + (flip ? " is-flip" : "") + '">' + ch + "</span>";
+    });
+    flipBox.innerHTML = spans.join("") + '<span class="dp-flip-unit">亿元</span>';
+    flipPrev = chars;
+  }
+
+  /* ===== 8. 右上：存款结构占比 donut ===== */
+  const donutChart = echarts.init($("dp-chart-donut"));
+  let donutLen = 0;
+  function donutData(scope) {
+    /* donut 分片 = 明细行按类别小计（scope 过滤后），映射见数据区注释 */
+    const rows = scope === "all" ? ROWS : ROWS.filter((r) => r.scope === scope);
+    const sums = {};
+    rows.forEach((r) => { sums[r.cat] = (sums[r.cat] || 0) + r.bal; });
+    return CAT_ORDER.filter((c) => sums[c]).map((c) => ({
+      name: c, value: sums[c],
+      itemStyle: { color: CAT_COLORS[c] }
+    }));
+  }
+  function donutOption(scope) {
+    const data = donutData(scope);
+    donutLen = data.length;
+    const total = data.reduce((s, d) => s + d.value, 0);
+    return {
+      tooltip: tip({
+        formatter: (o) => o.marker + " " + o.name + "<br/>余额 <b style=\"color:#ffdf9e\">" + fmt(o.value) +
+          "</b> 亿元 · 占比 <b style=\"color:#ffdf9e\">" + (o.value / total * 100).toFixed(1) + "%</b>"
+      }),
+      legend: {
+        bottom: 8, left: "center", itemWidth: 10, itemHeight: 10, itemGap: 16,
+        textStyle: { color: "#cfe6ff", fontSize: 12 }
+      },
+      series: [{
+        name: "存款结构", type: "pie",
+        radius: ["46%", "66%"], center: ["50%", "51%"],
+        itemStyle: { borderColor: "#0a1e3c", borderWidth: 2 },
+        label: { color: "#cfe6ff", fontSize: 12, formatter: (o) => o.name + "\n" + fmt(o.value) + " 亿 · " + o.percent.toFixed(1) + "%" },
+        labelLine: { length: 12, length2: 10, lineStyle: { color: "rgba(102, 178, 255, 0.4)" } },
+        emphasis: {
+          scale: true, scaleSize: 7,
+          itemStyle: { shadowColor: "rgba(245, 195, 75, 0.55)", shadowBlur: 18 },
+          label: { fontSize: 13, fontWeight: 700, color: "#fff4da" }
+        },
+        data
+      }, {
+        /* 外圈金色细描边装饰 */
+        type: "pie", radius: ["72%", "72.6%"], center: ["50%", "51%"], silent: true,
+        label: { show: false }, itemStyle: { color: "rgba(245, 195, 75, 0.28)" }, data: [1]
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+  /* 扇区轮流高亮 + 气泡 */
+  let donutIdx = -1;
+  setInterval(() => {
+    if (!donutLen) return;
+    donutChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    donutIdx = (donutIdx + 1) % donutLen;
+    donutChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: donutIdx });
+    donutChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: donutIdx });
+  }, 2500);
+
+  /* ===== 9. 右下：期限结构玫瑰图 ===== */
+  const roseChart = echarts.init($("dp-chart-rose"));
+  const ROSE_COLORS = [C.goldSoft, C.gold, "#e09a2f", C.cyan, C.blue, C.violet];
+  function roseOption(scope) {
+    const vals = TERM_DATA[scope];
+    const total = vals.reduce((s, v) => s + v, 0);
+    return {
+      tooltip: tip({
+        formatter: (o) => o.marker + " " + o.name + "<br/>余额 <b style=\"color:#ffdf9e\">" + fmt(o.value) +
+          "</b> 亿元 · 占比 <b style=\"color:#ffdf9e\">" + (o.value / total * 100).toFixed(1) + "%</b>"
+      }),
+      series: [{
+        name: "期限结构", type: "pie", roseType: "area",
+        radius: ["18%", "78%"], center: ["50%", "52%"],
+        itemStyle: {
+          borderColor: "#0a1e3c", borderWidth: 2, borderRadius: 5
+        },
+        color: ROSE_COLORS.map((c, i) => vGrad(c, "rgba(10, 30, 60, 0.55)")),
+        label: { color: "#d8e8fb", fontSize: 11.5, formatter: (o) => o.name + " " + fmt(o.value) },
+        labelLine: { length: 8, length2: 8, lineStyle: { color: "rgba(102, 178, 255, 0.4)" } },
+        emphasis: { label: { fontWeight: 700, color: "#fff4da" } },
+        data: TERMS.map((t, i) => ({ name: t, value: vals[i] }))
+      }],
+      animationDurationUpdate: 600
+    };
+  }
+
+  /* ===== 10. 口径切换：tabs → 表格 + donut + 玫瑰图 + 页头指标整体重刷 ===== */
+  function applyScope(scope) {
+    const rows = renderTable(scope);
+    const total = rows.reduce((s, r) => s + r.bal, 0);
+    const delta = rows.reduce((s, r) => s + r.delta, 0);
+    const wRate = rows.reduce((s, r) => s + r.bal * r.rate, 0) / total; /* 加权付息率 */
+    /* 页头指标 */
+    $("dp-meta-total").textContent = fmt(total);
+    $("dp-meta-rate").textContent = wRate.toFixed(2);
+    $("dp-meta-count").textContent = rows.length;
+    /* donut：分片重算 + 中心翻牌器 */
+    donutIdx = -1;
+    donutChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    donutChart.setOption(donutOption(scope));
+    $("dp-donut-scope").textContent = SCOPE_META[scope].label + " · " + donutLen + " 大类";
+    $("dp-flip-cap").textContent = SCOPE_META[scope].label + "总余额";
+    setFlip(total);
+    $("dp-flip-sub").textContent = "较年初 " + (delta >= 0 ? "▲ +" : "▼ -") + fmt(Math.abs(delta)) + " 亿";
+    /* 玫瑰图 */
+    roseChart.setOption(roseOption(scope));
+    $("dp-rose-scope").textContent = SCOPE_META[scope].label + " · 单位：亿元";
+  }
+  const tabsBox = $("dp-tabs");
+  tabsBox.addEventListener("click", (e) => {
+    const btn = e.target.closest(".dp-tab");
+    if (!btn) return;
+    tabsBox.querySelectorAll(".dp-tab").forEach((b) => b.classList.toggle("is-active", b === btn));
+    applyScope(btn.dataset.scope);
+  });
+
+  /* ===== 11. 底部跑马灯（内容 ×2 无缝循环） ===== */
+  const marqueeHtml = NEWS.map((n) => "<span>" + n + "</span><em>◆</em>").join("");
+  $("dp-marquee-track").innerHTML = marqueeHtml + marqueeHtml;
+
+  /* ===== 12. 首屏渲染 ===== */
+  applyScope("all");
+})();
+</script>
+</body>
+</html>
