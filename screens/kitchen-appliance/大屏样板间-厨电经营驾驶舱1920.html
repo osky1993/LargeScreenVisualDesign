@@ -441,22 +441,27 @@
   const TURN_TARGET = 40;        /* 库存周转天数目标 */
   const HEALTH_TARGET = 90;      /* 六维健康分目标 */
 
-  /* ===== 4.9 ★ 骨架版占位常量 ★ =====
-     TODO 收官阶段回填：待 P1–P12 完成后以各页实际值替换。
-     宫格微型指标与健康雷达六维值来自尚未建成的 12 张专题页，此处先给合理占位值，
-     使门户可读；本页其余数字（KPI、产销存全景、渠道结构、风险清单）均为现算真值。 */
-  const TODO_NAV = {
-    p1:  { v: "28.6 天", pct: 72 },   /* 原料采购总览 · 库存覆盖天数 */
-    p2:  { v: "94.2%",   pct: 94 },   /* 供应商协同 · 准时交付率 */
-    p3:  { v: "98.4%",   pct: 98 },   /* 生产制造总览 · 计划达成率 */
-    p4:  { v: "96.4%",   pct: 96 },   /* 品质管理 · 制程直通率 FPY（该页已建成，收官时取其现算值） */
-    p6:  { v: "93.6%",   pct: 94 },   /* 物流运输 · 时效达成率 */
-    p7:  { v: "+6.8%",   pct: 68 },   /* 门店零售 · 同店增长 */
-    p9:  { v: "3.2 : 1", pct: 64 },   /* 营销活动 · 平均投放 ROI */
-    p10: { v: "91.5%",   pct: 92 }    /* 售后服务 · 一次修复率 */
+  /* ===== 4.9 跨页指标快照（收官阶段已回填）=====
+     宫格微型指标与健康雷达六维值来自 12 张专题页的现算结果。这些页的 KPI 本身是派生量
+     （D.otd / D.achv / D.otr …），源码里没有字面量可引用，故此处是**快照**：
+     改动对应专题页的数据层时，记得回来同步这两张表。
+     本页其余数字（KPI、产销存全景、渠道结构、风险清单）均由本页数据现算。 */
+  /* 已于收官阶段回填：取值来自各专题页 KPI 的现算结果（逐页浏览器目检核对）。
+     这些页的 KPI 本身是派生量（D.otd / D.achv / D.otr …），源码里没有字面量，
+     故此处是快照而非引用——改动对应页的数据层时，记得回来同步这张表。 */
+  const NAV_METRIC = {
+    p1:  { v: "19.6 天", pct: 65 },   /* 原料采购总览 · 平均库存覆盖（5 种材料加权，2 种低于安全线） */
+    p2:  { v: "95.61%",  pct: 96 },   /* 供应商协同 · 准时交付率（采购额加权，目标 96.0%） */
+    p3:  { v: "101.23%", pct: 100 },  /* 生产制造总览 · 计划达成率（超额完成） */
+    p4:  { v: "96.42%",  pct: 96 },   /* 品质管理 · 制程直通率 FPY（产量加权，目标 95.0%） */
+    p6:  { v: "97.26%",  pct: 97 },   /* 物流运输 · 全网时效达成率（达标 46/52 条线路） */
+    p7:  { v: "+7.54%",  pct: 75 },   /* 门店零售 · 同店增长率 */
+    p9:  { v: "5.64 倍", pct: 80 },   /* 营销活动 · 综合 ROI（盈亏线 = 1÷毛利率 = 3.13） */
+    p10: { v: "86.77%",  pct: 87 }    /* 售后服务 · 一次修复率（低于目标 88.0%） */
   };
-  /* TODO 收官阶段回填：六维得分须与「经营健康指数」收官页同源同值 */
-  const TODO_HEALTH = [
+  /* 六维得分与权重：与「经营健康指数」收官页（P12）同源同值，两页共用这一组。
+     P12 的加权明细表可逐行验算，总分 Σ(得分×权重) = 83.39（两页均现算，不写死）。 */
+  const HEALTH_DIMS = [
     { dim: "交付", score: 88, w: 0.18, from: "P3 生产制造 · P6 物流运输" },
     { dim: "质量", score: 82, w: 0.20, from: "P4 品质管理" },
     { dim: "库存", score: 76, w: 0.15, from: "P5 仓储库存" },
@@ -518,10 +523,10 @@
   D.lineWorstFail = LINES.slice().sort((a, b) => b.fail - a.fail)[0];
   D.lineBestFail = LINES.slice().sort((a, b) => a.fail - b.fail)[0];
 
-  /* 健康指数：总分 = Σ(分项 × 权重)（分项值为 TODO 占位，算法为真） */
-  D.healthW = sum(TODO_HEALTH.map((h) => h.w));
-  D.health = sum(TODO_HEALTH.map((h) => h.score * h.w));
-  D.healthWorst = TODO_HEALTH.slice().sort((a, b) => a.score - b.score)[0];
+  /* 健康指数：总分 = Σ(分项 × 权重)，与 P12 收官页同源同算法 */
+  D.healthW = sum(HEALTH_DIMS.map((h) => h.w));
+  D.health = sum(HEALTH_DIMS.map((h) => h.score * h.w));
+  D.healthWorst = HEALTH_DIMS.slice().sort((a, b) => a.score - b.score)[0];
 
   /* ===== 5. 顶部时钟 ===== */
   const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
@@ -575,30 +580,31 @@
   KPI_DEFS.forEach((k, i) => countUp($("kd-kpi-" + i), k.val, k.dec));
 
   /* ===== 7. 12 页导航宫格（4 × 3，按业务顺序：供应制造 → 仓储流通 → 营销服务） =====
-         ★ 微型指标：P5 / P8 / P11 / P12 四格能由本页现算数据填实，其余取 TODO_NAV 占位。 */
+         ★ 微型指标：P5 / P8 / P11 / P12 四格由本页现算数据直接填实，
+            其余八格取 NAV_METRIC 快照（各专题页的现算 KPI）。 */
   const NAV = [
     { no: "P1",  icon: "◈", name: "原料采购总览", desc: "五大原材料 · 182 家供应商",
-      file: "大屏样板间-厨电原料采购总览1920.html", ml: "库存覆盖", mv: TODO_NAV.p1.v,  pct: TODO_NAV.p1.pct },
+      file: "大屏样板间-厨电原料采购总览1920.html", ml: "库存覆盖", mv: NAV_METRIC.p1.v,  pct: NAV_METRIC.p1.pct },
     { no: "P2",  icon: "⚙", name: "供应商协同",   desc: "S / A / B / C 四级台账",
-      file: "大屏样板间-厨电供应商协同1920.html",   ml: "准时交付", mv: TODO_NAV.p2.v,  pct: TODO_NAV.p2.pct },
+      file: "大屏样板间-厨电供应商协同1920.html",   ml: "准时交付", mv: NAV_METRIC.p2.v,  pct: NAV_METRIC.p2.pct },
     { no: "P3",  icon: "⛭", name: "生产制造总览", desc: "三大基地 · 六大产品线",
-      file: "大屏样板间-厨电生产制造总览1920.html", ml: "计划达成", mv: TODO_NAV.p3.v,  pct: TODO_NAV.p3.pct },
+      file: "大屏样板间-厨电生产制造总览1920.html", ml: "计划达成", mv: NAV_METRIC.p3.v,  pct: NAV_METRIC.p3.pct },
     { no: "P4",  icon: "✓", name: "品质管理",     desc: "质量链四段 · 缺陷帕累托",
-      file: "大屏样板间-厨电品质管理1920.html",     ml: "制程直通", mv: TODO_NAV.p4.v,  pct: TODO_NAV.p4.pct },
+      file: "大屏样板间-厨电品质管理1920.html",     ml: "制程直通", mv: NAV_METRIC.p4.v,  pct: NAV_METRIC.p4.pct },
     { no: "P5",  icon: "▤", name: "仓储库存",     desc: "七大 RDC · 库龄结构",
       file: "大屏样板间-厨电仓储库存1920.html",     ml: "周转天数", mv: fmtDec(D.turnDays, 1) + " 天",
       pct: Math.min(100, TURN_TARGET / D.turnDays * 100) },                       /* 现算：目标 40 天 ÷ 实际 */
     { no: "P6",  icon: "⇄", name: "物流运输",     desc: "干线 + 配送两级流向",
-      file: "大屏样板间-厨电物流运输1920.html",     ml: "时效达成", mv: TODO_NAV.p6.v,  pct: TODO_NAV.p6.pct },
+      file: "大屏样板间-厨电物流运输1920.html",     ml: "时效达成", mv: NAV_METRIC.p6.v,  pct: NAV_METRIC.p6.pct },
     { no: "P7",  icon: "⌂", name: "门店零售",     desc: "3 240 家门店 · 31 省",
-      file: "大屏样板间-厨电门店零售1920.html",     ml: "同店增长", mv: TODO_NAV.p7.v,  pct: TODO_NAV.p7.pct },
+      file: "大屏样板间-厨电门店零售1920.html",     ml: "同店增长", mv: NAV_METRIC.p7.v,  pct: NAV_METRIC.p7.pct },
     { no: "P8",  icon: "◎", name: "电商全渠道",   desc: "5 大平台 · 直播转化",
       file: "大屏样板间-厨电电商全渠道1920.html",   ml: "线上占比", mv: fmtDec(D.revOnlineShare, 1) + "%",
       pct: D.revOnlineShare },                                                     /* 现算：线上 ÷ 总营收 */
     { no: "P9",  icon: "✦", name: "营销活动",     desc: "投放结构 · 新品节奏",
-      file: "大屏样板间-厨电营销活动1920.html",     ml: "投放 ROI",  mv: TODO_NAV.p9.v,  pct: TODO_NAV.p9.pct },
+      file: "大屏样板间-厨电营销活动1920.html",     ml: "投放 ROI",  mv: NAV_METRIC.p9.v,  pct: NAV_METRIC.p9.pct },
     { no: "P10", icon: "☎", name: "售后服务",     desc: fmtDec(D.tickets, 1) + " 万工单 · 时效三联",
-      file: "大屏样板间-厨电售后服务1920.html",     ml: "一次修复", mv: TODO_NAV.p10.v, pct: TODO_NAV.p10.pct },
+      file: "大屏样板间-厨电售后服务1920.html",     ml: "一次修复", mv: NAV_METRIC.p10.v, pct: NAV_METRIC.p10.pct },
     { no: "P11", icon: "◍", name: "用户会员运营", desc: "1 860 万会员 · 复购分析",
       file: "大屏样板间-厨电用户会员运营1920.html", ml: "用户 NPS", mv: fmtDec(D.nps, 0) + " 分",
       pct: Math.max(0, Math.min(100, (D.nps + 100) / 2)) },                        /* 现算：NPS ∈ [−100,100] 归一 */
@@ -711,7 +717,7 @@
     ]
   });
 
-  /* 9.2 经营健康雷达六维：当前值 vs 目标值（★ 六维得分为 TODO 占位，加权算法为真） */
+  /* 9.2 经营健康雷达六维：当前值 vs 目标值（与 P12 收官页同源同值） */
   const radar = makeChart("kd-chart-radar");
   radar.setOption({
     backgroundColor: "transparent",
@@ -719,7 +725,7 @@
       trigger: "item",
       formatter: (p) => {
         if (p.seriesIndex != null && p.data && p.data.value) {
-          return "<b>" + p.data.name + "</b><br/>" + TODO_HEALTH.map((h, i) => (
+          return "<b>" + p.data.name + "</b><br/>" + HEALTH_DIMS.map((h, i) => (
             h.dim + " <b style=\"color:" + C.cyan + "\">" + fmtDec(p.data.value[i], 0) + "</b>" +
             "　<span style=\"color:" + C.textDim + "\">权重 " + fmtDec(h.w * 100, 0) + "%</span>"
           )).join("<br/>");
@@ -733,7 +739,7 @@
     },
     radar: {
       center: ["50%", "56%"], radius: "64%", splitNumber: 4, shape: "polygon",
-      indicator: TODO_HEALTH.map((h) => ({ name: h.dim, max: 100 })),
+      indicator: HEALTH_DIMS.map((h) => ({ name: h.dim, max: 100 })),
       axisName: { color: "#bfe4e0", fontSize: 12.5, fontWeight: 700 },
       axisLine: { lineStyle: { color: "rgba(64,196,190,.24)" } },
       splitLine: { lineStyle: { color: "rgba(64,196,190,.18)" } },
@@ -742,10 +748,10 @@
     series: [{
       type: "radar", symbolSize: 5,
       data: [
-        { name: "目标线", value: TODO_HEALTH.map(() => HEALTH_TARGET),
+        { name: "目标线", value: HEALTH_DIMS.map(() => HEALTH_TARGET),
           lineStyle: { color: C.orange, width: 1.6, type: "dashed" },
           itemStyle: { color: C.orange }, areaStyle: { color: "rgba(255,157,69,.06)" } },
-        { name: "本期得分", value: TODO_HEALTH.map((h) => h.score),
+        { name: "本期得分", value: HEALTH_DIMS.map((h) => h.score),
           lineStyle: { color: C.cyan, width: 2.4 }, itemStyle: { color: C.cyan },
           areaStyle: { color: new echarts.graphic.RadialGradient(0.5, 0.5, 0.9, [
             { offset: 0, color: "rgba(53,224,208,.06)" }, { offset: 1, color: "rgba(53,224,208,.34)" }]) } }
@@ -874,7 +880,7 @@
     ["市场故障率 ≈ 3.00% = 工单 ÷ 保有量", Math.abs(D.fail - 3.00) < 0.01],
     ["渠道占比合计 = 100%", Math.abs(sum(CHANNELS.map((c) => c.share)) - 100) < 1e-6],
     ["NPS 样本三分类之和 = 总样本", D.npsN === NPS_SURVEY.promoter + NPS_SURVEY.passive + NPS_SURVEY.detractor],
-    ["健康六维权重合计 = 1（分项值为 TODO 占位）", Math.abs(D.healthW - 1) < 1e-9],
+    ["健康六维权重合计 = 1（与 P12 收官页同源）", Math.abs(D.healthW - 1) < 1e-9],
     ["导航宫格 = 12 格", NAV.length === 12]
   ];
   const failed = checks.filter((c) => !c[1]);

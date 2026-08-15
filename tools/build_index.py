@@ -275,30 +275,35 @@ def scan_file(path: Path) -> dict:
     }
 
 
-PUBFUND_PORTAL = "大屏样板间-公共资金专题总览1920.html"
+# 各专题组的固定排序配置：细分类别 -> (门户文件名, 轮播脚本模块名, 下钻脚本模块名)。
+# 新增专题时在这里加一条即可，theme_rank() 与 scan() 都不用改。
+THEME_ORDER = {
+    "公共资金专题": ("大屏样板间-公共资金专题总览1920.html", "inject_carousel", "inject_drilldown"),
+    "厨电制造专题": ("大屏样板间-厨电经营驾驶舱1920.html", "inject_carousel_kitchen", "inject_drilldown_kitchen"),
+}
 
 
-def pubfund_rank() -> dict:
-    """公共资金专题组的固定排序：总览门户 → 13 个专题页 → 各专题页各自的二级子页。
+def theme_rank(cat: str, portal: str, carousel_mod: str, drill_mod: str) -> dict:
+    """专题组的固定排序：门户 → 各专题页（轮播页序）→ 各专题页各自的二级子页。
 
-    次序不在这里重复维护，而是从既有的两份权威来源推导，避免第三份副本各自漂移：
-      · 13 个专题页的先后 = inject_carousel.PAGES（轮播页序，即需求给的原始顺序）
-      · 父页 → 子页的归属 = inject_drilldown.PAGES（下钻入口配置）
-    子页整体排在 13 个专题页之后，组内按其父页的位置排。
-    未登记的公共资金文件排到末尾并按文件名兜底，不会因为漏配而丢卡片。
+    次序不在这里重复维护，而是从该专题既有的两份权威来源推导，避免第三份副本各自漂移：
+      · 专题页的先后 = <carousel_mod>.PAGES（轮播页序，即需求给的原始顺序）
+      · 父页 → 子页的归属 = <drill_mod>.PAGES（下钻入口配置）
+    子页整体排在专题页之后，组内按其父页的位置排。
+    未登记的文件排到末尾并按文件名兜底，不会因为漏配而丢卡片。
     """
-    rank = {PUBFUND_PORTAL: 0}
+    rank = {portal: 0}
     try:
-        import inject_carousel
-        import inject_drilldown
+        carousel = __import__(carousel_mod)
+        drill = __import__(drill_mod)
     except Exception as e:                       # 工具脚本缺失时退化为文件名排序，不阻断建索引
-        print("  ! 公共资金固定排序不可用（%s），该组回退为文件名排序" % e)
+        print("  ! %s 固定排序不可用（%s），该组回退为文件名排序" % (cat, e))
         return rank
-    parents = [f for f, _ in inject_carousel.PAGES]
+    parents = [f for f, _ in carousel.PAGES]
     for i, f in enumerate(parents):
         rank[f] = 100 + i
     subs_of = {}
-    for cfg in inject_drilldown.PAGES:
+    for cfg in drill.PAGES:
         seen = []
         for grp in ("targets", "charts", "panels"):
             for t in cfg.get(grp, []):
@@ -323,10 +328,11 @@ def scan() -> list:
                 continue
             entries.append(scan_file(p))
     order = {cat: i for i, (_, cat) in enumerate(CATEGORY_RULES)}
-    rank = pubfund_rank()
+    # 每个专题组各算一份 rank；非专题类别取空 dict，全部落到 9999 由文件名兜底（组内相对次序不变）
+    ranks = {cat: theme_rank(cat, *cfg) for cat, cfg in THEME_ORDER.items()}
     entries.sort(key=lambda e: (
         order.get(e["category"], 99),
-        rank.get(Path(e["file"]).name, 9999) if e["category"] == "公共资金专题" else 0,
+        ranks.get(e["category"], {}).get(Path(e["file"]).name, 9999),
         e["file"],
     ))
     return entries

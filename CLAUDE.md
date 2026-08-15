@@ -16,6 +16,21 @@ python3 tools/build_index.py
 # 新增样板间后，补上顶边「模拟数据」标识（幂等；--remove 整批摘掉）
 python3 tools/inject_mock_flag.py
 
+# 厨电制造专题（screens/kitchen-appliance/，21 块屏）的维护三件套。
+# ★ 顺序有讲究：三把导航脚本会往 <style> 里插 CSS 块、顶动 mockflag 的位置，
+#   所以 inject_mock_flag.py 必须**最后**跑，否则它每次都报「改动 N 个」不收敛。
+python3 tools/inject_carousel_kitchen.py     # 12 个专题页的轮播导航
+python3 tools/inject_subnav_kitchen.py       # 12 个父页的二级子页标签（8 有 / 4 无）
+python3 tools/inject_drilldown_kitchen.py    # 8 个父页的下钻入口（写盘前 preflight 核锚点）
+python3 tools/inject_mock_flag.py            # ← 必须最后
+python3 tools/sync_mfg_palette.py            # 与位置无关，任何时候跑都行
+
+# 整套换配色：改色源 JSON + 跑同步脚本，21 页一起变
+#   shared/palette-manufacturing.json → tools/sync_mfg_palette.py
+
+# 给地图页内联 GeoJSON（china 单集约 465KB，人工写不动，一律走工具）
+python3 tools/inline_geo.py <页面路径> china   # 注入页面预留的 /* geo:begin */…/* geo:end */ 块
+
 # 编辑某个「实验室」文件的内容（见下：实验室是 srcdoc 套壳，不能直接改）
 python3 tools/labtool.py decode charts/ECharts视觉实验室-柱状图8.html   # → 生成 *.inner.html
 #   ...编辑 charts/ECharts视觉实验室-柱状图8.inner.html...
