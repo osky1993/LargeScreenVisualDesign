@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电经营驾驶舱</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --kd-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：产销存平衡校验（月份 / 期初 / 产量 / 销量 / 期末 / 判定） */
+    --kd-tcols: 44px 1fr 1fr 1fr 1fr 50px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .kd-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 132px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .kd-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .kd-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .kd-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .kd-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .kd-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .kd-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .kd-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .kd-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .kd-crumb em { font-style: normal; color: #cfeae7; }
+  .kd-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .kd-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .kd-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .kd-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .kd-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .kd-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .kd-chips { display: flex; align-items: center; gap: 9px; }
+  .kd-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .kd-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .kd-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .kd-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .kd-chip.is-key b { color: var(--mfg-cyan); }
+  .kd-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .kd-clock-time { font: 700 26px/1 var(--kd-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .kd-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带（6 枚集团级） ===== */
+  .kd-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .kd-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 14px 0 16px;
+  }
+  .kd-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .kd-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .kd-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .kd-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .kd-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .kd-kpi.is-warn .kd-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .kd-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .kd-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .kd-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .kd-kpi-val { font: 700 29px/1 var(--kd-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .kd-kpi.is-warn .kd-kpi-val { color: #ffd9b0; }
+  .kd-kpi-unit { font-size: 12.5px; color: var(--mfg-text-dim); }
+  .kd-kpi-sub { font-size: 11px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kd-kpi-sub b { font-weight: 700; }
+  .kd-up { color: var(--mfg-green); }
+  .kd-down { color: var(--mfg-red); }
+
+  /* ===== 三栏主体 ===== */
+  .kd-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .kd-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .kd-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .kd-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .kd-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .kd-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .kd-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .kd-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .kd-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 12 页导航宫格（4 × 3） ===== */
+  .kd-navgrid {
+    flex: 1; min-height: 0; display: grid;
+    grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, 1fr); gap: 12px;
+  }
+  .kd-cell {
+    position: relative; overflow: hidden; text-decoration: none; color: inherit;
+    display: flex; flex-direction: column; gap: 6px; padding: 11px 13px 10px; border-radius: 11px;
+    border: 1px solid rgba(64, 196, 190, 0.18); background: rgba(10, 38, 42, 0.5);
+    transition: border-color .22s, background .22s, box-shadow .22s, transform .22s;
+  }
+  .kd-cell::after {
+    content: ""; position: absolute; right: -34px; top: -34px; width: 84px; height: 84px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.14), transparent 70%);
+  }
+  .kd-cell:hover, .kd-cell.is-active {
+    border-color: rgba(53, 224, 208, 0.62); background: rgba(18, 68, 68, 0.55);
+    box-shadow: inset 0 0 18px rgba(53, 224, 208, 0.14); transform: translateY(-2px);
+  }
+  .kd-cell-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .kd-cell-ico {
+    flex: none; width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 17px; color: #8ff0e6;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.24), rgba(79, 168, 232, 0.10));
+    border: 1px solid rgba(53, 224, 208, 0.32);
+  }
+  .kd-cell.is-active .kd-cell-ico { box-shadow: 0 0 14px rgba(53, 224, 208, 0.35); }
+  .kd-cell-no { font-style: normal; font: 700 12px/1 var(--kd-mono); letter-spacing: 0.12em; color: rgba(127, 166, 163, 0.6); }
+  .kd-cell-name { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #dff3f0; white-space: nowrap; }
+  .kd-cell-desc { font-size: 11px; color: rgba(127, 166, 163, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kd-cell-metric { margin-top: auto; display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+  .kd-cell-metric span { font-size: 11px; letter-spacing: 0.04em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .kd-cell-metric b { font: 700 17px/1 var(--kd-mono); color: var(--mfg-cyan); font-variant-numeric: tabular-nums; }
+  .kd-cell-bar { height: 4px; border-radius: 2px; background: rgba(64, 196, 190, 0.14); overflow: hidden; }
+  .kd-cell-bar i { display: block; height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--mfg-cyan-deep), var(--mfg-cyan)); }
+
+  /* ===== CSS grid 模拟表格 ===== */
+  .kd-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .kd-thead, .kd-tbody li {
+    display: grid; grid-template-columns: var(--kd-tcols); align-items: center; gap: 6px;
+  }
+  .kd-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .kd-thead span:not(:first-child), .kd-tbody li span:not(:first-child) { text-align: right; }
+  .kd-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .kd-tbody li {
+    padding: 0 8px; height: 24px; border-radius: 5px;
+    font-size: 12px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .kd-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .kd-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .kd-tbody li.is-total { background: rgba(255, 157, 69, 0.14); border: 1px solid rgba(255, 157, 69, 0.3); }
+  .kd-tbody li.is-total span { color: #ffdcb6; }
+  .kd-tbody li b { font-weight: 700; color: #eafcfa; }
+  .kd-badge {
+    justify-self: end; padding: 1px 6px; border-radius: 4px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .kd-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .kd-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .kd-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+
+  /* ===== 底部风险清单滚动条 ===== */
+  .kd-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .kd-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .kd-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: kd-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes kd-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .kd-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .kd-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .kd-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .kd-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .kd-foot-item b { font-weight: 700; }
+  .kd-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .kd-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="kd-stage" id="kd-stage">
+    <!-- mockflag:begin --><div class="kd-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="kd-error" id="kd-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="kd-header">
+      <div class="kd-head-left">
+        <div class="kd-crumb"><b>云麓厨电</b><i>›</i><em>经营驾驶舱</em></div>
+        <div class="kd-head-title-row">
+          <div class="kd-head-title">经营驾驶舱</div>
+          <div class="kd-head-meta">
+            <span><b>12</b> 张专题页 · <b>8</b> 张二级子页</span><i>|</i>
+            <span><b>6</b> 大产品线 · <b>3</b> 大基地 · <b>7</b> 大区域仓</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="kd-head-right">
+        <div class="kd-chips">
+          <div class="kd-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="kd-chip is-key"><span>REVENUE</span><b id="kd-chip-rev">--</b></div>
+        </div>
+        <div class="kd-clock" aria-label="实时时钟">
+          <span class="kd-clock-time" id="kd-clock-time">--:--:--</span>
+          <span class="kd-clock-date" id="kd-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="kd-band" id="kd-band"></div>
+
+    <!-- 左栏：产销存全景 + 平衡校验 -->
+    <div class="kd-col">
+      <section class="kd-panel" style="flex: 1;">
+        <div class="kd-panel-head">
+          <h2>产销存全景</h2>
+          <span class="kd-panel-tag">近 12 个月滚动 · 期初 <b id="kd-stock-open">--</b> → 期末 <b id="kd-stock-end">--</b> 万台</span>
+        </div>
+        <div class="kd-chart" id="kd-chart-psi"></div>
+      </section>
+      <!-- 高度写死 402px：13 行 × 24px + 表头 + 面板内边距，正好容下 12 个月 + 合计行不裁切 -->
+      <section class="kd-panel" style="flex: none; height: 402px;">
+        <div class="kd-panel-head">
+          <h2>产销存平衡校验</h2>
+          <span class="kd-panel-tag">期初 + 产量 − 销量 = 期末</span>
+        </div>
+        <div class="kd-table">
+          <div class="kd-thead">
+            <span>月份</span><span>期初</span><span>产量</span><span>销量</span><span>期末</span><span>判定</span>
+          </div>
+          <ul class="kd-tbody" id="kd-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中栏：12 页导航宫格 -->
+    <div class="kd-col">
+      <section class="kd-panel" style="flex: 1;">
+        <div class="kd-panel-head">
+          <h2>专题导航 · 12 张大屏</h2>
+          <span class="kd-panel-tag">供应与制造 <b>4</b> · 仓储与流通 <b>4</b> · 营销与服务 <b>4</b> · 点击进入</span>
+        </div>
+        <div class="kd-navgrid" id="kd-navgrid"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：经营健康雷达 + 渠道营收结构 -->
+    <div class="kd-col">
+      <section class="kd-panel" style="flex: 1;">
+        <div class="kd-panel-head">
+          <h2>经营健康雷达</h2>
+          <span class="kd-panel-tag">加权综合 <b id="kd-health-score">--</b> 分 · 最弱 <b id="kd-health-worst">--</b></span>
+        </div>
+        <div class="kd-chart" id="kd-chart-radar"></div>
+      </section>
+      <section class="kd-panel" style="flex: none; height: 262px;">
+        <div class="kd-panel-head">
+          <h2>渠道营收结构</h2>
+          <span class="kd-panel-tag">合计 <b id="kd-rev-total">--</b> 亿元 · 线上占 <b id="kd-rev-online">--</b></span>
+        </div>
+        <div class="kd-chart" id="kd-chart-channel"></div>
+      </section>
+    </div>
+
+    <!-- 底部关键风险清单 -->
+    <div class="kd-foot">
+      <div class="kd-foot-tag">关键风险</div>
+      <div class="kd-foot-view"><div class="kd-foot-track" id="kd-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("kd-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("kd-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const arrow = (v) => (v >= 0 ? "▲" : "▼");
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团 · 总部杭州）
+         口径与全系列基准盘一致：年营收 112.6 亿元、年销量 866 万台、年产量 902 万台、
+         成品库存 118 万台、保有量 3227 万台、年售后工单 96.8 万单。
+         合计一律由分项求和，比率一律现算，页面上不出现任何硬编码的合计值。 ===== */
+
+  /* 4.1 三渠道营收（亿元）——合计即年营收 */
+  const CHANNELS = [
+    { name: "线上全渠道", v: 58.7, color: C.cyan,   note: "京东 / 天猫 / 抖音 / 苏宁 / 自营" },
+    { name: "线下门店",   v: 48.4, color: C.orange, note: "KA 卖场 / 品牌专卖 / 建材集合" },
+    { name: "工程渠道",   v: 5.5,  color: C.blue,   note: "地产精装 / 集采项目" }
+  ];
+
+  /* 4.2 六大产品线：产量 / 销量 / 保有量（万台） · 市场故障率（%，与品质管理页同源） */
+  const LINES = [
+    { name: "吸油烟机",   short: "烟机", base: "杭州临平", out: 236, sale: 228, own: 892, fail: 2.72 },
+    { name: "燃气灶具",   short: "灶具", base: "杭州临平", out: 218, sale: 210, own: 836, fail: 2.45 },
+    { name: "洗碗机",     short: "洗碗", base: "安徽芜湖", out: 132, sale: 124, own: 402, fail: 3.86 },
+    { name: "蒸烤一体机", short: "蒸烤", base: "安徽芜湖", out:  96, sale:  92, own: 268, fail: 4.12 },
+    { name: "集成灶",     short: "集成", base: "广东佛山", out: 108, sale: 104, own: 358, fail: 3.24 },
+    { name: "净水热水",   short: "净水", base: "广东佛山", out: 112, sale: 108, own: 471, fail: 2.96 }
+  ];
+
+  /* 4.3 三大生产基地产量（万台）——与六产品线在同一总量上收敛 */
+  const BASES = [
+    { name: "杭州临平", v: 454, note: "烟机 + 灶具" },
+    { name: "安徽芜湖", v: 228, note: "洗碗 + 蒸烤" },
+    { name: "广东佛山", v: 220, note: "集成灶 + 净水热水" }
+  ];
+
+  /* 4.4 产销存 12 个月滚动序列（万台）。月序为「近 12 个月」：2025-08 → 2026-07。
+         期初库存不写死结果，取 期末 118 − 净增（产量 − 销量），逐月滚动必然收敛回 118。 */
+  const MONTH_SEQ = [8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7];
+  const PROD = [72, 80, 84, 78, 68, 72, 58, 76, 78, 82, 84, 70];   /* 春节 2 月停产检修，Σ = 902 */
+  const SALE = [66, 74, 78, 102, 48, 66, 52, 70, 72, 78, 96, 64];  /* 双 11 / 618 双峰，Σ = 866 */
+  const STOCK_END_BASE = 118;                                       /* 基准盘：期末成品库存 */
+
+  /* 4.5 会员满意度调研样本（NPS 不写死，由三类样本现算） */
+  const NPS_SURVEY = { promoter: 7040, passive: 3072, detractor: 2688 };
+
+  /* 4.6 目标线（管理层设定的口径，非派生量） */
+  const TURN_TARGET = 40;        /* 库存周转天数目标 */
+  const HEALTH_TARGET = 90;      /* 六维健康分目标 */
+
+  /* ===== 4.9 ★ 骨架版占位常量 ★ =====
+     TODO 收官阶段回填：待 P1–P12 完成后以各页实际值替换。
+     宫格微型指标与健康雷达六维值来自尚未建成的 12 张专题页，此处先给合理占位值，
+     使门户可读；本页其余数字（KPI、产销存全景、渠道结构、风险清单）均为现算真值。 */
+  const TODO_NAV = {
+    p1:  { v: "28.6 天", pct: 72 },   /* 原料采购总览 · 库存覆盖天数 */
+    p2:  { v: "94.2%",   pct: 94 },   /* 供应商协同 · 准时交付率 */
+    p3:  { v: "98.4%",   pct: 98 },   /* 生产制造总览 · 计划达成率 */
+    p4:  { v: "96.4%",   pct: 96 },   /* 品质管理 · 制程直通率 FPY（该页已建成，收官时取其现算值） */
+    p6:  { v: "93.6%",   pct: 94 },   /* 物流运输 · 时效达成率 */
+    p7:  { v: "+6.8%",   pct: 68 },   /* 门店零售 · 同店增长 */
+    p9:  { v: "3.2 : 1", pct: 64 },   /* 营销活动 · 平均投放 ROI */
+    p10: { v: "91.5%",   pct: 92 }    /* 售后服务 · 一次修复率 */
+  };
+  /* TODO 收官阶段回填：六维得分须与「经营健康指数」收官页同源同值 */
+  const TODO_HEALTH = [
+    { dim: "交付", score: 88, w: 0.18, from: "P3 生产制造 · P6 物流运输" },
+    { dim: "质量", score: 82, w: 0.20, from: "P4 品质管理" },
+    { dim: "库存", score: 76, w: 0.15, from: "P5 仓储库存" },
+    { dim: "渠道", score: 90, w: 0.17, from: "P7 门店零售 · P8 电商全渠道" },
+    { dim: "服务", score: 84, w: 0.15, from: "P10 售后服务" },
+    { dim: "增长", score: 79, w: 0.15, from: "P9 营销活动 · P11 会员运营" }
+  ];
+
+  /* ===== 4.10 派生量：全部现算，不复制数字 ===== */
+  const D = {};
+
+  /* 营收：合计 = 三渠道之和 */
+  D.rev = sum(CHANNELS.map((c) => c.v));
+  CHANNELS.forEach((c) => { c.share = c.v / D.rev * 100; });
+  D.revOnlineShare = CHANNELS[0].share;
+
+  /* 产销量：两个维度都收敛到同一总量 */
+  D.out = sum(LINES.map((l) => l.out));
+  D.outByBase = sum(BASES.map((b) => b.v));
+  D.sale = sum(LINES.map((l) => l.sale));
+  D.psRate = D.sale / D.out * 100;                     /* 产销率 */
+
+  /* 保有量与市场故障率：工单 = Σ(保有量 × 故障率)，故障率反过来由工单 ÷ 保有量现算，
+     与「品质管理」页完全同源（同一批 own / fail 明细）。 */
+  LINES.forEach((l) => { l.tickets = l.own * l.fail / 100; });
+  D.own = sum(LINES.map((l) => l.own));
+  D.tickets = sum(LINES.map((l) => l.tickets));
+  D.fail = D.tickets / D.own * 100;
+
+  /* 产销存平衡：期初 = 期末 − 净增，随后逐月滚动，末月必然回到 118 */
+  D.netAdd = sum(PROD) - sum(SALE);
+  D.stockOpen = STOCK_END_BASE - D.netAdd;
+  const PSI = [];
+  let carry = D.stockOpen;
+  MONTH_SEQ.forEach((m, i) => {
+    const open = carry, close = open + PROD[i] - SALE[i];
+    PSI.push({
+      m: m, label: m + "月", open: open, prod: PROD[i], sale: SALE[i], close: close,
+      delta: close - open, psRate: SALE[i] / PROD[i] * 100
+    });
+    carry = close;
+  });
+  D.stockEnd = PSI[PSI.length - 1].close;
+  D.stockAvg = sum(PSI.map((r) => r.close)) / PSI.length;          /* 平均库存（月末口径） */
+  D.saleDaily = D.sale / 365;                                       /* 日均销量 */
+  D.turnDays = D.stockAvg / D.saleDaily;                            /* 库存周转天数 */
+  D.turnTimes = D.sale / D.stockAvg;                                /* 年周转次数 */
+  D.psiLow = PSI.slice().sort((a, b) => a.close - b.close)[0];      /* 库存最低月 */
+  D.psiWorstPs = PSI.slice().sort((a, b) => a.psRate - b.psRate)[0];/* 产销率最低月 */
+  D.stockMom = PSI[11].close - PSI[10].close;                       /* 库存环比 */
+
+  /* NPS：推荐者占比 − 贬损者占比（样本三分类之和 = 总样本） */
+  D.npsN = NPS_SURVEY.promoter + NPS_SURVEY.passive + NPS_SURVEY.detractor;
+  D.npsPro = NPS_SURVEY.promoter / D.npsN * 100;
+  D.npsDet = NPS_SURVEY.detractor / D.npsN * 100;
+  D.nps = D.npsPro - D.npsDet;
+
+  /* 产品线极值（供风险清单引用） */
+  D.lineWorstFail = LINES.slice().sort((a, b) => b.fail - a.fail)[0];
+  D.lineBestFail = LINES.slice().sort((a, b) => a.fail - b.fail)[0];
+
+  /* 健康指数：总分 = Σ(分项 × 权重)（分项值为 TODO 占位，算法为真） */
+  D.healthW = sum(TODO_HEALTH.map((h) => h.w));
+  D.health = sum(TODO_HEALTH.map((h) => h.score * h.w));
+  D.healthWorst = TODO_HEALTH.slice().sort((a, b) => a.score - b.score)[0];
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("kd-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("kd-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("kd-chip-rev").textContent = fmtDec(D.rev, 1) + " 亿";
+
+  /* ===== 6. KPI 带：6 枚集团级指标，数值翻牌缓动 ===== */
+  const KPI_DEFS = [
+    { icon: "¥", label: "年营收", val: D.rev, unit: "亿元", dec: 1, warn: false,
+      sub: () => "线上 <b>" + fmtDec(CHANNELS[0].v, 1) + "</b> · 线下 <b>" + fmtDec(CHANNELS[1].v, 1) + "</b> · 工程 <b>" + fmtDec(CHANNELS[2].v, 1) + "</b>" },
+    { icon: "◈", label: "年销量", val: D.sale, unit: "万台", dec: 0, warn: false,
+      sub: () => "六产品线之和 · 产销率 <b>" + fmtDec(D.psRate, 1) + "%</b>" },
+    { icon: "⛭", label: "年产量", val: D.out, unit: "万台", dec: 0, warn: false,
+      sub: () => "三基地 " + BASES.map((b) => b.v).join(" / ") + " 万台" },
+    { icon: "▤", label: "库存周转", val: D.turnDays, unit: "天", dec: 1, warn: D.turnDays > TURN_TARGET,
+      sub: () => "平均库存 <b>" + fmtDec(D.stockAvg, 1) + "</b> 万台 · <b>" + fmtDec(D.turnTimes, 1) + "</b> 次/年" },
+    { icon: "⚠", label: "市场故障率", val: D.fail, unit: "%", dec: 2, warn: true,
+      sub: () => "保有量 <b>" + fmtDec(D.own, 0) + "</b> 万台 · 工单 <b>" + fmtDec(D.tickets, 1) + "</b> 万单" },
+    { icon: "◍", label: "用户 NPS", val: D.nps, unit: "分", dec: 0, warn: false,
+      sub: () => "推荐 <b class=\"kd-up\">" + fmtDec(D.npsPro, 1) + "%</b> − 贬损 <b class=\"kd-down\">" + fmtDec(D.npsDet, 1) + "%</b>" }
+  ];
+  const band = $("kd-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="kd-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="kd-kpi-icon">' + k.icon + "</div>" +
+      '<div class="kd-kpi-main">' +
+        '<div class="kd-kpi-label">' + k.label + "</div>" +
+        '<div class="kd-kpi-num"><span class="kd-kpi-val" id="kd-kpi-' + i + '">0</span><span class="kd-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="kd-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值 */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("kd-kpi-" + i), k.val, k.dec));
+
+  /* ===== 7. 12 页导航宫格（4 × 3，按业务顺序：供应制造 → 仓储流通 → 营销服务） =====
+         ★ 微型指标：P5 / P8 / P11 / P12 四格能由本页现算数据填实，其余取 TODO_NAV 占位。 */
+  const NAV = [
+    { no: "P1",  icon: "◈", name: "原料采购总览", desc: "五大原材料 · 182 家供应商",
+      file: "大屏样板间-厨电原料采购总览1920.html", ml: "库存覆盖", mv: TODO_NAV.p1.v,  pct: TODO_NAV.p1.pct },
+    { no: "P2",  icon: "⚙", name: "供应商协同",   desc: "S / A / B / C 四级台账",
+      file: "大屏样板间-厨电供应商协同1920.html",   ml: "准时交付", mv: TODO_NAV.p2.v,  pct: TODO_NAV.p2.pct },
+    { no: "P3",  icon: "⛭", name: "生产制造总览", desc: "三大基地 · 六大产品线",
+      file: "大屏样板间-厨电生产制造总览1920.html", ml: "计划达成", mv: TODO_NAV.p3.v,  pct: TODO_NAV.p3.pct },
+    { no: "P4",  icon: "✓", name: "品质管理",     desc: "质量链四段 · 缺陷帕累托",
+      file: "大屏样板间-厨电品质管理1920.html",     ml: "制程直通", mv: TODO_NAV.p4.v,  pct: TODO_NAV.p4.pct },
+    { no: "P5",  icon: "▤", name: "仓储库存",     desc: "七大 RDC · 库龄结构",
+      file: "大屏样板间-厨电仓储库存1920.html",     ml: "周转天数", mv: fmtDec(D.turnDays, 1) + " 天",
+      pct: Math.min(100, TURN_TARGET / D.turnDays * 100) },                       /* 现算：目标 40 天 ÷ 实际 */
+    { no: "P6",  icon: "⇄", name: "物流运输",     desc: "干线 + 配送两级流向",
+      file: "大屏样板间-厨电物流运输1920.html",     ml: "时效达成", mv: TODO_NAV.p6.v,  pct: TODO_NAV.p6.pct },
+    { no: "P7",  icon: "⌂", name: "门店零售",     desc: "3 240 家门店 · 31 省",
+      file: "大屏样板间-厨电门店零售1920.html",     ml: "同店增长", mv: TODO_NAV.p7.v,  pct: TODO_NAV.p7.pct },
+    { no: "P8",  icon: "◎", name: "电商全渠道",   desc: "5 大平台 · 直播转化",
+      file: "大屏样板间-厨电电商全渠道1920.html",   ml: "线上占比", mv: fmtDec(D.revOnlineShare, 1) + "%",
+      pct: D.revOnlineShare },                                                     /* 现算：线上 ÷ 总营收 */
+    { no: "P9",  icon: "✦", name: "营销活动",     desc: "投放结构 · 新品节奏",
+      file: "大屏样板间-厨电营销活动1920.html",     ml: "投放 ROI",  mv: TODO_NAV.p9.v,  pct: TODO_NAV.p9.pct },
+    { no: "P10", icon: "☎", name: "售后服务",     desc: fmtDec(D.tickets, 1) + " 万工单 · 时效三联",
+      file: "大屏样板间-厨电售后服务1920.html",     ml: "一次修复", mv: TODO_NAV.p10.v, pct: TODO_NAV.p10.pct },
+    { no: "P11", icon: "◍", name: "用户会员运营", desc: "1 860 万会员 · 复购分析",
+      file: "大屏样板间-厨电用户会员运营1920.html", ml: "用户 NPS", mv: fmtDec(D.nps, 0) + " 分",
+      pct: Math.max(0, Math.min(100, (D.nps + 100) / 2)) },                        /* 现算：NPS ∈ [−100,100] 归一 */
+    { no: "P12", icon: "◉", name: "经营健康指数", desc: "六维加权 · 收官页",
+      file: "大屏样板间-厨电经营健康指数1920.html", ml: "综合得分", mv: fmtDec(D.health, 1) + " 分",
+      pct: D.health }                                                              /* 现算：Σ(分项 × 权重) */
+  ];
+  $("kd-navgrid").innerHTML = NAV.map((n, i) => (
+    '<a class="kd-cell" data-i="' + i + '" href="' + n.file + '" title="' + n.name + '">' +
+      '<div class="kd-cell-top"><span class="kd-cell-ico">' + n.icon + '</span><i class="kd-cell-no">' + n.no + "</i></div>" +
+      '<div class="kd-cell-name">' + n.name + "</div>" +
+      '<div class="kd-cell-desc">' + n.desc + "</div>" +
+      '<div class="kd-cell-metric"><span>' + n.ml + "</span><b>" + n.mv + "</b></div>" +
+      '<div class="kd-cell-bar"><i style="width:' + fmtDec(Math.max(0, Math.min(100, n.pct)), 1) + '%"></i></div>' +
+    "</a>"
+  )).join("");
+  const navCells = Array.from($("kd-navgrid").children);
+
+  /* ===== 8. 产销存平衡校验表（左栏下，12 月 + 合计行） ===== */
+  const verdictOf = (delta) => (delta > 0 ? { t: "累库", c: "is-mid" }
+                              : delta < 0 ? { t: "去库", c: "is-good" }
+                              : { t: "持平", c: "is-good" });
+  const tbody = $("kd-tbody");
+  const totalDelta = D.stockEnd - D.stockOpen;
+  const totalV = verdictOf(totalDelta);
+  tbody.innerHTML = PSI.map((r, i) => (
+    '<li data-i="' + i + '">' +
+      "<span><b>" + r.label + "</b></span>" +
+      "<span>" + r.open + "</span>" +
+      "<span style=\"color:" + C.cyan + "\">" + r.prod + "</span>" +
+      "<span style=\"color:" + C.orange + "\">" + r.sale + "</span>" +
+      "<span><b>" + r.close + "</b></span>" +
+      '<span class="kd-badge ' + verdictOf(r.delta).c + '">' + verdictOf(r.delta).t + "</span>" +
+    "</li>"
+  )).join("") + (
+    '<li class="is-total">' +
+      "<span><b>合计</b></span>" +
+      "<span>" + fmtDec(D.stockOpen, 0) + "</span>" +
+      "<span>" + fmtDec(sum(PROD), 0) + "</span>" +
+      "<span>" + fmtDec(sum(SALE), 0) + "</span>" +
+      "<span><b>" + fmtDec(D.stockEnd, 0) + "</b></span>" +
+      '<span class="kd-badge ' + totalV.c + '">' + totalV.t + "</span>" +
+    "</li>"
+  );
+  const tbodyRows = Array.from(tbody.children).slice(0, PSI.length);
+
+  $("kd-stock-open").textContent = fmtDec(D.stockOpen, 0);
+  $("kd-stock-end").textContent = fmtDec(D.stockEnd, 0);
+  $("kd-health-score").textContent = fmtDec(D.health, 1);
+  $("kd-health-worst").textContent = D.healthWorst.dim + " " + fmtDec(D.healthWorst.score, 0);
+  $("kd-rev-total").textContent = fmtDec(D.rev, 1);
+  $("kd-rev-online").textContent = fmtDec(D.revOnlineShare, 1) + "%";
+
+  /* ===== 9. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = {
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  };
+
+  /* 9.1 产销存全景三联柱线：产量柱 + 销量柱 + 期末库存线（同一 y 轴，量纲同为万台） */
+  const psi = makeChart("kd-chart-psi");
+  psi.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 6, right: 10, top: 32, bottom: 4, containLabel: true },
+    tooltip: Object.assign({
+      trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: (ps) => {
+        const r = PSI[ps[0].dataIndex];
+        return "<b>" + r.label + "</b>　产销率 " + fmtDec(r.psRate, 1) + "%<br/>" +
+          "期初 <b>" + r.open + "</b> 万台<br/>" +
+          "产量 <b style=\"color:" + C.cyan + "\">+" + r.prod + "</b> 万台　销量 <b style=\"color:" + C.orange + "\">−" + r.sale + "</b> 万台<br/>" +
+          "期末 <b>" + r.close + "</b> 万台（" + signed(r.delta, 0) + "）";
+      }
+    }, TIP),
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+      textStyle: { color: C.textDim, fontSize: 11 },
+      data: ["产量", "销量", "期末库存"]
+    },
+    xAxis: {
+      type: "category", data: PSI.map((r) => r.label),
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 10.5 })
+    },
+    yAxis: {
+      type: "value", name: "万台", nameTextStyle: { color: C.textDim, fontSize: 10 },
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    series: [
+      { name: "产量", type: "bar", barWidth: "26%", barGap: "12%", data: PROD,
+        itemStyle: { borderRadius: [3, 3, 0, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: C.cyan }, { offset: 1, color: "rgba(26,158,150,.35)" }]) } },
+      { name: "销量", type: "bar", barWidth: "26%", data: SALE,
+        itemStyle: { borderRadius: [3, 3, 0, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: C.orange }, { offset: 1, color: "rgba(255,157,69,.28)" }]) } },
+      { name: "期末库存", type: "line", smooth: true, symbol: "circle", symbolSize: 6, z: 5,
+        data: PSI.map((r) => r.close),
+        lineStyle: { width: 2.4, color: C.amber }, itemStyle: { color: C.amber },
+        markPoint: {
+          symbol: "pin", symbolSize: 34, silent: true,
+          itemStyle: { color: "rgba(255,95,107,.85)" },
+          label: { color: "#fff", fontSize: 10, formatter: "低" },
+          data: [{ coord: [PSI.indexOf(D.psiLow), D.psiLow.close] }]
+        } }
+    ]
+  });
+
+  /* 9.2 经营健康雷达六维：当前值 vs 目标值（★ 六维得分为 TODO 占位，加权算法为真） */
+  const radar = makeChart("kd-chart-radar");
+  radar.setOption({
+    backgroundColor: "transparent",
+    tooltip: Object.assign({
+      trigger: "item",
+      formatter: (p) => {
+        if (p.seriesIndex != null && p.data && p.data.value) {
+          return "<b>" + p.data.name + "</b><br/>" + TODO_HEALTH.map((h, i) => (
+            h.dim + " <b style=\"color:" + C.cyan + "\">" + fmtDec(p.data.value[i], 0) + "</b>" +
+            "　<span style=\"color:" + C.textDim + "\">权重 " + fmtDec(h.w * 100, 0) + "%</span>"
+          )).join("<br/>");
+        }
+        return "";
+      }
+    }, TIP),
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["本期得分", "目标线"]
+    },
+    radar: {
+      center: ["50%", "56%"], radius: "64%", splitNumber: 4, shape: "polygon",
+      indicator: TODO_HEALTH.map((h) => ({ name: h.dim, max: 100 })),
+      axisName: { color: "#bfe4e0", fontSize: 12.5, fontWeight: 700 },
+      axisLine: { lineStyle: { color: "rgba(64,196,190,.24)" } },
+      splitLine: { lineStyle: { color: "rgba(64,196,190,.18)" } },
+      splitArea: { areaStyle: { color: ["rgba(53,224,208,.04)", "transparent"] } }
+    },
+    series: [{
+      type: "radar", symbolSize: 5,
+      data: [
+        { name: "目标线", value: TODO_HEALTH.map(() => HEALTH_TARGET),
+          lineStyle: { color: C.orange, width: 1.6, type: "dashed" },
+          itemStyle: { color: C.orange }, areaStyle: { color: "rgba(255,157,69,.06)" } },
+        { name: "本期得分", value: TODO_HEALTH.map((h) => h.score),
+          lineStyle: { color: C.cyan, width: 2.4 }, itemStyle: { color: C.cyan },
+          areaStyle: { color: new echarts.graphic.RadialGradient(0.5, 0.5, 0.9, [
+            { offset: 0, color: "rgba(53,224,208,.06)" }, { offset: 1, color: "rgba(53,224,208,.34)" }]) } }
+      ]
+    }]
+  });
+
+  /* 9.3 渠道营收结构环形图：中心合计由分项现算 */
+  const channel = makeChart("kd-chart-channel");
+  channel.setOption({
+    backgroundColor: "transparent",
+    tooltip: Object.assign({
+      trigger: "item",
+      formatter: (p) => {
+        const c = CHANNELS[p.dataIndex];
+        return "<b>" + c.name + "</b><br/>营收 <b style=\"color:" + c.color + "\">" + fmtDec(c.v, 1) +
+          "</b> 亿元 · 占比 <b>" + fmtDec(c.share, 1) + "%</b><br/><span style=\"color:" + C.textDim + "\">" + c.note + "</span>";
+      }
+    }, TIP),
+    legend: {
+      show: true, orient: "vertical", right: 8, top: "center", itemWidth: 12, itemHeight: 8,
+      textStyle: { color: C.textDim, fontSize: 11.5 },
+      formatter: (n) => {
+        const c = CHANNELS.find((x) => x.name === n);
+        return n + "  " + fmtDec(c.v, 1) + " 亿 (" + fmtDec(c.share, 1) + "%)";
+      },
+      data: CHANNELS.map((c) => c.name)
+    },
+    series: [{
+      type: "pie", center: ["30%", "52%"], radius: ["48%", "72%"], avoidLabelOverlap: false,
+      itemStyle: { borderColor: "rgba(7,27,30,.9)", borderWidth: 2 },
+      label: {
+        show: true, position: "center", color: "#eafcfa",
+        formatter: () => "{a|" + fmtDec(D.rev, 1) + "}\n{b|亿元 · 年营收}",
+        rich: {
+          a: { fontSize: 24, fontWeight: 700, color: "#eafcfa", lineHeight: 30 },
+          b: { fontSize: 11, color: C.textDim, lineHeight: 16 }
+        }
+      },
+      emphasis: { label: { show: true }, scale: true, scaleSize: 6 },
+      labelLine: { show: false },
+      data: CHANNELS.map((c) => ({ name: c.name, value: c.v, itemStyle: { color: c.color } }))
+    }]
+  });
+
+  /* ===== 10. 底部关键风险清单（全部由上面的派生量现算，不另编数字） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "库存低点出现在 " + D.psiLow.label + "，期末仅 " + D.psiLow.close +
+        " 万台，当月产销缺口 " + signed(D.psiLow.prod - D.psiLow.sale, 0) + " 万台，畅销 SKU 存在断货风险" },
+    { lv: "高", c: C.red, t: D.lineWorstFail.name + " 市场故障率 " + fmtDec(D.lineWorstFail.fail, 2) +
+        "%，为六线最高，高出集团现算值 " + fmtDec(D.lineWorstFail.fail - D.fail, 2) + "pp（基地：" + D.lineWorstFail.base + "）" },
+    { lv: "中", c: C.orange, t: "库存周转 " + fmtDec(D.turnDays, 1) + " 天，超 " + TURN_TARGET + " 天目标 " +
+        fmtDec(D.turnDays - TURN_TARGET, 1) + " 天；平均库存 " + fmtDec(D.stockAvg, 1) + " 万台，年周转 " + fmtDec(D.turnTimes, 1) + " 次" },
+    { lv: "中", c: C.orange, t: "产销率最低月为 " + D.psiWorstPs.label + "（" + fmtDec(D.psiWorstPs.psRate, 1) +
+        "%），当月累库 " + signed(D.psiWorstPs.delta, 0) + " 万台，需关注库龄前移" },
+    { lv: "中", c: C.amber, t: "全年产量 " + fmtDec(D.out, 0) + " 万台高于销量 " + fmtDec(D.sale, 0) +
+        " 万台，净增库存 " + signed(D.netAdd, 0) + " 万台，期末 " + fmtDec(D.stockEnd, 0) + " 万台" },
+    { lv: "低", c: C.amber, t: "工程渠道 " + fmtDec(CHANNELS[2].v, 1) + " 亿元，占营收 " + fmtDec(CHANNELS[2].share, 1) +
+        "%，为三渠道最低；线上 " + fmtDec(CHANNELS[0].v, 1) + " 亿元占 " + fmtDec(CHANNELS[0].share, 1) + "% 已成主力" },
+    { lv: "低", c: C.green, t: "年售后工单 " + fmtDec(D.tickets, 1) + " 万单 = 保有量 " + fmtDec(D.own, 0) +
+        " 万台 × 故障率 " + fmtDec(D.fail, 2) + "%，与品质管理 / 售后服务两页同源" },
+    { lv: "低", c: C.green, t: "用户 NPS " + fmtDec(D.nps, 0) + " 分（样本 " + fmtDec(D.npsN, 0) + " 份，推荐 " +
+        fmtDec(D.npsPro, 1) + "% − 贬损 " + fmtDec(D.npsDet, 1) + "%），" + D.lineBestFail.name + " 故障率 " +
+        fmtDec(D.lineBestFail.fail, 2) + "% 为六线最优" }
+  ];
+  const track = $("kd-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="kd-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                      /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 11. 活性轮播：平衡表行 ↔ 全景图联动；宫格逐格扫描 ===== */
+  let psiIdx = 0;
+  function playPsi() {
+    tbodyRows.forEach((r, i) => r.classList.toggle("is-active", i === psiIdx));
+    psi.dispatchAction({ type: "showTip", seriesIndex: 2, dataIndex: psiIdx });
+    psiIdx = (psiIdx + 1) % PSI.length;
+  }
+  playPsi();
+  setInterval(playPsi, 2400);
+
+  let navIdx = 0;
+  function playNav() {
+    navCells.forEach((c, i) => c.classList.toggle("is-active", i === navIdx));
+    navIdx = (navIdx + 1) % navCells.length;
+  }
+  playNav();
+  setInterval(playNav, 1800);
+
+  let radarIdx = 0;
+  setInterval(() => {
+    radar.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    radar.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: radarIdx });
+    radarIdx = (radarIdx + 1) % 2;                              /* 两条雷达线（目标线 / 本期）交替 */
+  }, 3400);
+
+  let chIdx = 0;
+  setInterval(() => {
+    channel.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    channel.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: chIdx });
+    chIdx = (chIdx + 1) % CHANNELS.length;
+  }, 2800);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const balanceOk = PSI.every((r) => Math.abs(r.open + r.prod - r.sale - r.close) < 1e-9);
+  const chainOk = PSI.every((r, i) => i === 0 || Math.abs(r.open - PSI[i - 1].close) < 1e-9);
+  const checks = [
+    ["年营收 112.6 亿元 = 三渠道之和", Math.abs(D.rev - 112.6) < 1e-6],
+    ["年产量 902 万台 = 六产品线之和", Math.abs(D.out - 902) < 1e-6],
+    ["年产量 902 万台 = 三基地之和", Math.abs(D.outByBase - 902) < 1e-6],
+    ["年销量 866 万台 = 六产品线之和", Math.abs(D.sale - 866) < 1e-6],
+    ["产销存逐月平衡：期初 + 产量 − 销量 = 期末", balanceOk],
+    ["库存滚动：本月期初 = 上月期末", chainOk],
+    ["期末库存回到基准 118 万台", Math.abs(D.stockEnd - STOCK_END_BASE) < 1e-6],
+    ["月度产量合计 = 年产量基准", Math.abs(sum(PROD) - D.out) < 1e-6],
+    ["月度销量合计 = 年销量基准", Math.abs(sum(SALE) - D.sale) < 1e-6],
+    ["保有量 3227 万台 = 六产品线之和", Math.abs(D.own - 3227) < 1e-6],
+    ["年售后工单 ≈ 96.8 万单 = Σ(保有量 × 故障率)", Math.abs(D.tickets - 96.8) < 0.1],
+    ["市场故障率 ≈ 3.00% = 工单 ÷ 保有量", Math.abs(D.fail - 3.00) < 0.01],
+    ["渠道占比合计 = 100%", Math.abs(sum(CHANNELS.map((c) => c.share)) - 100) < 1e-6],
+    ["NPS 样本三分类之和 = 总样本", D.npsN === NPS_SURVEY.promoter + NPS_SURVEY.passive + NPS_SURVEY.detractor],
+    ["健康六维权重合计 = 1（分项值为 TODO 占位）", Math.abs(D.healthW - 1) < 1e-9],
+    ["导航宫格 = 12 格", NAV.length === 12]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[经营驾驶舱] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

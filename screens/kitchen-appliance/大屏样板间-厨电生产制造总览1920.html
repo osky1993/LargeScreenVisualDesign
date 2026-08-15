@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电生产制造总览</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --zz-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：六产品线产能明细（产品线 / 产量 / 计划 / 达成 / 直通率 / 判定） */
+    --zz-tcols: 84px 50px 50px 62px 1fr 46px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .zz-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 132px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .zz-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .zz-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .zz-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .zz-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .zz-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .zz-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .zz-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .zz-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .zz-crumb em { font-style: normal; color: #cfeae7; }
+  .zz-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .zz-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .zz-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .zz-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .zz-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .zz-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .zz-chips { display: flex; align-items: center; gap: 9px; }
+  .zz-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .zz-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .zz-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .zz-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .zz-chip.is-key b { color: var(--mfg-cyan); }
+  .zz-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .zz-clock-time { font: 700 26px/1 var(--zz-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .zz-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .zz-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .zz-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .zz-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .zz-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .zz-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .zz-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .zz-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .zz-kpi.is-warn .zz-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .zz-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .zz-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .zz-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .zz-kpi-val { font: 700 30px/1 var(--zz-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .zz-kpi.is-warn .zz-kpi-val { color: #ffd9b0; }
+  .zz-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .zz-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zz-kpi-sub b { font-weight: 700; }
+  .zz-up { color: var(--mfg-green); }
+  .zz-down { color: var(--mfg-red); }
+
+  /* ===== 三栏主体 ===== */
+  .zz-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .zz-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .zz-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .zz-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .zz-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .zz-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .zz-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .zz-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  /* ★ 图表容器的 flex:1 只在直接父级也是 flex 容器时才有高度：.zz-panel 本身即 flex 列，
+       所以 .zz-chart 直接挂在 .zz-panel 下，中间不套任何非 flex 的 wrapper。 */
+  .zz-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 三大基地产能看板 ===== */
+  .zz-bases { flex: none; display: flex; flex-direction: column; gap: 8px; }
+  .zz-base-row {
+    position: relative; display: grid; grid-template-columns: 30px 1fr 62px 92px; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 9px;
+    border: 1px solid rgba(64, 196, 190, 0.16); background: rgba(10, 38, 42, 0.5);
+    transition: border-color .25s, background .25s;
+  }
+  .zz-base-row.is-active { border-color: rgba(53, 224, 208, 0.6); background: rgba(18, 68, 68, 0.55); box-shadow: inset 0 0 16px rgba(53, 224, 208, 0.12); }
+  .zz-base-row.is-building { border-style: dashed; border-color: rgba(169, 140, 245, 0.34); background: rgba(28, 26, 54, 0.4); }
+  .zz-base-no {
+    width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font: 700 14px/1 var(--zz-mono); color: #04191a;
+  }
+  .zz-base-name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .zz-base-name b { font-size: 13.5px; font-weight: 700; letter-spacing: 0.04em; color: #d6efec; }
+  .zz-base-name span { font-size: 11px; color: rgba(127, 166, 163, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zz-base-num { text-align: right; font-variant-numeric: tabular-nums; }
+  .zz-base-num b { display: block; font: 700 17px/1.1 var(--zz-mono); }
+  .zz-base-num span { font-size: 10px; color: var(--mfg-text-dim); }
+  .zz-base-bar { display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
+  .zz-base-track { width: 100%; height: 6px; border-radius: 3px; background: rgba(64, 196, 190, 0.14); overflow: hidden; }
+  .zz-base-track i { display: block; height: 100%; border-radius: 3px; transition: width .8s ease-out; }
+  .zz-base-bar em { font-style: normal; text-align: right; font: 700 12px/1 var(--zz-mono); font-variant-numeric: tabular-nums; }
+  .zz-base-bar em small { font-size: 9.5px; font-weight: 400; color: rgba(127, 166, 163, 0.8); margin-right: 3px; }
+
+  /* ===== CSS grid 模拟表格 ===== */
+  .zz-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .zz-thead, .zz-tbody li {
+    display: grid; grid-template-columns: var(--zz-tcols); align-items: center; gap: 6px;
+  }
+  .zz-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .zz-thead span:not(:first-child), .zz-tbody li span:not(:first-child) { text-align: right; }
+  .zz-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .zz-tbody li {
+    padding: 0 8px; height: 30px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .zz-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .zz-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .zz-tbody li b { font-weight: 700; color: #eafcfa; }
+  .zz-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .zz-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .zz-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .zz-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+
+  /* ===== 底部预警滚动条 ===== */
+  .zz-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .zz-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .zz-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: zz-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes zz-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .zz-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .zz-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .zz-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .zz-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .zz-foot-item b { font-weight: 700; }
+  .zz-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .zz-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="zz-stage" id="zz-stage">
+    <!-- mockflag:begin --><div class="zz-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="zz-error" id="zz-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，「模拟数据」标识由 tools/inject_mock_flag.py 注入） -->
+    <header class="zz-header">
+      <div class="zz-head-left">
+        <div class="zz-crumb"><b>云麓厨电</b><i>›</i><em>生产制造总览</em></div>
+        <div class="zz-head-title-row">
+          <div class="zz-head-title">生产制造总览</div>
+          <div class="zz-head-meta">
+            <span><b>3</b> 大基地 · <b>18</b> 条产线</span><i>|</i>
+            <span><b>6</b> 大产品线</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="zz-head-right">
+        <div class="zz-chips">
+          <div class="zz-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="zz-chip is-key"><span>ANNUAL OUTPUT</span><b id="zz-chip-out">--</b></div>
+        </div>
+        <div class="zz-clock" aria-label="实时时钟">
+          <span class="zz-clock-time" id="zz-clock-time">--:--:--</span>
+          <span class="zz-clock-date" id="zz-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="zz-band" id="zz-band"></div>
+
+    <!-- 左栏 -->
+    <div class="zz-col">
+      <section class="zz-panel" id="zz-base-race" style="flex: 1;">
+        <div class="zz-panel-head">
+          <h2>三基地产量竞速</h2>
+          <span class="zz-panel-tag">回放 <b id="zz-race-m">--</b> · 累计 <b id="zz-race-cum">--</b> 万台</span>
+        </div>
+        <div class="zz-chart" id="zz-chart-race" role="img" aria-label="三大生产基地累计产量逐月动态排序柱"></div>
+      </section>
+      <section class="zz-panel" style="flex: 1;">
+        <div class="zz-panel-head">
+          <h2>三基地 OEE 设备综合效率</h2>
+          <span class="zz-panel-tag">加权 <b id="zz-oee-w">--</b> · 目标 85.0%</span>
+        </div>
+        <div class="zz-chart" id="zz-chart-oee" role="img" aria-label="三大生产基地设备综合效率三联仪表"></div>
+      </section>
+    </div>
+
+    <!-- 中栏 -->
+    <div class="zz-col">
+      <section class="zz-panel" style="flex: 1.34;">
+        <div class="zz-panel-head">
+          <h2>基地 × 产品线产能甘特</h2>
+          <span class="zz-panel-tag">今日线 <b>2026-07-31</b> · 待执行窗口 <b id="zz-gantt-win">--</b> 个</span>
+        </div>
+        <div class="zz-chart" id="zz-chart-gantt" role="img" aria-label="基地与产品线年度排产甘特图，含检修换型窗口与今日线"></div>
+      </section>
+      <section class="zz-panel" style="flex: 1;">
+        <div class="zz-panel-head">
+          <h2>六产品线计划达成</h2>
+          <span class="zz-panel-tag">计划 <b id="zz-plan-total">--</b> 万台 · 达成 <b id="zz-plan-achv">--</b></span>
+        </div>
+        <div class="zz-chart" id="zz-chart-bullet" role="img" aria-label="六大产品线计划达成子弹图"></div>
+      </section>
+    </div>
+
+    <!-- 右栏 -->
+    <div class="zz-col">
+      <section class="zz-panel" id="zz-base-scope" style="flex: none;">
+        <div class="zz-panel-head">
+          <h2>三大基地产能看板</h2>
+          <span class="zz-panel-tag">三基地合计 <b id="zz-base-sum">--</b> 万台</span>
+        </div>
+        <div class="zz-bases" id="zz-bases"></div>
+      </section>
+      <section class="zz-panel" id="zz-line-scope" style="flex: 1;">
+        <div class="zz-panel-head">
+          <h2>六产品线产能明细</h2>
+          <span class="zz-panel-tag">六线合计 <b id="zz-line-sum">--</b> 万台</span>
+        </div>
+        <div class="zz-table">
+          <div class="zz-thead">
+            <span>产品线</span><span>产量</span><span>计划</span><span>达成</span><span>直通率</span><span>判定</span>
+          </div>
+          <ul class="zz-tbody" id="zz-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部预警滚动条 -->
+    <div class="zz-foot">
+      <div class="zz-foot-tag">生产预警</div>
+      <div class="zz-foot-view"><div class="zz-foot-track" id="zz-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("zz-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("zz-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const DAY_MS = 86400000;
+  const d26 = (m, d) => new Date(2026, m - 1, d).getTime();      /* 期次年份固定，kiosk 每次打开一致 */
+  const ymd = (ms) => { const d = new Date(ms); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         口径与全系列基准盘一致：年产量 902 万台 = 六产品线之和 = 三基地之和；
+         年销量 866 万台、成品库存 118 万台、制程直通率 FPY 96.42%（按产量加权现算）。
+         合计一律由分项求和，比率一律现算，页面上不出现任何硬编码的合计值。 ===== */
+
+  const SALES_Y = 866;          /* 年销量（基准盘，跨页同值） */
+  const STOCK_Y = 118;          /* 成品库存（基准盘，跨页同值） */
+  const OEE_TARGET = 85;        /* OEE 目标线 */
+
+  /* 4.1 六大产品线：产量 out / 计划 plan（万台） · 制程直通率 fpy（%，与品质管理页同源） */
+  const LINES = [
+    { name: "吸油烟机",   short: "烟机", base: "hz", out: 236, plan: 232, fpy: 96.8 },
+    { name: "燃气灶具",   short: "灶具", base: "hz", out: 218, plan: 220, fpy: 97.2 },
+    { name: "洗碗机",     short: "洗碗", base: "wh", out: 132, plan: 126, fpy: 95.2 },
+    { name: "蒸烤一体机", short: "蒸烤", base: "wh", out:  96, plan: 100, fpy: 94.4 },
+    { name: "集成灶",     short: "集成", base: "fs", out: 108, plan: 106, fpy: 96.1 },
+    { name: "净水热水",   short: "净水", base: "fs", out: 112, plan: 107, fpy: 97.6 }
+  ];
+
+  /* 4.2 三大基地：产量/计划不写死，全部由所属产品线求和 —— 这就是「两个维度收敛到同一总量」的实现。
+         OEE 三因子：时间开动率 a × 性能开动率 p × 良品率 q（%），OEE 由三者现算，不另填数字。 */
+  const BASES = [
+    { key: "hz", name: "杭州临平", short: "临平", city: "杭州", lines: 8, color: C.cyan,   a: 92.5, p: 94.8, q: 98.5 },
+    { key: "wh", name: "安徽芜湖", short: "芜湖", city: "芜湖", lines: 5, color: C.blue,   a: 88.2, p: 92.4, q: 97.9 },
+    { key: "fs", name: "广东佛山", short: "佛山", city: "佛山", lines: 5, color: C.violet, a: 90.4, p: 93.6, q: 98.3 }
+  ];
+  /* 叙事彩蛋：成都基地在建，规划产能不计入本年产能合计（out 恒为 0，勾稽自检里明确验这一条） */
+  const INCUBATOR = { name: "成都基地", short: "成都", note: "在建 · 规划 120 万台 · 2027 投产", out: 0, plan: 0, progress: 62 };
+
+  /* 4.3 甘特窗口：每条产品线的年度排产 / 检修 / 换型段（[月, 日] → 2026 年内）
+         排产段不写计划量，由「产品线年产量 × 该段天数 ÷ 该线排产总天数」现算并由末段吸收舍入，
+         保证「甘特各排产段之和 = 该产品线年产量」这条勾稽严格成立。 */
+  const SEG_TYPE = {
+    prod:   { t: "排产",     color: null,      thick: 0.56 },
+    change: { t: "换型试制", color: C.blue,    thick: 0.40 },
+    maint:  { t: "计划检修", color: C.orange,  thick: 0.40 },
+    build:  { t: "厂房土建", color: "rgba(169,140,245,.42)", thick: 0.34 },
+    equip:  { t: "设备安装", color: "rgba(169,140,245,.62)", thick: 0.34 },
+    pilot:  { t: "试产调试", color: C.amber,   thick: 0.34 }
+  };
+  const LINE_WINDOWS = [
+    /* 烟机 */ [["prod", [1, 1], [4, 18]], ["maint", [4, 19], [4, 27]], ["prod", [4, 28], [8, 9]], ["change", [8, 10], [8, 18]], ["prod", [8, 19], [12, 31]]],
+    /* 灶具 */ [["prod", [1, 1], [3, 22]], ["change", [3, 23], [3, 29]], ["prod", [3, 30], [7, 26]], ["maint", [7, 27], [8, 4]], ["prod", [8, 5], [12, 31]]],
+    /* 洗碗 */ [["prod", [1, 1], [5, 10]], ["maint", [5, 11], [5, 20]], ["prod", [5, 21], [9, 13]], ["change", [9, 14], [9, 21]], ["prod", [9, 22], [12, 31]]],
+    /* 蒸烤 */ [["prod", [1, 1], [2, 15]], ["change", [2, 16], [2, 26]], ["prod", [2, 27], [6, 21]], ["maint", [6, 22], [7, 2]], ["prod", [7, 3], [10, 11]], ["change", [10, 12], [10, 19]], ["prod", [10, 20], [12, 31]]],
+    /* 集成 */ [["prod", [1, 1], [4, 5]], ["maint", [4, 6], [4, 14]], ["prod", [4, 15], [9, 6]], ["change", [9, 7], [9, 14]], ["prod", [9, 15], [12, 31]]],
+    /* 净水 */ [["prod", [1, 1], [6, 7]], ["maint", [6, 8], [6, 16]], ["prod", [6, 17], [11, 8]], ["change", [11, 9], [11, 15]], ["prod", [11, 16], [12, 31]]]
+  ];
+  const INCUBATOR_WINDOWS = [["build", [1, 1], [6, 30]], ["equip", [7, 1], [10, 15]], ["pilot", [10, 16], [12, 31]]];
+
+  const TODAY_MS = d26(7, 31);                                   /* 今日线 = 数据截至日，固定不取系统时间 */
+
+  /* ===== 4.4 派生量：全部现算，不复制数字 ===== */
+  const D = {};
+
+  /* 产品线 → 基地：基地产量/计划 = 其下属产品线之和 */
+  const BY_KEY = {};
+  BASES.forEach((b) => {
+    BY_KEY[b.key] = b;
+    b.lineRefs = LINES.filter((l) => l.base === b.key);
+    b.out = sum(b.lineRefs.map((l) => l.out));
+    b.plan = sum(b.lineRefs.map((l) => l.plan));
+    b.achv = b.out / b.plan * 100;
+    b.oee = b.a * b.p * b.q / 1e4;                                /* OEE = A × P × Q */
+    b.lineNames = b.lineRefs.map((l) => l.name).join(" · ");
+  });
+  LINES.forEach((l) => { l.baseName = BY_KEY[l.base].name; l.baseShort = BY_KEY[l.base].short; l.color = BY_KEY[l.base].color; });
+
+  D.outByLine = sum(LINES.map((l) => l.out));                     /* 902（六产品线维度） */
+  D.outByBase = sum(BASES.map((b) => b.out));                     /* 902（三基地维度） */
+  D.out = D.outByBase;
+  D.plan = sum(LINES.map((l) => l.plan));                         /* 891 */
+  D.achv = D.out / D.plan * 100;                                  /* 计划达成率 */
+  D.gap = D.out - D.plan;
+  D.lineCnt = sum(BASES.map((b) => b.lines));                     /* 18 条产线 */
+  D.oee = sum(BASES.map((b) => b.oee * b.out)) / D.outByBase;     /* 综合 OEE：按产量加权 */
+  D.fpy = sum(LINES.map((l) => l.fpy * l.out)) / D.outByLine;     /* 制程直通率：按产量加权 → 96.42% */
+  D.ps = SALES_Y / D.out * 100;                                   /* 产销率 */
+  D.psGap = D.out - SALES_Y;                                      /* 产量 − 销量 → 库存净增 + 在途 */
+
+  /* 产品线达成判定 */
+  LINES.forEach((l) => {
+    l.achv = l.out / l.plan * 100;
+    l.verdict = l.achv >= 100 ? { t: "达标", c: "is-good" }
+              : l.achv >= 97 ? { t: "关注", c: "is-mid" }
+              : { t: "预警", c: "is-bad" };
+  });
+  D.lineMiss = LINES.filter((l) => l.achv < 100).length;
+  D.lineWorst = LINES.slice().sort((a, b) => a.achv - b.achv)[0];
+  D.lineBest = LINES.slice().sort((a, b) => b.achv - a.achv)[0];
+  D.oeeWorst = BASES.slice().sort((a, b) => a.oee - b.oee)[0];
+  D.oeeBest = BASES.slice().sort((a, b) => b.oee - a.oee)[0];
+
+  /* 4.5 逐月产量序列：确定性波形（不用 Math.random，kiosk 每次打开必须一致），
+         按权重归一化后 × 年产量，故 12 个月之和严格等于年产量。 */
+  const MONTHS = Array.from({ length: 12 }, (_, i) => (i + 1) + "月");
+  BASES.forEach((b, j) => {
+    const w = Array.from({ length: 12 }, (_, i) =>
+      1 + 0.17 * Math.sin(i * 0.72 + j * 2.1) + 0.09 * Math.sin(i * 1.45 + j * 0.8) + 0.05 * Math.sin(i * 2.3 + j));
+    const wSum = sum(w);
+    b.monthly = w.map((v) => v / wSum * b.out);
+    b.cum = [];
+    b.monthly.reduce((acc, v, i) => { const c = acc + v; b.cum[i] = c; return c; }, 0);
+    b.cum[11] = b.out;                                            /* 末月锚定，消除浮点尾差 */
+  });
+
+  /* 4.6 甘特段：排产量按天数比例现算，末段吸收舍入 */
+  const GANTT = [];
+  LINES.forEach((l, li) => {
+    const wins = LINE_WINDOWS[li].map((w) => ({
+      type: w[0], s: d26(w[1][0], w[1][1]), e: d26(w[2][0], w[2][1]) + DAY_MS - 1
+    }));
+    const prodWins = wins.filter((w) => w.type === "prod");
+    const prodDays = sum(prodWins.map((w) => (w.e - w.s) / DAY_MS));
+    let acc = 0;
+    prodWins.forEach((w, k) => {
+      if (k === prodWins.length - 1) { w.qty = l.out - acc; }      /* 末段吸收，保证严格求和 */
+      else { w.qty = l.out * ((w.e - w.s) / DAY_MS) / prodDays; acc += w.qty; }
+    });
+    wins.forEach((w) => { if (w.qty == null) w.qty = 0; });
+    l.segs = wins;
+    l.prodDays = prodDays;
+    l.downDays = sum(wins.filter((w) => w.type !== "prod").map((w) => (w.e - w.s) / DAY_MS));
+    wins.forEach((w) => GANTT.push({ row: li, line: l, type: w.type, s: w.s, e: w.e, qty: w.qty }));
+  });
+  INCUBATOR_WINDOWS.forEach((w) => GANTT.push({
+    row: LINES.length, line: null, type: w[0], s: d26(w[1][0], w[1][1]), e: d26(w[2][0], w[2][1]) + DAY_MS - 1, qty: 0
+  }));
+  const GANTT_ROWS = LINES.map((l) => l.baseShort + " · " + l.short).concat([INCUBATOR.short + " · 在建"]);
+  D.stopWins = GANTT.filter((g) => g.type === "change" || g.type === "maint");
+  D.stopFuture = D.stopWins.filter((g) => g.s > TODAY_MS);
+  D.stopDays = sum(LINES.map((l) => l.downDays));
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("zz-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("zz-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("zz-chip-out").textContent = fmtDec(D.out, 0) + " 万台";
+
+  /* ===== 6. KPI 带：5 枚，数值翻牌缓动 ===== */
+  const KPI_DEFS = [
+    { icon: "⚙", label: "年产量", val: D.out, unit: "万台", dec: 0, warn: false,
+      sub: () => "<b>3</b> 大基地 · <b>" + D.lineCnt + "</b> 条产线 · <b>6</b> 大产品线" },
+    { icon: "◎", label: "计划达成率", val: D.achv, unit: "%", dec: 2, warn: false,
+      sub: () => "计划 <b>" + fmtDec(D.plan, 0) + "</b> 万台 · 超产 <b class=\"zz-up\">" + signed(D.gap, 0) + "</b> 万台" },
+    { icon: "⛭", label: "综合 OEE", val: D.oee, unit: "%", dec: 2, warn: true,
+      sub: () => "按产量加权 · 低于目标 <b class=\"zz-down\">" + fmtDec(OEE_TARGET - D.oee, 2) + "pp</b>" },
+    { icon: "⇄", label: "产销率", val: D.ps, unit: "%", dec: 2, warn: false,
+      sub: () => "销量 <b>" + SALES_Y + "</b> 万台 · 差额 <b>" + fmtDec(D.psGap, 0) + "</b> 万台转库存与在途" },
+    { icon: "✓", label: "制程直通率 FPY", val: D.fpy, unit: "%", dec: 2, warn: false,
+      sub: () => "按产量加权 · 与品质管理页同源" }
+  ];
+  const band = $("zz-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="zz-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="zz-kpi-icon">' + k.icon + "</div>" +
+      '<div class="zz-kpi-main">' +
+        '<div class="zz-kpi-label">' + k.label + "</div>" +
+        '<div class="zz-kpi-num"><span class="zz-kpi-val" id="zz-kpi-' + i + '">0</span><span class="zz-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="zz-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值（验证勾稽请等收敛后再看） */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("zz-kpi-" + i), k.val, k.dec));
+
+  /* ===== 7. 三大基地产能看板（右栏上，下钻「基地生产详情」的挂载点 #zz-base-scope） ===== */
+  const basesBox = $("zz-bases");
+  basesBox.innerHTML = BASES.map((b, i) => (
+    '<div class="zz-base-row" data-i="' + i + '">' +
+      '<div class="zz-base-no" style="background:' + b.color + '">' + (i + 1) + "</div>" +
+      '<div class="zz-base-name"><b>' + b.name + "</b><span>" + b.lineNames + " · " + b.lines + " 条线</span></div>" +
+      '<div class="zz-base-num"><b style="color:' + b.color + '">' + fmtDec(b.out, 0) + "</b><span>万台</span></div>" +
+      '<div class="zz-base-bar">' +
+        '<div class="zz-base-track"><i style="width:' + Math.min(100, b.achv).toFixed(1) + "%;background:" + (b.achv >= 100 ? C.green : C.orange) + '"></i></div>' +
+        '<em style="color:' + (b.achv >= 100 ? C.green : C.orange) + '"><small>达成</small>' + fmtDec(b.achv, 2) + "%</em>" +
+      "</div>" +
+    "</div>"
+  )).join("") + (
+    '<div class="zz-base-row is-building">' +
+      '<div class="zz-base-no" style="background:rgba(169,140,245,.5);color:#efe7ff">◷</div>' +
+      '<div class="zz-base-name"><b style="color:#c9b6ff">' + INCUBATOR.name + "</b><span>" + INCUBATOR.note + "</span></div>" +
+      '<div class="zz-base-num"><b style="color:rgba(169,140,245,.85)">—</b><span>不计合计</span></div>' +
+      '<div class="zz-base-bar">' +
+        '<div class="zz-base-track"><i style="width:' + INCUBATOR.progress + '%;background:' + C.violet + '"></i></div>' +
+        '<em style="color:' + C.violet + '"><small>建设</small>' + INCUBATOR.progress + "%</em>" +
+      "</div>" +
+    "</div>"
+  );
+  const baseRows = Array.from(basesBox.children).slice(0, BASES.length);
+  $("zz-base-sum").textContent = fmtDec(D.outByBase, 0);
+
+  /* ===== 8. 六产品线产能明细表（右栏下） ===== */
+  const tbody = $("zz-tbody");
+  tbody.innerHTML = LINES.map((l, i) => (
+    "<li data-i=\"" + i + "\">" +
+      "<span><b>" + l.name + "</b></span>" +
+      "<span>" + fmtDec(l.out, 0) + "</span>" +
+      "<span>" + fmtDec(l.plan, 0) + "</span>" +
+      "<span style=\"color:" + (l.achv >= 100 ? C.green : l.achv >= 97 ? C.amber : C.red) + "\">" + fmtDec(l.achv, 1) + "%</span>" +
+      "<span style=\"color:" + (l.fpy < 95 ? C.orange : "#cbe6e3") + "\">" + fmtDec(l.fpy, 1) + "%</span>" +
+      '<span class="zz-badge ' + l.verdict.c + '">' + l.verdict.t + "</span>" +
+    "</li>"
+  )).join("");
+  const tbodyRows = Array.from(tbody.children);
+  $("zz-line-sum").textContent = fmtDec(D.outByLine, 0);
+  $("zz-plan-total").textContent = fmtDec(D.plan, 0);
+  $("zz-plan-achv").textContent = fmtDec(D.achv, 2) + "%";
+  $("zz-oee-w").textContent = fmtDec(D.oee, 2) + "%";
+  $("zz-gantt-win").textContent = D.stopFuture.length;
+
+  /* ===== 9. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: from }, { offset: 1, color: to }]);
+  const TIP = (extra) => Object.assign({
+    confine: true, backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line,
+    textStyle: { color: C.text, fontSize: 12 }
+  }, extra || {});
+
+  /* 9.1 三基地产量动态排序柱（realtimeSort + setInterval 逐月回放）
+         数据项写成对象并自带 itemStyle：排序时颜色跟着基地走，不会因 dataIndex 变化而串色。 */
+  const race = makeChart("zz-chart-race");
+  const raceItem = (b, v) => ({
+    name: b.short, value: Number(v.toFixed(2)),
+    itemStyle: { borderRadius: [0, 4, 4, 0], color: hGrad(b.color + "55", b.color) }
+  });
+  function raceData(m) { return BASES.map((b) => raceItem(b, b.cum[m - 1])); }
+  race.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 6, right: 84, top: 22, bottom: 8, containLabel: true },
+    tooltip: TIP({
+      trigger: "item",
+      formatter: (p) => {
+        const b = BASES.filter((x) => x.short === p.name)[0];
+        const m = raceMonth;
+        return "<b style=\"color:" + b.color + "\">" + b.name + "</b><br/>" +
+          "累计至 " + m + " 月 <b>" + fmtDec(b.cum[m - 1], 1) + "</b> 万台<br/>" +
+          "当月 <b>" + fmtDec(b.monthly[m - 1], 1) + "</b> 万台<br/>" +
+          "<span style=\"color:" + C.textDim + "\">全年 " + fmtDec(b.out, 0) + " 万台 · " + b.lines + " 条线 · " + b.lineNames + "</span>";
+      }
+    }),
+    xAxis: {
+      type: "value", max: "dataMax",
+      axisLine: { show: false }, axisTick: { show: false },
+      splitLine: SPLIT_LINE,
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10.5, formatter: (v) => fmtDec(v, 0) })
+    },
+    yAxis: {
+      type: "category", inverse: true, max: BASES.length - 1,
+      data: BASES.map((b) => b.short),
+      axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: { color: "#cfe9e6", fontSize: 13, fontWeight: 700, margin: 10 },
+      animationDuration: 300, animationDurationUpdate: 300
+    },
+    graphic: [{
+      type: "text", id: "zz-race-month", right: 14, bottom: 6, silent: true,
+      style: { text: "1 月", fill: "rgba(53,224,208,.20)", fontSize: 40, fontWeight: 700, textAlign: "right" }
+    }],
+    series: [{
+      id: "zz-race-bar", type: "bar", realtimeSort: true, barWidth: "44%",
+      data: raceData(1),
+      label: {
+        show: true, position: "right", valueAnimation: true,
+        color: "#eafcfa", fontSize: 12.5, fontWeight: 700,
+        formatter: (p) => fmtDec(p.value, 1) + " 万台"
+      }
+    }],
+    animationDuration: 260, animationDurationUpdate: 820,
+    animationEasing: "linear", animationEasingUpdate: "linear"
+  });
+
+  let raceMonth = 1, raceHold = 0;
+  function drawRace(m) {
+    raceMonth = m;
+    race.setOption({
+      series: [{ id: "zz-race-bar", type: "bar", data: raceData(m) }],
+      graphic: [{ id: "zz-race-month", style: { text: m + " 月" } }]
+    });
+    $("zz-race-m").textContent = m + " 月";
+    $("zz-race-cum").textContent = fmtDec(sum(BASES.map((b) => b.cum[m - 1])), 1);
+  }
+  drawRace(1);
+  setInterval(() => {
+    if (raceMonth === 12) { if (raceHold < 3) { raceHold++; return; } raceHold = 0; drawRace(1); return; }
+    drawRace(raceMonth + 1);
+  }, 1250);
+
+  /* 9.2 三基地 OEE 三联仪表：OEE = 时间开动率 A × 性能开动率 P × 良品率 Q（现算）
+         轨道上 85% 处留一道橙色目标刻线（用 axisLine 的分段色实现，不额外画图元）。 */
+  const oee = makeChart("zz-chart-oee");
+  const OEE_MIN = 60, OEE_MAX = 100;
+  const tgtPos = (OEE_TARGET - OEE_MIN) / (OEE_MAX - OEE_MIN);
+  oee.setOption({
+    backgroundColor: "transparent",
+    tooltip: TIP({
+      trigger: "item",
+      formatter: (p) => {
+        const b = BASES.filter((x) => x.name === p.name)[0];
+        return "<b style=\"color:" + b.color + "\">" + b.name + "</b><br/>" +
+          "OEE <b>" + fmtDec(b.oee, 2) + "%</b> = A " + fmtDec(b.a, 1) + "% × P " + fmtDec(b.p, 1) + "% × Q " + fmtDec(b.q, 1) + "%<br/>" +
+          "产量 <b>" + fmtDec(b.out, 0) + "</b> 万台 · " + b.lines + " 条线<br/>" +
+          "<span style=\"color:" + (b.oee >= OEE_TARGET ? C.green : C.orange) + "\">较目标 " + signed(b.oee - OEE_TARGET, 2) + "pp</span>";
+      }
+    }),
+    series: BASES.map((b, i) => ({
+      type: "gauge", center: [(16.6 + i * 33.4) + "%", "50%"], radius: 66,
+      min: OEE_MIN, max: OEE_MAX, startAngle: 212, endAngle: -32, splitNumber: 4,
+      progress: { show: true, width: 8, roundCap: true, itemStyle: { color: b.color, shadowColor: b.color, shadowBlur: 8 } },
+      axisLine: { lineStyle: { width: 8, color: [
+        [tgtPos - 0.004, "rgba(64,196,190,.16)"],
+        [tgtPos + 0.004, C.orange],
+        [1, "rgba(64,196,190,.16)"]
+      ] } },
+      axisTick: { show: false },
+      splitLine: { length: 7, distance: 2, lineStyle: { color: "rgba(64,196,190,.3)", width: 1 } },
+      axisLabel: { show: false },
+      pointer: { show: true, length: "58%", width: 3, itemStyle: { color: b.color } },
+      anchor: { show: true, size: 7, showAbove: true, itemStyle: { color: b.color } },
+      detail: {
+        valueAnimation: true, offsetCenter: [0, "56%"],
+        formatter: (v) => "{v|" + fmtDec(v, 2) + "%}\n{s|A " + fmtDec(b.a, 1) + " P " + fmtDec(b.p, 1) + " Q " + fmtDec(b.q, 1) + "}",
+        rich: {
+          v: { color: b.oee >= OEE_TARGET ? b.color : C.orange, fontSize: 16, fontWeight: 700, lineHeight: 20 },
+          s: { color: "#5f8a87", fontSize: 9.5, lineHeight: 13 }
+        }
+      },
+      title: { show: true, offsetCenter: [0, "97%"], color: "#cfe9e6", fontSize: 12, fontWeight: 700 },
+      data: [{ value: b.oee, name: b.name }],
+      animationDuration: 1200
+    }))
+  });
+
+  /* 9.3 基地 × 产品线产能甘特（本页招牌图，custom 系列 + renderItem）
+         · 坐标系是 time × category，encode 把 value[1]/value[2] 映射到 x、value[0] 映射到 y；
+         · 今日线挂在 dataIndex 0 的 renderItem 里（最稳，不会被 clip 掉也不依赖 markLine 的类目对齐）；
+         · custom 系列没有内建 emphasis，巡航高亮靠整份替换 data 的 itemStyle 实现。 */
+  const gantt = makeChart("zz-chart-gantt");
+  const AX_MIN = d26(1, 1) - 3 * DAY_MS;
+  const AX_MAX = d26(12, 31) + 4 * DAY_MS;
+
+  function segStyle(g, focused) {
+    const st = SEG_TYPE[g.type];
+    const base = g.type === "prod"
+      ? { color: hGrad(g.line.color + "cc", g.line.color + "55"), opacity: 0.96 }
+      : { color: st.color, opacity: 0.9 };
+    if (g.type === "maint") { base.shadowColor = "rgba(255,157,69,.5)"; base.shadowBlur = 8; }
+    if (focused) {
+      base.borderColor = "rgba(255,255,255,.9)"; base.borderWidth = 1.3;
+      base.shadowColor = "rgba(255,255,255,.55)"; base.shadowBlur = 12; base.opacity = 1;
+    }
+    return base;
+  }
+  /* value = [行号, 起ms, 止ms, 段类型索引, 计划量] */
+  const TYPE_KEYS = Object.keys(SEG_TYPE);
+  const ganttValue = (g) => [g.row, g.s, g.e, TYPE_KEYS.indexOf(g.type), Number(g.qty.toFixed(3))];
+  const ganttData = (focusRow) => GANTT.map((g) => ({
+    name: g.type, value: ganttValue(g), itemStyle: segStyle(g, focusRow === g.row)
+  }));
+
+  function todayMark(params, api) {
+    const x = api.coord([TODAY_MS, 0])[0];
+    const cs = params.coordSys;
+    if (x < cs.x || x > cs.x + cs.width) return null;
+    return {
+      type: "group", silent: true,
+      children: [
+        { type: "line", shape: { x1: x, y1: cs.y - 8, x2: x, y2: cs.y + cs.height },
+          style: { stroke: "rgba(255,255,255,.85)", lineWidth: 1.4, lineDash: [5, 4] } },
+        { type: "text", style: { text: "今日 07-31", x: x + 6, y: cs.y - 6, fill: "#dff3f0", fontSize: 10 } }
+      ]
+    };
+  }
+  function ganttItem(params, api) {
+    const row = api.value(0);
+    const st = api.coord([api.value(1), row]);
+    const en = api.coord([api.value(2), row]);
+    const rowH = api.size([0, 1])[1];
+    const type = TYPE_KEYS[api.value(3)];
+    const h = rowH * SEG_TYPE[type].thick;
+    const qty = api.value(4);
+    const rect = echarts.graphic.clipRectByRect(
+      { x: st[0], y: st[1] - h / 2, width: Math.max(en[0] - st[0], 2), height: h },
+      { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height }
+    );
+    const children = [];
+    if (params.dataIndex === 0) { const tm = todayMark(params, api); if (tm) children.push(tm); }
+    if (rect) {
+      children.push({ type: "rect", shape: Object.assign({ r: 3 }, rect), style: api.style() });
+      const label = type === "prod" ? fmtDec(qty, 1) + " 万台" : SEG_TYPE[type].t;
+      const need = type === "prod" ? 74 : 60;
+      if (rect.width > need) {
+        children.push({ type: "text", silent: true, style: {
+          text: label, x: rect.x + 7, y: rect.y + rect.height / 2,
+          fill: type === "prod" ? "#04191a" : (type === "maint" ? "#3a2405" : "#efe7ff"),
+          fontSize: 10.5, fontWeight: 700, verticalAlign: "middle"
+        } });
+      }
+    }
+    return { type: "group", children: children };
+  }
+
+  gantt.setOption({
+    backgroundColor: "transparent",
+    tooltip: TIP({
+      trigger: "item",
+      formatter: (p) => {
+        const g = GANTT[p.dataIndex];
+        const days = Math.round((g.e - g.s) / DAY_MS);
+        if (!g.line) {
+          return "<b style=\"color:" + C.violet + "\">" + INCUBATOR.name + " · " + SEG_TYPE[g.type].t + "</b><br/>" +
+            ymd(g.s) + " → " + ymd(g.e) + "（" + days + " 天）<br/>" +
+            "<span style=\"color:" + C.textDim + "\">" + INCUBATOR.note + "，不计入本年产能合计</span>";
+        }
+        return "<b style=\"color:" + g.line.color + "\">" + g.line.baseName + " · " + g.line.name + "</b><br/>" +
+          SEG_TYPE[g.type].t + "　" + ymd(g.s) + " → " + ymd(g.e) + "（" + days + " 天）<br/>" +
+          (g.type === "prod"
+            ? "本段计划 <b>" + fmtDec(g.qty, 1) + "</b> 万台 · 占该线 " + fmtDec(g.qty / g.line.out * 100, 1) + "%<br/>"
+            : "停产窗口 · 不产出<br/>") +
+          "<span style=\"color:" + C.textDim + "\">该线全年 " + fmtDec(g.line.out, 0) + " 万台 · 排产 " +
+          fmtDec(g.line.prodDays, 0) + " 天 · 停产 " + fmtDec(g.line.downDays, 0) + " 天</span>";
+      }
+    }),
+    grid: { left: 88, right: 18, top: 26, bottom: 22, containLabel: false },
+    xAxis: {
+      type: "time", min: AX_MIN, max: AX_MAX,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      splitLine: { show: true, lineStyle: { color: "rgba(64,196,190,.10)" } },
+      axisLabel: Object.assign({}, AXIS_LABEL, {
+        fontSize: 10.5, hideOverlap: true,
+        formatter: (v) => (new Date(v).getMonth() + 1) + "月"
+      })
+    },
+    yAxis: {
+      type: "category", inverse: true, data: GANTT_ROWS,
+      axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: {
+        fontSize: 11.5, margin: 10,
+        color: (val, i) => (i === LINES.length ? "rgba(169,140,245,.75)" : "#cbe6e3")
+      }
+    },
+    series: [
+      { name: "排产窗口", type: "custom", renderItem: ganttItem, encode: { x: [1, 2], y: 0 },
+        clip: true, data: ganttData(-1), animationDuration: 760, animationDurationUpdate: 0 },
+      /* 今日线之后仍待执行的检修 / 换型窗口：起点打一枚橙色脉冲 */
+      { name: "待执行窗口", type: "effectScatter", coordinateSystem: "cartesian2d", z: 6, silent: true,
+        symbolSize: 9, rippleEffect: { brushType: "stroke", scale: 3.4, period: 3.2 },
+        itemStyle: { color: C.orange, shadowColor: "rgba(255,157,69,.8)", shadowBlur: 10 },
+        data: D.stopFuture.map((g) => [g.s, g.row]) }
+    ]
+  });
+  function focusGantt(row) { gantt.setOption({ series: [{ data: ganttData(row) }] }); }
+
+  /* 9.4 六产品线计划达成子弹图（custom 系列手绘：区间带 + 实际条 + 目标刻线 + 达成率）
+         用 custom 而非「多系列 bar + 负 barGap」叠放：后者的居中对齐依赖布局细节，
+         custom 里用 api.coord / api.size 现算几何，位置完全可控。 */
+  const bullet = makeChart("zz-chart-bullet");
+  const BULLET_MAX = Math.max.apply(null, LINES.map((l) => l.plan)) * 1.52;
+  const bulletValue = (l, i, focused) => [i, l.out, l.plan, focused ? 1 : 0];
+  const bulletData = (focusIdx) => LINES.map((l, i) => ({ value: bulletValue(l, i, i === focusIdx) }));
+
+  function bulletItem(params, api) {
+    const cat = api.value(0), actual = api.value(1), plan = api.value(2), focused = api.value(3) === 1;
+    const bandH = api.size([0, 1])[1];
+    const cy = api.coord([0, cat])[1];
+    const px = (v) => api.coord([v, cat])[0];
+    const x0 = px(0);
+    const bandTop = cy - bandH * 0.30, bandHi = bandH * 0.60;
+    const bars = [
+      { x1: 0, x2: plan * 0.8, c: "rgba(64,196,190,.10)" },
+      { x1: plan * 0.8, x2: plan, c: "rgba(64,196,190,.19)" },
+      { x1: plan, x2: plan * 1.25, c: "rgba(64,196,190,.30)" }
+    ];
+    const children = bars.map((b) => ({
+      type: "rect", silent: true,
+      shape: { x: px(b.x1), y: bandTop, width: Math.max(px(b.x2) - px(b.x1), 1), height: bandHi },
+      style: { fill: b.c }
+    }));
+    /* 实际产量条：达成 ≥ 100% 走青色，未达标转工业橙 */
+    const ok = actual >= plan;
+    const barH = bandH * 0.26;
+    children.push({
+      type: "rect", silent: true,
+      shape: { x: x0, y: cy - barH / 2, width: Math.max(px(actual) - x0, 1), height: barH, r: [0, 3, 3, 0] },
+      style: {
+        fill: hGrad(ok ? C.cyanDeep : "#c26a20", ok ? C.cyan : C.orange),
+        shadowColor: ok ? "rgba(53,224,208,.4)" : "rgba(255,157,69,.45)", shadowBlur: focused ? 14 : 6,
+        stroke: focused ? "rgba(255,255,255,.9)" : "transparent", lineWidth: focused ? 1.2 : 0
+      }
+    });
+    /* 目标刻线：计划值处一道竖线 */
+    children.push({
+      type: "rect", silent: true,
+      shape: { x: px(plan) - 1.5, y: cy - bandH * 0.34, width: 3, height: bandH * 0.68 },
+      style: { fill: C.orange, shadowColor: "rgba(255,157,69,.7)", shadowBlur: 6 }
+    });
+    /* 右侧达成率：钉在带区末端右侧，永远落在坐标系内 */
+    children.push({
+      type: "text", silent: true,
+      style: {
+        text: fmtDec(actual / plan * 100, 1) + "%", x: px(plan * 1.25) + 9, y: cy,
+        fill: ok ? C.green : C.orange, fontSize: 12.5, fontWeight: 700, verticalAlign: "middle"
+      }
+    });
+    children.push({
+      type: "text", silent: true,
+      style: {
+        text: fmtDec(actual, 0) + " / " + fmtDec(plan, 0), x: px(plan * 1.25) + 9, y: cy + bandH * 0.30,
+        fill: "rgba(127,166,163,.85)", fontSize: 9.5, verticalAlign: "middle"
+      }
+    });
+    return { type: "group", children: children };
+  }
+
+  bullet.setOption({
+    backgroundColor: "transparent",
+    tooltip: TIP({
+      trigger: "item",
+      formatter: (p) => {
+        const l = LINES[p.dataIndex];
+        return "<b style=\"color:" + l.color + "\">" + l.name + "</b>　<span style=\"color:" + C.textDim + "\">" + l.baseName + "</span><br/>" +
+          "实际 <b>" + fmtDec(l.out, 0) + "</b> 万台 · 计划 <b>" + fmtDec(l.plan, 0) + "</b> 万台<br/>" +
+          "达成率 <b style=\"color:" + (l.achv >= 100 ? C.green : C.orange) + "\">" + fmtDec(l.achv, 2) + "%</b>（" + signed(l.out - l.plan, 0) + " 万台）<br/>" +
+          "<span style=\"color:" + C.textDim + "\">制程直通率 " + fmtDec(l.fpy, 1) + "% · 判定 " + l.verdict.t + "</span>";
+      }
+    }),
+    grid: { left: 62, right: 16, top: 14, bottom: 22 },
+    xAxis: {
+      type: "value", min: 0, max: BULLET_MAX,
+      axisLine: { show: false }, axisTick: { show: false }, splitLine: SPLIT_LINE,
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10.5 })
+    },
+    yAxis: {
+      type: "category", inverse: true, data: LINES.map((l) => l.short),
+      axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: { color: "#cbe6e3", fontSize: 12, fontWeight: 700, margin: 10 }
+    },
+    series: [{
+      type: "custom", renderItem: bulletItem, encode: { x: [1, 2], y: 0 },
+      data: bulletData(-1), animationDuration: 700, animationDurationUpdate: 0
+    }]
+  });
+  function focusBullet(i) { bullet.setOption({ series: [{ data: bulletData(i) }] }); }
+
+  /* ===== 10. 底部生产预警滚动条（文案里的数字全部来自上面的派生量，不另编） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: D.lineWorst.name + " 计划达成 " + fmtDec(D.lineWorst.achv, 1) + "%，缺口 " +
+      fmtDec(D.lineWorst.plan - D.lineWorst.out, 0) + " 万台，产线在" + D.lineWorst.baseName },
+    { lv: "高", c: C.red, t: D.oeeWorst.name + " OEE " + fmtDec(D.oeeWorst.oee, 2) + "%，低于目标 " +
+      fmtDec(OEE_TARGET - D.oeeWorst.oee, 2) + "pp，短板在性能开动率 " + fmtDec(D.oeeWorst.p, 1) + "%" },
+    { lv: "中", c: C.orange, t: "今日线之后仍有 " + D.stopFuture.length + " 个检修 / 换型窗口待执行，全年停产 " +
+      fmtDec(D.stopDays, 0) + " 天，排产已按天数摊回各段计划量" },
+    { lv: "中", c: C.orange, t: "计划达成率 " + fmtDec(D.achv, 2) + "%（" + fmtDec(D.out, 0) + " / " + fmtDec(D.plan, 0) +
+      " 万台），六线中 " + D.lineMiss + " 条未达计划" },
+    { lv: "低", c: C.amber, t: "产销率 " + fmtDec(D.ps, 2) + "%，产量 " + fmtDec(D.out, 0) + " − 销量 " + SALES_Y +
+      " = " + fmtDec(D.psGap, 0) + " 万台转入库存与在途（期末成品库存 " + STOCK_Y + " 万台）" },
+    { lv: "低", c: C.violet, t: INCUBATOR.name + INCUBATOR.note + "，土建 / 设备安装 / 试产三段已排入甘特，不计入 " +
+      fmtDec(D.out, 0) + " 万台产能合计" },
+    { lv: "低", c: C.green, t: D.lineBest.name + " 达成 " + fmtDec(D.lineBest.achv, 1) + "% 为六线最优；" +
+      D.oeeBest.name + " OEE " + fmtDec(D.oeeBest.oee, 2) + "% 领跑三基地" }
+  ];
+  const track = $("zz-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="zz-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                       /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 11. 活性轮播：基地看板 ↔ 甘特行 / 明细表 ↔ 子弹图 两组联动（kiosk 常驻，不做 teardown） ===== */
+  let baseIdx = 0;
+  function playBase() {
+    baseRows.forEach((r, i) => r.classList.toggle("is-active", i === baseIdx));
+    baseIdx = (baseIdx + 1) % BASES.length;
+  }
+  playBase();
+  setInterval(playBase, 3400);
+
+  let lineIdx = 0;
+  function playLine() {
+    tbodyRows.forEach((r, i) => r.classList.toggle("is-active", i === lineIdx));
+    focusBullet(lineIdx);
+    focusGantt(lineIdx);
+    lineIdx = (lineIdx + 1) % LINES.length;
+  }
+  setTimeout(() => { playLine(); setInterval(playLine, 2800); }, 1000);  /* 等入场动画收敛后再接管焦点 */
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const EPS = 1e-9;
+  const checks = [
+    ["年产量 902 万台 = 六产品线之和", Math.abs(D.outByLine - 902) < EPS],
+    ["年产量 902 万台 = 三基地之和", Math.abs(D.outByBase - 902) < EPS],
+    ["★ 两个维度收敛到同一总量（六产品线 = 三基地）", Math.abs(D.outByLine - D.outByBase) < EPS],
+    ["各基地产量 = 其下属产品线之和", BASES.every((b) => Math.abs(b.out - sum(b.lineRefs.map((l) => l.out))) < EPS)],
+    ["计划合计 = 六产品线计划之和", Math.abs(D.plan - sum(LINES.map((l) => l.plan))) < EPS],
+    ["各基地 12 月产量序列合计 = 该基地年产量", BASES.every((b) => Math.abs(sum(b.monthly) - b.out) < 1e-6)],
+    ["竞速末月累计 = 三基地年产量合计", Math.abs(sum(BASES.map((b) => b.cum[11])) - D.outByBase) < 1e-6],
+    ["甘特各排产段计划量之和 = 对应产品线年产量",
+      LINES.every((l) => Math.abs(sum(l.segs.filter((s) => s.type === "prod").map((s) => s.qty)) - l.out) < 1e-6)],
+    ["各基地 OEE = 时间开动率 × 性能开动率 × 良品率", BASES.every((b) => Math.abs(b.oee - b.a * b.p * b.q / 1e4) < EPS)],
+    ["综合 OEE = 三基地按产量加权", Math.abs(D.oee - sum(BASES.map((b) => b.oee * b.out)) / D.outByBase) < EPS],
+    ["综合 OEE 落在制造业合理区间 75%~90%", D.oee > 75 && D.oee < 90],
+    ["制程直通率 96.42%（按产量加权，与品质管理页同源）", Math.abs(D.fpy - 96.42) < 0.005],
+    ["计划达成率 = 产量 ÷ 计划（现算）", Math.abs(D.achv - D.out / D.plan * 100) < EPS],
+    ["产销率 = 年销量 866 ÷ 年产量（现算）", Math.abs(D.ps - SALES_Y / D.out * 100) < EPS],
+    ["成都基地在建，产能不计入合计", INCUBATOR.out === 0 && Math.abs(D.outByBase - 902) < EPS]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[生产制造总览] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

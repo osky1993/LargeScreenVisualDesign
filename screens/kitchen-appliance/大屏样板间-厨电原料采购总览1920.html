@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电原料采购总览</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --yc-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：重点采购品类明细（品类 / 归属材料 / 采购额 / 占比 / 价格环比 / 供应商 / 判定） */
+    --yc-tcols: 100px 1fr 46px 38px 52px 40px 40px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .yc-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 132px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .yc-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .yc-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .yc-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .yc-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .yc-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .yc-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .yc-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .yc-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .yc-crumb em { font-style: normal; color: #cfeae7; }
+  .yc-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .yc-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .yc-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .yc-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .yc-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .yc-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .yc-chips { display: flex; align-items: center; gap: 9px; }
+  .yc-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .yc-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .yc-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .yc-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .yc-chip.is-key b { color: var(--mfg-cyan); }
+  .yc-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .yc-clock-time { font: 700 26px/1 var(--yc-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .yc-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .yc-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .yc-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .yc-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .yc-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .yc-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .yc-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .yc-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .yc-kpi.is-warn .yc-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .yc-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .yc-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .yc-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .yc-kpi-val { font: 700 30px/1 var(--yc-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .yc-kpi.is-warn .yc-kpi-val { color: #ffd9b0; }
+  .yc-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .yc-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .yc-kpi-sub b { font-weight: 700; }
+  .yc-up { color: var(--mfg-green); }
+  .yc-down { color: var(--mfg-red); }
+
+  /* ===== 三栏主体 ===== */
+  .yc-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .yc-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .yc-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .yc-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .yc-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .yc-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .yc-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .yc-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .yc-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 五大原材料要素看板 ===== */
+  .yc-mats { flex: none; display: flex; flex-direction: column; gap: 8px; }
+  .yc-mat-row {
+    position: relative; display: grid; grid-template-columns: 30px 1fr 74px 58px; align-items: center; gap: 10px;
+    padding: 7px 10px; border-radius: 9px;
+    border: 1px solid rgba(64, 196, 190, 0.16); background: rgba(10, 38, 42, 0.5);
+    transition: border-color .25s, background .25s;
+  }
+  .yc-mat-row.is-active { border-color: rgba(53, 224, 208, 0.6); background: rgba(18, 68, 68, 0.55); box-shadow: inset 0 0 16px rgba(53, 224, 208, 0.12); }
+  .yc-mat-no {
+    width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font: 700 14px/1 var(--yc-mono); color: #04191a;
+  }
+  .yc-mat-name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .yc-mat-name b { font-size: 13.5px; font-weight: 700; letter-spacing: 0.04em; color: #d6efec; }
+  .yc-mat-name span { font-size: 11px; color: rgba(127, 166, 163, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .yc-mat-amt { text-align: right; font: 700 17px/1 var(--yc-mono); font-variant-numeric: tabular-nums; }
+  .yc-mat-amt i { font-style: normal; font-size: 10.5px; font-weight: 400; color: var(--mfg-text-dim); margin-left: 3px; }
+  .yc-mat-side { text-align: right; font-size: 11px; color: var(--mfg-text-dim); font-variant-numeric: tabular-nums; }
+  .yc-mat-side b { display: block; font: 700 13px/1.35 var(--yc-mono); color: #bfe4e0; }
+
+  /* ===== CSS grid 模拟表格 ===== */
+  .yc-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .yc-thead, .yc-tbody li {
+    display: grid; grid-template-columns: var(--yc-tcols); align-items: center; gap: 6px;
+  }
+  .yc-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .yc-thead span:not(:first-child), .yc-tbody li span:not(:first-child) { text-align: right; }
+  .yc-thead span:nth-child(2), .yc-tbody li span:nth-child(2) { text-align: left; }
+  .yc-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .yc-tbody li {
+    padding: 0 8px; height: 31px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .yc-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .yc-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .yc-tbody li b { font-weight: 700; color: #eafcfa; }
+  .yc-tbody li em { font-style: normal; font-size: 11px; color: rgba(127, 166, 163, 0.9); }
+  .yc-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .yc-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .yc-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .yc-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+
+  /* ===== 底部预警滚动条 ===== */
+  .yc-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .yc-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .yc-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: yc-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes yc-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .yc-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .yc-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .yc-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .yc-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .yc-foot-item b { font-weight: 700; }
+  .yc-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .yc-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="yc-stage" id="yc-stage">
+    <!-- mockflag:begin --><div class="yc-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="yc-error" id="yc-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="yc-header">
+      <div class="yc-head-left">
+        <div class="yc-crumb"><b>云麓厨电</b><i>›</i><em>原料采购总览</em></div>
+        <div class="yc-head-title-row">
+          <div class="yc-head-title">原料采购总览</div>
+          <div class="yc-head-meta">
+            <span>五大原材料 · <b>10</b> 个重点品类</span><i>|</i>
+            <span>在册供应商 <b>182</b> 家</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="yc-head-right">
+        <div class="yc-chips">
+          <div class="yc-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="yc-chip is-key"><span>PRICE INDEX</span><b id="yc-chip-idx">--</b></div>
+        </div>
+        <div class="yc-clock" aria-label="实时时钟">
+          <span class="yc-clock-time" id="yc-clock-time">--:--:--</span>
+          <span class="yc-clock-date" id="yc-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="yc-band" id="yc-band"></div>
+
+    <!-- 左栏 -->
+    <div class="yc-col">
+      <section class="yc-panel" style="flex: 1.06;">
+        <div class="yc-panel-head">
+          <h2>采购额结构瀑布</h2>
+          <span class="yc-panel-tag">按材料类 · 合计 <b id="yc-wf-total">--</b> 亿元</span>
+        </div>
+        <div class="yc-chart" id="yc-chart-waterfall"></div>
+      </section>
+      <section class="yc-panel" style="flex: 1;">
+        <div class="yc-panel-head">
+          <h2>采购降本达成子弹图</h2>
+          <span class="yc-panel-tag">目标 <b id="yc-save-target">--</b> 万元 · 达成 <b id="yc-save-rate">--</b></span>
+        </div>
+        <div class="yc-chart" id="yc-chart-bullet"></div>
+      </section>
+    </div>
+
+    <!-- 中栏 -->
+    <div class="yc-col">
+      <section class="yc-panel" style="flex: 1.36;">
+        <div class="yc-panel-head">
+          <h2>五大原材料价格三年月度走势</h2>
+          <span class="yc-panel-tag">2023-08 起 36 个月 · 指数基期 100 · 区间带：<b id="yc-band-name">--</b> 滚动 12 月高低区间</span>
+        </div>
+        <div class="yc-chart" id="yc-chart-price"></div>
+      </section>
+      <section class="yc-panel" style="flex: 1;">
+        <div class="yc-panel-head">
+          <h2>库存覆盖天数五联温度计</h2>
+          <span class="yc-panel-tag">覆盖天数 = 库存 ÷ 日均耗用 · 橙线 = 安全线 · 低于安全线 <b id="yc-cov-short">--</b> 种</span>
+        </div>
+        <div class="yc-chart" id="yc-chart-cover"></div>
+      </section>
+    </div>
+
+    <!-- 右栏 -->
+    <div class="yc-col">
+      <section class="yc-panel" style="flex: none;">
+        <div class="yc-panel-head">
+          <h2>五大原材料要素看板</h2>
+          <span class="yc-panel-tag">年采购额 · 占比 / 覆盖天数</span>
+        </div>
+        <div class="yc-mats" id="yc-mats"></div>
+      </section>
+      <section class="yc-panel" style="flex: 1;">
+        <div class="yc-panel-head">
+          <h2>重点采购品类明细</h2>
+          <span class="yc-panel-tag">合计 <b id="yc-tbl-amt">--</b> 亿元 · 供应商 <b id="yc-tbl-sup">--</b> 家</span>
+        </div>
+        <div class="yc-table">
+          <div class="yc-thead">
+            <span>采购品类</span><span>归属材料</span><span>采购额</span><span>占比</span><span>价格环比</span><span>供应商</span><span>判定</span>
+          </div>
+          <ul class="yc-tbody" id="yc-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部预警滚动条 -->
+    <div class="yc-foot">
+      <div class="yc-foot-tag">采购预警</div>
+      <div class="yc-foot-view"><div class="yc-foot-track" id="yc-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("yc-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("yc-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const arrow = (v) => (v >= 0 ? "▲" : "▼");
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         口径与全系列基准盘一致：年营收 112.6 亿元、在册供应商 182 家、年产量 902 万台。
+         合计一律由分项求和，比率 / 达成率 / 覆盖天数一律现算，页面上不出现任何硬编码的合计值。 ===== */
+
+  const REVENUE = 112.6;            /* 年营收（亿元）——基准盘，占营收比现算用 */
+  const SUP_TOTAL_BASE = 182;       /* 在册供应商家数——基准盘，自检回算用 */
+
+  /* 4.1 十个重点采购品类：采购额（亿元）+ 供应商家数。
+         五大原材料的采购额 = 其品类之和；全年采购总额 = 五材料之和（两级都靠求和收敛）。 */
+  const ITEMS = [
+    { name: "DC01 冷轧卷",   mat: "冷轧板",     amt: 9.30,  sup: 14 },
+    { name: "热镀锌板",       mat: "冷轧板",     amt: 5.90,  sup: 11 },
+    { name: "304 不锈钢板",   mat: "不锈钢",     amt: 7.45,  sup: 13 },
+    { name: "430 不锈钢板",   mat: "不锈钢",     amt: 3.95,  sup: 9  },
+    { name: "紫铜管",         mat: "铜材",       amt: 4.90,  sup: 10 },
+    { name: "漆包线",         mat: "铜材",       amt: 2.90,  sup: 8  },
+    { name: "钢化面板",       mat: "面板玻璃",   amt: 3.65,  sup: 12 },
+    { name: "丝印玻璃",       mat: "面板玻璃",   amt: 1.95,  sup: 9  },
+    { name: "主控板",         mat: "电子电控件", amt: 10.85, sup: 56 },
+    { name: "显示与传感模组", mat: "电子电控件", amt: 7.75,  sup: 40 }
+  ];
+
+  /* 4.2 五大原材料：价格指数波形参数（确定性，不用 Math.random——kiosk 常驻每次打开须一致）
+         + 年耗用量 / 期末库存 / 安全线天数 + 年度降本目标与实际（万元）。
+         采购额不在这里写，由 4.4 从 ITEMS 汇总，避免同一个数字抄两遍。 */
+  const MAT = [
+    { name: "冷轧板",     short: "冷轧板", unit: "万吨", puk: "元/吨",
+      trend: -0.185, a1: 3.4, w1: 0.55, p1: 0.4, a2: 1.5, w2: 1.22, p2: 1.1,
+      qty: 32.6, stock: 2.05, safe: 20, saveTgt: 3800, saveAct: 4260, color: PAL.series[0],
+      note: "机身壳体 / 面框冲压" },
+    { name: "不锈钢",     short: "不锈钢", unit: "万吨", puk: "元/吨",
+      trend: 0.06, a1: 6.6, w1: 0.42, p1: 1.9, a2: 2.4, w2: 1.05, p2: 0.3,
+      qty: 8.9, stock: 0.42, safe: 18, saveTgt: 2600, saveAct: 2180, color: PAL.series[1],
+      note: "灶具面板 / 内胆腔体" },
+    { name: "铜材",       short: "铜材",   unit: "万吨", puk: "元/吨",
+      trend: 0.42, a1: 4.2, w1: 0.48, p1: 2.6, a2: 1.8, w2: 1.15, p2: 2.2,
+      qty: 1.28, stock: 0.092, safe: 25, saveTgt: 1500, saveAct: 1080, color: PAL.series[2],
+      note: "电机绕组 / 燃气管路" },
+    { name: "面板玻璃",   short: "玻璃",   unit: "万片", puk: "元/片",
+      trend: -0.12, a1: 2.4, w1: 0.63, p1: 0.9, a2: 1.1, w2: 1.40, p2: 1.6,
+      qty: 486, stock: 38.5, safe: 22, saveTgt: 1100, saveAct: 1240, color: PAL.series[3],
+      note: "钢化面板 / 触控视窗" },
+    { name: "电子电控件", short: "电控件", unit: "万套", puk: "元/套",
+      trend: -0.34, a1: 3.0, w1: 0.50, p1: 3.1, a2: 1.3, w2: 1.28, p2: 0.7,
+      qty: 1560, stock: 55, safe: 15, saveTgt: 4200, saveAct: 4620, color: PAL.series[5],
+      note: "主控板 / 显示与传感" }
+  ];
+
+  /* 4.3 三年 36 个月标签：2023-08 → 2026-07（末月 = 期次月） */
+  const NM = 36, END_Y = 2026, END_M = 7;
+  const MONTHS = Array.from({ length: NM }, (_, i) => {
+    const t = END_Y * 12 + (END_M - 1) - (NM - 1 - i);
+    return Math.floor(t / 12) + "-" + pad(t % 12 + 1);
+  });
+
+  /* ===== 4.4 派生量：全部现算，不复制数字 ===== */
+  const D = {};
+
+  /* 材料采购额 = 归属品类之和；采购总额 = 五材料之和 */
+  MAT.forEach((m) => {
+    m.items = ITEMS.filter((it) => it.mat === m.name);
+    m.amt = sum(m.items.map((it) => it.amt));
+    m.sup = sum(m.items.map((it) => it.sup));
+  });
+  D.amt = sum(MAT.map((m) => m.amt));                 /* 年采购总额（亿元） */
+  D.sup = sum(MAT.map((m) => m.sup));                 /* 在册供应商家数 = 182 */
+  D.amtRatio = D.amt / REVENUE * 100;                 /* 采购额占营收比 */
+  MAT.forEach((m) => { m.share = m.amt / D.amt * 100; });
+
+  /* 价格指数序列 + 滚动 12 月高低区间带（逐月变化，前 11 月为扩张窗口） */
+  MAT.forEach((m) => {
+    m.idx = Array.from({ length: NM }, (_, t) =>
+      100 + m.trend * t + m.a1 * Math.sin(m.w1 * t + m.p1) + m.a2 * Math.sin(m.w2 * t + m.p2));
+    m.bandLo = []; m.bandW = [];
+    for (let t = 0; t < NM; t++) {
+      const win = m.idx.slice(Math.max(0, t - 11), t + 1);
+      const lo = Math.min.apply(null, win), hi = Math.max.apply(null, win);
+      m.bandLo.push(Number(lo.toFixed(2)));
+      m.bandW.push(Number((hi - lo).toFixed(2)));
+    }
+    /* 隐含年均单价 = 年采购额 ÷ 年耗用量（亿元 → 元，万吨/万片/万套 → 单位），
+       基期价 p0 由「年均单价 ÷ 指数均值」倒推，现价 = p0 × 末月指数，三者天然自洽。 */
+    m.unitPrice = m.amt * 1e4 / m.qty;
+    m.p0 = m.unitPrice / (sum(m.idx) / NM / 100);
+    m.price = m.p0 * m.idx[NM - 1] / 100;
+    m.mom = (m.idx[NM - 1] / m.idx[NM - 2] - 1) * 100;
+    m.yoy = (m.idx[NM - 1] / m.idx[NM - 13] - 1) * 100;
+    /* 覆盖天数 = 期末库存 ÷ 日均耗用（日均耗用 = 年耗用量 ÷ 365）—— 现算，不写死 */
+    m.daily = m.qty / 365;
+    m.days = m.stock / m.daily;
+    m.ratio = m.days / m.safe;
+    m.saveRate = m.saveAct / m.saveTgt * 100;
+  });
+
+  /* 综合采购价格指数：按采购额份额加权 */
+  D.comp = Array.from({ length: NM }, (_, t) => sum(MAT.map((m) => m.amt / D.amt * m.idx[t])));
+  D.compIdx = D.comp[NM - 1];
+  D.compMom = (D.comp[NM - 1] / D.comp[NM - 2] - 1) * 100;
+  D.compYoy = (D.comp[NM - 1] / D.comp[NM - 13] - 1) * 100;
+
+  /* 库存覆盖：按采购额加权平均 + 低于安全线的品种 */
+  D.wavgDays = sum(MAT.map((m) => m.amt * m.days)) / D.amt;
+  D.shortList = MAT.filter((m) => m.days < m.safe);
+  D.shortCnt = D.shortList.length;
+  D.worstCov = MAT.slice().sort((a, b) => a.ratio - b.ratio)[0];
+  D.highCov = MAT.slice().sort((a, b) => b.ratio - a.ratio)[0];
+
+  /* 降本：合计 = 五材料之和，达成率现算 */
+  D.saveTgt = sum(MAT.map((m) => m.saveTgt));
+  D.saveAct = sum(MAT.map((m) => m.saveAct));
+  D.saveRate = D.saveAct / D.saveTgt * 100;
+  D.saveMiss = MAT.filter((m) => m.saveRate < 100).sort((a, b) => a.saveRate - b.saveRate);
+
+  /* 价格：涨幅最高 / 最低的材料 */
+  D.priceUp = MAT.slice().sort((a, b) => b.yoy - a.yoy)[0];
+  D.priceDown = MAT.slice().sort((a, b) => a.yoy - b.yoy)[0];
+
+  /* 覆盖状态判定：r = 覆盖天数 ÷ 安全线 */
+  const covState = (m) => (m.ratio < 0.9 ? { t: "缺料", c: C.red, cls: "is-bad" }
+                        : m.ratio < 1.0 ? { t: "偏紧", c: C.amber, cls: "is-mid" }
+                        : m.ratio <= 1.3 ? { t: "达标", c: C.green, cls: "is-good" }
+                        : { t: "偏高", c: C.amber, cls: "is-mid" });
+  MAT.forEach((m) => { m.cov = covState(m); });
+
+  /* 品类价格环比：母材料环比 + 确定性偏移，偏移按采购额加权后归零，
+     故「品类环比的采购额加权平均 = 母材料环比」，可逐行验算。 */
+  MAT.forEach((m) => {
+    const raw = m.items.map((_, i) => (i % 2 === 0 ? 0.55 : -0.55));
+    const mean = sum(m.items.map((it, i) => it.amt * raw[i])) / m.amt;
+    m.items.forEach((it, i) => {
+      it.mom = m.mom + (raw[i] - mean);
+      it.share = it.amt / D.amt * 100;
+      it.color = m.color;
+      it.verdict = it.mom <= -0.5 ? { t: "利好", c: "is-good" }
+                 : it.mom <= 1.2 ? { t: "平稳", c: "is-mid" }
+                 : { t: "承压", c: "is-bad" };
+    });
+  });
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("yc-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("yc-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("yc-chip-idx").textContent = fmtDec(D.compIdx, 2);
+
+  /* ===== 6. KPI 带：5 枚，数值翻牌缓动 ===== */
+  const KPI_DEFS = [
+    { icon: "¥", label: "年原料采购总额", val: D.amt, unit: "亿元", dec: 2, warn: false,
+      sub: () => "= 五大原材料之和 · 占营收 <b>" + fmtDec(D.amtRatio, 2) + "%</b>" },
+    { icon: "◈", label: "综合采购价格指数", val: D.compIdx, unit: "", dec: 2, warn: false,
+      sub: () => "环比 <b class=\"" + (D.compMom >= 0 ? "yc-down" : "yc-up") + "\">" + arrow(D.compMom) + fmtDec(Math.abs(D.compMom), 2) + "%</b> · 同比 <b class=\"" + (D.compYoy >= 0 ? "yc-down" : "yc-up") + "\">" + signed(D.compYoy, 2) + "%</b>" },
+    { icon: "⧗", label: "平均库存覆盖", val: D.wavgDays, unit: "天", dec: 1, warn: true,
+      sub: () => "低于安全线 <b class=\"yc-down\">" + D.shortCnt + "</b> 种 · 最短 " + D.worstCov.short + " <b>" + fmtDec(D.worstCov.days, 1) + "</b> 天" },
+    { icon: "↓", label: "年度降本达成", val: D.saveRate, unit: "%", dec: 1, warn: false,
+      sub: () => "实际 <b>" + fmtDec(D.saveAct, 0) + "</b> / 目标 <b>" + fmtDec(D.saveTgt, 0) + "</b> 万元" },
+    { icon: "⚑", label: "在册供应商", val: D.sup, unit: "家", dec: 0, warn: false,
+      sub: () => "= 10 个重点品类之和 · 与供应商协同页同源" }
+  ];
+  const band = $("yc-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="yc-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="yc-kpi-icon">' + k.icon + "</div>" +
+      '<div class="yc-kpi-main">' +
+        '<div class="yc-kpi-label">' + k.label + "</div>" +
+        '<div class="yc-kpi-num"><span class="yc-kpi-val" id="yc-kpi-' + i + '">0</span><span class="yc-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="yc-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值 */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("yc-kpi-" + i), k.val, k.dec));
+
+  /* ===== 7. 五大原材料要素看板（右栏上） ===== */
+  const matsBox = $("yc-mats");
+  matsBox.innerHTML = MAT.map((m, i) => (
+    '<div class="yc-mat-row" data-i="' + i + '">' +
+      '<div class="yc-mat-no" style="background:' + m.color + '">' + (i + 1) + "</div>" +
+      '<div class="yc-mat-name"><b>' + m.name + "</b><span>" + m.note + " · " + m.sup + " 家供应商</span></div>" +
+      '<div class="yc-mat-amt" style="color:' + m.color + '">' + fmtDec(m.amt, 2) + "<i>亿</i></div>" +
+      '<div class="yc-mat-side">占比 ' + fmtDec(m.share, 1) + "%<b style=\"color:" + m.cov.c + "\">" + fmtDec(m.days, 1) + " 天</b></div>" +
+    "</div>"
+  )).join("");
+  const matRows = Array.from(matsBox.children);
+
+  /* ===== 8. 重点采购品类明细表（右栏下） ===== */
+  const tbody = $("yc-tbody");
+  tbody.innerHTML = ITEMS.map((it, i) => (
+    "<li data-i=\"" + i + "\">" +
+      "<span><b>" + it.name + "</b></span>" +
+      "<span><em style=\"color:" + it.color + "\">" + it.mat + "</em></span>" +
+      "<span>" + fmtDec(it.amt, 2) + "</span>" +
+      "<span>" + fmtDec(it.share, 1) + "</span>" +
+      "<span style=\"color:" + (it.mom > 1.2 ? C.red : it.mom > -0.5 ? C.amber : C.green) + "\">" + signed(it.mom, 2) + "%</span>" +
+      "<span>" + it.sup + "</span>" +
+      '<span class="yc-badge ' + it.verdict.c + '">' + it.verdict.t + "</span>" +
+    "</li>"
+  )).join("");
+  const tbodyRows = Array.from(tbody.children);
+
+  $("yc-wf-total").textContent = fmtDec(D.amt, 2);
+  $("yc-save-target").textContent = fmtDec(D.saveTgt, 0);
+  $("yc-save-rate").textContent = fmtDec(D.saveRate, 1) + "%";
+  $("yc-cov-short").textContent = D.shortCnt;
+  $("yc-tbl-amt").textContent = fmtDec(D.amt, 2);
+  $("yc-tbl-sup").textContent = D.sup;
+
+  /* ===== 9. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+
+  /* ---- 9.1 五大原材料价格三年走势 + 历史区间带（本页招牌图） ----
+     区间带 = 聚焦材料的「滚动 12 月最高/最低」，逐月变化，用两条 stack line 实现：
+       ① 下界（透明打底）  ② 带宽 = 上界 − 下界（填充）
+     打底那条必须 lineStyle.opacity 0 + areaStyle transparent + silent + tooltip 关闭，
+     否则 tooltip 会冒出「_带下界」这种内部系列名。 */
+  const price = makeChart("yc-chart-price");
+  const PRICE_MIN = 84, PRICE_MAX = 120;
+
+  function priceSeries(focus) {
+    const f = MAT[focus];
+    const bandSeries = [
+      { name: "_带下界", type: "line", stack: "yc-band", symbol: "none", silent: true, z: 1,
+        data: f.bandLo, lineStyle: { opacity: 0 }, areaStyle: { color: "transparent" },
+        tooltip: { show: false }, animationDuration: 380 },
+      { name: "_带宽", type: "line", stack: "yc-band", symbol: "none", silent: true, z: 1,
+        data: f.bandW, lineStyle: { opacity: 0 },
+        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: f.color + "33" }, { offset: 1, color: f.color + "0d" }
+        ]) },
+        tooltip: { show: false }, animationDuration: 380 }
+    ];
+    const lines = MAT.map((m, i) => {
+      const on = i === focus;
+      return {
+        name: m.name, type: "line", smooth: true, symbol: "none", z: on ? 8 : 4,
+        data: m.idx.map((v) => Number(v.toFixed(2))),
+        lineStyle: { color: m.color, width: on ? 3 : 1.4, opacity: on ? 1 : 0.42 },
+        itemStyle: { color: m.color },
+        emphasis: { focus: "series", lineStyle: { width: on ? 3.4 : 2.2 } },
+        endLabel: {
+          show: on, color: m.color, fontSize: 11.5, fontWeight: 700, distance: 6,
+          formatter: () => m.short + " " + fmtDec(m.idx[NM - 1], 1)
+        }
+      };
+    });
+    return bandSeries.concat(lines);
+  }
+
+  price.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 6, right: 76, top: 34, bottom: 4, containLabel: true },
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: TIP.backgroundColor, borderColor: TIP.borderColor, textStyle: TIP.textStyle,
+      formatter: (ps) => {
+        /* 带系列以「_」开头，是实现细节，不进 tooltip */
+        const real = ps.filter((p) => p.seriesName.charAt(0) !== "_");
+        if (!real.length) return "";
+        const t = real[0].dataIndex;
+        let s = "<b>" + MONTHS[t] + "</b>　综合指数 <b style=\"color:" + C.cyan + "\">" + fmtDec(D.comp[t], 2) + "</b>";
+        real.forEach((p) => {
+          const m = MAT.filter((x) => x.name === p.seriesName)[0];
+          s += "<br/><span style=\"color:" + m.color + "\">●</span> " + m.name +
+            " <b>" + fmtDec(p.value, 1) + "</b>　" + fmtDec(m.p0 * p.value / 100, m.p0 > 1000 ? 0 : 1) + " " + m.puk;
+        });
+        return s;
+      }
+    },
+    legend: {
+      show: true, top: 0, right: 4, itemWidth: 14, itemHeight: 8, itemGap: 12,
+      textStyle: { color: C.textDim, fontSize: 11 },
+      data: MAT.map((m) => m.name)
+    },
+    xAxis: {
+      type: "category", boundaryGap: false, data: MONTHS,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 5, fontSize: 10.5 })
+    },
+    yAxis: {
+      /* min/max/interval 三者须整除（120−84=36，interval 6 → 7 根网格线），否则末档会画成半格 */
+      type: "value", name: "指数", min: PRICE_MIN, max: PRICE_MAX, interval: 6,
+      nameTextStyle: { color: C.textDim, fontSize: 10 },
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    /* 基期 100 基准线单挂一条空系列，避免挂到 stack 系列上被堆叠偏移 */
+    series: priceSeries(0).concat([{
+      name: "_基期", type: "line", data: new Array(NM).fill(null), silent: true, symbol: "none",
+      lineStyle: { opacity: 0 }, tooltip: { show: false },
+      markLine: {
+        silent: true, symbol: "none",
+        data: [{ yAxis: 100 }],
+        lineStyle: { color: "rgba(255,201,77,.45)", type: "dashed", width: 1 },
+        label: { formatter: "基期 100", color: C.amber, fontSize: 10, position: "insideStartTop" }
+      }
+    }])
+  });
+
+  /* ---- 9.2 采购额结构瀑布（按材料类，末柱为合计） ----
+     placeholder 系列透明打底，撑起每根柱的起点 = 之前材料的累计额。 */
+  const waterfall = makeChart("yc-chart-waterfall");
+  const WF = MAT.slice().sort((a, b) => b.amt - a.amt);
+  const wfBase = [];
+  let wfAcc = 0;
+  WF.forEach((m) => { wfBase.push(wfAcc); wfAcc += m.amt; });
+  const wfCats = WF.map((m) => m.short).concat(["合计"]);
+  const wfPlace = wfBase.concat([0]);
+  /* ★ label.color 不吃回调（itemStyle.color 才吃），逐项配色一律走 data 对象里的 label */
+  const wfValue = WF.map((m) => ({ value: Number(m.amt.toFixed(2)), label: { color: "#dff3f0" } }))
+    .concat([{ value: Number(D.amt.toFixed(2)), label: { color: C.orange } }]);
+
+  waterfall.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 4, right: 10, top: 30, bottom: 2, containLabel: true },
+    tooltip: {
+      trigger: "axis", axisPointer: { type: "shadow" },
+      backgroundColor: TIP.backgroundColor, borderColor: TIP.borderColor, textStyle: TIP.textStyle,
+      formatter: (ps) => {
+        const i = ps[0].dataIndex;
+        if (i === WF.length) {
+          return "<b>采购总额</b><br/>合计 <b style=\"color:" + C.orange + "\">" + fmtDec(D.amt, 2) +
+            "</b> 亿元 = 五材料之和<br/><span style=\"color:" + C.textDim + "\">占年营收 " +
+            fmtDec(REVENUE, 1) + " 亿元的 " + fmtDec(D.amtRatio, 2) + "%</span>";
+        }
+        const m = WF[i];
+        return "<b>" + m.name + "</b><br/>采购额 <b style=\"color:" + m.color + "\">" + fmtDec(m.amt, 2) +
+          "</b> 亿元 · 占比 " + fmtDec(m.share, 1) + "%<br/>累计至此 <b>" + fmtDec(wfBase[i] + m.amt, 2) +
+          "</b> 亿元<br/><span style=\"color:" + C.textDim + "\">" + m.items.length + " 个品类 · " +
+          m.sup + " 家供应商</span>";
+      }
+    },
+    xAxis: {
+      type: "category", data: wfCats,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 11 })
+    },
+    yAxis: {
+      type: "value", name: "亿元", nameTextStyle: { color: C.textDim, fontSize: 10 },
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    series: [
+      { name: "_起点", type: "bar", stack: "wf", silent: true, data: wfPlace,
+        itemStyle: { color: "transparent" }, tooltip: { show: false } },
+      { name: "采购额", type: "bar", stack: "wf", barWidth: "54%", data: wfValue,
+        itemStyle: {
+          borderRadius: [3, 3, 0, 0],
+          color: (p) => {
+            const c = p.dataIndex === WF.length ? C.orange : WF[p.dataIndex].color;
+            return new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: c }, { offset: 1, color: c + "66" }
+            ]);
+          }
+        },
+        label: {
+          show: true, position: "top", fontSize: 11, fontWeight: 700, lineHeight: 13,
+          formatter: (p) => fmtDec(p.value, 2) + "\n" +
+            fmtDec(p.dataIndex === WF.length ? 100 : WF[p.dataIndex].share, 1) + "%"
+        } }
+    ]
+  });
+
+  /* ---- 9.3 库存覆盖天数五联温度计 ----
+     槽（透明底）+ 柱身 + 底部球泡 + 橙色安全线；覆盖天数全部由 4.4 现算。 */
+  const cover = makeChart("yc-chart-cover");
+  const covMax = Math.ceil(Math.max.apply(null, MAT.map((m) => Math.max(m.days, m.safe))) * 1.18 / 5) * 5;
+  cover.setOption({
+    backgroundColor: "transparent",
+    /* right 留给最右一根的安全线数值标签，否则会被网格边缘切掉 */
+    grid: { left: 4, right: 26, top: 22, bottom: 2, containLabel: true },
+    tooltip: {
+      trigger: "axis", axisPointer: { type: "shadow" },
+      backgroundColor: TIP.backgroundColor, borderColor: TIP.borderColor, textStyle: TIP.textStyle,
+      formatter: (ps) => {
+        const m = MAT[ps[0].dataIndex];
+        return "<b>" + m.name + "</b><br/>覆盖天数 <b style=\"color:" + m.cov.c + "\">" + fmtDec(m.days, 2) +
+          "</b> 天　安全线 <b style=\"color:" + C.orange + "\">" + m.safe + "</b> 天<br/>" +
+          "期末库存 <b>" + fmtDec(m.stock, 3) + "</b> " + m.unit +
+          " ÷ 日均耗用 <b>" + fmtDec(m.daily, 3) + "</b> " + m.unit + "/天<br/>" +
+          "<span style=\"color:" + C.textDim + "\">年耗用 " + fmtDec(m.qty, 2) + " " + m.unit +
+          " · 状态：" + m.cov.t + "</span>";
+      }
+    },
+    xAxis: {
+      type: "category", data: MAT.map((m) => m.short),
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 11 })
+    },
+    yAxis: {
+      type: "value", name: "天", min: 0, max: covMax, nameTextStyle: { color: C.textDim, fontSize: 10 },
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    series: [
+      /* 温度计外槽 */
+      { name: "_槽", type: "bar", barWidth: 26, barGap: "-100%", silent: true, z: 1,
+        data: MAT.map(() => covMax), tooltip: { show: false },
+        itemStyle: { color: "rgba(64,196,190,.09)", borderRadius: 13,
+          borderColor: "rgba(64,196,190,.22)", borderWidth: 1 } },
+      /* 水银柱 */
+      { name: "覆盖天数", type: "bar", barWidth: 14, barGap: "-100%", z: 3,
+        data: MAT.map((m) => ({ value: Number(m.days.toFixed(2)), label: { color: m.cov.c } })),
+        itemStyle: {
+          borderRadius: 7,
+          color: (p) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: MAT[p.dataIndex].cov.c },
+            { offset: 1, color: MAT[p.dataIndex].cov.c + "77" }
+          ])
+        },
+        label: {
+          show: true, position: "top", fontSize: 11.5, fontWeight: 700,
+          formatter: (p) => fmtDec(p.value, 1) + " 天"
+        } },
+      /* 球泡 */
+      { name: "_球泡", type: "scatter", symbol: "circle", symbolSize: 20, silent: true, z: 4,
+        data: MAT.map((m, i) => ({ value: [i, covMax * 0.035], itemStyle: { color: m.cov.c, opacity: 0.9 } })),
+        tooltip: { show: false } },
+      /* 橙色安全线（逐材料不同，用扁矩形符号逐点画；markLine 只能画全图统一的一条） */
+      { name: "安全线", type: "scatter", symbol: "rect", symbolSize: [30, 3], z: 6,
+        data: MAT.map((m, i) => [i, m.safe]),
+        itemStyle: { color: C.orange },
+        tooltip: { show: false },
+        label: {
+          show: true, position: "right", distance: 3, fontSize: 9.5, fontWeight: 700,
+          color: C.orange, formatter: (p) => MAT[p.dataIndex].safe + "天"
+        } }
+    ]
+  });
+
+  /* ---- 9.4 采购降本达成子弹图 ----
+     x 轴归一到「达成率 %」，五材料才可横向对比；三段背景 = 0-80 / 80-100 / 100-125，
+     100% 处一条橙色目标线，绝对金额进 tooltip。 */
+  const bullet = makeChart("yc-chart-bullet");
+  const BU = MAT.slice().reverse();          /* yAxis category 自下而上，反转后首材料在顶 */
+  const BU_MAX = 125;
+  bullet.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 4, right: 46, top: 24, bottom: 2, containLabel: true },
+    tooltip: {
+      trigger: "axis", axisPointer: { type: "shadow" },
+      backgroundColor: TIP.backgroundColor, borderColor: TIP.borderColor, textStyle: TIP.textStyle,
+      formatter: (ps) => {
+        const m = BU[ps[0].dataIndex];
+        return "<b>" + m.name + "</b><br/>达成率 <b style=\"color:" + (m.saveRate >= 100 ? C.green : C.orange) + "\">" +
+          fmtDec(m.saveRate, 1) + "%</b><br/>实际降本 <b>" + fmtDec(m.saveAct, 0) + "</b> 万元 / 目标 <b>" +
+          fmtDec(m.saveTgt, 0) + "</b> 万元<br/><span style=\"color:" + C.textDim + "\">缺口 " +
+          signed(m.saveAct - m.saveTgt, 0) + " 万元 · 采购额 " + fmtDec(m.amt, 2) + " 亿元</span>";
+      }
+    },
+    xAxis: {
+      type: "value", min: 0, max: BU_MAX, name: "达成率 %",
+      nameTextStyle: { color: C.textDim, fontSize: 10 },
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    yAxis: {
+      type: "category", data: BU.map((m) => m.short),
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 11 })
+    },
+    series: [
+      { name: "_档1", type: "bar", stack: "bg", barWidth: 22, silent: true, z: 1,
+        data: BU.map(() => 80), itemStyle: { color: "rgba(64,196,190,.07)" }, tooltip: { show: false } },
+      { name: "_档2", type: "bar", stack: "bg", silent: true, z: 1,
+        data: BU.map(() => 20), itemStyle: { color: "rgba(64,196,190,.13)" }, tooltip: { show: false } },
+      { name: "_档3", type: "bar", stack: "bg", silent: true, z: 1,
+        data: BU.map(() => BU_MAX - 100), itemStyle: { color: "rgba(64,196,190,.20)" }, tooltip: { show: false } },
+      { name: "达成率", type: "bar", barWidth: 10, barGap: "-100%", z: 4,
+        data: BU.map((m) => ({
+          value: Number(m.saveRate.toFixed(1)),
+          label: { color: m.saveRate >= 100 ? C.green : C.orange }
+        })),
+        itemStyle: {
+          borderRadius: [0, 5, 5, 0],
+          color: (p) => {
+            const c = BU[p.dataIndex].saveRate >= 100 ? C.green : BU[p.dataIndex].saveRate >= 85 ? C.amber : C.red;
+            return new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: c + "77" }, { offset: 1, color: c }
+            ]);
+          }
+        },
+        label: {
+          show: true, position: "right", distance: 5, fontSize: 11, fontWeight: 700,
+          formatter: (p) => fmtDec(p.value, 1) + "%"
+        },
+        markLine: {
+          silent: true, symbol: "none",
+          data: [{ xAxis: 100 }],
+          lineStyle: { color: C.orange, type: "dashed", width: 1.4 },
+          label: { formatter: "目标 100%", color: C.orange, fontSize: 10, position: "insideEndTop" }
+        } }
+    ]
+  });
+
+  /* ===== 10. 底部采购预警滚动条（文案数字全部由派生量现算，不另编数字） ===== */
+  const shortNeed = D.worstCov.daily * (D.worstCov.safe - D.worstCov.days);      /* 补至安全线的补货量 */
+  const overDays = D.highCov.days - D.highCov.safe;
+  const overCash = overDays * D.highCov.daily * D.highCov.unitPrice / 1e4;       /* 超备占压资金（万元） */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: D.worstCov.name + " 库存覆盖仅 " + fmtDec(D.worstCov.days, 2) + " 天，低于 " +
+        D.worstCov.safe + " 天安全线，需补货 " + fmtDec(shortNeed, 2) + " " + D.worstCov.unit + " 方可回到安全线" },
+    { lv: "高", c: C.red, t: "覆盖天数低于安全线的材料共 " + D.shortCnt + " 种：" +
+        D.shortList.map((m) => m.name + " " + fmtDec(m.days, 1) + " 天").join(" / ") },
+    { lv: "中", c: C.orange, t: D.priceUp.name + " 价格指数 " + fmtDec(D.priceUp.idx[NM - 1], 1) + "，同比 " +
+        signed(D.priceUp.yoy, 2) + "%，为五材料最高，年采购额 " + fmtDec(D.priceUp.amt, 2) + " 亿元承压" },
+    { lv: "中", c: C.orange, t: "降本达成低于目标的材料：" +
+        D.saveMiss.map((m) => m.name + " " + fmtDec(m.saveRate, 1) + "%").join(" / ") +
+        "，合计缺口 " + fmtDec(sum(D.saveMiss.map((m) => m.saveTgt - m.saveAct)), 0) + " 万元" },
+    { lv: "低", c: C.amber, t: D.highCov.name + " 覆盖 " + fmtDec(D.highCov.days, 1) + " 天，超安全线 " +
+        fmtDec(overDays, 1) + " 天，超备占压资金约 " + fmtDec(overCash, 0) + " 万元" },
+    { lv: "低", c: C.green, t: "年采购总额 " + fmtDec(D.amt, 2) + " 亿元 = 五大原材料之和，占年营收 " +
+        fmtDec(REVENUE, 1) + " 亿元的 " + fmtDec(D.amtRatio, 2) + "%，全年降本达成 " + fmtDec(D.saveRate, 1) + "%" }
+  ];
+  const track = $("yc-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="yc-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                      /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 11. 活性轮播：走势图聚焦材料 ↔ 要素看板 ↔ 温度计 ↔ 子弹图 四处联动 ===== */
+  let matIdx = 0;
+  function playMat() {
+    const i = matIdx;
+    matRows.forEach((r, k) => r.classList.toggle("is-active", k === i));
+    price.setOption({ series: priceSeries(i) });
+    $("yc-band-name").textContent = MAT[i].name;
+    cover.dispatchAction({ type: "downplay", seriesIndex: 1 });
+    cover.dispatchAction({ type: "highlight", seriesIndex: 1, dataIndex: i });
+    const bi = BU.length - 1 - i;                               /* 子弹图 y 轴已反转 */
+    bullet.dispatchAction({ type: "downplay", seriesIndex: 3 });
+    bullet.dispatchAction({ type: "highlight", seriesIndex: 3, dataIndex: bi });
+    waterfall.dispatchAction({ type: "downplay", seriesIndex: 1 });
+    waterfall.dispatchAction({ type: "highlight", seriesIndex: 1,
+      dataIndex: WF.map((m) => m.name).indexOf(MAT[i].name) });
+    matIdx = (matIdx + 1) % MAT.length;
+  }
+  playMat();
+  setInterval(playMat, 4200);
+
+  let itemIdx = 0;
+  function playItem() {
+    tbodyRows.forEach((r, i) => r.classList.toggle("is-active", i === itemIdx));
+    itemIdx = (itemIdx + 1) % ITEMS.length;
+  }
+  playItem();
+  setInterval(playItem, 2400);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const near = (a, b, eps) => Math.abs(a - b) < (eps == null ? 1e-9 : eps);
+  const checks = [
+    ["采购总额 = 五材料之和 = 十品类之和", near(D.amt, sum(ITEMS.map((it) => it.amt)), 1e-9)],
+    ["各材料采购额 = 其品类之和", MAT.every((m) => near(m.amt, sum(m.items.map((it) => it.amt)), 1e-9))],
+    ["在册供应商 182 家 = 十品类之和", D.sup === SUP_TOTAL_BASE && D.sup === sum(ITEMS.map((it) => it.sup))],
+    ["采购额占营收比 = 采购额 ÷ 112.6", near(D.amtRatio, D.amt / REVENUE * 100)],
+    ["覆盖天数 = 库存 ÷ (年耗用 ÷ 365)", MAT.every((m) => near(m.days, m.stock * 365 / m.qty, 1e-9))],
+    ["材料占比合计 = 100%", near(sum(MAT.map((m) => m.share)), 100, 1e-9)],
+    ["品类占比合计 = 100%", near(sum(ITEMS.map((it) => it.share)), 100, 1e-9)],
+    ["降本达成率 = 实际合计 ÷ 目标合计", near(D.saveRate, sum(MAT.map((m) => m.saveAct)) / sum(MAT.map((m) => m.saveTgt)) * 100)],
+    ["品类环比按采购额加权 = 母材料环比", MAT.every((m) =>
+      near(sum(m.items.map((it) => it.amt * it.mom)) / m.amt, m.mom, 1e-9))],
+    ["隐含年均单价 = 采购额 ÷ 年耗用量", MAT.every((m) => near(m.unitPrice, m.amt * 1e4 / m.qty, 1e-9))],
+    ["综合指数 = 各材料指数按采购额加权", near(D.compIdx, sum(MAT.map((m) => m.amt / D.amt * m.idx[NM - 1])), 1e-9)],
+    ["区间带包住价格线（逐月成立）", MAT.every((m) => m.idx.every((v, t) =>
+      v >= m.bandLo[t] - 0.011 && v <= m.bandLo[t] + m.bandW[t] + 0.011))],
+    ["区间带落在 y 轴 [" + PRICE_MIN + "," + PRICE_MAX + "] 内", MAT.every((m) => m.bandLo.every((v, t) =>
+      v >= PRICE_MIN && v + m.bandW[t] <= PRICE_MAX))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[原料采购总览] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
