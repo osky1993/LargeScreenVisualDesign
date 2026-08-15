@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电品质管理</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --pz-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：产品线质量明细（产品线 / 产量 / 来料 / 直通 / 出厂 / 故障率 / 判定） */
+    --pz-tcols: 84px 56px 1fr 1fr 1fr 60px 46px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .pz-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 132px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .pz-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .pz-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .pz-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .pz-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .pz-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .pz-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .pz-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .pz-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .pz-crumb em { font-style: normal; color: #cfeae7; }
+  .pz-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .pz-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .pz-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .pz-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .pz-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .pz-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .pz-chips { display: flex; align-items: center; gap: 9px; }
+  .pz-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .pz-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .pz-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .pz-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .pz-chip.is-key b { color: var(--mfg-cyan); }
+  .pz-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .pz-clock-time { font: 700 26px/1 var(--pz-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .pz-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .pz-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .pz-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .pz-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .pz-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .pz-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .pz-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .pz-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .pz-kpi.is-warn .pz-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .pz-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .pz-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .pz-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .pz-kpi-val { font: 700 30px/1 var(--pz-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .pz-kpi.is-warn .pz-kpi-val { color: #ffd9b0; }
+  .pz-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .pz-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pz-kpi-sub b { font-weight: 700; }
+  .pz-up { color: var(--mfg-green); }
+  .pz-down { color: var(--mfg-red); }
+
+  /* ===== 三栏主体 ===== */
+  .pz-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .pz-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .pz-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .pz-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .pz-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .pz-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .pz-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pz-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .pz-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 质量链四段看板 ===== */
+  .pz-stages { flex: none; display: flex; flex-direction: column; gap: 8px; }
+  .pz-stage-row {
+    position: relative; display: grid; grid-template-columns: 30px 1fr 78px 66px; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 9px;
+    border: 1px solid rgba(64, 196, 190, 0.16); background: rgba(10, 38, 42, 0.5);
+    transition: border-color .25s, background .25s;
+  }
+  .pz-stage-row.is-active { border-color: rgba(53, 224, 208, 0.6); background: rgba(18, 68, 68, 0.55); box-shadow: inset 0 0 16px rgba(53, 224, 208, 0.12); }
+  .pz-stage-no {
+    width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font: 700 14px/1 var(--pz-mono); color: #04191a;
+  }
+  .pz-stage-name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .pz-stage-name b { font-size: 13.5px; font-weight: 700; letter-spacing: 0.04em; color: #d6efec; }
+  .pz-stage-name span { font-size: 11px; color: rgba(127, 166, 163, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pz-stage-rate { text-align: right; font: 700 17px/1 var(--pz-mono); font-variant-numeric: tabular-nums; }
+  .pz-stage-cum { text-align: right; font-size: 11px; color: var(--mfg-text-dim); font-variant-numeric: tabular-nums; }
+  .pz-stage-cum b { display: block; font: 700 13px/1.35 var(--pz-mono); color: #bfe4e0; }
+
+  /* ===== CSS grid 模拟表格 ===== */
+  .pz-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .pz-thead, .pz-tbody li {
+    display: grid; grid-template-columns: var(--pz-tcols); align-items: center; gap: 6px;
+  }
+  .pz-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .pz-thead span:not(:first-child), .pz-tbody li span:not(:first-child) { text-align: right; }
+  .pz-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .pz-tbody li {
+    padding: 0 8px; height: 30px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .pz-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .pz-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .pz-tbody li b { font-weight: 700; color: #eafcfa; }
+  .pz-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .pz-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .pz-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .pz-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+
+  /* ===== 底部预警滚动条 ===== */
+  .pz-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .pz-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .pz-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: pz-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes pz-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .pz-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .pz-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .pz-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .pz-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .pz-foot-item b { font-weight: 700; }
+  .pz-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .pz-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="pz-stage" id="pz-stage">
+    <!-- mockflag:begin --><div class="pz-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="pz-error" id="pz-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="pz-header">
+      <div class="pz-head-left">
+        <div class="pz-crumb"><b>云麓厨电</b><i>›</i><em>品质管理</em></div>
+        <div class="pz-head-title-row">
+          <div class="pz-head-title">品质管理</div>
+          <div class="pz-head-meta">
+            <span>质量链 <b>4</b> 段贯穿</span><i>|</i>
+            <span><b>6</b> 大产品线 · <b>3</b> 大基地</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="pz-head-right">
+        <div class="pz-chips">
+          <div class="pz-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="pz-chip is-key"><span>FPY</span><b id="pz-chip-fpy">--</b></div>
+        </div>
+        <div class="pz-clock" aria-label="实时时钟">
+          <span class="pz-clock-time" id="pz-clock-time">--:--:--</span>
+          <span class="pz-clock-date" id="pz-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="pz-band" id="pz-band"></div>
+
+    <!-- 左栏 -->
+    <div class="pz-col">
+      <section class="pz-panel" id="pz-defect-scope" style="flex: 1.12;">
+        <div class="pz-panel-head">
+          <h2>缺陷类型帕累托</h2>
+          <span class="pz-panel-tag">前 <b id="pz-pareto-k">--</b> 类占 <b id="pz-pareto-p">--</b></span>
+        </div>
+        <div class="pz-chart" id="pz-chart-pareto"></div>
+      </section>
+      <section class="pz-panel" style="flex: 1;">
+        <div class="pz-panel-head">
+          <h2>六产品线制程直通率</h2>
+          <span class="pz-panel-tag">近 12 个月 · 目标 <b>95.0%</b></span>
+        </div>
+        <div class="pz-chart" id="pz-chart-small"></div>
+      </section>
+    </div>
+
+    <!-- 中栏 -->
+    <div class="pz-col">
+      <section class="pz-panel" style="flex: 1.24;">
+        <div class="pz-panel-head">
+          <h2>四段质量漏斗</h2>
+          <span class="pz-panel-tag">原料 → 制程 → 出厂 → 市场 · 累计通过 <b id="pz-funnel-cum">--</b></span>
+        </div>
+        <div class="pz-chart" id="pz-chart-funnel"></div>
+      </section>
+      <section class="pz-panel" style="flex: 1;">
+        <div class="pz-panel-head">
+          <h2>市场故障率走廊</h2>
+          <span class="pz-panel-tag">近 24 个月 · 目标带 <b id="pz-corridor-band">--</b></span>
+        </div>
+        <div class="pz-chart" id="pz-chart-corridor"></div>
+      </section>
+    </div>
+
+    <!-- 右栏 -->
+    <div class="pz-col">
+      <section class="pz-panel" style="flex: none;">
+        <div class="pz-panel-head">
+          <h2>质量链四段看板</h2>
+          <span class="pz-panel-tag">单段合格率 · 累计通过率</span>
+        </div>
+        <div class="pz-stages" id="pz-stages"></div>
+      </section>
+      <section class="pz-panel" id="pz-line-scope" style="flex: 1;">
+        <div class="pz-panel-head">
+          <h2>产品线质量明细</h2>
+          <span class="pz-panel-tag">合计产量 <b id="pz-tbl-out">--</b> 万台</span>
+        </div>
+        <div class="pz-table">
+          <div class="pz-thead">
+            <span>产品线</span><span>产量</span><span>来料</span><span>直通</span><span>出厂</span><span>故障率</span><span>判定</span>
+          </div>
+          <ul class="pz-tbody" id="pz-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部预警滚动条 -->
+    <div class="pz-foot">
+      <div class="pz-foot-tag">质量预警</div>
+      <div class="pz-foot-view"><div class="pz-foot-track" id="pz-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("pz-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("pz-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const arrow = (v) => (v >= 0 ? "▲" : "▼");
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         口径与全系列基准盘一致：年产量 902 万台、年售后工单 96.8 万单。
+         合计一律由分项求和，比率一律现算，页面上不出现任何硬编码的合计值。 ===== */
+
+  /* 4.1 六大产品线：产量/保有量(万台) · 来料合格率/制程直通率 FPY/出厂检验合格率/市场故障率(%) */
+  const LINES = [
+    { name: "吸油烟机",   short: "烟机", base: "杭州临平", out: 236, own: 892, iqc: 99.24, fpy: 96.8, oqc: 99.72, fail: 2.72 },
+    { name: "燃气灶具",   short: "灶具", base: "杭州临平", out: 218, own: 836, iqc: 99.36, fpy: 97.2, oqc: 99.78, fail: 2.45 },
+    { name: "洗碗机",     short: "洗碗", base: "安徽芜湖", out: 132, own: 402, iqc: 98.86, fpy: 95.2, oqc: 99.58, fail: 3.86 },
+    { name: "蒸烤一体机", short: "蒸烤", base: "安徽芜湖", out:  96, own: 268, iqc: 98.72, fpy: 94.4, oqc: 99.46, fail: 4.12 },
+    { name: "集成灶",     short: "集成", base: "广东佛山", out: 108, own: 358, iqc: 99.02, fpy: 96.1, oqc: 99.64, fail: 3.24 },
+    { name: "净水热水",   short: "净水", base: "广东佛山", out: 112, own: 471, iqc: 99.42, fpy: 97.6, oqc: 99.80, fail: 2.96 }
+  ];
+
+  /* 4.2 缺陷类型（年度批次缺陷件数）——帕累托的累计占比全部现算 */
+  const DEFECTS = [
+    { name: "电控失效", n: 4820, part: "电控板" },
+    { name: "密封不良", n: 3960, part: "密封圈" },
+    { name: "焊接虚焊", n: 3240, part: "线束端子" },
+    { name: "面板划伤", n: 2680, part: "面板玻璃" },
+    { name: "噪音超标", n: 2150, part: "风机总成" },
+    { name: "点火异常", n: 1720, part: "点火针" },
+    { name: "涂层脱落", n: 1180, part: "腔体内胆" },
+    { name: "装配错位", n: 940,  part: "结构件" },
+    { name: "其他",     n: 610,  part: "—" }
+  ];
+
+  /* 4.3 市场故障率走廊：目标带 [2.5%, 3.5%]，近 24 个月。
+         末月不写死，由 4.4 现算的全司故障率填入，保证与 KPI / 明细表同源。 */
+  const CORRIDOR_LO = 2.5, CORRIDOR_HI = 3.5;
+  const FAIL_23 = [
+    3.62, 3.54, 3.48, 3.41, 3.38, 3.29, 3.24, 3.18, 3.22, 3.14, 3.08, 3.11,
+    3.05, 2.98, 3.02, 2.94, 2.88, 2.92, 2.85, 2.91, 3.04, 3.12, 3.06
+  ];
+
+  /* 4.4 派生量：全部现算，不复制数字 */
+  const D = {};
+  D.out = sum(LINES.map((l) => l.out));                       /* 年产量合计 902 万台 */
+  D.own = sum(LINES.map((l) => l.own));                       /* 保有量合计 */
+  /* 三段合格率按产量加权（不同产品线产量不同，简单平均会失真） */
+  const wByOut = (key) => sum(LINES.map((l) => l[key] * l.out)) / D.out;
+  D.iqc = wByOut("iqc");
+  D.fpy = wByOut("fpy");
+  D.oqc = wByOut("oqc");
+  /* 售后工单 = Σ(保有量 × 故障率)；全司故障率反过来由工单量 ÷ 保有量现算 —— 与售后服务页同源 */
+  LINES.forEach((l) => { l.tickets = l.own * l.fail / 100; });
+  D.tickets = sum(LINES.map((l) => l.tickets));               /* ≈ 96.8 万单 */
+  D.fail = D.tickets / D.own * 100;                           /* ≈ 3.00% */
+  D.pass = 100 - D.fail;                                      /* 市场无故障率 */
+
+  /* 4.5 质量链四段：单段合格率 + 累计通过率（逐段相乘，漏斗因此天然递减） */
+  const STAGES = [
+    { no: 1, name: "来料检验", key: "IQC", note: "五大原材料 · 182 家供应商", rate: D.iqc, color: C.cyan },
+    { no: 2, name: "制程直通", key: "FPY", note: "三大基地 · 一次通过未返修", rate: D.fpy, color: C.blue },
+    { no: 3, name: "出厂检验", key: "OQC", note: "全检 + 抽检双线", rate: D.oqc, color: C.violet },
+    { no: 4, name: "市场表现", key: "FIELD", note: "保有量 " + fmtDec(D.own, 0) + " 万台 · 12 个月窗口", rate: D.pass, color: C.orange }
+  ];
+  let cum = 100;
+  STAGES.forEach((s) => { cum = cum * s.rate / 100; s.cum = cum; });
+  D.cumFinal = cum;                                            /* 四段累计通过率 */
+
+  /* 4.6 缺陷帕累托派生：累计占比 + 达到 80% 所需的类别数 */
+  D.defTotal = sum(DEFECTS.map((d) => d.n));
+  let acc = 0;
+  DEFECTS.forEach((d) => { d.share = d.n / D.defTotal * 100; acc += d.share; d.cum = acc; });
+  D.pareto80 = DEFECTS.findIndex((d) => d.cum >= 80) + 1;      /* 前 N 类占 80% */
+  D.pareto80Share = DEFECTS[D.pareto80 - 1].cum;
+
+  /* 4.7 走廊序列：末月接上现算故障率；越界月份用于底部预警 */
+  const CORRIDOR = FAIL_23.concat([D.fail]);
+  D.corridorHiCnt = CORRIDOR.filter((v) => v > CORRIDOR_HI).length;
+  D.corridorMom = CORRIDOR[CORRIDOR.length - 1] - CORRIDOR[CORRIDOR.length - 2];
+  D.corridorYoy = CORRIDOR[CORRIDOR.length - 1] - CORRIDOR[CORRIDOR.length - 13];
+
+  /* 4.8 产品线判定：故障率 ≤ 3.0% 优 / ≤ 3.9% 关注 / 其余预警 */
+  LINES.forEach((l) => {
+    l.verdict = l.fail <= 3.0 ? { t: "优", c: "is-good" }
+              : l.fail <= 3.9 ? { t: "关注", c: "is-mid" }
+              : { t: "预警", c: "is-bad" };
+  });
+  D.lineWorst = LINES.slice().sort((a, b) => b.fail - a.fail)[0];
+  D.lineBest = LINES.slice().sort((a, b) => a.fail - b.fail)[0];
+  D.fpyBelow = LINES.filter((l) => l.fpy < 95).length;         /* 直通率低于目标的产品线数 */
+
+  /* 4.9 六产品线 12 月直通率序列：确定性波形（不用 Math.random，kiosk 每次打开须一致） */
+  const MONTHS12 = Array.from({ length: 12 }, (_, i) => (i + 8 > 12 ? i - 4 : i + 8) + "月");
+  LINES.forEach((l, li) => {
+    l.fpySeries = Array.from({ length: 12 }, (_, i) => {
+      const wave = Math.sin(i * 0.62 + li * 1.7) * 0.55 + Math.sin(i * 1.31 + li) * 0.22;
+      const trend = (i - 5.5) * 0.055;                          /* 全年缓升 */
+      return Number((l.fpy + wave + trend).toFixed(2));
+    });
+    l.fpySeries[11] = l.fpy;                                    /* 末月锚定到基准值，与表格勾稽 */
+  });
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("pz-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("pz-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("pz-chip-fpy").textContent = fmtDec(D.fpy, 2) + "%";
+
+  /* ===== 6. KPI 带：5 枚，数值翻牌缓动 ===== */
+  const KPI_DEFS = [
+    { icon: "◈", label: "来料合格率", val: D.iqc, unit: "%", dec: 2, warn: false,
+      sub: () => "五大原材料 · 按产量加权" },
+    { icon: "⛭", label: "制程直通率 FPY", val: D.fpy, unit: "%", dec: 2, warn: false,
+      sub: () => "低于目标 <b class=\"pz-down\">" + D.fpyBelow + "</b> 条线 · 目标 95.0%" },
+    { icon: "✓", label: "出厂检验合格率", val: D.oqc, unit: "%", dec: 2, warn: false,
+      sub: () => "全检 + 抽检 · 三大基地合并" },
+    { icon: "⚠", label: "市场故障率", val: D.fail, unit: "%", dec: 2, warn: true,
+      sub: () => "环比 <b class=\"" + (D.corridorMom >= 0 ? "pz-down" : "pz-up") + "\">" + arrow(D.corridorMom) + fmtDec(Math.abs(D.corridorMom), 2) + "pp</b> · 同比 <b class=\"" + (D.corridorYoy >= 0 ? "pz-down" : "pz-up") + "\">" + signed(D.corridorYoy, 2) + "pp</b>" },
+    { icon: "☎", label: "年售后工单", val: D.tickets, unit: "万单", dec: 1, warn: false,
+      sub: () => "= 保有量 <b>" + fmtDec(D.own, 0) + "</b> 万台 × 故障率" }
+  ];
+  const band = $("pz-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="pz-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="pz-kpi-icon">' + k.icon + "</div>" +
+      '<div class="pz-kpi-main">' +
+        '<div class="pz-kpi-label">' + k.label + "</div>" +
+        '<div class="pz-kpi-num"><span class="pz-kpi-val" id="pz-kpi-' + i + '">0</span><span class="pz-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="pz-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值 */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("pz-kpi-" + i), k.val, k.dec));
+
+  /* ===== 7. 质量链四段看板（右栏上） ===== */
+  const stagesBox = $("pz-stages");
+  stagesBox.innerHTML = STAGES.map((s, i) => (
+    '<div class="pz-stage-row" data-i="' + i + '">' +
+      '<div class="pz-stage-no" style="background:' + s.color + '">' + s.no + "</div>" +
+      '<div class="pz-stage-name"><b>' + s.name + " · " + s.key + "</b><span>" + s.note + "</span></div>" +
+      '<div class="pz-stage-rate" style="color:' + s.color + '">' + fmtDec(s.rate, 2) + "%</div>" +
+      '<div class="pz-stage-cum">累计<b>' + fmtDec(s.cum, 2) + "%</b></div>" +
+    "</div>"
+  )).join("");
+  const stageRows = Array.from(stagesBox.children);
+
+  /* ===== 8. 产品线质量明细表（右栏下） ===== */
+  const tbody = $("pz-tbody");
+  tbody.innerHTML = LINES.map((l, i) => (
+    "<li data-i=\"" + i + "\">" +
+      "<span><b>" + l.name + "</b></span>" +
+      "<span>" + l.out + "</span>" +
+      "<span>" + fmtDec(l.iqc, 2) + "</span>" +
+      "<span style=\"color:" + (l.fpy < 95 ? C.orange : "#cbe6e3") + "\">" + fmtDec(l.fpy, 1) + "</span>" +
+      "<span>" + fmtDec(l.oqc, 2) + "</span>" +
+      "<span style=\"color:" + (l.fail > 3.9 ? C.red : l.fail > 3.0 ? C.amber : C.green) + "\">" + fmtDec(l.fail, 2) + "</span>" +
+      '<span class="pz-badge ' + l.verdict.c + '">' + l.verdict.t + "</span>" +
+    "</li>"
+  )).join("");
+  const tbodyRows = Array.from(tbody.children);
+  $("pz-tbl-out").textContent = fmtDec(D.out, 0);
+  $("pz-funnel-cum").textContent = fmtDec(D.cumFinal, 2) + "%";
+  $("pz-corridor-band").textContent = fmtDec(CORRIDOR_LO, 1) + "% ~ " + fmtDec(CORRIDOR_HI, 1) + "%";
+  $("pz-pareto-k").textContent = D.pareto80;
+  $("pz-pareto-p").textContent = fmtDec(D.pareto80Share, 1) + "%";
+
+  /* ===== 9. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+
+  /* 9.1 四段质量漏斗（本页招牌图）：值 = 累计通过率，逐段相乘天然递减 */
+  const funnel = makeChart("pz-chart-funnel");
+  funnel.setOption({
+    backgroundColor: "transparent",
+    tooltip: {
+      trigger: "item",
+      backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 },
+      formatter: (p) => {
+        const s = STAGES[p.dataIndex];
+        return "<b>" + s.name + " · " + s.key + "</b><br/>单段合格率 <b style=\"color:" + s.color + "\">" +
+          fmtDec(s.rate, 2) + "%</b><br/>累计通过率 <b>" + fmtDec(s.cum, 2) + "%</b><br/>" +
+          "<span style=\"color:" + C.textDim + "\">" + s.note + "</span>";
+      }
+    },
+    series: [{
+      type: "funnel", left: "8%", right: "8%", top: 14, bottom: 26,
+      /* ★ 必须显式给 min/max：funnel 默认把值域映射到 [0, max]，而四段累计通过率挤在
+         92~99 之间，默认映射下四段几乎等宽（实测顶边 744/728/726/714 px），读不出逐段流失。
+         收窄到 [88, 100] 后宽度拉开到 92%/73%/72%/57%，漏斗形态才成立。 */
+      min: 88, max: 100,
+      minSize: "34%", maxSize: "96%", sort: "descending", gap: 6,
+      label: {
+        show: true, position: "inside", color: "#04191a", fontSize: 13, fontWeight: 700,
+        formatter: (p) => STAGES[p.dataIndex].name + "  " + fmtDec(STAGES[p.dataIndex].rate, 2) + "%"
+      },
+      labelLine: { show: false },
+      itemStyle: { borderColor: "rgba(7,27,30,.85)", borderWidth: 2 },
+      emphasis: { label: { fontSize: 14 } },
+      data: STAGES.map((s) => ({
+        name: s.name, value: s.cum,
+        itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+          { offset: 0, color: s.color }, { offset: 1, color: s.color + "aa" }
+        ]) }
+      }))
+    }]
+  });
+
+  /* 9.2 缺陷类型帕累托：柱 + 累计占比线（双轴），80% 处画基准线 */
+  const pareto = makeChart("pz-chart-pareto");
+  pareto.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 6, right: 8, top: 30, bottom: 4, containLabel: true },
+    tooltip: {
+      trigger: "axis", axisPointer: { type: "shadow" },
+      backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 },
+      formatter: (ps) => {
+        const d = DEFECTS[ps[0].dataIndex];
+        return "<b>" + d.name + "</b><br/>缺陷 <b style=\"color:" + C.cyan + "\">" + d.n + "</b> 件 · 占比 " +
+          fmtDec(d.share, 1) + "%<br/>累计 <b style=\"color:" + C.orange + "\">" + fmtDec(d.cum, 1) +
+          "%</b><br/><span style=\"color:" + C.textDim + "\">主责部件：" + d.part + "</span>";
+      }
+    },
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+      textStyle: { color: C.textDim, fontSize: 11 },
+      data: ["缺陷件数", "累计占比"]
+    },
+    xAxis: {
+      type: "category", data: DEFECTS.map((d) => d.name),
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, rotate: 32, fontSize: 10.5 })
+    },
+    yAxis: [
+      { type: "value", name: "件", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false } },
+      { type: "value", name: "%", max: 100, nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: Object.assign({}, AXIS_LABEL, { formatter: "{value}" }), splitLine: { show: false }, axisLine: { show: false } }
+    ],
+    series: [
+      { name: "缺陷件数", type: "bar", barWidth: "56%", data: DEFECTS.map((d) => d.n),
+        itemStyle: {
+          borderRadius: [3, 3, 0, 0],
+          color: (p) => (p.dataIndex < D.pareto80
+            ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: C.cyan }, { offset: 1, color: C.cyanDeep }])
+            : "rgba(79,168,232,.42)")
+        } },
+      { name: "累计占比", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 6,
+        data: DEFECTS.map((d) => Number(fmtDec(d.cum, 1))),
+        lineStyle: { color: C.orange, width: 2 }, itemStyle: { color: C.orange },
+        markLine: {
+          silent: true, symbol: "none",
+          label: { formatter: "80%", color: C.amber, fontSize: 10, position: "insideEndTop" },
+          lineStyle: { color: C.amber, type: "dashed", width: 1 },
+          data: [{ yAxis: 80 }]
+        } }
+    ]
+  });
+
+  /* 9.3 市场故障率 24 月走廊带：带内青色、越上界转橙红 */
+  const corridor = makeChart("pz-chart-corridor");
+  const corridorMonths = Array.from({ length: 24 }, (_, i) => {
+    const m = ((7 - (23 - i)) % 12 + 12) % 12 + 1;             /* 倒推 24 个月，末月 = 7 月 */
+    return m + "月";
+  });
+  corridor.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 6, right: 12, top: 30, bottom: 4, containLabel: true },
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 },
+      formatter: (ps) => {
+        const v = CORRIDOR[ps[0].dataIndex];
+        const st = v > CORRIDOR_HI ? "<b style=\"color:" + C.red + "\">越上界</b>"
+                 : v < CORRIDOR_LO ? "<b style=\"color:" + C.blue + "\">优于下界</b>"
+                 : "<b style=\"color:" + C.cyan + "\">带内</b>";
+        return "第 " + (ps[0].dataIndex + 1) + " 月　故障率 <b>" + fmtDec(v, 2) + "%</b><br/>" + st +
+          "　目标带 " + fmtDec(CORRIDOR_LO, 1) + "% ~ " + fmtDec(CORRIDOR_HI, 1) + "%";
+      }
+    },
+    legend: { show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["市场故障率"] },
+    xAxis: {
+      type: "category", boundaryGap: false, data: corridorMonths,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 2, fontSize: 10.5 })
+    },
+    yAxis: {
+      type: "value", name: "%", min: 2.2, max: 3.9, nameTextStyle: { color: C.textDim, fontSize: 10 },
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    series: [
+      /* 目标带：下界透明打底 + 带宽堆叠，形成一条水平色带 */
+      { name: "_带下界", type: "line", stack: "corridor", symbol: "none", silent: true,
+        data: new Array(24).fill(CORRIDOR_LO),
+        lineStyle: { opacity: 0 }, areaStyle: { color: "transparent" }, tooltip: { show: false } },
+      { name: "_带宽", type: "line", stack: "corridor", symbol: "none", silent: true,
+        data: new Array(24).fill(CORRIDOR_HI - CORRIDOR_LO),
+        lineStyle: { opacity: 0 }, areaStyle: { color: "rgba(53,224,208,.10)" }, tooltip: { show: false } },
+      { name: "市场故障率", type: "line", smooth: true, symbol: "circle", symbolSize: 5, z: 5,
+        data: CORRIDOR.map((v) => Number(fmtDec(v, 2))),
+        itemStyle: { color: (p) => (p.value > CORRIDOR_HI ? C.red : p.value < CORRIDOR_LO ? C.blue : C.cyan) },
+        lineStyle: { width: 2.4, color: C.cyan },
+        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: "rgba(53,224,208,.28)" }, { offset: 1, color: "rgba(53,224,208,0)" }
+        ]) },
+        markLine: {
+          silent: true, symbol: "none",
+          data: [
+            { yAxis: CORRIDOR_HI, lineStyle: { color: C.orange, type: "dashed", width: 1 },
+              label: { formatter: "上界 " + fmtDec(CORRIDOR_HI, 1) + "%", color: C.orange, fontSize: 10, position: "insideStartTop" } },
+            { yAxis: CORRIDOR_LO, lineStyle: { color: C.blue, type: "dashed", width: 1 },
+              label: { formatter: "下界 " + fmtDec(CORRIDOR_LO, 1) + "%", color: C.blue, fontSize: 10, position: "insideStartBottom" } }
+          ]
+        } }
+    ]
+  });
+
+  /* 9.4 六产品线直通率小多图：6 个 grid（2 行 × 3 列），各自一条走势 */
+  const small = makeChart("pz-chart-small");
+  const SM_COLS = 3, SM_ROWS = 2;
+  const smGrids = [], smXs = [], smYs = [], smSeries = [], smTitles = [];
+  LINES.forEach((l, i) => {
+    const r = Math.floor(i / SM_COLS), c = i % SM_COLS;
+    smGrids.push({
+      left: (3 + c * 32.6) + "%", width: "27.5%",
+      top: (16 + r * 48) + "%", height: "30%"
+    });
+    smTitles.push({
+      text: l.short, textStyle: { color: C.textDim, fontSize: 11, fontWeight: 400 },
+      subtext: fmtDec(l.fpy, 1) + "%",
+      subtextStyle: { color: l.fpy < 95 ? C.orange : C.cyan, fontSize: 12.5, fontWeight: 700 },
+      left: (3 + c * 32.6) + "%", top: (2 + r * 48) + "%", itemGap: 1
+    });
+    smXs.push({
+      gridIndex: i, type: "category", boundaryGap: false, data: MONTHS12,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }, axisLabel: { show: false }
+    });
+    smYs.push({
+      gridIndex: i, type: "value", min: 93, max: 99, scale: true,
+      axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false },
+      splitLine: { show: false }
+    });
+    smSeries.push({
+      name: l.name, type: "line", xAxisIndex: i, yAxisIndex: i,
+      data: l.fpySeries, smooth: true, symbol: "none",
+      lineStyle: { width: 1.8, color: l.fpy < 95 ? C.orange : C.series[i % C.series.length] },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: (l.fpy < 95 ? "rgba(255,157,69,.26)" : "rgba(53,224,208,.24)") },
+        { offset: 1, color: "rgba(53,224,208,0)" }
+      ]) },
+      markLine: {
+        silent: true, symbol: "none",
+        data: [{ yAxis: 95 }],
+        lineStyle: { color: "rgba(255,201,77,.5)", type: "dashed", width: 1 },
+        label: { show: false }
+      }
+    });
+  });
+  small.setOption({
+    backgroundColor: "transparent",
+    title: smTitles,
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 },
+      formatter: (ps) => ps[0].seriesName + "　" + ps[0].name + "<br/>直通率 <b>" + fmtDec(ps[0].value, 2) + "%</b>"
+    },
+    grid: smGrids, xAxis: smXs, yAxis: smYs, series: smSeries
+  });
+
+  /* ===== 10. 底部质量预警滚动条（数据全部由上面的派生量现算，不另编数字） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: D.lineWorst.name + " 市场故障率 " + fmtDec(D.lineWorst.fail, 2) + "%，为六线最高，超目标带上界 " + fmtDec(D.lineWorst.fail - CORRIDOR_HI, 2) + "pp" },
+    { lv: "高", c: C.red, t: "直通率低于 95.0% 目标的产品线共 " + D.fpyBelow + " 条，集中在安徽芜湖基地" },
+    { lv: "中", c: C.orange, t: "缺陷前 " + D.pareto80 + " 类合计占 " + fmtDec(D.pareto80Share, 1) + "%，首位「" + DEFECTS[0].name + "」主责部件为" + DEFECTS[0].part },
+    { lv: "中", c: C.orange, t: "近 24 个月故障率越上界 " + D.corridorHiCnt + " 次，当前 " + fmtDec(D.fail, 2) + "%，环比 " + signed(D.corridorMom, 2) + "pp" },
+    { lv: "低", c: C.amber, t: "年售后工单 " + fmtDec(D.tickets, 1) + " 万单 = 保有量 " + fmtDec(D.own, 0) + " 万台 × 故障率 " + fmtDec(D.fail, 2) + "%，与售后服务页同源" },
+    { lv: "低", c: C.green, t: D.lineBest.name + " 故障率 " + fmtDec(D.lineBest.fail, 2) + "% 为六线最优，出厂合格率 " + fmtDec(D.lineBest.oqc, 2) + "%" }
+  ];
+  const track = $("pz-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="pz-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                      /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 11. 活性轮播：四段看板 ↔ 漏斗 ↔ 明细表 三处联动高亮 ===== */
+  let stageIdx = 0;
+  function playStage() {
+    stageRows.forEach((r, i) => r.classList.toggle("is-active", i === stageIdx));
+    funnel.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    funnel.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: stageIdx });
+    stageIdx = (stageIdx + 1) % STAGES.length;
+  }
+  playStage();
+  setInterval(playStage, 3200);
+
+  let lineIdx = 0;
+  function playLine() {
+    tbodyRows.forEach((r, i) => r.classList.toggle("is-active", i === lineIdx));
+    small.dispatchAction({ type: "showTip", seriesIndex: lineIdx, dataIndex: 11 });
+    lineIdx = (lineIdx + 1) % LINES.length;
+  }
+  playLine();
+  setInterval(playLine, 2600);
+
+  let paretoIdx = 0;
+  setInterval(() => {
+    pareto.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    pareto.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: paretoIdx });
+    paretoIdx = (paretoIdx + 1) % DEFECTS.length;
+  }, 2200);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const checks = [
+    ["产量合计 = 六产品线之和", Math.abs(D.out - 902) < 0.01],
+    ["保有量合计 = 六产品线之和", Math.abs(D.own - sum(LINES.map((l) => l.own))) < 0.01],
+    ["年工单 ≈ 96.8 万单（保有量 × 故障率）", Math.abs(D.tickets - 96.8) < 0.1],
+    ["四段累计通过率 = 逐段相乘", Math.abs(D.cumFinal - (D.iqc * D.fpy * D.oqc * D.pass / 1e6)) < 1e-9],
+    ["缺陷占比合计 = 100%", Math.abs(DEFECTS[DEFECTS.length - 1].cum - 100) < 1e-9]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[品质管理] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
