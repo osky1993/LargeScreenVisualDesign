@@ -3,6 +3,8 @@
 面向管理大屏的 **ECharts 6 视觉方案库**：一堆自包含的静态 HTML，双击就能看效果，
 每张方案卡片可一键复制可运行的配置。无构建系统、无 npm 依赖，运行时只从 CDN 加载 echarts。
 
+**在线预览：<https://osky1993.github.io/LargeScreenVisualDesign/>**（GitHub Pages，随 master 分支自动发布）
+
 当前共 **103 个文件、801 项方案**，外加 33 套配色主题（12 套行业主题 + 21 套风格皮肤）。
 
 | 板块 | 内容 |
