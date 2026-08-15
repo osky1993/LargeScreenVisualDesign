@@ -5,7 +5,8 @@
   python3 tools/build_index.py
 
 行为：
-  - 扫描仓库根目录下所有顶层 .html（排除 index.html、*.inner.html、隐藏文件）
+  - 扫描 CONTENT_DIRS 里各内容目录本层的 .html（排除 *.inner.html、隐藏文件）；
+    manifest 的 file 字段是相对仓库根的路径，index.html 直接拿它当 href
   - 「ECharts视觉实验室*」与「管理大屏配色专项*」类文件内容内嵌在 <iframe srcdoc="...">
     中（HTML 转义），参照 tools/labtool.py 的方式解码后提取 <title> 与方案名
   - 普通 HTML（如 图表配色方案-21套.html）直接取 <title>
@@ -20,6 +21,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "index.html"
+
+# 内容目录（只扫这几个目录的本层 .html；新增分类目录时加到这里）
+CONTENT_DIRS = [
+    "charts",               # 图表方案画廊
+    "screens",              # 通用样板间
+    "screens/public-funds",  # 公共资金专题样板间
+    "components",           # 大屏组件与脚手架
+    "palettes",             # 配色陈列
+    "studies",              # 选型/效果对比
+]
 
 SRCDOC_RE = re.compile(r'srcdoc="(.*?)"', re.S)
 TITLE_RE = re.compile(r"<title>(.*?)</title>", re.S | re.I)
@@ -249,7 +260,7 @@ def scan_file(path: Path) -> dict:
 
     size = path.stat().st_size
     return {
-        "file": path.name,
+        "file": path.relative_to(ROOT).as_posix(),   # 带目录的相对路径，index.html 直接当 href 用
         "title": title,
         "category": cat,
         "count": count,
@@ -300,16 +311,17 @@ def pubfund_rank() -> dict:
 
 def scan() -> list:
     entries = []
-    for p in sorted(ROOT.glob("*.html")):
-        name = p.name
-        if name == "index.html" or name.endswith(".inner.html") or name.startswith("."):
-            continue
-        entries.append(scan_file(p))
+    for d in CONTENT_DIRS:
+        for p in sorted((ROOT / d).glob("*.html")):   # 只扫该目录本层，子目录各自登记在 CONTENT_DIRS
+            name = p.name
+            if name.endswith(".inner.html") or name.startswith("."):
+                continue
+            entries.append(scan_file(p))
     order = {cat: i for i, (_, cat) in enumerate(CATEGORY_RULES)}
     rank = pubfund_rank()
     entries.sort(key=lambda e: (
         order.get(e["category"], 99),
-        rank.get(e["file"], 9999) if e["category"] == "公共资金专题" else 0,
+        rank.get(Path(e["file"]).name, 9999) if e["category"] == "公共资金专题" else 0,
         e["file"],
     ))
     return entries
@@ -489,14 +501,15 @@ footer{margin-top:44px;color:rgba(127,163,204,.55);font-size:12px;letter-spacing
     var chips = shown.map(function(p){ return chipHtml(p[0], p[1], toks); }).join("");
     if(rest > 0) chips += '<span class="more">+' + rest + "</span>";
     if(!e.schemes.length) chips = '<span class="more">—</span>';
-    var titleLine = (e.title && e.title !== e.file.replace(/\\.html$/,"")) ?
+    var fname = e.file.split("/").pop().replace(/\\.html$/,"");   // 卡片只显示文件名，目录信息在 href 里
+    var titleLine = (e.title && e.title !== fname) ?
       '<div class="ftitle">' + highlight(e.title, toks) + "</div>" : "";
     return '<a class="card" href="' + encodeURI(e.file) + '" target="_blank" rel="noopener">' +
       '<div class="card-top">' +
         '<span class="badge" style="color:' + color + ";border-color:" + color + '55;background:' + color + '14">' + esc(e.category) + "</span>" +
         '<span class="size">' + esc(e.size_label) + "</span>" +
       "</div>" +
-      '<div class="fname">' + highlight(e.file.replace(/\\.html$/,""), toks) + "</div>" +
+      '<div class="fname">' + highlight(fname, toks) + "</div>" +
       titleLine +
       '<div class="meta"><span>方案 <strong>' + e.count + "</strong></span>" +
         '<span>提取方案名 <strong>' + e.schemes.length + "</strong></span></div>" +

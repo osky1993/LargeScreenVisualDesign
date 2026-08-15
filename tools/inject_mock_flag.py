@@ -16,6 +16,8 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 成品屏所在目录（各目录只取本层）
+SCREEN_DIRS = ["screens", os.path.join("screens", "public-funds")]
 
 CSS_BEGIN = "  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */"
 CSS_END = "  /* mockflag:end */"
@@ -75,7 +77,11 @@ def inject(html, path):
 
 def main():
     do_remove = "--remove" in sys.argv
-    names = sorted(n for n in os.listdir(ROOT) if n.startswith("大屏样板间-") and n.endswith(".html"))
+    names = []
+    for d in SCREEN_DIRS:
+        base = os.path.join(ROOT, d)
+        names += [os.path.join(d, n) for n in sorted(os.listdir(base))
+                  if n.startswith("大屏样板间-") and n.endswith(".html")]
     done = 0
     for name in names:
         path = os.path.join(ROOT, name)

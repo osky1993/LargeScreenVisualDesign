@@ -18,6 +18,8 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 公共资金专题 27 块屏所在目录（页面互链是同目录相对路径，移动目录时只改这里）
+PAGES_DIR = os.path.join(ROOT, "screens", "public-funds")
 
 # 父页 → (子页展示名, 页内入口位置, 子页文件)；无子页则为 None
 SUB = {
@@ -73,7 +75,7 @@ def chips_re(p):
 
 
 def apply(fname, remove=False):
-    path = os.path.join(ROOT, fname)
+    path = os.path.join(PAGES_DIR, fname)
     html = io.open(path, encoding="utf-8").read()
     p = prefix_of(html)
 
@@ -123,7 +125,7 @@ def apply(fname, remove=False):
 def main():
     remove = "--remove" in sys.argv
     for f in SUB:
-        if not os.path.exists(os.path.join(ROOT, f)):
+        if not os.path.exists(os.path.join(PAGES_DIR, f)):
             print("跳过（不存在）：" + f)
             continue
         print(apply(f, remove))

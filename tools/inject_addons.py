@@ -4,7 +4,7 @@
 用法：
   python3 tools/inject_addons.py <lab.html> '<setup-config-json>'
 例：
-  python3 tools/inject_addons.py ECharts视觉实验室-柱状图8.html '{"headSelector": ".e6-panel-header", "chartSelector": ".e6-chart"}'
+  python3 tools/inject_addons.py charts/ECharts视觉实验室-柱状图8.html '{"headSelector": ".e6-panel-header", "chartSelector": ".e6-chart"}'
 
 幂等：重复运行会替换 LAB_ADDONS 标记块。注入点：第一个 echarts CDN <script> 之后。
 """

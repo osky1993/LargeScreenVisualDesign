@@ -25,6 +25,8 @@ import sys
 import json
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 公共资金专题 27 块屏所在目录（页面互链是同目录相对路径，移动目录时只改这里）
+PAGES_DIR = os.path.join(ROOT, "screens", "public-funds")
 
 CITIES = ["苏州", "南京", "无锡", "南通", "常州", "徐州", "盐城", "扬州", "泰州", "淮安", "镇江", "宿迁", "连云港"]
 INDUSTRIES = ["制造业", "批发和零售业", "房地产业", "金融业", "建筑业", "租赁和商务服务业",
@@ -295,7 +297,7 @@ def strip(html, begin, end):
 
 
 def apply(cfg, remove=False):
-    path = os.path.join(ROOT, cfg["file"])
+    path = os.path.join(PAGES_DIR, cfg["file"])
     html = io.open(path, encoding="utf-8").read()
     p = prefix_of(html)
     html = strip(html, CSS_BEGIN, CSS_END)
@@ -340,7 +342,7 @@ def preflight():
     """
     bad = []
     for cfg in PAGES:
-        path = os.path.join(ROOT, cfg["file"])
+        path = os.path.join(PAGES_DIR, cfg["file"])
         if not os.path.exists(path):
             continue
         html = io.open(path, encoding="utf-8").read()
@@ -356,7 +358,7 @@ def preflight():
         for s in [t["sub"] for t in cfg.get("targets", [])] + \
                  [c["sub"] for c in cfg.get("charts", [])] + \
                  [pn["sub"] for pn in cfg.get("panels", [])]:
-            if not os.path.exists(os.path.join(ROOT, s)):
+            if not os.path.exists(os.path.join(PAGES_DIR, s)):
                 bad.append("%s：子页「%s」不存在" % (cfg["file"], s))
     if bad:
         raise SystemExit("配置预检未通过，未写入任何文件：\n  " + "\n  ".join(bad))
@@ -368,7 +370,7 @@ def main():
         preflight()
     n = 0
     for cfg in PAGES:
-        if not os.path.exists(os.path.join(ROOT, cfg["file"])):
+        if not os.path.exists(os.path.join(PAGES_DIR, cfg["file"])):
             print("跳过（不存在）：" + cfg["file"])
             continue
         print(apply(cfg, remove))

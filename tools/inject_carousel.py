@@ -19,6 +19,8 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 公共资金专题 27 块屏所在目录（页面互链是同目录相对路径，移动目录时只改这里）
+PAGES_DIR = os.path.join(ROOT, "screens", "public-funds")
 
 # 轮播页序 = 需求提出 13 个专题时的原始顺序，勿随意调整
 PAGES = [
@@ -200,7 +202,7 @@ def strip_block(html: str, begin: str, end: str) -> str:
 
 
 def inject(path: str, idx: int, remove: bool = False) -> str:
-    full = os.path.join(ROOT, path)
+    full = os.path.join(PAGES_DIR, path)
     html = io.open(full, encoding="utf-8").read()
     p = prefix_of(html)
 
@@ -244,7 +246,7 @@ def inject(path: str, idx: int, remove: bool = False) -> str:
 def main():
     remove = "--remove" in sys.argv
     for i, (f, _t) in enumerate(PAGES):
-        if not os.path.exists(os.path.join(ROOT, f)):
+        if not os.path.exists(os.path.join(PAGES_DIR, f)):
             print("跳过（文件不存在）：" + f)
             continue
         print(inject(f, i, remove))

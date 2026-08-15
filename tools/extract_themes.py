@@ -48,7 +48,7 @@ def node_eval(js: str):
 
 
 def extract_industry():
-    s = (ROOT / "管理大屏配色专项与行业主体实现实验室.html").read_text(encoding="utf-8")
+    s = (ROOT / "palettes" / "管理大屏配色专项与行业主体实现实验室.html").read_text(encoding="utf-8")
     m = re.search(r'srcdoc="(.*?)"', s, re.S)
     inner = html.unescape(m.group(1))
     idx = re.search(r"var themes\s*=\s*\[", inner)
@@ -57,7 +57,7 @@ def extract_industry():
 
 
 def extract_styles():
-    s = (ROOT / "图表配色方案-21套.html").read_text(encoding="utf-8")
+    s = (ROOT / "palettes" / "图表配色方案-21套.html").read_text(encoding="utf-8")
     # text/x-dc 脚本内的源码带字面 \n 与 \" 转义
     start = s.find("const data = [")
     if start < 0:
