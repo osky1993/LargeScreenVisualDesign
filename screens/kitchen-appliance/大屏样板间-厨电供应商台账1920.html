@@ -1,0 +1,929 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电供应商台账</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --gy-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：编号 / 供应商 / 级别 / 主供材料 / 所在省 / 准时交付率 / 来料合格率 / 账期 / 年采购额 / 判定 */
+    --gy-tcols: 78px 156px 84px 96px 64px 1fr 1fr 66px 104px 74px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .gy-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 452px;
+    grid-template-rows: 84px 118px 46px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .gy-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .gy-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .gy-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .gy-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .gy-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .gy-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .gy-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .gy-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .gy-crumb em { font-style: normal; color: #cfeae7; }
+  /* 返回上级：同目录相对路径回到供应商协同，暖橙描边与本页青主色区分 */
+  .gy-back {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 157, 69, 0.42);
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.16), rgba(14, 46, 50, 0.6));
+    color: #ffd9b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .gy-back:hover { color: #fff1e2; border-color: rgba(255, 157, 69, 0.9); box-shadow: 0 0 14px rgba(255, 157, 69, 0.4); }
+  .gy-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .gy-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .gy-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .gy-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .gy-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .gy-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .gy-chips { display: flex; align-items: center; gap: 9px; }
+  .gy-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .gy-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .gy-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .gy-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .gy-chip.is-key b { color: var(--mfg-cyan); }
+  .gy-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .gy-clock-time { font: 700 26px/1 var(--gy-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .gy-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .gy-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .gy-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .gy-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .gy-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .gy-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .gy-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .gy-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .gy-kpi.is-warn .gy-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .gy-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .gy-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .gy-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .gy-kpi-val { font: 700 28px/1 var(--gy-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .gy-kpi.is-warn .gy-kpi-val { color: #ffd9b0; }
+  .gy-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .gy-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gy-kpi-sub b { font-weight: 700; }
+  .gy-up { color: var(--mfg-green); }
+  .gy-down { color: var(--mfg-red); }
+
+  /* ===== 级别筛选条 ===== */
+  .gy-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 14px;
+  }
+  .gy-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #7fc0ba; }
+  .gy-fchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 5px 14px 6px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(64, 196, 190, 0.2); background: rgba(10, 38, 42, 0.55);
+    color: #bcdedb; font-size: 13px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .gy-fchip u { text-decoration: none; font: 700 13px/1 var(--gy-mono); color: inherit; }
+  .gy-fchip i { font-style: normal; font-size: 11.5px; color: rgba(127, 166, 163, 0.85); font-variant-numeric: tabular-nums; }
+  .gy-fchip:hover { border-color: rgba(53, 224, 208, 0.55); color: #eafcfa; }
+  .gy-fchip.is-on { color: #04191a; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .gy-fchip.is-on i { color: rgba(4, 25, 26, 0.68); }
+  .gy-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .gy-filters-state b { font-weight: 700; color: var(--mfg-cyan); }
+  .gy-filters-state em { font-style: normal; color: #cfe9e6; }
+  .gy-filters-state i { font-style: normal; color: rgba(127, 166, 163, 0.4); margin: 0 8px; }
+
+  /* ===== 面板 ===== */
+  .gy-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .gy-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .gy-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .gy-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .gy-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .gy-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .gy-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .gy-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .gy-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .gy-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .gy-thead, .gy-tbody li {
+    display: grid; grid-template-columns: var(--gy-tcols); align-items: center; gap: 8px;
+  }
+  .gy-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .gy-thead span:nth-child(8), .gy-thead span:nth-child(9), .gy-thead span:nth-child(10) { text-align: right; }
+  .gy-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .gy-tbody li {
+    padding: 0 8px; height: 30px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    animation: gy-rowin .34s ease both;
+  }
+  @keyframes gy-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .gy-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .gy-tbody li.is-risk { background: rgba(255, 95, 107, 0.10); box-shadow: inset 2px 0 0 var(--mfg-red); }
+  .gy-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gy-tbody li span:nth-child(8), .gy-tbody li span:nth-child(9) { text-align: right; }
+  .gy-tbody li .gy-no { font: 700 11.5px/1 var(--gy-mono); color: rgba(127, 166, 163, 0.85); letter-spacing: 0.04em; }
+  .gy-tbody li .gy-name { font-weight: 700; color: #eafcfa; }
+  .gy-tbody li .gy-amt { font-weight: 700; color: #eafcfa; }
+  /* 双条：微条 + 数值，占两个 1fr 列 */
+  .gy-bar { display: flex; align-items: center; gap: 8px; }
+  .gy-bar-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(64, 196, 190, 0.14); overflow: hidden; }
+  .gy-bar-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .gy-bar em { flex: none; width: 48px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+  .gy-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .gy-tbody li .gy-badge:last-child, .gy-thead span:last-child { justify-self: end; }
+  .gy-badge.is-s { color: #04241f; background: var(--mfg-cyan); }
+  .gy-badge.is-a { color: #041b2c; background: var(--mfg-blue); }
+  .gy-badge.is-b { color: #063a25; background: var(--mfg-green); }
+  .gy-badge.is-c { color: #3a2405; background: var(--mfg-orange); }
+  .gy-badge.is-top { color: #04241f; background: var(--mfg-cyan); }
+  .gy-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .gy-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .gy-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+
+  /* ===== 右栏：主供材料结构条 ===== */
+  .gy-mats { flex: none; display: flex; flex-direction: column; gap: 7px; }
+  .gy-mat-row { display: grid; grid-template-columns: 78px 1fr 76px; align-items: center; gap: 10px; font-size: 12px; color: #bcdedb; }
+  .gy-mat-row b { font-weight: 400; color: #d6efec; white-space: nowrap; }
+  .gy-mat-bar { height: 9px; border-radius: 5px; background: rgba(64, 196, 190, 0.12); overflow: hidden; }
+  .gy-mat-bar i { display: block; height: 100%; border-radius: 5px; transition: width .5s ease; }
+  .gy-mat-num { text-align: right; font-variant-numeric: tabular-nums; color: var(--mfg-text-dim); }
+  .gy-mat-num em { font-style: normal; font-weight: 700; color: #eafcfa; margin-right: 5px; }
+
+  /* ===== 底部滚动条 ===== */
+  .gy-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .gy-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .gy-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: gy-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes gy-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .gy-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .gy-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .gy-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .gy-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .gy-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .gy-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="gy-stage" id="gy-stage">
+    <!-- mockflag:begin --><div class="gy-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="gy-error" id="gy-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="gy-header">
+      <div class="gy-head-left">
+        <div class="gy-crumb">
+          <a class="gy-back" href="大屏样板间-厨电供应商协同1920.html" title="返回上级专题页：供应商协同">‹ 返回 供应商协同</a>
+          <b>云麓厨电</b><i>›</i><span>供应商协同</span><i>›</i><em>供应商台账</em>
+        </div>
+        <div class="gy-head-title-row">
+          <div class="gy-head-title">供应商台账</div>
+          <div class="gy-head-meta">
+            <span>全量 <b id="gy-meta-total">--</b> 家 · 覆盖 <b id="gy-meta-prov">--</b> 省</span><i>|</i>
+            <span><b>5</b> 大原材料 · <b>4</b> 级分层</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="gy-head-right">
+        <div class="gy-chips">
+          <div class="gy-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="gy-chip is-key"><span id="gy-chip-key">ON-TIME · ALL</span><b id="gy-chip-otd">--</b></div>
+        </div>
+        <div class="gy-clock" aria-label="实时时钟">
+          <span class="gy-clock-time" id="gy-clock-time">--:--:--</span>
+          <span class="gy-clock-date" id="gy-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带（随筛选联动） -->
+    <div class="gy-band" id="gy-band"></div>
+
+    <!-- 级别筛选条 -->
+    <div class="gy-filters">
+      <span class="gy-filters-tag">级别筛选</span>
+      <div id="gy-fchips" style="display:flex;align-items:center;gap:10px;"></div>
+      <div class="gy-filters-state" id="gy-filters-state">--</div>
+    </div>
+
+    <!-- 左：全量台账表 -->
+    <section class="gy-panel">
+      <div class="gy-panel-head">
+        <h2>供应商全量台账</h2>
+        <span class="gy-panel-tag" id="gy-table-tag">--</span>
+      </div>
+      <div class="gy-table">
+        <div class="gy-thead">
+          <span>编号</span><span>供应商</span><span>级别</span><span>主供材料</span><span>所在省</span>
+          <span>准时交付率 %</span><span>来料合格率 %</span><span>账期(天)</span><span>年采购额(万元)</span><span>风险判定</span>
+        </div>
+        <ul class="gy-tbody" id="gy-tbody"></ul>
+      </div>
+    </section>
+
+    <!-- 右：辅助图 -->
+    <div class="gy-col">
+      <section class="gy-panel" style="flex: 1;">
+        <div class="gy-panel-head">
+          <h2>级别结构</h2>
+          <span class="gy-panel-tag">四级合计 <b id="gy-donut-total">--</b> 家</span>
+        </div>
+        <div class="gy-chart" id="gy-chart-donut"></div>
+      </section>
+      <section class="gy-panel" style="flex: 1;">
+        <div class="gy-panel-head">
+          <h2>准时交付率分布</h2>
+          <span class="gy-panel-tag" id="gy-hist-tag">--</span>
+        </div>
+        <div class="gy-chart" id="gy-chart-hist"></div>
+      </section>
+      <section class="gy-panel" style="flex: none;">
+        <div class="gy-panel-head">
+          <h2>主供材料结构</h2>
+          <span class="gy-panel-tag">当前筛选 <b id="gy-mat-total">--</b> 家</span>
+        </div>
+        <div class="gy-mats" id="gy-mats"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="gy-foot">
+      <div class="gy-foot-tag">台账研判</div>
+      <div class="gy-foot-view"><div class="gy-foot-track" id="gy-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("gy-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("gy-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         ★ 与上级页「供应商协同」严格同源：级别定义、省×级别矩阵、材料模式、字号表、
+           波形与合格率标定全部照搬，182 家逐条生成结果与上级页一一对应（同名同数）。
+         本页在同源基础上只新增两个台账字段：账期（天）与风险判定。
+         合计一律由分项求和，比率一律现算，页面上不出现任何硬编码的合计值。 ===== */
+
+  /* 4.1 级别定义（otd/qual/amt/pay 是级别中心值，个体由确定性波形展开，不用 Math.random） */
+  const TIERS = [
+    { key: "S", name: "战略", full: "战略供应商", color: C.cyan,   badge: "is-s", otd: 97.6, otdA: 1.0, qual: 99.46, qualA: 0.16, amt: 12000, amtA: 0.30, pay: 90, payA: 9 },
+    { key: "A", name: "优选", full: "优选供应商", color: C.blue,   badge: "is-a", otd: 96.2, otdA: 1.7, qual: 99.22, qualA: 0.26, amt:  5200, amtA: 0.34, pay: 75, payA: 9 },
+    { key: "B", name: "合格", full: "合格供应商", color: C.green,  badge: "is-b", otd: 93.6, otdA: 3.0, qual: 98.92, qualA: 0.42, amt:  1800, amtA: 0.38, pay: 60, payA: 9 },
+    { key: "C", name: "观察", full: "观察供应商", color: C.orange, badge: "is-c", otd: 88.4, otdA: 3.4, qual: 98.19, qualA: 0.62, amt:   700, amtA: 0.40, pay: 45, payA: 8 }
+  ];
+
+  /* 4.2 省 × 级别矩阵：n = [S, A, B, C]。全表求和 = 182 家，列求和 = 12 / 45 / 98 / 27 */
+  const PROVS = [
+    { name: "浙江", n: [2, 9, 16, 4] },
+    { name: "广东", n: [3, 8, 14, 4] },
+    { name: "江苏", n: [2, 6, 12, 3] },
+    { name: "安徽", n: [1, 5, 10, 3] },
+    { name: "山东", n: [1, 4,  8, 3] },
+    { name: "福建", n: [1, 2,  5, 2] },
+    { name: "上海", n: [1, 3,  4, 1] },
+    { name: "河北", n: [0, 2,  4, 2] },
+    { name: "河南", n: [0, 1,  5, 1] },
+    { name: "湖北", n: [0, 1,  3, 1] },
+    { name: "四川", n: [0, 1,  3, 1] },
+    { name: "重庆", n: [0, 1,  2, 1] },
+    { name: "湖南", n: [0, 1,  2, 1] },
+    { name: "辽宁", n: [0, 1,  2, 0] },
+    { name: "天津", n: [1, 0,  2, 0] },
+    { name: "江西", n: [0, 0,  2, 0] },
+    { name: "陕西", n: [0, 0,  2, 0] },
+    { name: "广西", n: [0, 0,  1, 0] },
+    { name: "山西", n: [0, 0,  1, 0] }
+  ];
+
+  /* 4.3 五大原材料 + 主供材料排布模式（长度 10 的确定性模式，182 家展开后各材料家数固定） */
+  const MATERIALS = [
+    { name: "冷轧板",     suffix: "钢构", color: C.blue },
+    { name: "不锈钢",     suffix: "精钢", color: C.cyan },
+    { name: "铜材",       suffix: "铜业", color: C.amber },
+    { name: "面板玻璃",   suffix: "玻璃", color: C.violet },
+    { name: "电子电控件", suffix: "电子", color: C.green }
+  ];
+  const MAT_PATTERN = [0, 1, 2, 3, 4, 0, 1, 4, 3, 4];
+
+  /* 4.4 虚构字号：14 × 13 = 182 个两字组合，与供应商数恰好一一对应，保证不重名。
+         全部为杜撰字号，不指向任何真实企业。 */
+  const ZH1 = ["恒", "泰", "鼎", "华", "锐", "昊", "嘉", "远", "晟", "博", "维", "宸", "泓", "祁"];
+  const ZH2 = ["锐", "岚", "铖", "驰", "砚", "屹", "澈", "岱", "沣", "擎", "稷", "弘", "铠", "琮"];
+
+  /* 4.5 来料合格率的跨页锚：品质管理页六产品线（产量, 来料合格率），按产量加权 = 全司来料合格率。
+         上级页也是这么算的，两页因此取到同一个 99.15%，而不是各自硬编码。 */
+  const IQC_REF = [
+    { out: 236, iqc: 99.24 }, { out: 218, iqc: 99.36 }, { out: 132, iqc: 98.86 },
+    { out:  96, iqc: 98.72 }, { out: 108, iqc: 99.02 }, { out: 112, iqc: 99.42 }
+  ];
+  const OUT_TOTAL = sum(IQC_REF.map((l) => l.out));                        /* 902 万台 */
+  const IQC_GROUP = sum(IQC_REF.map((l) => l.iqc * l.out)) / OUT_TOTAL;    /* 99.1541% */
+
+  /* 两套阈值各司其职：OTD_TARGET 是集团年度目标（只用于叙事）；
+     OTD_LINE / QUAL_LINE 是供应商准入基准线，风险判定与分布图分色都用它。 */
+  const OTD_TARGET = 96.0;
+  const OTD_LINE = 93.0, QUAL_LINE = 98.80;
+
+  /* ===== 5. 由矩阵展开 182 家供应商（确定性，kiosk 每次打开完全一致） ===== */
+  const SUPPLIERS = [];
+  let gi = 0;
+  PROVS.forEach((p) => {
+    p.total = sum(p.n);
+    TIERS.forEach((t, ti) => {
+      for (let k = 0; k < p.n[ti]; k++) {
+        const i = gi++;
+        const mi = MAT_PATTERN[i % MAT_PATTERN.length];
+        const w1 = Math.sin(i * 1.37 + ti * 2.1), w2 = Math.sin(i * 0.53 + 0.7);
+        const w3 = Math.sin(i * 0.91 + ti * 1.3), w4 = Math.sin(i * 2.17 + 1.1);
+        SUPPLIERS.push({
+          idx: i,
+          name: ZH1[i % ZH1.length] + ZH2[Math.floor(i / ZH1.length) % ZH2.length] + MATERIALS[mi].suffix,
+          prov: p.name,
+          tier: t.key, tierIdx: ti,
+          mat: mi,
+          otd: clamp(t.otd + w1 * t.otdA * 0.72 + w2 * t.otdA * 0.28, 80, 99.6),
+          qual: t.qual + w3 * t.qualA * 0.7 + w4 * t.qualA * 0.3,
+          amt: Math.round(t.amt * (1 + t.amtA * Math.sin(i * 0.77 + ti))),   /* 年采购额，万元 */
+          pay: Math.round(t.pay + Math.sin(i * 1.09 + ti * 0.83) * t.payA)   /* 账期，天（本页新增字段） */
+        });
+      }
+    });
+  });
+
+  /* 5.1 来料合格率标定（与上级页同一步）：把个体波形的采购额加权均值精确对到 IQC_GROUP，
+         分布形态不变、跨页口径归一。 */
+  const amtTotal = sum(SUPPLIERS.map((s) => s.amt));
+  const qualRaw = sum(SUPPLIERS.map((s) => s.qual * s.amt)) / amtTotal;
+  const QUAL_CAL = IQC_GROUP - qualRaw;
+  SUPPLIERS.forEach((s) => { s.qual = s.qual + QUAL_CAL; });
+
+  /* 5.2 风险判定（本页新增）：以准入双线切档，双线皆达且双高 = 优 */
+  SUPPLIERS.forEach((s) => {
+    s.verdict = (s.otd < OTD_LINE && s.qual < QUAL_LINE) ? { t: "高风险", c: "is-bad" }
+              : (s.otd < OTD_LINE || s.qual < QUAL_LINE) ? { t: "关注",   c: "is-mid" }
+              : (s.otd >= 97 && s.qual >= 99.3)          ? { t: "优",     c: "is-top" }
+              : { t: "正常", c: "is-good" };
+  });
+
+  /* 5.3 台账编号：按「级别 → 年采购额降序」定序后固定编号，与筛选无关（编号即身份） */
+  const LEDGER = SUPPLIERS.slice().sort((a, b) => (a.tierIdx - b.tierIdx) || (b.amt - a.amt));
+  LEDGER.forEach((s, i) => { s.no = "GY-" + String(i + 1).padStart(3, "0"); });
+
+  /* ===== 6. 派生量：全部现算 ===== */
+  /* 任意子集的加权口径（准时率 / 合格率 / 账期一律按采购额加权，与上级页一致） */
+  function agg(list) {
+    const amt = sum(list.map((s) => s.amt));
+    return {
+      cnt: list.length,
+      amt: amt,
+      otd: amt ? sum(list.map((s) => s.otd * s.amt)) / amt : 0,
+      qual: amt ? sum(list.map((s) => s.qual * s.amt)) / amt : 0,
+      pay: amt ? sum(list.map((s) => s.pay * s.amt)) / amt : 0,
+      otdOk: list.filter((s) => s.otd >= OTD_LINE).length,
+      qualOk: list.filter((s) => s.qual >= QUAL_LINE).length,
+      provs: (new Set(list.map((s) => s.prov))).size,
+      payMin: list.length ? Math.min.apply(null, list.map((s) => s.pay)) : 0,
+      payMax: list.length ? Math.max.apply(null, list.map((s) => s.pay)) : 0
+    };
+  }
+
+  const D = Object.assign(agg(SUPPLIERS), {});
+  D.total = SUPPLIERS.length;                                        /* = 省矩阵全表之和 = 182 */
+  D.provCnt = PROVS.length;
+
+  /* 6.1 三个维度的家数汇总，全部必须收敛回 182 */
+  TIERS.forEach((t) => {
+    const list = SUPPLIERS.filter((s) => s.tier === t.key);
+    t.cnt = list.length;
+    t.stat = agg(list);
+  });
+  D.tierSum = sum(TIERS.map((t) => t.cnt));                          /* 必须 = 182 */
+  MATERIALS.forEach((m, mi) => {
+    const list = SUPPLIERS.filter((s) => s.mat === mi);
+    m.cnt = list.length;
+    m.amt = sum(list.map((s) => s.amt));
+  });
+  D.matSum = sum(MATERIALS.map((m) => m.cnt));                       /* 必须 = 182 */
+  D.provSum = sum(PROVS.map((p) => p.total));                        /* 必须 = 182 */
+  D.ranked = PROVS.slice().sort((a, b) => b.total - a.total);
+  D.maxProv = D.ranked[0];
+
+  /* 6.2 台账研判用的全局量 */
+  D.bad = SUPPLIERS.filter((s) => s.verdict.t === "高风险");
+  D.badAmt = sum(D.bad.map((s) => s.amt));
+  D.warnCnt = SUPPLIERS.filter((s) => s.verdict.t === "关注").length;
+  D.topCnt = SUPPLIERS.filter((s) => s.verdict.t === "优").length;
+  D.goodCnt = SUPPLIERS.filter((s) => s.verdict.t === "正常").length;
+  D.longPay = SUPPLIERS.filter((s) => s.pay >= 90);
+  D.longPayAmt = sum(D.longPay.map((s) => s.amt));
+  D.matTop = MATERIALS.slice().sort((a, b) => b.cnt - a.cnt)[0];
+  D.worst = SUPPLIERS.slice().sort((a, b) => a.otd - b.otd)[0];
+  D.bigTop = LEDGER[0];                                              /* 采购额首位（S 级内最大） */
+
+  /* ===== 7. 顶部时钟与页头 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("gy-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("gy-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("gy-meta-total").textContent = D.total;
+  $("gy-meta-prov").textContent = D.provCnt;
+  $("gy-donut-total").textContent = D.tierSum;
+
+  /* ===== 8. KPI 带：5 枚，随筛选重算并翻牌缓动 ===== */
+  const KPI_DEFS = [
+    { icon: "▣", label: "在册家数", unit: "家", dec: 0, warn: false,
+      val: (a) => a.cnt,
+      sub: (a) => "占全量 <b>" + fmtDec(100 * a.cnt / D.total, 1) + "%</b>（" + D.total + " 家）· 覆盖 <b>" + a.provs + "</b> 省" },
+    { icon: "¥", label: "年采购额", unit: "亿元", dec: 2, warn: false,
+      val: (a) => a.amt / 10000,
+      sub: (a) => "占全量采购额 <b>" + fmtDec(100 * a.amt / D.amt, 1) + "%</b>（" + fmtDec(D.amt / 10000, 2) + " 亿元）" },
+    { icon: "⇄", label: "平均准时交付率", unit: "%", dec: 2, warn: false,
+      val: (a) => a.otd,
+      sub: (a) => "采购额加权 · 距目标 <b class=\"" + (a.otd >= OTD_TARGET ? "gy-up" : "gy-down") + "\">" + signed(a.otd - OTD_TARGET, 2) + "pp</b> · 过准入线 <b>" + a.otdOk + "</b> 家" },
+    { icon: "✓", label: "平均来料合格率", unit: "%", dec: 2, warn: false,
+      val: (a) => a.qual,
+      sub: (a) => "采购额加权 · 准入线 " + fmtDec(QUAL_LINE, 2) + "% · 达线 <b>" + a.qualOk + "</b> 家" },
+    { icon: "⏱", label: "平均账期", unit: "天", dec: 1, warn: true,
+      val: (a) => a.pay,
+      sub: (a) => "采购额加权 · 区间 <b>" + a.payMin + "~" + a.payMax + "</b> 天" }
+  ];
+  const band = $("gy-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="gy-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="gy-kpi-icon">' + k.icon + "</div>" +
+      '<div class="gy-kpi-main">' +
+        '<div class="gy-kpi-label">' + k.label + "</div>" +
+        '<div class="gy-kpi-num"><span class="gy-kpi-val" id="gy-kpi-' + i + '">0</span><span class="gy-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="gy-kpi-sub" id="gy-kpisub-' + i + '"></div>' +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，0.9 秒收敛；每次筛选换一代 token，旧动画自动作废 */
+  const kpiGen = KPI_DEFS.map(() => 0);
+  function countUp(i, target, dec) {
+    const el = $("gy-kpi-" + i), g = ++kpiGen[i];
+    const from = parseFloat(el.textContent.replace(/,/g, "")) || 0;
+    const dur = 900, t0 = performance.now();
+    (function step(now) {
+      if (kpiGen[i] !== g) return;
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      const v = from + (target - from) * e;
+      el.textContent = dec === 0 ? fmtInt(v) : fmtDec(v, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = dec === 0 ? fmtInt(target) : fmtDec(target, dec);
+    })(t0);
+  }
+
+  /* ===== 9. 级别筛选 chip（全部 + S/A/B/C），点击筛选并同步 location.hash ===== */
+  const FILTERS = [{ key: "ALL", label: "全部", full: "全部", color: C.cyan, cnt: D.total }]
+    .concat(TIERS.map((t) => ({ key: t.key, label: t.name + t.key, full: t.full, color: t.color, cnt: t.cnt })));
+  const fbox = $("gy-fchips");
+  fbox.innerHTML = FILTERS.map((f, i) => (
+    '<button class="gy-fchip" type="button" data-i="' + i + '">' +
+      "<u>" + f.label + "</u><i>" + f.cnt + " 家</i>" +
+    "</button>"
+  )).join("");
+  const fchips = Array.from(fbox.children);
+
+  /* 9.1 hash 传参：父页下钻会跳「子页#对象名」，对象名是级别名。
+         级别全称 / 简称 / 单字母 key 三种写法都认，匹配不到落到「全部」。 */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k).toUpperCase()] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("全部供应商", 0);
+  TIERS.forEach((t, ti) => {
+    const i = ti + 1;
+    alias(t.key, i); alias(t.key + "级", i); alias(t.key + "类", i);
+    alias(t.name, i); alias(t.name + "级", i); alias(t.full, i);
+    alias(t.name + t.key, i); alias(t.key + t.name, i);
+  });
+  function parseHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配 */ }
+    raw = raw.trim();
+    if (!raw) return 0;
+    const hit = HASH_ALIAS[raw.toUpperCase()];
+    return hit === undefined ? 0 : hit;                       /* 匹配不到 → 全部 */
+  }
+  let hashSuppress = false;
+  function syncHash(fi) {
+    const want = "#" + encodeURIComponent(FILTERS[fi].full);
+    if (location.hash !== want) { hashSuppress = true; location.hash = want; }
+  }
+
+  /* ===== 10. 图表（★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 resize()） =====
+     ★ 循环引用红线：进 option 的 data 只放标量与数组，业务对象一律用索引 / 名称关联。
+       setOption 会深拷贝整个 option，一旦混进对象回指就无限递归、整页图表全空。 */
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const donut = echarts.init($("gy-chart-donut"));
+  const hist = echarts.init($("gy-chart-hist"));
+
+  /* 10.1 级别结构环形：四级家数恒定（12/45/98/27，合计 182），选中级别高亮、其余压暗 */
+  function donutOption(fi) {
+    return {
+      backgroundColor: "transparent",
+      title: {
+        text: String(FILTERS[fi].cnt), left: "34%", top: "44%", textAlign: "center",
+        textStyle: { color: fi === 0 ? "#eafcfa" : FILTERS[fi].color, fontSize: 26, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" },
+        subtext: FILTERS[fi].full + " · 家", subtextStyle: { color: C.textDim, fontSize: 11 }, itemGap: 3
+      },
+      tooltip: {
+        trigger: "item", backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line,
+        textStyle: { color: C.text, fontSize: 12 },
+        formatter: (p) => {
+          const t = TIERS[p.dataIndex];
+          return "<b>" + t.full + "</b><br/>家数 <b style=\"color:" + t.color + "\">" + t.cnt + "</b> 家 · 占 " +
+            fmtDec(100 * t.cnt / D.total, 1) + "%<br/>采购额 <b>" + fmtDec(t.stat.amt / 10000, 2) + "</b> 亿元 · 占 " +
+            fmtDec(100 * t.stat.amt / D.amt, 1) + "%<br/><span style=\"color:" + C.textDim + "\">准时 " +
+            fmtDec(t.stat.otd, 2) + "% · 合格 " + fmtDec(t.stat.qual, 2) + "% · 账期 " + fmtDec(t.stat.pay, 0) + " 天</span>";
+        }
+      },
+      legend: {
+        orient: "vertical", right: 6, top: "center", itemWidth: 11, itemHeight: 8, itemGap: 12,
+        textStyle: { color: C.textDim, fontSize: 11 },
+        formatter: (name) => {
+          const t = TIERS.filter((x) => x.full === name)[0];
+          return name.slice(0, 2) + "  " + t.cnt + " 家";
+        },
+        data: TIERS.map((t) => t.full)
+      },
+      series: [{
+        type: "pie", center: ["34%", "52%"], radius: ["52%", "76%"], avoidLabelOverlap: false,
+        label: { show: false }, labelLine: { show: false },
+        itemStyle: { borderColor: "rgba(7,27,30,.9)", borderWidth: 2, borderRadius: 3 },
+        data: TIERS.map((t, ti) => ({
+          name: t.full, value: t.cnt,
+          itemStyle: { color: t.color, opacity: (fi === 0 || fi - 1 === ti) ? 1 : 0.22 }
+        }))
+      }]
+    };
+  }
+
+  /* 10.2 准时交付率分布直方：固定 8 档（84%~100%，2pp 一档），随筛选重算频数 */
+  const BIN_LO = 84, BIN_W = 2, BIN_N = 8;
+  const BIN_LABELS = Array.from({ length: BIN_N }, (_, i) => (BIN_LO + i * BIN_W) + "~" + (BIN_LO + (i + 1) * BIN_W));
+  function binOf(v) { return clamp(Math.floor((v - BIN_LO) / BIN_W), 0, BIN_N - 1); }
+  function binColor(i) {
+    const hi = BIN_LO + (i + 1) * BIN_W;
+    return hi <= OTD_LINE ? C.orange : (BIN_LO + i * BIN_W) < OTD_LINE ? C.amber : C.cyan;
+  }
+  function histOption(list) {
+    const bins = new Array(BIN_N).fill(0);
+    list.forEach((s) => { bins[binOf(s.otd)] += 1; });
+    const tot = sum(bins);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 14, top: 20, bottom: 2, containLabel: true },
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex, n = bins[i];
+          return "准时交付率 <b>" + BIN_LABELS[i] + "%</b><br/><b style=\"color:" +
+            binColor(i) + "\">" + n + "</b> 家 · 占 " + fmtDec(tot ? 100 * n / tot : 0, 1) + "%<br/>" +
+            "<span style=\"color:" + C.textDim + "\">准入基准线 " + fmtDec(OTD_LINE, 1) + "%</span>";
+        }
+      },
+      xAxis: {
+        type: "category", data: BIN_LABELS,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 9.5, rotate: 30 })
+      },
+      yAxis: {
+        type: "value", name: "家", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, axisLine: { show: false },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      series: [{
+        type: "bar", barWidth: "62%", data: bins,
+        label: { show: true, position: "top", color: C.textDim, fontSize: 10, formatter: (p) => (p.value ? p.value : "") },
+        itemStyle: {
+          borderRadius: [3, 3, 0, 0],
+          color: (p) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: binColor(p.dataIndex) },
+            { offset: 1, color: binColor(p.dataIndex) + "44" }
+          ])
+        }
+      }]
+    };
+  }
+
+  /* ===== 11. 台账表：滚动窗口（每页 20 行，4.5 秒翻一页；末页贴底不留空行） ===== */
+  const tbody = $("gy-tbody");
+  const WIN = 20;
+  let view = LEDGER, page = 0, pages = 1;
+
+  function renderTable() {
+    const n = view.length;
+    const start = n <= WIN ? 0 : Math.min(page * WIN, n - WIN);
+    const rows = view.slice(start, Math.min(start + WIN, n));
+    tbody.innerHTML = rows.map((s, k) => {
+      const t = TIERS[s.tierIdx];
+      const otdW = clamp((s.otd - 84) / 16 * 100, 3, 100);            /* 84%~100% 映射到条宽 */
+      const qualW = clamp((s.qual - 97.5) / 2.5 * 100, 3, 100);       /* 97.5%~100% 映射到条宽 */
+      const otdC = s.otd < OTD_LINE ? C.red : s.otd < OTD_TARGET ? C.amber : C.cyan;
+      const qualC = s.qual < QUAL_LINE ? C.red : C.green;
+      return "<li" + (s.verdict.t === "高风险" ? ' class="is-risk"' : "") +
+        ' style="animation-delay:' + (k * 14) + 'ms">' +
+        '<span class="gy-no">' + s.no + "</span>" +
+        '<span class="gy-name">' + s.name + "</span>" +
+        '<span class="gy-badge ' + t.badge + '">' + t.key + " " + t.name + "</span>" +
+        "<span>" + MATERIALS[s.mat].name + "</span>" +
+        "<span>" + s.prov + "</span>" +
+        '<span class="gy-bar"><span class="gy-bar-t"><u style="width:' + fmtDec(otdW, 1) + "%;background:" + otdC + '"></u></span><em style="color:' + otdC + '">' + fmtDec(s.otd, 2) + "</em></span>" +
+        '<span class="gy-bar"><span class="gy-bar-t"><u style="width:' + fmtDec(qualW, 1) + "%;background:" + qualC + '"></u></span><em style="color:' + qualC + '">' + fmtDec(s.qual, 2) + "</em></span>" +
+        "<span>" + s.pay + "</span>" +
+        '<span class="gy-amt">' + fmtInt(s.amt) + "</span>" +
+        '<span class="gy-badge ' + s.verdict.c + '">' + s.verdict.t + "</span>" +
+      "</li>";
+    }).join("");
+    const from = start + 1, to = start + rows.length;
+    $("gy-table-tag").textContent =
+      "全量 " + D.total + " 家 · 当前筛选 " + n + " 家 · 第 " + (page + 1) + "/" + pages +
+      " 页（第 " + from + "–" + to + " 行）";
+    $("gy-filters-state").innerHTML =
+      "筛选结果 <b>" + n + "</b> 家 / 全量 " + D.total + " 家<i>|</i>高风险 <em>" +
+      view.filter((s) => s.verdict.t === "高风险").length + "</em> 家<i>|</i>第 <em>" +
+      (page + 1) + "</em>/" + pages + " 页 · 每页 " + Math.min(WIN, n) + " 行";
+  }
+
+  /* ===== 12. 主供材料结构（DOM 条，随筛选重算；五档之和 = 当前筛选家数） ===== */
+  function renderMats(list) {
+    const cnts = MATERIALS.map((m, mi) => list.filter((s) => s.mat === mi).length);
+    const tot = sum(cnts);
+    const mx = Math.max.apply(null, cnts.concat([1]));
+    $("gy-mat-total").textContent = tot;
+    $("gy-mats").innerHTML = MATERIALS.map((m, mi) => (
+      '<div class="gy-mat-row">' +
+        "<b>" + m.name + "</b>" +
+        '<div class="gy-mat-bar"><i style="width:' + fmtDec(100 * cnts[mi] / mx, 1) + "%;background:" + m.color + '"></i></div>' +
+        '<div class="gy-mat-num"><em>' + cnts[mi] + "</em>家 " + fmtDec(tot ? 100 * cnts[mi] / tot : 0, 1) + "%</div>" +
+      "</div>"
+    )).join("");
+  }
+
+  /* ===== 13. 筛选主流程：一次调用刷新 KPI / 表 / 两图 / 材料条 / 页头 chip ===== */
+  let fIdx = 0;
+  function applyFilter(fi, pushHash) {
+    fIdx = clamp(fi, 0, FILTERS.length - 1);
+    const f = FILTERS[fIdx];
+    view = fIdx === 0 ? LEDGER : LEDGER.filter((s) => s.tier === f.key);
+    pages = Math.max(1, Math.ceil(view.length / WIN));
+    page = 0;
+
+    fchips.forEach((el, i) => {
+      const on = i === fIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? FILTERS[i].color : "";
+      el.style.borderColor = on ? FILTERS[i].color : "";
+    });
+
+    const a = agg(view);
+    KPI_DEFS.forEach((k, i) => {
+      countUp(i, k.val(a), k.dec);
+      $("gy-kpisub-" + i).innerHTML = k.sub(a);
+    });
+    $("gy-chip-key").textContent = "ON-TIME · " + f.key;
+    $("gy-chip-otd").textContent = fmtDec(a.otd, 2) + "%";
+    $("gy-hist-tag").textContent = "准入线 " + fmtDec(OTD_LINE, 1) + "% · 样本 " + a.cnt + " 家 · 过线 " + a.otdOk + " 家";
+
+    donut.setOption(donutOption(fIdx), true);
+    hist.setOption(histOption(view), true);
+    renderMats(view);
+    renderTable();
+    if (pushHash) syncHash(fIdx);
+  }
+
+  fchips.forEach((el) => {
+    el.addEventListener("click", () => applyFilter(Number(el.dataset.i), true));
+  });
+  /* 支持父页多次下钻：每次 hash 变化都重新定位 */
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    applyFilter(parseHash(), false);
+  });
+  /* 初始化：直接读 hash 定位（decodeURIComponent），匹配不到落到「全部」 */
+  applyFilter(parseHash(), false);
+
+  /* 翻页轮播：kiosk 常驻，鼠标停在表上时暂停 */
+  let pageTimer = null;
+  function restartPaging() {
+    clearInterval(pageTimer);
+    pageTimer = setInterval(() => { page = (page + 1) % pages; renderTable(); }, 4500);
+  }
+  restartPaging();
+  tbody.addEventListener("mouseenter", () => clearInterval(pageTimer));
+  tbody.addEventListener("mouseleave", restartPaging);
+
+  /* ===== 14. 底部台账研判滚动条（文案里的数字全部由上面的派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "双低整改（准时低于 " + fmtDec(OTD_LINE, 1) + "% 且合格低于 " + fmtDec(QUAL_LINE, 2) + "%）共 " + D.bad.length + " 家，涉采购额 " + fmtDec(D.badAmt / 10000, 2) + " 亿元，占 " + fmtDec(100 * D.badAmt / D.amt, 1) + "%" },
+    { lv: "高", c: C.red, t: "全量最低准时率「" + D.worst.name + "」（" + D.worst.prov + " · " + D.worst.tier + " 级）" + fmtDec(D.worst.otd, 2) + "%，低于准入线 " + fmtDec(OTD_LINE - D.worst.otd, 2) + "pp" },
+    { lv: "中", c: C.orange, t: "观察级 " + TIERS[3].cnt + " 家平均准时 " + fmtDec(TIERS[3].stat.otd, 2) + "%、合格 " + fmtDec(TIERS[3].stat.qual, 2) + "%，账期均值 " + fmtDec(TIERS[3].stat.pay, 0) + " 天，需季度复评" },
+    { lv: "中", c: C.orange, t: "账期 ≥ 90 天的供应商 " + D.longPay.length + " 家，覆盖采购额 " + fmtDec(100 * D.longPayAmt / D.amt, 1) + "%，全量加权账期 " + fmtDec(D.pay, 1) + " 天" },
+    { lv: "低", c: C.amber, t: D.matTop.name + " 供应商 " + D.matTop.cnt + " 家为五大原材料最多，占在册 " + fmtDec(100 * D.matTop.cnt / D.total, 1) + "%；采购额首位「" + D.bigTop.name + "」" + fmtInt(D.bigTop.amt) + " 万元" },
+    { lv: "低", c: C.green, t: "三维校验：四级 " + TIERS.map((t) => t.cnt).join("/") + " = 五材料 " + MATERIALS.map((m) => m.cnt).join("/") + " = " + D.provCnt + " 省合计 = " + D.total + " 家；加权准时 " + fmtDec(D.otd, 2) + "% / 合格 " + fmtDec(D.qual, 2) + "%，与上级页同源" }
+  ];
+  const track = $("gy-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="gy-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                            /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 15. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(donutOption(0)); JSON.stringify(histOption(LEDGER)); }
+  catch (e) { optAcyclic = false; console.error("[供应商台账] option 存在循环引用：", e.message); }
+
+  const checks = [
+    ["全量 182 家 = 省 × 级别矩阵全表之和", D.total === 182 && D.provSum === 182],
+    ["182 = 四级之和（S12 / A45 / B98 / C27）", D.tierSum === 182 &&
+      TIERS[0].cnt === 12 && TIERS[1].cnt === 45 && TIERS[2].cnt === 98 && TIERS[3].cnt === 27],
+    ["182 = 五大原材料家数之和（37/37/18/36/54）", D.matSum === 182 &&
+      MATERIALS.map((m) => m.cnt).join("/") === "37/37/18/36/54"],
+    ["供应商名称两两不重复", (new Set(SUPPLIERS.map((s) => s.name))).size === SUPPLIERS.length],
+    ["台账编号两两不重复且覆盖全量", (new Set(LEDGER.map((s) => s.no))).size === D.total],
+    ["采购额合计 57.20 亿元（与上级页同源）", Math.abs(D.amt / 10000 - 57.20) < 0.005],
+    ["加权准时交付率 95.61%（与上级页同源）", Math.abs(D.otd - 95.61) < 0.005],
+    ["加权来料合格率 = 品质管理页口径 99.15%", Math.abs(D.qual - IQC_GROUP) < 1e-9 && Math.abs(IQC_GROUP - 99.15) < 0.01],
+    ["产量基准 902 万台（跨页锚点）", OUT_TOTAL === 902],
+    ["判定四档之和 = 182 家", D.topCnt + D.goodCnt + D.warnCnt + D.bad.length === D.total],
+    ["各级筛选结果数 = 该级家数", TIERS.every((t) => LEDGER.filter((s) => s.tier === t.key).length === t.cnt)],
+    ["hash 传参：级别全称 / 简称 / 单字母都能命中", HASH_ALIAS["战略供应商"] === 1 && HASH_ALIAS["S"] === 1 &&
+      HASH_ALIAS["观察供应商"] === 4 && HASH_ALIAS["C"] === 4 && parseHash() >= 0],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[供应商台账] 自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

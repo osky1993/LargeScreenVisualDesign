@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电库存库龄台账</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --kn-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：仓 × 产品线 × 库龄段（名称 / 库存 / 0-30 / 31-60 / 61-90 / 90+ / 90+占比 / 占全部 / 判定） */
+    --kn-tcols: 1fr 104px 88px 88px 88px 88px 96px 88px 62px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .kn-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1160px 1fr;
+    grid-template-rows: 84px 132px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .kn-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .kn-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .kn-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .kn-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .kn-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .kn-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .kn-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .kn-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .kn-crumb em { font-style: normal; color: #cfeae7; }
+  .kn-crumb a { color: #9fd8d2; text-decoration: none; border-bottom: 1px dashed rgba(159, 216, 210, 0.45); }
+  .kn-crumb a:hover { color: var(--mfg-cyan); border-bottom-color: var(--mfg-cyan); }
+  .kn-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .kn-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .kn-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .kn-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .kn-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .kn-head-right { display: flex; align-items: center; gap: 18px; flex: none; }
+  /* 返回上级（三层导航最后一环 → 回专题页） */
+  .kn-back {
+    display: flex; align-items: center; gap: 6px; flex: none;
+    padding: 8px 15px; border-radius: 9px; text-decoration: none; white-space: nowrap;
+    border: 1px solid rgba(255, 157, 69, 0.45); background: rgba(58, 32, 12, 0.5);
+    color: #ffcf9d; font-size: 13px; letter-spacing: 0.06em;
+    transition: border-color .2s, background .2s, color .2s;
+  }
+  .kn-back:hover { border-color: var(--mfg-orange); background: rgba(86, 46, 14, 0.62); color: #ffe6cd; }
+  .kn-chips { display: flex; align-items: center; gap: 9px; }
+  .kn-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .kn-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .kn-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .kn-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .kn-chip.is-key b { color: var(--mfg-cyan); }
+  .kn-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .kn-clock-time { font: 700 26px/1 var(--kn-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .kn-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .kn-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .kn-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .kn-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .kn-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .kn-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .kn-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .kn-kpi.is-sel::before { background: linear-gradient(90deg, var(--mfg-amber), transparent); }
+  .kn-kpi.is-sel { border-color: rgba(255, 201, 77, 0.42); }
+  .kn-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .kn-kpi.is-warn .kn-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .kn-kpi.is-sel .kn-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 201, 77, 0.26), rgba(255, 157, 69, 0.12));
+    border-color: rgba(255, 201, 77, 0.4); box-shadow: inset 0 0 12px rgba(255, 201, 77, 0.16);
+  }
+  .kn-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .kn-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .kn-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .kn-kpi-val { font: 700 30px/1 var(--kn-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .kn-kpi.is-warn .kn-kpi-val { color: #ffd9b0; }
+  .kn-kpi.is-sel .kn-kpi-val { color: #ffe9b8; }
+  .kn-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .kn-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kn-kpi-sub b { font-weight: 700; }
+  .kn-up { color: var(--mfg-green); }
+  .kn-down { color: var(--mfg-red); }
+
+  /* ===== 面板 ===== */
+  .kn-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .kn-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .kn-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .kn-panel-head { display: flex; align-items: center; gap: 12px; flex: none; margin-bottom: 6px; }
+  .kn-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; white-space: nowrap; }
+  .kn-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .kn-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; margin-left: auto; }
+  .kn-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .kn-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 顶部仓切换 chip ===== */
+  .kn-tabs { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+  .kn-tab {
+    flex: 1; min-width: 0; cursor: pointer; text-align: center;
+    padding: 4px 6px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(64, 196, 190, 0.18); background: rgba(10, 38, 42, 0.5);
+    color: #9dc4c0; transition: border-color .2s, background .2s, color .2s;
+  }
+  .kn-tab b { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+  .kn-tab span { display: block; font: 700 11px/1.3 var(--kn-mono); color: #6f9a97; font-variant-numeric: tabular-nums; }
+  .kn-tab:hover { border-color: rgba(53, 224, 208, 0.45); color: #cfeae7; }
+  .kn-tab.is-active {
+    border-color: rgba(53, 224, 208, 0.75); background: rgba(20, 74, 74, 0.75); color: #eafcfa;
+    box-shadow: inset 0 0 16px rgba(53, 224, 208, 0.16);
+  }
+  .kn-tab.is-active span { color: var(--mfg-cyan); }
+
+  /* ===== CSS grid 模拟表格（三级嵌套：合计 › 仓 › 产品线） ===== */
+  .kn-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .kn-thead, .kn-tbody li, .kn-tfoot {
+    display: grid; grid-template-columns: var(--kn-tcols); align-items: center; gap: 8px;
+  }
+  .kn-thead {
+    flex: none; padding: 6px 10px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .kn-thead span:not(:first-child), .kn-tbody li span:not(:first-child), .kn-tfoot span:not(:first-child) { text-align: right; }
+  .kn-tbody { flex: 1; min-height: 0; margin: 5px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .kn-tbody li {
+    padding: 0 10px; border-radius: 5px; cursor: pointer;
+    font-size: 13px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    border: 1px solid transparent; transition: background .22s, border-color .22s;
+  }
+  .kn-tbody li.is-l0 { height: 36px; font-size: 14px; background: rgba(24, 78, 80, 0.42); }
+  .kn-tbody li.is-l1 { height: 32px; }
+  .kn-tbody li.is-l1:nth-of-type(odd) { background: rgba(24, 72, 74, 0.24); }
+  .kn-tbody li.is-l2 { height: 28px; font-size: 12.5px; color: #a8ccc8; background: rgba(10, 34, 38, 0.5); }
+  .kn-tbody li:hover { border-color: rgba(53, 224, 208, 0.4); }
+  .kn-tbody li.is-active { background: rgba(53, 224, 208, 0.17); border-color: rgba(53, 224, 208, 0.55); color: #eafcfa; }
+  .kn-tbody li.is-focus { background: rgba(255, 201, 77, 0.16); border-color: rgba(255, 201, 77, 0.5); color: #fdf1d8; }
+  .kn-td-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .kn-tri { flex: none; width: 12px; font-style: normal; font-size: 11px; color: rgba(53, 224, 208, 0.85); }
+  .kn-tri.is-empty { color: transparent; }
+  .kn-dot { flex: none; width: 9px; height: 9px; border-radius: 2px; }
+  .kn-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kn-nm b { font-weight: 700; color: #eafcfa; }
+  .kn-sub { font-size: 11px; font-style: normal; color: rgba(127, 166, 163, 0.75); margin-left: 4px; }
+  .kn-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .kn-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .kn-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .kn-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+  .kn-tfoot {
+    flex: none; margin-top: 5px; padding: 7px 10px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.5); border: 1px solid rgba(64, 196, 190, 0.24);
+    font-size: 12.5px; color: #bfe4e0; font-variant-numeric: tabular-nums;
+  }
+  .kn-tfoot b { font-weight: 700; color: #eafcfa; }
+
+  /* 表体余量里的图例 + 勾稽锚点卡 */
+  .kn-hint { display: block !important; height: auto !important; cursor: default !important; background: none !important; padding: 0 !important; }
+  .kn-hint:hover { border-color: transparent !important; }
+  .kn-hint-card {
+    margin: 10px 2px 0; padding: 12px 14px 11px; border-radius: 9px;
+    border: 1px dashed rgba(64, 196, 190, 0.28); background: rgba(9, 34, 38, 0.5);
+  }
+  .kn-hint-t { font-size: 12.5px; font-weight: 700; letter-spacing: 0.1em; color: #8fd0c9; margin-bottom: 6px; }
+  .kn-hint-legend { display: grid; grid-template-columns: 1fr 1fr; column-gap: 20px; }
+  .kn-hint-row { display: grid; grid-template-columns: 12px 74px 1fr; align-items: center; gap: 10px; font-size: 11.5px; color: #9dc4c0; height: 20px; }
+  .kn-hint-row u { display: block; width: 12px; height: 12px; border-radius: 3px; }
+  .kn-hint-row b { font-weight: 700; color: #cbe6e3; }
+  .kn-hint-anchor {
+    margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(64, 196, 190, 0.18);
+    font-size: 11.5px; color: #9dc4c0; font-variant-numeric: tabular-nums; line-height: 1.6;
+  }
+  .kn-hint-anchor b { font-weight: 700; color: var(--mfg-cyan); }
+  .kn-hint-op { margin-top: 6px; font-size: 11.5px; color: rgba(127, 166, 163, 0.75); }
+  .kn-hint-op b { font-weight: 700; color: var(--mfg-amber); }
+
+  /* ===== 右栏：选中仓指标 + 库龄结构 ===== */
+  .kn-metric { flex: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+  .kn-m-top { display: flex; align-items: baseline; gap: 9px; }
+  .kn-m-badge {
+    flex: none; padding: 3px 9px; border-radius: 5px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em;
+    color: #04191a; background: var(--mfg-cyan);
+  }
+  .kn-m-name { font-size: 15px; font-weight: 700; color: #eafcfa; letter-spacing: 0.04em; }
+  .kn-m-val { margin-left: auto; font: 700 26px/1 var(--kn-mono); color: #eafcfa; font-variant-numeric: tabular-nums; }
+  .kn-m-unit { font-size: 12px; color: var(--mfg-text-dim); }
+  .kn-m-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+  .kn-m-cell {
+    display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 4px 6px;
+    border-radius: 7px; border: 1px solid rgba(64, 196, 190, 0.16); background: rgba(10, 38, 42, 0.5);
+  }
+  .kn-m-k { font-size: 10.5px; letter-spacing: 0.08em; color: #6f9a97; white-space: nowrap; }
+  .kn-m-n { font: 700 15px/1 var(--kn-mono); color: #cfe9e6; font-variant-numeric: tabular-nums; }
+
+  .kn-pie-wrap { flex: 1; min-height: 0; display: flex; align-items: stretch; gap: 6px; }
+  .kn-pie-wrap .kn-chart { flex: 1.02; }
+  .kn-agelist { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 7px; padding-right: 4px; }
+  .kn-age-row { display: grid; grid-template-columns: 10px 62px 60px 46px; align-items: center; gap: 7px; font-size: 12px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .kn-age-row u { display: block; width: 10px; height: 10px; border-radius: 2px; }
+  .kn-age-row .kn-age-q { text-align: right; font-weight: 700; color: #eafcfa; }
+  .kn-age-row .kn-age-s { text-align: right; color: #8fb8b4; }
+  .kn-age-bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: rgba(64, 196, 190, 0.12); overflow: hidden; margin-top: -3px; }
+  .kn-age-bar i { display: block; height: 100%; border-radius: 2px; }
+
+  /* ===== 底部预警滚动条 ===== */
+  .kn-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .kn-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .kn-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: kn-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes kn-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .kn-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .kn-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .kn-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .kn-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .kn-foot-item b { font-weight: 700; }
+  .kn-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .kn-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="kn-stage" id="kn-stage">
+    <!-- mockflag:begin --><div class="kn-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="kn-error" id="kn-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="kn-header">
+      <div class="kn-head-left">
+        <div class="kn-crumb">
+          <b>云麓厨电</b><i>›</i>
+          <a href="大屏样板间-厨电仓储库存1920.html">仓储库存</a><i>›</i>
+          <em id="kn-crumb-obj">库存库龄台账</em>
+        </div>
+        <div class="kn-head-title-row">
+          <div class="kn-head-title">库存库龄台账</div>
+          <div class="kn-head-meta">
+            <span>口径 <b>成品库存 · 期末数</b></span><i>|</i>
+            <span><b>7</b> 仓 × <b>6</b> 产品线 × <b>4</b> 库龄段</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="kn-head-right">
+        <a class="kn-back" href="大屏样板间-厨电仓储库存1920.html" title="返回上级专题页（Esc）">‹ 返回 仓储库存</a>
+        <div class="kn-chips">
+          <div class="kn-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="kn-chip is-key"><span>SELECTED RDC</span><b id="kn-chip-wh">--</b></div>
+        </div>
+        <div class="kn-clock" aria-label="实时时钟">
+          <span class="kn-clock-time" id="kn-clock-time">--:--:--</span>
+          <span class="kn-clock-date" id="kn-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="kn-band" id="kn-band"></div>
+
+    <!-- 左栏：仓 × 产品线 × 库龄段 嵌套台账 -->
+    <section class="kn-panel" id="kn-tblpanel">
+      <div class="kn-panel-head">
+        <h2>仓 × 产品线 × 库龄段台账</h2>
+        <div class="kn-tabs" id="kn-tabs" role="tablist" aria-label="七大区域仓切换"></div>
+      </div>
+      <div class="kn-table">
+        <div class="kn-thead">
+          <span>区域仓 / 产品线</span><span>库存(万台)</span><span>0-30 天</span><span>31-60 天</span>
+          <span>61-90 天</span><span>90+ 天</span><span>90+ 占比</span><span>占全国</span><span>判定</span>
+        </div>
+        <ul class="kn-tbody" id="kn-tbody"></ul>
+        <div class="kn-tfoot" id="kn-tfoot"></div>
+      </div>
+    </section>
+
+    <!-- 右栏：选中仓库龄结构饼 + 产品线构成 + 库龄趋势 -->
+    <div class="kn-col">
+      <section class="kn-panel" style="flex: 1.50;">
+        <div class="kn-panel-head">
+          <h2>选中仓库龄结构</h2>
+          <span class="kn-panel-tag" id="kn-pie-tag">--</span>
+        </div>
+        <div class="kn-metric">
+          <div class="kn-m-top">
+            <span class="kn-m-badge" id="kn-m-badge">RDC</span>
+            <span class="kn-m-name" id="kn-m-name">--</span>
+            <span class="kn-m-val" id="kn-m-val">0</span><span class="kn-m-unit">万台</span>
+          </div>
+          <div class="kn-m-grid">
+            <div class="kn-m-cell"><span class="kn-m-k">仓容利用率</span><span class="kn-m-n" id="kn-m-util">--</span></div>
+            <div class="kn-m-cell"><span class="kn-m-k">周转天数</span><span class="kn-m-n" id="kn-m-turn">--</span></div>
+            <div class="kn-m-cell"><span class="kn-m-k">平均库龄</span><span class="kn-m-n" id="kn-m-age">--</span></div>
+            <div class="kn-m-cell"><span class="kn-m-k">覆盖省区</span><span class="kn-m-n" id="kn-m-prov">--</span></div>
+          </div>
+        </div>
+        <div class="kn-pie-wrap">
+          <div class="kn-chart" id="kn-chart-pie" role="img" aria-label="选中仓四段库龄结构环形图"></div>
+          <div class="kn-agelist" id="kn-agelist"></div>
+        </div>
+      </section>
+
+      <section class="kn-panel" style="flex: 0.95;">
+        <div class="kn-panel-head">
+          <h2>该仓产品线构成</h2>
+          <span class="kn-panel-tag" id="kn-bar-tag">--</span>
+        </div>
+        <div class="kn-chart" id="kn-chart-bar"></div>
+      </section>
+
+      <section class="kn-panel" style="flex: 0.89;">
+        <div class="kn-panel-head">
+          <h2>库龄结构 12 月趋势</h2>
+          <span class="kn-panel-tag" id="kn-trend-tag">--</span>
+        </div>
+        <div class="kn-chart" id="kn-chart-trend"></div>
+      </section>
+    </div>
+
+    <!-- 底部预警滚动条 -->
+    <div class="kn-foot">
+      <div class="kn-foot-tag">呆滞预警</div>
+      <div class="kn-foot-view"><div class="kn-foot-track" id="kn-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("kn-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("kn-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         ★ 与上级页「厨电仓储库存」严格同源：同一份「七仓 × 六产品线」42 格矩阵、
+         同一组库龄基线与压货偏移、同一套产销存月度数。本页只是把上级页的
+         42 格摊开成可逐格追溯的台账，一个数都不另编。
+         成品库存 118 万台 = 七仓之和（行和）= 六产品线之和（列和）= 四库龄段之和，
+         三个维度全部由这一份矩阵求和，用千台整数判等，不会有浮点尾差。 ===== */
+
+  /* 4.1 七大区域仓 RDC：容量（万台）+ 覆盖省区数（与上级页仓网同一组） */
+  const WH = [
+    { key: "HD", zone: "华东", city: "杭州", cap: 33.0, hq: true,  provCnt: 6 },
+    { key: "HN", zone: "华南", city: "佛山", cap: 27.0, hq: false, provCnt: 3 },
+    { key: "HB", zone: "华北", city: "天津", cap: 20.0, hq: false, provCnt: 6 },
+    { key: "HZ", zone: "华中", city: "武汉", cap: 19.0, hq: false, provCnt: 3 },
+    { key: "XN", zone: "西南", city: "成都", cap: 17.0, hq: false, provCnt: 5 },
+    { key: "DB", zone: "东北", city: "沈阳", cap: 15.0, hq: false, provCnt: 3 },
+    { key: "XB", zone: "西北", city: "西安", cap: 10.5, hq: false, provCnt: 5 }
+  ];
+  WH.forEach((w) => { w.name = w.zone + "-" + w.city; });
+
+  /* 4.2 六大产品线：年产量 / 年销量（万台，跨页基准盘 902 / 866）+ 库龄基线分布 */
+  const LINES = [
+    { name: "吸油烟机",   short: "烟机", out: 236, sale: 228, age: [46, 30, 16,  8] },
+    { name: "燃气灶具",   short: "灶具", out: 218, sale: 210, age: [48, 31, 15,  6] },
+    { name: "洗碗机",     short: "洗碗", out: 132, sale: 124, age: [38, 29, 20, 13] },
+    { name: "蒸烤一体机", short: "蒸烤", out:  96, sale:  90, age: [34, 28, 21, 17] },
+    { name: "集成灶",     short: "集成", out: 108, sale: 104, age: [42, 30, 18, 10] },
+    { name: "净水热水",   short: "净水", out: 112, sale: 110, age: [44, 31, 17,  8] }
+  ];
+
+  /* 4.3 ★ 单一数据源：42 格库存矩阵（千台，整数）。行 = 七仓，列 = 六产品线。
+         行和 = [310,215,175,150,130,100,100]，列和 = [300,260,200,145,140,135]，
+         全表 = 1180 千台 = 118.0 万台。三个维度的合计都从这里求，不另写死。 */
+  const MATRIX = [
+    [78, 65, 58, 45, 33, 31],
+    [51, 45, 36, 24, 32, 27],
+    [46, 40, 30, 20, 19, 20],
+    [38, 34, 25, 18, 18, 17],
+    [32, 29, 22, 16, 16, 15],
+    [28, 23, 15, 11, 11, 12],
+    [27, 24, 14, 11, 11, 13]
+  ];
+
+  /* 4.4 库龄四段 + 各仓「压货偏移」：越远的仓周转越慢，90+ 天占比越高。
+         偏移只把权重从 0-30 段挪到 90+ 段，四段和恒等于 1，不凭空造出库存。 */
+  const AGE_BUCKETS = [
+    { name: "0-30 天",  short: "0-30",  mid: 15,  color: C.cyan },
+    { name: "31-60 天", short: "31-60", mid: 45,  color: C.blue },
+    { name: "61-90 天", short: "61-90", mid: 75,  color: C.amber },
+    { name: "90+ 天",   short: "90+",   mid: 120, color: C.red }
+  ];
+  const WH_SKEW = [0.78, 0.90, 1.00, 1.06, 1.14, 1.28, 1.36];
+
+  /* 4.5 产销存滚动（与上级页 / 门户「产销存全景」同一组月度数）：
+         期初不写死，取 期末 118 − 净增（产量 − 销量），逐月滚动必然收敛回 118。 */
+  const MONTH_SEQ = [8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7];
+  const PROD = [72, 80, 84, 78, 68, 72, 58, 76, 78, 82, 84, 70];   /* 春节 2 月停产检修，Σ = 902 */
+  const SALE = [66, 74, 78, 102, 48, 66, 52, 70, 72, 78, 96, 64];  /* 双 11 / 618 双峰，Σ = 866 */
+
+  const TURN_TARGET = 40;                       /* 管理层目标，与上级页 TURN_TARGET 同值 */
+  const REVENUE_YI = 112.6;                     /* 年营收（亿元），用于反算单台均价 */
+  const DEAD_LINE = 10;                         /* 呆滞预警线：某格 90+ 占比 ≥ 10% 入预警 */
+
+  /* ===== 5. 由矩阵展开 42 格明细（含库龄拆分，确定性，kiosk 每次打开完全一致） =====
+     库龄拆分用最大余数法落到整数：每格四段之和 === 该格库存，故全表四段之和 === 1180 千台，
+     库龄维度与仓、产品线两个维度必然收敛到同一总量，不会出现「差 0.1 万台」的对不上。 */
+  function splitAge(total, base, skew) {
+    const w = base.slice();
+    const shift = w[3] * (skew - 1);
+    w[3] += shift; w[0] -= shift;                  /* 只在 90+ 与 0-30 之间挪权重，和不变 */
+    const s = sum(w);
+    const raw = w.map((x) => x / s * total);
+    const fl = raw.map(Math.floor);
+    const rest = total - sum(fl);
+    const order = raw.map((v, i) => [v - fl[i], i]).sort((a, b) => b[0] - a[0]);
+    for (let k = 0; k < rest; k++) fl[order[k % 4][1]]++;
+    return fl;
+  }
+  /* ★ 单元格只存标量与数组（wi / li 是索引，不是对象引用）。
+     进 ECharts option 的数据一律来自这些标量，业务对象之间绝不互相回指——
+     option 里一旦成环，setOption 的深拷贝会无限递归、整页图表全空且报不出行号。 */
+  const CELLS = [];
+  WH.forEach((w, wi) => {
+    LINES.forEach((l, li) => {
+      const q = MATRIX[wi][li];
+      CELLS.push({ wi: wi, li: li, qk: q, q: q / 10, ag: splitAge(q, l.age, WH_SKEW[wi]) });
+    });
+  });
+
+  /* ===== 6. 派生量：全部现算，页面上不出现任何硬编码合计 ===== */
+  const D = {};
+  D.totalK = sum(CELLS.map((c) => c.qk));                       /* 千台整数口径，用于三维判等 */
+  D.total = D.totalK / 10;                                      /* = 118.0 万台 */
+
+  /* 6.1 库龄维度：四段 = 全表按段求和；平均库龄 = 段中位数按量加权 */
+  AGE_BUCKETS.forEach((b, k) => {
+    b.qk = sum(CELLS.map((c) => c.ag[k]));
+    b.q = b.qk / 10;
+    b.share = 100 * b.qk / D.totalK;
+  });
+  D.ageSumK = sum(AGE_BUCKETS.map((b) => b.qk));                /* 必须 = 1180 */
+  D.dead = AGE_BUCKETS[3].q;
+  D.deadShare = AGE_BUCKETS[3].share;
+  const avgAgeOf = (agK) => sum(AGE_BUCKETS.map((b, k) => agK[k] * b.mid)) / sum(agK);
+  D.avgAge = avgAgeOf(AGE_BUCKETS.map((b) => b.qk));
+
+  /* 6.2 产品线维度：库存 = 列和；周转由产销存滚动现算（与上级页同一算法） */
+  D.out = sum(LINES.map((l) => l.out));
+  D.sale = sum(LINES.map((l) => l.sale));
+  LINES.forEach((l, li) => {
+    const cells = CELLS.filter((c) => c.li === li);
+    l.qk = sum(cells.map((c) => c.qk));
+    l.q = l.qk / 10;
+    l.agK = AGE_BUCKETS.map((_, k) => sum(cells.map((c) => c.ag[k])));
+    l.deadShare = 100 * l.agK[3] / l.qk;
+    /* 期初 = 期末 − 净增；月度产/销按该线占比分摊，Σ 分摊 = 集团月度值 */
+    l.open = l.q - (l.out - l.sale);
+    let carry = l.open;
+    l.closes = PROD.map((p, i) => {
+      carry = carry + p * l.out / D.out - SALE[i] * l.sale / D.sale;
+      return carry;
+    });
+    l.avg = sum(l.closes) / l.closes.length;                    /* 月末口径平均库存 */
+  });
+  D.lineSumK = sum(LINES.map((l) => l.qk));                     /* 必须 = 1180 */
+  D.stockAvg = sum(LINES.map((l) => l.avg));                    /* 集团 12 个月月末均值 */
+  D.saleDaily = D.sale / 365;
+  D.turn = D.stockAvg / D.saleDaily;                            /* ≈ 44.0 天，与上级页同源 */
+  D.turnGap = D.turn - TURN_TARGET;
+  /* 集团月末库存序列 = 各线月末之和，末月必然回到 118.0 */
+  D.closes = PROD.map((_, i) => sum(LINES.map((l) => l.closes[i])));
+
+  /* 6.3 仓维度：库存 = 行和；年出货由库存与压货偏移反推（压货越重、出货越慢），Σ = 866 */
+  const whShipW = WH.map((w, wi) => sum(MATRIX[wi]) / 10 / WH_SKEW[wi]);
+  const whShipT = sum(whShipW);
+  const avgRatio = D.stockAvg / D.total;                        /* 平均库存 ÷ 期末库存，全司同一比例 */
+  WH.forEach((w, wi) => {
+    const cells = CELLS.filter((c) => c.wi === wi);
+    w.qk = sum(cells.map((c) => c.qk));
+    w.q = w.qk / 10;
+    w.util = w.q / w.cap * 100;
+    w.agK = AGE_BUCKETS.map((_, k) => sum(cells.map((c) => c.ag[k])));
+    w.dead = w.agK[3] / 10;
+    w.deadShare = 100 * w.agK[3] / w.qk;
+    w.avgAge = avgAgeOf(w.agK);
+    w.share = 100 * w.qk / D.totalK;
+    w.ship = D.sale * whShipW[wi] / whShipT;                    /* 年出货量，万台 */
+    w.avgStock = w.q * avgRatio;
+    w.turn = w.avgStock / (w.ship / 365);                       /* 该仓周转天数 */
+    w.lineQk = LINES.map((l, li) => MATRIX[wi][li]);
+    /* 月末库存按该仓占比分摊：末月 = w.q，与台账期末数勾稽 */
+    w.closes = D.closes.map((v) => v * w.q / D.total);
+  });
+  D.whSumK = sum(WH.map((w) => w.qk));                          /* 必须 = 1180 */
+  D.shipSum = sum(WH.map((w) => w.ship));                       /* 必须 = 866 */
+  D.cap = sum(WH.map((w) => w.cap));
+  D.util = D.total / D.cap * 100;
+  D.whTop = WH.slice().sort((a, b) => b.q - a.q)[0];
+  D.whDeadTop = WH.slice().sort((a, b) => b.deadShare - a.deadShare)[0];
+  D.whSlow = WH.slice().sort((a, b) => b.turn - a.turn)[0];
+  D.provCnt = sum(WH.map((w) => w.provCnt));
+
+  /* 6.4 呆滞占用资金：单台均价 = 年营收 ÷ 年销量，不另写死 */
+  D.unitPrice = REVENUE_YI * 1e8 / (D.sale * 1e4);              /* 元 / 台 */
+  D.deadMoney = D.dead * 1e4 * D.unitPrice / 1e8;               /* 亿元 */
+
+  /* 6.5 42 格逐格呆滞判定 */
+  const verdictOf = (share) => (share >= 12 ? { t: "呆滞", c: "is-bad" }
+                              : share >= DEAD_LINE ? { t: "关注", c: "is-mid" }
+                              : { t: "良好", c: "is-good" });
+  CELLS.forEach((c) => {
+    c.deadShare = 100 * c.ag[3] / c.qk;
+    c.verdict = verdictOf(c.deadShare);
+  });
+  D.deadCells = CELLS.filter((c) => c.deadShare >= DEAD_LINE).length;
+  D.deadWorst = CELLS.slice().sort((a, b) => b.ag[3] - a.ag[3] || b.deadShare - a.deadShare)[0];
+
+  /* 6.6 各仓 12 个月库龄结构：当前结构为基线，摆幅随月份线性衰减到 0，
+         故第 12 月（本期）与台账现值完全一致——趋势图末点即台账末行。 */
+  WH.forEach((w, wi) => {
+    const base = AGE_BUCKETS.map((_, k) => w.agK[k] / w.qk);
+    w.trend = MONTH_SEQ.map((_, i) => {
+      const amp = 0.20 * (11 - i) / 11;                          /* 末月 amp = 0 → 锚定现值 */
+      const raw = base.map((b, k) => b * (1 + amp * Math.sin(i * 0.62 + k * 1.9 + wi * 0.8)));
+      const t = sum(raw);
+      const shares = raw.map((v) => v / t);
+      return shares.map((s) => s * w.closes[i]);                 /* 万台，按当月库存拆到四段 */
+    });
+  });
+
+  /* ===== 7. 顶部时钟与页头 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("kn-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("kn-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 8. KPI 带：5 枚，末枚随选中仓联动翻牌 ===== */
+  const KPI_DEFS = [
+    { icon: "▤", label: "成品库存", val: () => D.total, unit: "万台", dec: 1, cls: "",
+      sub: () => "七仓 / 六产品线 / 四库龄段 <b>三口径同源</b>" },
+    { icon: "⚠", label: "90+ 天呆滞占比", val: () => D.deadShare, unit: "%", dec: 1, cls: "is-warn",
+      sub: () => "呆滞 <b>" + fmtDec(D.dead, 1) + "</b> 万台 · 占用 <b>" + fmtDec(D.deadMoney, 2) + "</b> 亿元" },
+    { icon: "◷", label: "平均库龄", val: () => D.avgAge, unit: "天", dec: 1, cls: "",
+      sub: () => "四段中位数 15 / 45 / 75 / 120 天按量加权" },
+    { icon: "↻", label: "库存周转天数", val: () => D.turn, unit: "天", dec: 1, cls: D.turn > TURN_TARGET ? "is-warn" : "",
+      sub: () => "平均库存 <b>" + fmtDec(D.stockAvg, 1) + "</b> 万台 ÷ 日均销量 · 距目标 <b class=\"" + (D.turnGap <= 0 ? "kn-up" : "kn-down") + "\">" + signed(D.turnGap, 1) + " 天</b>" },
+    { icon: "◎", label: "选中仓库存", val: () => WH[selWi].q, unit: "万台", dec: 1, cls: "is-sel",
+      sub: () => WH[selWi].name + " · 占全国 <b>" + fmtDec(WH[selWi].share, 1) + "%</b> · 利用率 <b>" + fmtDec(WH[selWi].util, 1) + "%</b>" }
+  ];
+  let selWi = 0;          /* 选中仓索引（hash 定位前的默认值：第一个仓） */
+  let selLi = -1;         /* 选中产品线索引，-1 = 该仓全部 */
+
+  const band = $("kn-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="kn-kpi ' + k.cls + '">' +
+      '<div class="kn-kpi-icon">' + k.icon + "</div>" +
+      '<div class="kn-kpi-main">' +
+        '<div class="kn-kpi-label">' + k.label + "</div>" +
+        '<div class="kn-kpi-num"><span class="kn-kpi-val" id="kn-kpi-' + i + '">0</span><span class="kn-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="kn-kpi-sub" id="kn-kpisub-' + i + '">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，从当前值滚到目标值（选中仓切换时也走这条通道） */
+  const kpiCur = KPI_DEFS.map(() => 0);
+  const kpiRaf = KPI_DEFS.map(() => 0);
+  function countUp(i, target) {
+    const el = $("kn-kpi-" + i), dec = KPI_DEFS[i].dec, from = kpiCur[i];
+    const dur = 900, t0 = performance.now();
+    cancelAnimationFrame(kpiRaf[i]);
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      const v = from + (target - from) * e;
+      el.textContent = fmtDec(v, dec);
+      if (p < 1) kpiRaf[i] = requestAnimationFrame(step);
+      else { el.textContent = fmtDec(target, dec); kpiCur[i] = target; }
+    })(t0);
+    kpiCur[i] = target;
+  }
+  KPI_DEFS.forEach((k, i) => { kpiCur[i] = 0; countUp(i, k.val()); });
+
+  /* ===== 9. 七仓切换 chip（顶部 tab） ===== */
+  const tabsBox = $("kn-tabs");
+  tabsBox.innerHTML = WH.map((w, i) => (
+    '<button class="kn-tab" type="button" role="tab" data-wi="' + i + '" title="' + esc(w.name) + " RDC · " + fmtDec(w.q, 1) + ' 万台">' +
+      "<b>" + esc(w.name) + "</b><span>" + fmtDec(w.q, 1) + "</span>" +
+    "</button>"
+  )).join("");
+  const tabNodes = Array.from(tabsBox.children);
+
+  /* ===== 10. 左表：三级嵌套（合计 › 仓 › 产品线），手风琴——只展开选中仓 ===== */
+  const AGE_CELLS = (agK, qk) => AGE_BUCKETS.map((b, k) => (
+    '<span style="color:' + (k === 3 && agK[3] / qk * 100 >= DEAD_LINE ? C.red : "inherit") + '">' + fmtDec(agK[k] / 10, 1) + "</span>"
+  )).join("");
+
+  const HINT_HTML = () => (
+    '<div class="kn-hint-card">' +
+      '<div class="kn-hint-t">四段库龄图例 · 台账口径</div>' +
+      '<div class="kn-hint-legend">' + AGE_BUCKETS.map((b) => (
+        '<div class="kn-hint-row"><u style="background:' + b.color + '"></u><b>' + b.name + "</b>" +
+          "<span>全国 " + fmtDec(b.q, 1) + " 万台 · 占 " + fmtDec(b.share, 1) + "%</span></div>"
+      )).join("") + "</div>" +
+      '<div class="kn-hint-anchor">勾稽锚点：七仓之和 <b>' + fmtDec(sum(WH.map((w) => w.qk)) / 10, 1) +
+        "</b> = 六产品线之和 <b>" + fmtDec(sum(LINES.map((l) => l.qk)) / 10, 1) +
+        "</b> = 四库龄段之和 <b>" + fmtDec(sum(AGE_BUCKETS.map((b) => b.qk)) / 10, 1) + "</b> 万台" +
+        "（千台整数口径 " + D.totalK + " / " + D.lineSumK + " / " + D.ageSumK + "，三维完全收敛）<br/>" +
+        "42 格逐格四段之和 = 该格库存（最大余数法拆整），呆滞格 <b>" + D.deadCells + "</b> / 42，" +
+        "呆滞量 <b>" + fmtDec(D.dead, 1) + "</b> 万台 × 均价 <b>" + fmtDec(D.unitPrice, 0) + "</b> 元 = <b>" +
+        fmtDec(D.deadMoney, 2) + "</b> 亿元</div>" +
+      '<div class="kn-hint-op">点击 <b>仓行</b> 切换右侧联动 · 点击 <b>产品线行</b> 聚焦该品类 · ' +
+        "<b>← →</b> 换仓 · <b>↑ ↓</b> 换产品线 · <b>Esc</b> 返回上级</div>" +
+    "</div>"
+  );
+
+  function rowHTML(cls, lvl, name, subName, dotColor, qk, agK, share, verdict, attrs) {
+    return '<li class="' + cls + '" ' + attrs + ">" +
+      '<span class="kn-td-name" style="padding-left:' + (lvl * 20) + 'px">' +
+        '<i class="kn-tri' + (lvl === 2 ? " is-empty" : "") + '">' + (lvl === 2 ? "▸" : (lvl === 0 ? "▾" : "")) + "</i>" +
+        '<u class="kn-dot" style="background:' + dotColor + '"></u>' +
+        '<span class="kn-nm"><b>' + esc(name) + "</b>" + (subName ? '<i class="kn-sub">' + esc(subName) + "</i>" : "") + "</span>" +
+      "</span>" +
+      "<span><b>" + fmtDec(qk / 10, 1) + "</b></span>" +
+      AGE_CELLS(agK, qk) +
+      '<span style="color:' + (100 * agK[3] / qk >= DEAD_LINE ? C.red : C.green) + '">' + fmtDec(100 * agK[3] / qk, 1) + "%</span>" +
+      "<span>" + fmtDec(share, 1) + "%</span>" +
+      '<span class="kn-badge ' + verdict.c + '">' + verdict.t + "</span>" +
+      "</li>";
+  }
+
+  function renderTable() {
+    const allAg = AGE_BUCKETS.map((b) => b.qk);
+    let html = rowHTML("kn-row is-l0", 0, "全国合计", "7 仓 · " + D.provCnt + " 省区", C.cyan,
+      D.totalK, allAg, 100, verdictOf(D.deadShare), 'data-wi="-1"');
+    WH.forEach((w, wi) => {
+      const on = wi === selWi;
+      html += rowHTML("kn-row is-l1" + (on ? " is-active" : ""), 1,
+        w.name + " RDC", (w.hq ? "总部同址 · " : "") + w.provCnt + " 省 · 容量 " + fmtDec(w.cap, 1) + " 万台",
+        on ? C.cyan : C.cyanDeep, w.qk, w.agK, w.share, verdictOf(w.deadShare), 'data-wi="' + wi + '"');
+      if (!on) return;
+      LINES.forEach((l, li) => {
+        const c = CELLS[wi * LINES.length + li];
+        html += rowHTML("kn-row is-l2" + (li === selLi ? " is-focus" : ""), 2,
+          l.name, "", C.series[li % C.series.length],
+          c.qk, c.ag, 100 * c.qk / D.totalK, c.verdict, 'data-wi="' + wi + '" data-li="' + li + '"');
+      });
+    });
+    $("kn-tbody").innerHTML = html + '<li class="kn-hint">' + HINT_HTML() + "</li>";
+  }
+
+  /* 表尾：42 格合计——与全国合计行、与三个维度的和逐列对齐 */
+  $("kn-tfoot").innerHTML =
+    "<span>全表 " + CELLS.length + " 格合计（7 仓 × 6 产品线）</span>" +
+    "<span><b>" + fmtDec(D.totalK / 10, 1) + "</b></span>" +
+    AGE_BUCKETS.map((b) => "<span><b>" + fmtDec(b.q, 1) + "</b></span>").join("") +
+    '<span style="color:' + C.red + '"><b>' + fmtDec(D.deadShare, 1) + "%</b></span>" +
+    "<span><b>" + fmtDec(sum(WH.map((w) => w.share)), 1) + "%</b></span>" +
+    '<span class="kn-badge ' + verdictOf(D.deadShare).c + '">' + verdictOf(D.deadShare).t + "</span>";
+
+  /* ===== 11. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+
+  /* ★ setOption 会深拷贝整个 option，option 里只要有循环引用就无限递归、整页图表全空，
+     且堆栈里只有 echarts 内部帧。这里在下发前跑一次 JSON.stringify 环检测：
+     一旦成环就打出成环路径并跳过本次 setOption，页面其余部分照常渲染。
+     规则仍是根本：进 option 的只放标量与数组，业务对象之间用索引关联、绝不回指。 */
+  function setOpt(chart, option, notMerge) {
+    if (!chart) return;
+    try { JSON.stringify(option); }
+    catch (e) { console.error("[库存库龄台账] option 存在循环引用，已跳过 setOption：", e.message); return; }
+    chart.setOption(option, notMerge);
+  }
+
+  const pieChart = makeChart("kn-chart-pie");
+  const barChart = makeChart("kn-chart-bar");
+  const trendChart = makeChart("kn-chart-trend");
+
+  /* 11.1 选中仓四段库龄环形图（focus = 选中产品线时，画该格的四段） */
+  function pieOption(w, li) {
+    const agK = li < 0 ? w.agK : CELLS[WH.indexOf(w) * LINES.length + li].ag;
+    const totK = sum(agK);
+    const deadS = 100 * agK[3] / totK;
+    return {
+      backgroundColor: "transparent",
+      /* 圆心汇总用 title 组件放在环心，不另起一个零半径 pie —— 更稳且不进图例 */
+      title: {
+        text: fmtDec(totK / 10, 1) + " 万台", subtext: "90+ " + fmtDec(deadS, 1) + "%",
+        left: "center", top: "40%", itemGap: 4,
+        textStyle: { color: "#eafcfa", fontSize: 15, fontWeight: 700 },
+        subtextStyle: { color: deadS >= DEAD_LINE ? C.red : C.green, fontSize: 12, fontWeight: 700 }
+      },
+      tooltip: Object.assign({ trigger: "item",
+        formatter: (p) => "<b>" + p.name + "</b><br/>库存 <b>" + fmtDec(p.value, 1) + "</b> 万台 · 占 <b>" +
+          fmtDec(100 * p.value * 10 / totK, 1) + "%</b><br/><span style=\"color:" + C.textDim + "\">中位库龄 " +
+          AGE_BUCKETS[p.dataIndex].mid + " 天</span>" }, TIP),
+      series: [{
+        type: "pie", radius: ["48%", "70%"], center: ["50%", "52%"],
+        avoidLabelOverlap: true, minAngle: 4,
+        itemStyle: { borderColor: "rgba(7,27,30,.92)", borderWidth: 2, borderRadius: 3 },
+        label: {
+          show: true, position: "outside", color: C.textDim, fontSize: 10.5,
+          formatter: (p) => AGE_BUCKETS[p.dataIndex].short + "\n" + fmtDec(100 * p.value * 10 / totK, 1) + "%"
+        },
+        labelLine: { length: 6, length2: 8, lineStyle: { color: "rgba(64,196,190,.35)" } },
+        emphasis: { scaleSize: 6, label: { color: C.text, fontSize: 11.5, fontWeight: 700 } },
+        data: AGE_BUCKETS.map((b, k) => ({
+          name: b.name, value: Number(fmtDec(agK[k] / 10, 1)),
+          itemStyle: { color: b.color }
+        }))
+      }]
+    };
+  }
+
+  /* 11.2 该仓产品线构成：六条横向堆叠条（四段库龄），选中产品线加亮 */
+  function barOption(w, li) {
+    const wi = WH.indexOf(w);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 40, top: 22, bottom: 2, containLabel: true },
+      tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const idx = ps[0].dataIndex;
+          const c = CELLS[wi * LINES.length + idx];
+          return "<b>" + LINES[idx].name + "</b>　" + w.name + "<br/>" +
+            "库存 <b>" + fmtDec(c.qk / 10, 1) + "</b> 万台 · 占该仓 <b>" + fmtDec(100 * c.qk / w.qk, 1) + "%</b><br/>" +
+            AGE_BUCKETS.map((b, k) => '<span style="color:' + b.color + '">' + b.short + "</span> " +
+              fmtDec(c.ag[k] / 10, 1) + " 万台（" + fmtDec(100 * c.ag[k] / c.qk, 1) + "%）").join("<br/>");
+        } }, TIP),
+      legend: { show: true, top: 0, right: 2, itemWidth: 12, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: AGE_BUCKETS.map((b) => b.name) },
+      xAxis: { type: "value", axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10 }),
+        splitLine: SPLIT_LINE, axisLine: { show: false } },
+      yAxis: { type: "category", inverse: true, data: LINES.map((l) => l.short),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: (v, i) => (li < 0 || li === i ? "#cbe6e3" : "rgba(127,166,163,.55)"), fontSize: 11 } },
+      series: AGE_BUCKETS.map((b, k) => ({
+        name: b.name, type: "bar", stack: "age", barWidth: "56%",
+        itemStyle: { color: b.color, opacity: 1 },
+        data: LINES.map((l, i) => ({
+          value: Number(fmtDec(CELLS[wi * LINES.length + i].ag[k] / 10, 1)),
+          itemStyle: { opacity: li < 0 || li === i ? 1 : 0.32 }
+        })),
+        label: k === 3 ? {
+          show: true, position: "right", color: C.textDim, fontSize: 10,
+          formatter: (p) => fmtDec(CELLS[wi * LINES.length + p.dataIndex].qk / 10, 1)
+        } : { show: false }
+      }))
+    };
+  }
+
+  /* 11.3 库龄结构 12 月趋势：四段堆叠柱（万台）+ 90+ 占比折线（右轴），末月锚定台账现值 */
+  function trendOption(w) {
+    const months = MONTH_SEQ.map((m) => m + "月");
+    const deadLine = w.trend.map((v) => Number(fmtDec(100 * v[3] / sum(v), 1)));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 6, top: 24, bottom: 2, containLabel: true },
+      tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const v = w.trend[i];
+          return "<b>" + months[i] + "</b>　" + w.name + "<br/>库存 <b>" + fmtDec(sum(v), 1) + "</b> 万台<br/>" +
+            AGE_BUCKETS.map((b, k) => '<span style="color:' + b.color + '">' + b.short + "</span> " +
+              fmtDec(v[k], 1) + " 万台").join("<br/>") +
+            '<br/>90+ 占比 <b style="color:' + C.red + '">' + fmtDec(deadLine[i], 1) + "%</b>";
+        } }, TIP),
+      legend: { show: true, top: 0, right: 2, itemWidth: 12, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: AGE_BUCKETS.map((b) => b.name).concat(["90+ 占比"]) },
+      xAxis: { type: "category", data: months, axisLine: { lineStyle: { color: C.line } },
+        axisTick: { show: false }, axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10, interval: 0 }) },
+      yAxis: [
+        { type: "value", name: "万台", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10 }), splitLine: SPLIT_LINE, axisLine: { show: false } },
+        { type: "value", name: "%", min: 0, nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10 }), splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: AGE_BUCKETS.map((b, k) => ({
+        name: b.name, type: "bar", stack: "m", barWidth: "58%",
+        itemStyle: { color: b.color },
+        data: w.trend.map((v) => Number(fmtDec(v[k], 1)))
+      })).concat([{
+        name: "90+ 占比", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 4, z: 5,
+        data: deadLine, lineStyle: { color: C.red, width: 2 }, itemStyle: { color: C.red }
+      }])
+    };
+  }
+
+  /* ===== 12. 选中联动：左表 ↔ 右三图 ↔ KPI ↔ 页头 ↔ hash ===== */
+  function renderAgeList(w, li) {
+    const agK = li < 0 ? w.agK : CELLS[WH.indexOf(w) * LINES.length + li].ag;
+    const totK = sum(agK);
+    $("kn-agelist").innerHTML = AGE_BUCKETS.map((b, k) => {
+      const s = 100 * agK[k] / totK;
+      return '<div class="kn-age-row"><u style="background:' + b.color + '"></u>' +
+        "<span>" + b.name + '</span><span class="kn-age-q">' + fmtDec(agK[k] / 10, 1) + '</span><span class="kn-age-s">' +
+        fmtDec(s, 1) + '%</span><span class="kn-age-bar"><i style="width:' + fmtDec(s, 1) + "%;background:" + b.color + '"></i></span></div>';
+    }).join("");
+  }
+
+  function select(wi, li, fromHash) {
+    selWi = Math.max(0, Math.min(WH.length - 1, wi));
+    selLi = (li == null || li < 0) ? -1 : li;
+    const w = WH[selWi];
+    const scopeName = selLi < 0 ? w.name + " RDC" : w.name + " · " + LINES[selLi].name;
+    const agK = selLi < 0 ? w.agK : CELLS[selWi * LINES.length + selLi].ag;
+    const qk = sum(agK);
+
+    renderTable();
+    tabNodes.forEach((t, i) => t.classList.toggle("is-active", i === selWi));
+
+    /* 右栏指标块 */
+    $("kn-m-badge").textContent = w.key;
+    $("kn-m-name").textContent = scopeName;
+    $("kn-m-val").textContent = fmtDec(qk / 10, 1);
+    $("kn-m-util").textContent = fmtDec(w.util, 1) + "%";
+    $("kn-m-turn").textContent = fmtDec(w.turn, 1) + " 天";
+    $("kn-m-age").textContent = fmtDec(selLi < 0 ? w.avgAge : avgAgeOf(agK), 1) + " 天";
+    $("kn-m-prov").textContent = w.provCnt + " 省";
+
+    $("kn-pie-tag").innerHTML = "90+ <b>" + fmtDec(100 * agK[3] / qk, 1) + "%</b> · 平均库龄 " + fmtDec(avgAgeOf(agK), 1) + " 天";
+    $("kn-bar-tag").innerHTML = "该仓 <b>" + fmtDec(w.q, 1) + "</b> 万台 · 占全国 " + fmtDec(w.share, 1) + "%";
+    $("kn-trend-tag").innerHTML = "年出货 <b>" + fmtDec(w.ship, 1) + "</b> 万台 · 周转 " + fmtDec(w.turn, 1) + " 天";
+    $("kn-chip-wh").textContent = w.name;
+    $("kn-crumb-obj").textContent = "库存库龄台账 · " + w.name;
+    document.title = "大屏样板间 · 厨电库存库龄台账 · " + w.name;
+
+    renderAgeList(w, selLi);
+    /* notMerge：品类聚焦会改变扇区与透明度集合，整体替换才不残留上一次的状态 */
+    setOpt(pieChart, pieOption(w, selLi), true);
+    setOpt(barChart, barOption(w, selLi), true);
+    setOpt(trendChart, trendOption(w), true);
+
+    /* KPI 末枚随选中仓翻牌 */
+    countUp(4, WH[selWi].q);
+    $("kn-kpisub-4").innerHTML = KPI_DEFS[4].sub();
+
+    /* 用 replaceState 同步 hash，不用 location.hash（会触发跳转与滚动） */
+    if (!fromHash) history.replaceState(null, "", "#" + encodeURIComponent(w.name));
+  }
+
+  /* ===== 13. 交互：左表点击 / 顶部 chip / 键盘 ===== */
+  $("kn-tbody").addEventListener("click", (e) => {
+    const li = e.target.closest(".kn-row");
+    if (!li) return;
+    const wi = Number(li.getAttribute("data-wi"));
+    if (wi < 0) { select(selWi, -1); restart(); return; }        /* 合计行 = 清掉品类聚焦 */
+    const lineAttr = li.getAttribute("data-li");
+    const nl = lineAttr == null ? -1 : Number(lineAttr);
+    /* 已选中的产品线再点一次 = 取消聚焦，回到整仓视图 */
+    select(wi, wi === selWi && nl === selLi ? -1 : nl);
+    restart();
+  });
+
+  tabsBox.addEventListener("click", (e) => {
+    const b = e.target.closest(".kn-tab");
+    if (!b) return;
+    select(Number(b.getAttribute("data-wi")), -1);
+    restart();
+  });
+
+  barChart.on("click", (p) => {
+    if (p.componentType !== "series") return;
+    select(selWi, p.dataIndex === selLi ? -1 : p.dataIndex);
+    restart();
+  });
+
+  const PARENT = "大屏样板间-厨电仓储库存1920.html";
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { location.href = PARENT; return; }
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      select((selWi + (e.key === "ArrowRight" ? 1 : -1) + WH.length) % WH.length, -1);
+      restart();
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const n = LINES.length;
+      const base = selLi < 0 ? (e.key === "ArrowDown" ? -1 : 0) : selLi;
+      select(selWi, (base + (e.key === "ArrowDown" ? 1 : -1) + n) % n);
+      restart();
+    }
+  });
+
+  /* ===== 14. hash 传参：父页下钻跳 <子页>#<仓名>，直接定位到该仓 =====
+     父页文案可能只带「华东」或「杭州」一段，故做四级兜底匹配：
+     全名 → 仓 key → 区域/城市全等 → 双向子串包含；都匹配不到落到第一个仓。 */
+  function matchWh(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return -1;
+    const low = s.toLowerCase();
+    let i = WH.findIndex((w) => w.name === s);
+    if (i >= 0) return i;
+    i = WH.findIndex((w) => w.key.toLowerCase() === low);
+    if (i >= 0) return i;
+    i = WH.findIndex((w) => w.zone === s || w.city === s);
+    if (i >= 0) return i;
+    i = WH.findIndex((w) => s.indexOf(w.zone) >= 0 && s.indexOf(w.city) >= 0);
+    if (i >= 0) return i;
+    i = WH.findIndex((w) => s.indexOf(w.city) >= 0 || s.indexOf(w.zone) >= 0);
+    if (i >= 0) return i;
+    return WH.findIndex((w) => w.name.indexOf(s) >= 0);
+  }
+  function readHash(initial) {
+    let raw = "";
+    try { raw = decodeURIComponent((location.hash || "").replace(/^#/, "")); }
+    catch (err) { raw = (location.hash || "").replace(/^#/, ""); }
+    const i = matchWh(raw);
+    if (i >= 0) { select(i, -1, true); return true; }
+    if (initial) select(0, -1);                                  /* 匹配不到 → 默认第一个仓 */
+    return false;
+  }
+  readHash(true);
+  window.addEventListener("hashchange", () => { readHash(false); restart(); });
+
+  /* ===== 15. 底部呆滞预警滚动条（全部由派生量现算，不另编数字） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: D.whDeadTop.name + " RDC 90+ 天占比 " + fmtDec(D.whDeadTop.deadShare, 1) + "%（全国 " +
+      fmtDec(D.deadShare, 1) + "%），呆滞 " + fmtDec(D.whDeadTop.dead, 1) + " 万台，建议专项清库" },
+    { lv: "高", c: C.red, t: "单格呆滞最重：" + WH[D.deadWorst.wi].name + " · " + LINES[D.deadWorst.li].name + " 90+ 天 " +
+      fmtDec(D.deadWorst.ag[3] / 10, 1) + " 万台，占该格 " + fmtDec(D.deadWorst.deadShare, 1) + "%" },
+    { lv: "中", c: C.orange, t: "42 格中 90+ 占比 ≥ " + DEAD_LINE + "% 的呆滞格 " + D.deadCells + " 个，合计呆滞 " +
+      fmtDec(D.dead, 1) + " 万台，占用资金 " + fmtDec(D.deadMoney, 2) + " 亿元（均价 " + fmtDec(D.unitPrice, 0) + " 元/台）" },
+    { lv: "中", c: C.orange, t: D.whSlow.name + " RDC 周转 " + fmtDec(D.whSlow.turn, 1) + " 天，为七仓最慢，全国 " +
+      fmtDec(D.turn, 1) + " 天 · 距目标 " + signed(D.turnGap, 1) + " 天" },
+    { lv: "低", c: C.amber, t: "全国平均库龄 " + fmtDec(D.avgAge, 1) + " 天，首位仓 " + D.whTop.name + " " +
+      fmtDec(D.whTop.q, 1) + " 万台（占 " + fmtDec(D.whTop.share, 1) + "%），仓容利用率 " + fmtDec(D.util, 1) + "%" },
+    { lv: "低", c: C.green, t: "成品库存 " + fmtDec(D.total, 1) + " 万台 = 七仓之和 = 六产品线之和 = 四库龄段之和，" +
+      "与上级页「仓储库存」同一份 42 格矩阵，三维完全收敛" }
+  ];
+  const track = $("kn-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="kn-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                       /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 16. kiosk 活性：每 9 秒轮换到下一个仓；鼠标进入左表暂停，任一交互重置 ===== */
+  let timer = null;
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { select((selWi + 1) % WH.length, -1); }, 9000);
+  }
+  restart();
+  const tblPanel = $("kn-tblpanel");
+  tblPanel.addEventListener("mouseenter", () => clearInterval(timer));
+  tblPanel.addEventListener("mouseleave", restart);
+
+  /* ===== 17. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const checks = [
+    ["118 万台 = 七仓之和（行和）", D.whSumK === 1180],
+    ["118 万台 = 六产品线之和（列和）", D.lineSumK === 1180],
+    ["118 万台 = 四库龄段之和", D.ageSumK === 1180],
+    ["三维同源：仓和 = 线和 = 段和", D.whSumK === D.lineSumK && D.lineSumK === D.ageSumK],
+    ["每格四段之和 = 该格库存（42 格）", CELLS.every((c) => sum(c.ag) === c.qk)],
+    ["矩阵行和 = 七仓库存", WH.every((w, i) => w.qk === sum(MATRIX[i]))],
+    ["矩阵列和 = 六产品线库存", LINES.every((l, i) => l.qk === sum(MATRIX.map((r) => r[i])))],
+    ["90+ 天占比 = 10.0%", Math.abs(D.deadShare - 10) < 0.05],
+    ["各仓 90+ 之和 = 库龄 90+ 段总量", sum(WH.map((w) => w.agK[3])) === AGE_BUCKETS[3].qk],
+    ["各仓占全国之和 = 100%", Math.abs(sum(WH.map((w) => w.share)) - 100) < 1e-9],
+    ["年产量 902 / 年销量 866（跨页基准盘）", D.out === 902 && D.sale === 866],
+    ["月度产量之和 = 902、销量之和 = 866", sum(PROD) === 902 && sum(SALE) === 866],
+    ["产销存滚动末月 = 118.0 万台", Math.abs(D.closes[11] - D.total) < 1e-9],
+    ["库存周转 ≈ 44.0 天（与上级页同源）", Math.abs(D.turn - 44) < 0.1],
+    ["七仓年出货之和 = 866 万台", Math.abs(D.shipSum - D.sale) < 1e-9],
+    ["单台均价 ≈ 1300 元 = 营收 ÷ 销量", Math.abs(D.unitPrice - 1300) < 1],
+    ["各仓趋势末月 = 该仓期末库存", WH.every((w) => Math.abs(sum(w.trend[11]) - w.q) < 1e-9)]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[库存库龄台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
