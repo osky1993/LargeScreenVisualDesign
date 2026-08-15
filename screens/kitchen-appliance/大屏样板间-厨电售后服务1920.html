@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电售后服务</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --sf-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：产品线工单明细（产品线 / 保有量 / 故障率 / 工单 / 及时率 / 满意度 / 判定） */
+    --sf-tcols: 84px 56px 1fr 1fr 1fr 60px 46px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .sf-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 132px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .sf-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .sf-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .sf-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .sf-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .sf-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .sf-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .sf-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .sf-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .sf-crumb em { font-style: normal; color: #cfeae7; }
+  .sf-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .sf-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .sf-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .sf-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .sf-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .sf-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .sf-chips { display: flex; align-items: center; gap: 9px; }
+  .sf-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .sf-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .sf-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .sf-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .sf-chip.is-key b { color: var(--mfg-cyan); }
+  .sf-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .sf-clock-time { font: 700 26px/1 var(--sf-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .sf-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .sf-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .sf-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .sf-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .sf-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .sf-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .sf-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .sf-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .sf-kpi.is-warn .sf-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .sf-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .sf-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .sf-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .sf-kpi-val { font: 700 30px/1 var(--sf-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .sf-kpi.is-warn .sf-kpi-val { color: #ffd9b0; }
+  .sf-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .sf-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sf-kpi-sub b { font-weight: 700; }
+  .sf-up { color: var(--mfg-green); }
+  .sf-down { color: var(--mfg-red); }
+
+  /* ===== 三栏主体 ===== */
+  .sf-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .sf-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .sf-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .sf-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .sf-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .sf-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .sf-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .sf-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .sf-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 工单流转四段看板 ===== */
+  .sf-stages { flex: none; display: flex; flex-direction: column; gap: 8px; }
+  .sf-stage-row {
+    position: relative; display: grid; grid-template-columns: 30px 1fr 78px 66px; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 9px;
+    border: 1px solid rgba(64, 196, 190, 0.16); background: rgba(10, 38, 42, 0.5);
+    transition: border-color .25s, background .25s;
+  }
+  .sf-stage-row.is-active { border-color: rgba(53, 224, 208, 0.6); background: rgba(18, 68, 68, 0.55); box-shadow: inset 0 0 16px rgba(53, 224, 208, 0.12); }
+  .sf-stage-no {
+    width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font: 700 14px/1 var(--sf-mono); color: #04191a;
+  }
+  .sf-stage-name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .sf-stage-name b { font-size: 13.5px; font-weight: 700; letter-spacing: 0.04em; color: #d6efec; }
+  .sf-stage-name span { font-size: 11px; color: rgba(127, 166, 163, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sf-stage-rate { text-align: right; font: 700 17px/1 var(--sf-mono); font-variant-numeric: tabular-nums; }
+  .sf-stage-cum { text-align: right; font-size: 11px; color: var(--mfg-text-dim); font-variant-numeric: tabular-nums; }
+  .sf-stage-cum b { display: block; font: 700 13px/1.35 var(--sf-mono); color: #bfe4e0; }
+
+  /* ===== CSS grid 模拟表格 ===== */
+  .sf-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .sf-thead, .sf-tbody li {
+    display: grid; grid-template-columns: var(--sf-tcols); align-items: center; gap: 6px;
+  }
+  .sf-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .sf-thead span:not(:first-child), .sf-tbody li span:not(:first-child) { text-align: right; }
+  .sf-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .sf-tbody li {
+    padding: 0 8px; height: 30px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .sf-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .sf-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .sf-tbody li b { font-weight: 700; color: #eafcfa; }
+  .sf-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .sf-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .sf-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .sf-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+
+  /* ===== 甘特图例（超时段用橙色，说明一次） ===== */
+  .sf-legend { flex: none; display: flex; align-items: center; gap: 14px; padding: 2px 2px 4px; }
+  .sf-legend i {
+    display: inline-flex; align-items: center; gap: 5px; font-style: normal;
+    font-size: 11px; color: rgba(127, 166, 163, 0.9); letter-spacing: 0.04em;
+  }
+  .sf-legend i::before { content: ""; width: 14px; height: 8px; border-radius: 2px; background: var(--mfg-cyan); }
+  .sf-legend i.is-dispatch::before { background: var(--mfg-blue); }
+  .sf-legend i.is-onsite::before { background: var(--mfg-violet); }
+  .sf-legend i.is-close::before { background: var(--mfg-green); }
+  .sf-legend i.is-over::before { background: var(--mfg-orange); box-shadow: 0 0 8px rgba(255, 157, 69, 0.7); }
+
+  /* ===== 底部预警滚动条 ===== */
+  .sf-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .sf-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .sf-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: sf-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes sf-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .sf-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .sf-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .sf-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .sf-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .sf-foot-item b { font-weight: 700; }
+  .sf-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .sf-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="sf-stage" id="sf-stage">
+    <!-- mockflag:begin --><div class="sf-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="sf-error" id="sf-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="sf-header">
+      <div class="sf-head-left">
+        <div class="sf-crumb"><b>云麓厨电</b><i>›</i><em>售后服务</em></div>
+        <div class="sf-head-title-row">
+          <div class="sf-head-title">售后服务</div>
+          <div class="sf-head-meta">
+            <span>工单流转 <b>4</b> 段</span><i>|</i>
+            <span><b>6</b> 大产品线 · <b>31</b> 省服务网</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="sf-head-right">
+        <div class="sf-chips">
+          <div class="sf-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="sf-chip is-key"><span>SATISFACTION</span><b id="sf-chip-sat">--</b></div>
+        </div>
+        <div class="sf-clock" aria-label="实时时钟">
+          <span class="sf-clock-time" id="sf-clock-time">--:--:--</span>
+          <span class="sf-clock-date" id="sf-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="sf-band" id="sf-band"></div>
+
+    <!-- 左栏 -->
+    <div class="sf-col">
+      <section class="sf-panel" id="sf-part-scope" style="flex: 1.12;">
+        <div class="sf-panel-head">
+          <h2>故障类型旭日</h2>
+          <span class="sf-panel-tag">产品线 → 部件 · 首位部件 <b id="sf-part-top">--</b></span>
+        </div>
+        <div class="sf-chart" id="sf-chart-sun" role="img" aria-label="故障类型旭日图，内圈六大产品线、外圈故障部件"></div>
+      </section>
+      <section class="sf-panel" style="flex: 1;">
+        <div class="sf-panel-head">
+          <h2>满意度与投诉率走势</h2>
+          <span class="sf-panel-tag">近 24 个月 · 满意度目标 <b>4.50</b> 分</span>
+        </div>
+        <div class="sf-chart" id="sf-chart-sat" role="img" aria-label="近 24 个月用户满意度折线与投诉率柱状双轴图"></div>
+      </section>
+    </div>
+
+    <!-- 中栏 -->
+    <div class="sf-col">
+      <section class="sf-panel" id="sf-order-scope" style="flex: 1.24;">
+        <div class="sf-panel-head">
+          <h2>工单流转甘特</h2>
+          <span class="sf-panel-tag">抽样 <b id="sf-gantt-n">--</b> 单 · 超时段 <b id="sf-gantt-over">--</b> 处</span>
+        </div>
+        <div class="sf-legend">
+          <i>受理</i><i class="is-dispatch">派单</i><i class="is-onsite">上门</i><i class="is-close">完结</i><i class="is-over">超时段</i>
+        </div>
+        <div class="sf-chart" id="sf-chart-gantt" role="img" aria-label="工单流转甘特图，受理派单上门完结四段，超时部分以橙色标出"></div>
+      </section>
+      <section class="sf-panel" style="flex: 1;">
+        <div class="sf-panel-head">
+          <h2>服务及时率三联仪表</h2>
+          <span class="sf-panel-tag">24h 响应 / 48h 上门 / 一次修复 · 按工单量加权</span>
+        </div>
+        <div class="sf-chart" id="sf-chart-gauge" role="img" aria-label="24 小时响应率、48 小时上门率、一次修复率三联仪表"></div>
+      </section>
+    </div>
+
+    <!-- 右栏 -->
+    <div class="sf-col">
+      <section class="sf-panel" style="flex: none;">
+        <div class="sf-panel-head">
+          <h2>工单流转四段看板</h2>
+          <span class="sf-panel-tag">段均时长 · 超时单数（抽样口径）</span>
+        </div>
+        <div class="sf-stages" id="sf-stages"></div>
+      </section>
+      <section class="sf-panel" id="sf-line-scope" style="flex: 1;">
+        <div class="sf-panel-head">
+          <h2>产品线工单明细</h2>
+          <span class="sf-panel-tag">合计工单 <b id="sf-tbl-tickets">--</b> 万单</span>
+        </div>
+        <div class="sf-table">
+          <div class="sf-thead">
+            <span>产品线</span><span>保有量</span><span>故障率</span><span>工单</span><span>及时率</span><span>满意度</span><span>判定</span>
+          </div>
+          <ul class="sf-tbody" id="sf-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部预警滚动条 -->
+    <div class="sf-foot">
+      <div class="sf-foot-tag">服务预警</div>
+      <div class="sf-foot-view"><div class="sf-foot-track" id="sf-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("sf-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("sf-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const arrow = (v) => (v >= 0 ? "▲" : "▼");
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         ★ 保有量与市场故障率**取自品质管理页的同一张基准表**，本页不另编：
+           年售后工单 = Σ(保有量 × 故障率 ÷ 100) = 96.84 万单，两页天然同源。
+         ★ 进 ECharts option 的数据一律只放标量与数组，业务对象之间用 name / 索引关联，
+           绝不互相持有对象引用——option 会被深拷贝，成环即栈溢出、整页图表全空。 ===== */
+
+  /* 4.1 六大产品线：保有量(万台) / 市场故障率(%)（= 品质管理页口径）
+         + 本页特有的服务指标：24h 响应率 / 48h 上门率 / 一次修复率 / 满意度(5 分制) / 投诉率(%) */
+  const LINES = [
+    { name: "吸油烟机",   short: "烟机", own: 892, fail: 2.72, resp: 96.8, onsite: 93.4, fix1: 88.6, sat: 4.66, cmp: 1.24 },
+    { name: "燃气灶具",   short: "灶具", own: 836, fail: 2.45, resp: 97.4, onsite: 94.2, fix1: 90.2, sat: 4.71, cmp: 1.08 },
+    { name: "洗碗机",     short: "洗碗", own: 402, fail: 3.86, resp: 94.2, onsite: 90.1, fix1: 83.4, sat: 4.48, cmp: 1.86 },
+    { name: "蒸烤一体机", short: "蒸烤", own: 268, fail: 4.12, resp: 93.1, onsite: 88.6, fix1: 81.2, sat: 4.39, cmp: 2.14 },
+    { name: "集成灶",     short: "集成", own: 358, fail: 3.24, resp: 95.6, onsite: 91.8, fix1: 85.9, sat: 4.57, cmp: 1.52 },
+    { name: "净水热水",   short: "净水", own: 471, fail: 2.96, resp: 96.2, onsite: 92.6, fix1: 87.4, sat: 4.62, cmp: 1.36 }
+  ];
+
+  /* 4.2 故障部件构成（产品线 → 部件，权重是相对份额，求和归一后现算工单量）。
+         部件名沿用品质管理页的缺陷主责部件口径，两页叙事可衔接。 */
+  const PARTS = {
+    "吸油烟机":   [["风机总成", 34], ["电控板", 26], ["面板玻璃", 22], ["结构件", 18]],
+    "燃气灶具":   [["点火针", 38], ["密封圈", 26], ["面板玻璃", 20], ["结构件", 16]],
+    "洗碗机":     [["电控板", 33], ["密封圈", 29], ["线束端子", 22], ["结构件", 16]],
+    "蒸烤一体机": [["电控板", 31], ["腔体内胆", 27], ["线束端子", 24], ["面板玻璃", 18]],
+    "集成灶":     [["风机总成", 30], ["点火针", 27], ["电控板", 24], ["密封圈", 19]],
+    "净水热水":   [["密封圈", 36], ["电控板", 28], ["线束端子", 21], ["腔体内胆", 15]]
+  };
+
+  /* 4.3 服务网络与全系列共用常量（NPS 与门户、会员运营页同值） */
+  const NET = { prov: 31, sites: 1280, engineers: 6400, nps: 34, members: 1860 };
+
+  /* 4.4 工单流转四段与 SLA（累计口径，单位小时）
+         受理 ≤2h / 24h 响应（受理+派单）/ 48h 上门 / 72h 完结 */
+  const STAGE_DEF = [
+    { key: "ACCEPT",   name: "受理",  note: "400 热线 / APP / 小程序三入口", sla: 2,  color: C.cyan },
+    { key: "DISPATCH", name: "派单",  note: "按网点半径 + 工程师技能匹配",   sla: 24, color: C.blue },
+    { key: "ONSITE",   name: "上门",  note: "工程师到达并开始检修",         sla: 48, color: C.violet },
+    { key: "CLOSE",    name: "完结",  note: "修复交付 + 用户确认签收",       sla: 72, color: C.green }
+  ];
+
+  /* 4.5 甘特抽样工单：12 条实时流转中的代表性工单。
+         dur = [受理, 派单, 上门, 完结] 各段耗时（小时），全部写死的确定性常量，不含随机数。 */
+  const TICKETS = [
+    { code: "GD26-7301", li: 0, city: "杭州", dur: [0.6,  5.4, 12.0, 18.0] },
+    { code: "GD26-7314", li: 1, city: "成都", dur: [0.4,  3.2,  9.6, 14.5] },
+    { code: "GD26-7326", li: 2, city: "武汉", dur: [1.2, 12.6, 22.4, 26.0] },
+    { code: "GD26-7338", li: 3, city: "沈阳", dur: [1.8, 16.4, 28.6, 31.5] },
+    { code: "GD26-7345", li: 4, city: "佛山", dur: [0.8,  6.8, 14.2, 20.4] },
+    { code: "GD26-7357", li: 5, city: "西安", dur: [0.5,  4.2, 10.8, 16.2] },
+    { code: "GD26-7362", li: 0, city: "天津", dur: [2.6,  8.4, 15.2, 19.6] },
+    { code: "GD26-7371", li: 2, city: "昆明", dur: [1.0, 24.6, 20.4, 21.0] },
+    { code: "GD26-7384", li: 3, city: "乌鲁木齐", dur: [1.4, 14.2, 36.8, 24.6] },
+    { code: "GD26-7396", li: 4, city: "南京", dur: [0.7,  5.6, 13.4, 17.8] },
+    { code: "GD26-7402", li: 1, city: "青岛", dur: [0.9,  7.2, 11.6, 15.4] },
+    { code: "GD26-7418", li: 5, city: "长沙", dur: [0.6,  9.4, 18.2, 23.2] }
+  ];
+
+  /* 4.6 满意度 / 投诉率 24 月序列：前 23 月为历史，末月由本期现算值接上 */
+  const SAT_23 = [
+    4.31, 4.29, 4.33, 4.35, 4.34, 4.38, 4.36, 4.40, 4.42, 4.41, 4.45, 4.44,
+    4.47, 4.49, 4.48, 4.52, 4.50, 4.53, 4.55, 4.54, 4.56, 4.58, 4.57
+  ];
+  const CMP_23 = [
+    2.14, 2.18, 2.09, 2.05, 2.11, 1.98, 2.02, 1.94, 1.88, 1.92, 1.84, 1.87,
+    1.79, 1.74, 1.77, 1.68, 1.71, 1.63, 1.58, 1.61, 1.54, 1.49, 1.52
+  ];
+  const SAT_TARGET = 4.50;
+
+  /* ===== 4.7 派生量：全部现算，页面上不出现任何硬编码合计 ===== */
+  const D = {};
+  /* ★ 工单量与品质管理页同源：逐线 own × fail / 100，再求和 */
+  LINES.forEach((l) => { l.tickets = l.own * l.fail / 100; });
+  D.own = sum(LINES.map((l) => l.own));                          /* 保有量合计 3227 万台 */
+  D.tickets = sum(LINES.map((l) => l.tickets));                  /* 年售后工单 ≈ 96.84 万单 */
+  D.fail = D.tickets / D.own * 100;                              /* 全司市场故障率 ≈ 3.00% */
+
+  /* 服务指标按工单量加权（各线单量差异大，简单平均会失真） */
+  const wByTk = (key) => sum(LINES.map((l) => l[key] * l.tickets)) / D.tickets;
+  D.resp = wByTk("resp");
+  D.onsite = wByTk("onsite");
+  D.fix1 = wByTk("fix1");
+  D.sat = wByTk("sat");
+  D.cmp = wByTk("cmp");
+  D.complaints = D.tickets * D.cmp / 100;                        /* 投诉单量（万单） */
+  D.perEng = D.tickets * 10000 / NET.engineers;                  /* 工程师人均年工单 */
+
+  /* 及时率目标与达标判定 */
+  const TARGET = { resp: 95.0, onsite: 92.0, fix1: 88.0 };
+  const GAUGES = [
+    { name: "24h 响应率", val: D.resp,   target: TARGET.resp,   color: C.cyan },
+    { name: "48h 上门率", val: D.onsite, target: TARGET.onsite, color: C.blue },
+    { name: "一次修复率", val: D.fix1,   target: TARGET.fix1,   color: C.violet }
+  ];
+  D.gaugeMiss = GAUGES.filter((g) => g.val < g.target).length;
+
+  /* 产品线判定：综合及时率（响应 / 上门 / 一次修复 三项均值）+ 满意度 */
+  LINES.forEach((l) => {
+    l.timely = (l.resp + l.onsite + l.fix1) / 3;
+    l.verdict = l.sat >= 4.60 && l.timely >= 92 ? { t: "优", c: "is-good" }
+              : l.sat >= 4.45 ? { t: "关注", c: "is-mid" }
+              : { t: "预警", c: "is-bad" };
+  });
+  D.lineWorst = LINES.slice().sort((a, b) => a.sat - b.sat)[0];
+  D.lineBest = LINES.slice().sort((a, b) => b.sat - a.sat)[0];
+  D.lineTop = LINES.slice().sort((a, b) => b.tickets - a.tickets)[0];
+
+  /* 4.8 旭日树：产品线 → 部件；叶子值 = 该线工单 × 部件份额，叶子合计 = D.tickets */
+  const PART_ROWS = [];                                          /* 扁平表：用于部件排行，不进 option */
+  LINES.forEach((l) => {
+    const ws = PARTS[l.name];
+    const wsum = sum(ws.map((w) => w[1]));
+    ws.forEach((w) => {
+      PART_ROWS.push({ line: l.name, short: l.short, part: w[0], val: l.tickets * w[1] / wsum });
+    });
+  });
+  D.partAgg = {};                                                /* 部件 → 合计工单（跨产品线） */
+  PART_ROWS.forEach((r) => { D.partAgg[r.part] = (D.partAgg[r.part] || 0) + r.val; });
+  D.partRank = Object.keys(D.partAgg)
+    .map((k) => ({ part: k, val: D.partAgg[k] }))
+    .sort((a, b) => b.val - a.val);
+  D.partTop = D.partRank[0];
+  D.partTopShare = D.partTop.val / D.tickets * 100;
+  D.partKinds = D.partRank.length;
+
+  /* 4.9 甘特段：按 SLA 累计阈值把每段拆成「正常 + 超时」两截，超时截统一走工业橙。
+         段对象只存标量（行号 / 起止 / 段序 / 超时标记 / 文本），不回指 LINES / TICKETS 对象。 */
+  const GANTT = [];
+  TICKETS.forEach((t, ri) => {
+    const l = LINES[t.li];
+    t.lineName = l.name;
+    t.short = l.short;
+    t.row = ri;
+    let cur = 0, over = 0;
+    t.dur.forEach((d, si) => {
+      const s = cur, e = cur + d, lim = STAGE_DEF[si].sla;
+      cur = e;
+      const push = (a, b, isOver) => GANTT.push({
+        row: ri, s: a, e: b, si: si, over: isOver,
+        code: t.code, lineName: l.name, short: l.short, city: t.city,
+        stage: STAGE_DEF[si].name, sla: lim
+      });
+      if (e <= lim + 1e-9) { push(s, e, 0); }
+      else if (s >= lim - 1e-9) { push(s, e, 1); over += e - s; }
+      else { push(s, lim, 0); push(lim, e, 1); over += e - lim; }
+    });
+    t.total = cur;
+    t.over = over;
+  });
+  D.ganttOver = GANTT.filter((g) => g.over === 1).length;         /* 超时段处数 */
+  D.ticketOver = TICKETS.filter((t) => t.over > 0).length;        /* 含超时的工单数 */
+  D.ticketMax = TICKETS.slice().sort((a, b) => b.total - a.total)[0];
+  D.axMax = Math.ceil((D.ticketMax.total + 4) / 12) * 12;         /* 甘特 x 轴上界：最长单再留 4h 余量，取 12h 整数倍 */
+
+  /* 四段看板：段均时长与超时单数，全部由抽样工单现算 */
+  const STAGES = STAGE_DEF.map((sd, si) => {
+    const durs = TICKETS.map((t) => t.dur[si]);
+    const overN = GANTT.filter((g) => g.si === si && g.over === 1).length;
+    return {
+      no: si + 1, key: sd.key, name: sd.name, note: sd.note, color: sd.color, sla: sd.sla,
+      avg: sum(durs) / durs.length,
+      overN: overN,
+      overRate: overN / TICKETS.length * 100
+    };
+  });
+
+  /* 4.10 满意度 / 投诉率序列：末月接上现算值 */
+  const SAT = SAT_23.concat([D.sat]);
+  const CMP = CMP_23.concat([D.cmp]);
+  D.satMom = SAT[SAT.length - 1] - SAT[SAT.length - 2];
+  D.satYoy = SAT[SAT.length - 1] - SAT[SAT.length - 13];
+  D.cmpMom = CMP[CMP.length - 1] - CMP[CMP.length - 2];
+  D.cmpYoy = CMP[CMP.length - 1] - CMP[CMP.length - 13];
+  D.satAbove = SAT.filter((v) => v >= SAT_TARGET).length;
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("sf-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("sf-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("sf-chip-sat").textContent = fmtDec(D.sat, 2) + " 分";
+
+  /* ===== 6. KPI 带：5 枚，数值翻牌缓动 ===== */
+  const KPI_DEFS = [
+    { icon: "☎", label: "年售后工单", val: D.tickets, unit: "万单", dec: 1, warn: false,
+      sub: () => "= 保有量 <b>" + fmtDec(D.own, 0) + "</b> 万台 × 故障率 <b>" + fmtDec(D.fail, 2) + "%</b>" },
+    { icon: "⚡", label: "24h 响应率", val: D.resp, unit: "%", dec: 2, warn: false,
+      sub: () => "目标 95.0% · <b class=\"sf-up\">" + arrow(D.resp - TARGET.resp) + fmtDec(Math.abs(D.resp - TARGET.resp), 2) + "pp</b>" },
+    { icon: "◈", label: "48h 上门率", val: D.onsite, unit: "%", dec: 2, warn: false,
+      sub: () => "目标 92.0% · " + NET.sites + " 个服务网点覆盖 " + NET.prov + " 省" },
+    { icon: "⛭", label: "一次修复率", val: D.fix1, unit: "%", dec: 2, warn: true,
+      sub: () => "低于目标 88.0% <b class=\"sf-down\">" + fmtDec(TARGET.fix1 - D.fix1, 2) + "pp</b> · 备件齐套待提升" },
+    { icon: "★", label: "用户满意度", val: D.sat, unit: "分", dec: 2, warn: false,
+      sub: () => "NPS <b>" + NET.nps + "</b> · 投诉率 <b>" + fmtDec(D.cmp, 2) + "%</b> · 环比 <b class=\"" + (D.satMom >= 0 ? "sf-up" : "sf-down") + "\">" + signed(D.satMom, 2) + "</b>" }
+  ];
+  const band = $("sf-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="sf-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="sf-kpi-icon">' + k.icon + "</div>" +
+      '<div class="sf-kpi-main">' +
+        '<div class="sf-kpi-label">' + k.label + "</div>" +
+        '<div class="sf-kpi-num"><span class="sf-kpi-val" id="sf-kpi-' + i + '">0</span><span class="sf-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="sf-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值 */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("sf-kpi-" + i), k.val, k.dec));
+
+  /* ===== 7. 工单流转四段看板（右栏上） ===== */
+  const stagesBox = $("sf-stages");
+  stagesBox.innerHTML = STAGES.map((s, i) => (
+    '<div class="sf-stage-row" data-i="' + i + '">' +
+      '<div class="sf-stage-no" style="background:' + s.color + '">' + s.no + "</div>" +
+      '<div class="sf-stage-name"><b>' + s.name + " · " + s.key + "</b><span>" + s.note + " · SLA " + s.sla + "h</span></div>" +
+      '<div class="sf-stage-rate" style="color:' + s.color + '">' + fmtDec(s.avg, 1) + "h</div>" +
+      '<div class="sf-stage-cum">超时<b style="color:' + (s.overN ? C.orange : "#bfe4e0") + '">' + s.overN + " 单</b></div>" +
+    "</div>"
+  )).join("");
+  const stageRows = Array.from(stagesBox.children);
+
+  /* ===== 8. 产品线工单明细表（右栏下） ===== */
+  const tbody = $("sf-tbody");
+  tbody.innerHTML = LINES.map((l, i) => (
+    "<li data-i=\"" + i + "\">" +
+      "<span><b>" + l.name + "</b></span>" +
+      "<span>" + l.own + "</span>" +
+      "<span style=\"color:" + (l.fail > 3.9 ? C.red : l.fail > 3.0 ? C.amber : C.green) + "\">" + fmtDec(l.fail, 2) + "</span>" +
+      "<span><b>" + fmtDec(l.tickets, 2) + "</b></span>" +
+      "<span style=\"color:" + (l.timely < 90 ? C.orange : "#cbe6e3") + "\">" + fmtDec(l.timely, 1) + "</span>" +
+      "<span style=\"color:" + (l.sat >= 4.6 ? C.cyan : l.sat >= 4.45 ? "#cbe6e3" : C.orange) + "\">" + fmtDec(l.sat, 2) + "</span>" +
+      '<span class="sf-badge ' + l.verdict.c + '">' + l.verdict.t + "</span>" +
+    "</li>"
+  )).join("");
+  const tbodyRows = Array.from(tbody.children);
+  $("sf-tbl-tickets").textContent = fmtDec(D.tickets, 2);
+  $("sf-gantt-n").textContent = TICKETS.length;
+  $("sf-gantt-over").textContent = D.ganttOver;
+  $("sf-part-top").textContent = D.partTop.part + " " + fmtDec(D.partTopShare, 1) + "%";
+
+  /* ===== 9. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = (o) => Object.assign({
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  }, o);
+
+  /* 9.1 工单流转甘特（本页招牌图，custom 系列 + renderItem）
+         · 坐标系 value(小时) × category(工单行)，encode 把 value[1]/value[2] 映射到 x、value[0] 到 y；
+         · SLA 竖线（24h / 48h / 72h）画在 dataIndex 0 的 renderItem 里，不依赖 markLine 的类目对齐；
+         · custom 系列没有内建 emphasis，巡航高亮靠整份替换 data 的 itemStyle 实现；
+         · ★ data 里只放数字数组 + 纯样式对象，绝不塞业务对象（option 深拷贝遇环即栈溢出）。 */
+  const gantt = makeChart("sf-chart-gantt");
+  const GANTT_ROWS = TICKETS.map((t) => t.short + "·" + t.code.slice(5));
+
+  function segStyle(g, focused) {
+    const base = g.over === 1
+      ? { color: C.orange, opacity: 0.95, shadowColor: "rgba(255,157,69,.55)", shadowBlur: 9 }
+      : { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+          { offset: 0, color: STAGE_DEF[g.si].color }, { offset: 1, color: STAGE_DEF[g.si].color + "88" }
+        ]), opacity: 0.94 };
+    if (focused) {
+      base.borderColor = "rgba(255,255,255,.9)"; base.borderWidth = 1.2;
+      base.shadowColor = "rgba(255,255,255,.5)"; base.shadowBlur = 12; base.opacity = 1;
+    }
+    return base;
+  }
+  /* value = [行号, 起(h), 止(h), 段序, 超时标记] —— 全标量 */
+  const ganttValue = (g) => [g.row, Number(g.s.toFixed(3)), Number(g.e.toFixed(3)), g.si, g.over];
+  const ganttData = (focusRow) => GANTT.map((g) => ({
+    name: STAGE_DEF[g.si].name, value: ganttValue(g), itemStyle: segStyle(g, focusRow === g.row)
+  }));
+
+  function slaMarks(params, api) {
+    const cs = params.coordSys;
+    const children = [];
+    STAGE_DEF.slice(1).forEach((sd) => {
+      const x = api.coord([sd.sla, 0])[0];
+      if (x < cs.x || x > cs.x + cs.width) return;
+      children.push({ type: "line", silent: true,
+        shape: { x1: x, y1: cs.y - 7, x2: x, y2: cs.y + cs.height },
+        style: { stroke: "rgba(255,201,77,.55)", lineWidth: 1.2, lineDash: [5, 4] } });
+      children.push({ type: "text", silent: true, style: {
+        text: sd.sla + "h " + sd.name, x: x + 5, y: cs.y - 6,
+        fill: "rgba(255,201,77,.9)", fontSize: 10
+      } });
+    });
+    return { type: "group", silent: true, children: children };
+  }
+  function ganttItem(params, api) {
+    const row = api.value(0);
+    const st = api.coord([api.value(1), row]);
+    const en = api.coord([api.value(2), row]);
+    const rowH = api.size([0, 1])[1];
+    const h = Math.min(rowH * 0.54, 16);
+    const si = api.value(3), over = api.value(4);
+    const cs = params.coordSys;
+    const rect = echarts.graphic.clipRectByRect(
+      { x: st[0], y: st[1] - h / 2, width: Math.max(en[0] - st[0], 2), height: h },
+      { x: cs.x, y: cs.y, width: cs.width, height: cs.height }
+    );
+    const children = [];
+    if (params.dataIndex === 0) children.push(slaMarks(params, api));
+    if (rect) {
+      children.push({ type: "rect", shape: Object.assign({ r: 3 }, rect), style: api.style() });
+      const label = over === 1 ? "超时" : STAGE_DEF[si].name;
+      if (rect.width > 34) {
+        children.push({ type: "text", silent: true, style: {
+          text: label, x: rect.x + 6, y: rect.y + rect.height / 2,
+          fill: over === 1 ? "#3a2405" : "#04191a",
+          fontSize: 10, fontWeight: 700, verticalAlign: "middle"
+        } });
+      }
+    }
+    return { type: "group", children: children };
+  }
+
+  gantt.setOption({
+    backgroundColor: "transparent",
+    tooltip: TIP({
+      trigger: "item",
+      formatter: (p) => {
+        const g = GANTT[p.dataIndex];
+        const t = TICKETS[g.row];
+        return "<b style=\"color:" + (g.over === 1 ? C.orange : STAGE_DEF[g.si].color) + "\">" +
+          g.code + " · " + g.lineName + "</b><br/>" +
+          g.stage + (g.over === 1 ? "（超时段）" : "") + "　" + fmtDec(g.s, 1) + "h → " + fmtDec(g.e, 1) + "h（" +
+          fmtDec(g.e - g.s, 1) + "h）<br/>" +
+          "本段 SLA 累计上限 <b>" + g.sla + "h</b>　服务城市 " + g.city + "<br/>" +
+          "<span style=\"color:" + C.textDim + "\">该单全程 " + fmtDec(t.total, 1) + "h · 超时合计 " +
+          fmtDec(t.over, 1) + "h</span>";
+      }
+    }),
+    grid: { left: 104, right: 22, top: 24, bottom: 26, containLabel: false },
+    xAxis: {
+      type: "value", min: 0, max: D.axMax, interval: 12,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      splitLine: { show: true, lineStyle: { color: "rgba(64,196,190,.10)" } },
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10.5, formatter: (v) => v + "h" })
+    },
+    yAxis: {
+      type: "category", inverse: true, data: GANTT_ROWS,
+      axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: { fontSize: 11, margin: 10, color: "#cbe6e3" }
+    },
+    series: [
+      { name: "工单流转", type: "custom", renderItem: ganttItem, encode: { x: [1, 2], y: 0 },
+        clip: true, data: ganttData(-1), animationDuration: 760, animationDurationUpdate: 0 },
+      /* 超时工单的完结时点：打一枚橙色脉冲，一眼看出哪几单破了 72h */
+      { name: "超时完结", type: "effectScatter", coordinateSystem: "cartesian2d", z: 6, silent: true,
+        symbolSize: 9, rippleEffect: { brushType: "stroke", scale: 3.4, period: 3.2 },
+        itemStyle: { color: C.orange, shadowColor: "rgba(255,157,69,.8)", shadowBlur: 10 },
+        data: TICKETS.filter((t) => t.over > 0).map((t) => [Number(t.total.toFixed(3)), t.row]) }
+    ]
+  });
+  function focusGantt(row) { gantt.setOption({ series: [{ data: ganttData(row) }] }); }
+
+  /* 9.2 服务及时率三联仪表：一个实例三枚 gauge，各自 center 偏移；未达标转橙 */
+  const gauge = makeChart("sf-chart-gauge");
+  gauge.setOption({
+    backgroundColor: "transparent",
+    tooltip: TIP({
+      trigger: "item",
+      formatter: (p) => {
+        const g = GAUGES[p.seriesIndex];
+        return "<b style=\"color:" + (g.val >= g.target ? g.color : C.orange) + "\">" + g.name + "</b><br/>" +
+          "实际 <b>" + fmtDec(g.val, 2) + "%</b>　目标 " + fmtDec(g.target, 1) + "%<br/>" +
+          "<span style=\"color:" + C.textDim + "\">差额 " + signed(g.val - g.target, 2) + "pp · 按工单量加权</span>";
+      }
+    }),
+    series: GAUGES.map((g, i) => ({
+      name: g.name, type: "gauge", center: [(17 + i * 33) + "%", "56%"], radius: "66%",
+      min: 70, max: 100, startAngle: 210, endAngle: -30, splitNumber: 3,
+      progress: { show: true, width: 11, roundCap: true,
+        itemStyle: { color: g.val >= g.target ? g.color : C.orange } },
+      axisLine: { lineStyle: { width: 11, color: [[1, "rgba(64,196,190,.16)"]] } },
+      axisTick: { show: false },
+      splitLine: { length: 8, lineStyle: { color: "rgba(64,196,190,.35)", width: 1 } },
+      axisLabel: { distance: 12, color: C.textDim, fontSize: 9 },
+      pointer: { show: true, length: "56%", width: 3,
+        itemStyle: { color: g.val >= g.target ? g.color : C.orange } },
+      anchor: { show: true, size: 8, itemStyle: { color: "#0b2b2e", borderColor: g.color, borderWidth: 2 } },
+      /* 目标刻线：用一段极窄的 axisLine 分段做不到，改用 title 下方文字 + markLine 不可用，
+         故把目标值放进 detail 副行，读数与判定一次给全 */
+      detail: {
+        valueAnimation: true, offsetCenter: [0, "34%"],
+        formatter: (v) => "{v|" + fmtDec(v, 2) + "%}\n{s|目标 " + fmtDec(g.target, 1) + "% · " +
+          (g.val >= g.target ? "达标" : "缺口 " + fmtDec(g.target - g.val, 2) + "pp") + "}",
+        rich: {
+          v: { color: g.val >= g.target ? "#eafcfa" : "#ffd9b0", fontSize: 17, fontWeight: 700, lineHeight: 21 },
+          s: { color: g.val >= g.target ? "#5f8a87" : C.orange, fontSize: 9.5, lineHeight: 13 }
+        }
+      },
+      title: { show: true, offsetCenter: [0, "76%"], color: "#cfe9e6", fontSize: 12, fontWeight: 700 },
+      data: [{ value: Number(fmtDec(g.val, 2)), name: g.name }],
+      animationDuration: 1200
+    }))
+  });
+
+  /* 9.3 故障类型旭日：内圈产品线、外圈部件；叶子值合计 = 年售后工单
+         ★ 树节点每次现建，父子只有 children 单向引用，绝不让子节点回指父节点。 */
+  const sun = makeChart("sf-chart-sun");
+  function sunData(focusLine) {
+    return LINES.map((l, li) => {
+      const base = C.series[li % C.series.length];
+      const ws = PARTS[l.name];
+      const wsum = sum(ws.map((w) => w[1]));
+      const on = focusLine === l.name;
+      return {
+        name: l.short,
+        itemStyle: { color: base, opacity: on ? 1 : 0.92,
+          borderColor: on ? "rgba(255,255,255,.9)" : "rgba(7,27,30,.85)", borderWidth: on ? 1.6 : 1.4 },
+        children: ws.map((w, wi) => ({
+          name: w[0],
+          value: Number((l.tickets * w[1] / wsum).toFixed(4)),
+          itemStyle: { color: base, opacity: (on ? 0.86 : 0.62) - wi * 0.09,
+            borderColor: "rgba(7,27,30,.85)", borderWidth: 1 }
+        }))
+      };
+    });
+  }
+  sun.setOption({
+    backgroundColor: "transparent",
+    tooltip: TIP({
+      trigger: "item",
+      formatter: (p) => {
+        const path = (p.treePathInfo || []).slice(1).map((n) => n.name).join(" › ");
+        return "<b>" + (path || p.name) + "</b><br/>工单 <b style=\"color:" + C.cyan + "\">" +
+          fmtDec(p.value, 2) + "</b> 万单<br/><span style=\"color:" + C.textDim + "\">占全年工单 " +
+          fmtDec(p.value / D.tickets * 100, 1) + "%</span>";
+      }
+    }),
+    series: [{
+      type: "sunburst", radius: [16, "92%"], center: ["50%", "52%"], sort: null,
+      nodeClick: false, data: sunData(null),
+      emphasis: { focus: "ancestor" },
+      levels: [
+        {},
+        { r0: "16%", r: "50%",
+          label: { rotate: "tangential", color: "#04191a", fontSize: 11.5, fontWeight: 700 } },
+        { r0: "51%", r: "92%",
+          label: { rotate: "radial", color: "#eafcfa", fontSize: 10.5, minAngle: 8 } }
+      ]
+    }]
+  });
+
+  /* 9.4 满意度 + 投诉率 24 月双轴：满意度折线（目标线 4.50），投诉率橙柱 */
+  const satChart = makeChart("sf-chart-sat");
+  const SAT_MONTHS = Array.from({ length: 24 }, (_, i) => {
+    const m = ((7 - (23 - i)) % 12 + 12) % 12 + 1;                /* 倒推 24 个月，末月 = 7 月 */
+    return m + "月";
+  });
+  satChart.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 6, right: 10, top: 30, bottom: 4, containLabel: true },
+    tooltip: TIP({
+      trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: (ps) => {
+        const i = ps[0].dataIndex;
+        return "第 " + (i + 1) + " 月<br/>满意度 <b style=\"color:" + C.cyan + "\">" + fmtDec(SAT[i], 2) +
+          "</b> 分　" + (SAT[i] >= SAT_TARGET ? "<b style=\"color:" + C.green + "\">达标</b>" : "<b style=\"color:" + C.orange + "\">未达标</b>") +
+          "<br/>投诉率 <b style=\"color:" + C.orange + "\">" + fmtDec(CMP[i], 2) + "%</b>";
+      }
+    }),
+    legend: { show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["用户满意度", "投诉率"] },
+    xAxis: {
+      type: "category", data: SAT_MONTHS,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 2, fontSize: 10.5 })
+    },
+    yAxis: [
+      { type: "value", name: "分", min: 4.2, max: 4.8, nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: Object.assign({}, AXIS_LABEL, { formatter: (v) => v.toFixed(1) }),
+        splitLine: SPLIT_LINE, axisLine: { show: false } },
+      { type: "value", name: "%", min: 0, max: 3, nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: { show: false }, axisLine: { show: false } }
+    ],
+    series: [
+      { name: "投诉率", type: "bar", yAxisIndex: 1, barWidth: "44%",
+        data: CMP.map((v) => Number(fmtDec(v, 2))),
+        itemStyle: { borderRadius: [2, 2, 0, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "rgba(255,157,69,.68)" }, { offset: 1, color: "rgba(255,157,69,.14)" }
+          ]) } },
+      { name: "用户满意度", type: "line", smooth: true, symbol: "circle", symbolSize: 5, z: 5,
+        data: SAT.map((v) => Number(fmtDec(v, 2))),
+        itemStyle: { color: (p) => (p.value >= SAT_TARGET ? C.cyan : C.orange) },
+        lineStyle: { width: 2.4, color: C.cyan },
+        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: "rgba(53,224,208,.26)" }, { offset: 1, color: "rgba(53,224,208,0)" }
+        ]) },
+        markLine: {
+          silent: true, symbol: "none",
+          data: [{ yAxis: SAT_TARGET, lineStyle: { color: C.amber, type: "dashed", width: 1 },
+            label: { formatter: "目标 " + fmtDec(SAT_TARGET, 2) + " 分", color: C.amber, fontSize: 10, position: "insideStartTop" } }]
+        } }
+    ]
+  });
+
+  /* ===== 10. 底部服务预警滚动条（文案数字全部由上面的派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: D.lineWorst.name + " 满意度 " + fmtDec(D.lineWorst.sat, 2) + " 分为六线最低，一次修复率仅 " + fmtDec(D.lineWorst.fix1, 1) + "%" },
+    { lv: "高", c: C.red, t: "一次修复率 " + fmtDec(D.fix1, 2) + "%，低于目标 " + fmtDec(TARGET.fix1 - D.fix1, 2) + "pp，共 " + D.gaugeMiss + " 项及时率指标未达标" },
+    { lv: "中", c: C.orange, t: "抽样 " + TICKETS.length + " 单中 " + D.ticketOver + " 单出现超时，最长 " + D.ticketMax.code + " 全程 " + fmtDec(D.ticketMax.total, 1) + "h，超 72h 完结线" },
+    { lv: "中", c: C.orange, t: "故障部件首位「" + D.partTop.part + "」年工单 " + fmtDec(D.partTop.val, 2) + " 万单，占 " + fmtDec(D.partTopShare, 1) + "%，建议联动品质管理页缺陷帕累托" },
+    { lv: "低", c: C.amber, t: "年售后工单 " + fmtDec(D.tickets, 2) + " 万单 = 保有量 " + fmtDec(D.own, 0) + " 万台 × 故障率 " + fmtDec(D.fail, 2) + "%，与品质管理页同源" },
+    { lv: "低", c: C.amber, t: "认证工程师 " + NET.engineers + " 名，人均年工单 " + fmtDec(D.perEng, 0) + " 单；投诉 " + fmtDec(D.complaints, 2) + " 万单，投诉率 " + fmtDec(D.cmp, 2) + "%" },
+    { lv: "低", c: C.green, t: D.lineBest.name + " 满意度 " + fmtDec(D.lineBest.sat, 2) + " 分为六线最优；近 24 月满意度达标 " + D.satAbove + " 个月，同比 " + signed(D.satYoy, 2) + " 分" }
+  ];
+  const track = $("sf-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="sf-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                        /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 11. 活性轮播：四段看板 / 甘特行 / 明细表 ↔ 旭日 三组联动（kiosk 常驻，不做 teardown） ===== */
+  let stageIdx = 0;
+  function playStage() {
+    stageRows.forEach((r, i) => r.classList.toggle("is-active", i === stageIdx));
+    stageIdx = (stageIdx + 1) % STAGES.length;
+  }
+  playStage();
+  setInterval(playStage, 3200);
+
+  let ticketIdx = 0;
+  function playTicket() {
+    focusGantt(ticketIdx);
+    ticketIdx = (ticketIdx + 1) % TICKETS.length;
+  }
+  playTicket();
+  setInterval(playTicket, 2400);
+
+  let lineIdx = 0;
+  function playLine() {
+    tbodyRows.forEach((r, i) => r.classList.toggle("is-active", i === lineIdx));
+    sun.setOption({ series: [{ data: sunData(LINES[lineIdx].name) }] });
+    lineIdx = (lineIdx + 1) % LINES.length;
+  }
+  playLine();
+  setInterval(playLine, 2800);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const near = (a, b, eps) => Math.abs(a - b) < (eps == null ? 1e-9 : eps);
+  const checks = [
+    ["年售后工单 = 六产品线之和 ≈ 96.84 万单", near(D.tickets, 96.84, 0.01)],
+    ["逐线工单 = 保有量 × 故障率 ÷ 100（与品质管理页同源）",
+      LINES.every((l) => near(l.tickets, l.own * l.fail / 100))],
+    ["保有量合计 = 六产品线之和 = 3227 万台", near(D.own, 3227, 0.01)],
+    ["全司市场故障率 = 工单 ÷ 保有量 ≈ 3.00%", near(D.fail, 3.0011, 0.001)],
+    ["旭日叶子合计 = 年售后工单", near(sum(PART_ROWS.map((r) => r.val)), D.tickets, 1e-6)],
+    ["甘特各段时长之和 = 各工单全程时长（超时拆分不改变总量）",
+      TICKETS.every((t) => near(sum(GANTT.filter((g) => g.row === t.row).map((g) => g.e - g.s)), t.total, 1e-9))],
+    ["工单全程 = 四段耗时之和", TICKETS.every((t) => near(t.total, sum(t.dur), 1e-9))],
+    ["加权及时率介于六线最小与最大之间",
+      [["resp", D.resp], ["onsite", D.onsite], ["fix1", D.fix1], ["sat", D.sat]].every(([k, v]) =>
+        v >= Math.min.apply(null, LINES.map((l) => l[k])) - 1e-9 &&
+        v <= Math.max.apply(null, LINES.map((l) => l[k])) + 1e-9)],
+    ["投诉单量 = 工单 × 投诉率", near(D.complaints, D.tickets * D.cmp / 100)],
+    ["满意度 / 投诉率序列均为 24 个月且末月 = 现算值",
+      SAT.length === 24 && CMP.length === 24 && near(SAT[23], D.sat) && near(CMP[23], D.cmp)]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[售后服务] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

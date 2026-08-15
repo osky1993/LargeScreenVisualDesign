@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电营销活动</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --yx-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：活动投产明细（活动 / 费用亿 / 营收亿 / ROI / 判定） */
+    --yx-tcols: 1fr 54px 58px 46px 48px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .yx-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 132px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .yx-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .yx-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .yx-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .yx-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .yx-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .yx-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .yx-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .yx-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .yx-crumb em { font-style: normal; color: #cfeae7; }
+  .yx-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .yx-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .yx-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .yx-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .yx-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .yx-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .yx-chips { display: flex; align-items: center; gap: 9px; }
+  .yx-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .yx-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .yx-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .yx-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .yx-chip.is-key b { color: var(--mfg-cyan); }
+  .yx-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .yx-clock-time { font: 700 26px/1 var(--yx-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .yx-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .yx-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .yx-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .yx-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .yx-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .yx-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .yx-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .yx-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .yx-kpi.is-warn .yx-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .yx-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .yx-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .yx-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .yx-kpi-val { font: 700 30px/1 var(--yx-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .yx-kpi.is-warn .yx-kpi-val { color: #ffd9b0; }
+  .yx-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .yx-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .yx-kpi-sub b { font-weight: 700; }
+  .yx-up { color: var(--mfg-green); }
+  .yx-down { color: var(--mfg-red); }
+
+  /* ===== 三栏主体 ===== */
+  .yx-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .yx-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .yx-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .yx-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .yx-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .yx-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .yx-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .yx-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .yx-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== CSS grid 模拟表格 ===== */
+  .yx-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .yx-thead, .yx-tbody li {
+    display: grid; grid-template-columns: var(--yx-tcols); align-items: center; gap: 6px;
+  }
+  .yx-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .yx-thead span:not(:first-child), .yx-tbody li span:not(:first-child) { text-align: right; }
+  .yx-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .yx-tbody li {
+    padding: 0 8px; height: 28px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .yx-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .yx-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .yx-tbody li b { font-weight: 700; color: #eafcfa; }
+  .yx-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .yx-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .yx-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .yx-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+
+  /* ===== 底部预警滚动条 ===== */
+  .yx-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .yx-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .yx-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: yx-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes yx-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .yx-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .yx-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .yx-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .yx-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .yx-foot-item b { font-weight: 700; }
+  .yx-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .yx-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="yx-stage" id="yx-stage">
+    <!-- mockflag:begin --><div class="yx-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="yx-error" id="yx-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="yx-header">
+      <div class="yx-head-left">
+        <div class="yx-crumb"><b>云麓厨电</b><i>›</i><em>营销活动</em></div>
+        <div class="yx-head-title-row">
+          <div class="yx-head-title">营销活动</div>
+          <div class="yx-head-meta">
+            <span>活动 <b id="yx-meta-camp">--</b> 项 · 新品 <b id="yx-meta-new">--</b> 款</span><i>|</i>
+            <span>营销费率 <b id="yx-meta-rate">--</b></span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="yx-head-right">
+        <div class="yx-chips">
+          <div class="yx-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="yx-chip is-key"><span>ROI</span><b id="yx-chip-roi">--</b></div>
+        </div>
+        <div class="yx-clock" aria-label="实时时钟">
+          <span class="yx-clock-time" id="yx-clock-time">--:--:--</span>
+          <span class="yx-clock-date" id="yx-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="yx-band" id="yx-band"></div>
+
+    <!-- 左栏 -->
+    <div class="yx-col">
+      <section class="yx-panel" style="flex: 1.15;">
+        <div class="yx-panel-head">
+          <h2>活动 ROI 排序</h2>
+          <span class="yx-panel-tag">盈亏线 <b id="yx-roi-be">--</b> · 低于线 <b id="yx-roi-bad">--</b> 项</span>
+        </div>
+        <div class="yx-chart" id="yx-chart-roi"></div>
+      </section>
+      <section class="yx-panel" style="flex: 1;">
+        <div class="yx-panel-head">
+          <h2>投放结构 · 媒介 → 平台</h2>
+          <span class="yx-panel-tag">合计 <b id="yx-sun-total">--</b> 亿元</span>
+        </div>
+        <div class="yx-chart" id="yx-chart-sun"></div>
+      </section>
+    </div>
+
+    <!-- 中栏 -->
+    <div class="yx-col">
+      <section class="yx-panel" style="flex: 1;">
+        <div class="yx-panel-head">
+          <h2>新品上市节奏时间轴</h2>
+          <span class="yx-panel-tag">预热 → 首发 → 铺货 → 放量 · 窗口 <b>2025-08 ~ 2026-07</b></span>
+        </div>
+        <div class="yx-chart" id="yx-chart-gantt"></div>
+      </section>
+      <section class="yx-panel" style="flex: 1.1;">
+        <div class="yx-panel-head">
+          <h2>新品首销 30 天爬坡</h2>
+          <span class="yx-panel-tag">累计销量（万台）· 达标 <b id="yx-ramp-ok">--</b> / <b id="yx-ramp-all">--</b> 款</span>
+        </div>
+        <div class="yx-chart" id="yx-chart-ramp"></div>
+      </section>
+    </div>
+
+    <!-- 右栏 -->
+    <div class="yx-col">
+      <section class="yx-panel" style="flex: 1;">
+        <div class="yx-panel-head">
+          <h2>品牌声量 × 转化</h2>
+          <span class="yx-panel-tag">峰值 <b id="yx-voice-peak">--</b></span>
+        </div>
+        <div class="yx-chart" id="yx-chart-voice"></div>
+      </section>
+      <section class="yx-panel" style="flex: 1.12;">
+        <div class="yx-panel-head">
+          <h2>活动投产明细</h2>
+          <span class="yx-panel-tag">合计费用 <b id="yx-tbl-fee">--</b> 亿元</span>
+        </div>
+        <div class="yx-table">
+          <div class="yx-thead">
+            <span>活动</span><span>费用亿</span><span>营收亿</span><span>ROI</span><span>判定</span>
+          </div>
+          <ul class="yx-tbody" id="yx-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部预警滚动条 -->
+    <div class="yx-foot">
+      <div class="yx-foot-tag">营销洞察</div>
+      <div class="yx-foot-view"><div class="yx-foot-track" id="yx-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("yx-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("yx-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const arrow = (v) => (v >= 0 ? "▲" : "▼");
+  const wan2yi = (w) => w / 10000;   /* 万元 → 亿元 */
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         口径与全系列基准盘一致：年营收 112.6 亿元（线下 48.4 + 线上 58.7 + 工程 5.5）、
+         年销量 866 万台、线上 GMV 58.70 亿 / 线上销量 322.6 万台 / 客单价 1819 元。
+         合计一律由分项求和，ROI / 费率 / 达成率一律现算，页面上不出现任何硬编码的合计值。
+
+     ★ 建模铁律（本专题踩过的最深的坑）：进 ECharts option 的数据只放**标量与数组**，
+       业务对象之间一律用 name / 索引关联，绝不互相持有对象引用。setOption 会深拷贝整个
+       option，只要成环就 RangeError: Maximum call stack size exceeded，整页图表全空，
+       且堆栈里只有 echarts 内部帧。下面所有 tooltip 都靠 dataIndex 反查数组，没有 raw: obj。 ===== */
+
+  /* 4.0 全系列基准盘（跨页共用，本页只读不改） */
+  const BASE = {
+    revenue: 112.6,       /* 年营收（亿元） */
+    volume: 866,          /* 年销量（万台） */
+    onlineGmv: 58.70,     /* 线上 GMV（亿元） */
+    onlineVol: 322.6,     /* 线上销量（万台） */
+    promoDays: 86,        /* 全年大促期天数 */
+    promoShare: 39.6,     /* 大促期贡献线上占比（%） */
+    grossMargin: 32.0     /* 综合毛利率（%）——营销盈亏线 ROI = 1 ÷ 毛利率 */
+  };
+
+  /* 4.1 十项营销活动：费用 / 带动营收（万元），ROI 全部现算 */
+  const CAMPAIGNS = [
+    { name: "双 11 全域大促", short: "双11大促",  kind: "大促", promo: true,  fee: 14200, rev: 96500, days: 24, note: "抖音 · 京东 · 天猫三平台同频" },
+    { name: "618 年中大促",   short: "618大促",   kind: "大促", promo: true,  fee: 11800, rev: 79600, days: 31, note: "线上主战场 · 线下同店联动" },
+    { name: "双 12 收官促",   short: "双12收官",  kind: "大促", promo: true,  fee: 6400,  rev: 38200, days: 14, note: "清库存 + 年货节预热" },
+    { name: "抖音品牌自播",   short: "抖音自播",  kind: "常态", promo: false, fee: 8600,  rev: 52400, days: 365, note: "全年常态直播 · 抖音 +36.3% 领涨" },
+    { name: "净享 X7 上市",   short: "净享X7",    kind: "新品", promo: false, fee: 7200,  rev: 31500, days: 92, note: "洗碗机新品 · 增长品类落点" },
+    { name: "悦烤 S5 上市",   short: "悦烤S5",    kind: "新品", promo: false, fee: 5600,  rev: 22400, days: 92, note: "蒸烤一体机新品 · 高价位段" },
+    { name: "五一焕新季",     short: "五一焕新",  kind: "节点", promo: false, fee: 4300,  rev: 21800, days: 12, note: "家装旺季 · 建材集合店主推" },
+    { name: "品牌代言与品宣", short: "品牌品宣",  kind: "品牌", promo: false, fee: 3800,  rev: 9600,  days: 365, note: "央视 + 分众 + 综艺冠名，长周期回收" },
+    { name: "门店样板间共建", short: "样板间共建", kind: "终端", promo: false, fee: 3100,  rev: 12400, days: 180, note: "KA 与专卖店场景化改造" },
+    { name: "会员回馈日",     short: "会员回馈",  kind: "私域", promo: false, fee: 2200,  rev: 14600, days: 8,  note: "1860 万会员触达 · 复购拉动" }
+  ];
+
+  /* 4.2 投放结构（媒介 → 平台，万元）——旭日的每一层都由下一层求和，不写死合计 */
+  const MEDIA = [
+    { name: "电商平台内", color: C.cyan, items: [
+      { name: "京东直投", v: 8600 }, { name: "天猫直通", v: 7900 },
+      { name: "抖音千川", v: 8200 }, { name: "苏宁·自营", v: 3900 } ] },
+    { name: "内容种草", color: C.orange, items: [
+      { name: "抖音达人", v: 6200 }, { name: "小红书", v: 4300 },
+      { name: "微信生态", v: 3100 }, { name: "站外短视频", v: 1800 } ] },
+    { name: "品牌广告", color: C.blue, items: [
+      { name: "央视卫视", v: 4200 }, { name: "分众楼宇", v: 3400 }, { name: "综艺冠名", v: 2200 } ] },
+    { name: "门店终端", color: C.green, items: [
+      { name: "场景样板间", v: 3600 }, { name: "导购激励", v: 3100 }, { name: "建材联盟", v: 1900 } ] },
+    { name: "会员私域", color: C.amber, items: [
+      { name: "企微社群", v: 2100 }, { name: "短信触达", v: 1400 }, { name: "自营 App", v: 1300 } ] }
+  ];
+
+  /* 4.3 六款新品：上市节奏（月序 0 = 2025-08）+ 首销 30 天 + 年累计销量（万台）+ 均价（元）
+         line 字段是**产品线名**（字符串，不是对象引用），新品销量按此计入 P7/P8 的六产品线口径 */
+  const NEWS = [
+    { name: "净享 X7 洗碗机",   short: "净享X7", line: "洗碗机",     launch: 1, first30: 2.24, target30: 2.00, vol: 14.6, price: 4280 },
+    { name: "风语 K8 烟机",     short: "风语K8", line: "吸油烟机",   launch: 2, first30: 1.58, target30: 1.50, vol: 9.6,  price: 3680 },
+    { name: "悦烤 S5 蒸烤",     short: "悦烤S5", line: "蒸烤一体机", launch: 3, first30: 1.86, target30: 2.00, vol: 11.2, price: 5180 },
+    { name: "净澈 W3 净水",     short: "净澈W3", line: "净水热水",   launch: 5, first30: 2.42, target30: 2.20, vol: 12.8, price: 2380 },
+    { name: "星焰 P9 集成灶",   short: "星焰P9", line: "集成灶",     launch: 7, first30: 0.96, target30: 1.00, vol: 6.4,  price: 8600 },
+    { name: "炽焰 G6 灶具",     short: "炽焰G6", line: "燃气灶具",   launch: 9, first30: 0.72, target30: 0.80, vol: 4.2,  price: 2180 }
+  ];
+
+  /* 4.4 品牌声量（万次提及）× 线上转化率（%），12 个月：2025-08 → 2026-07 */
+  const MONTHS12 = ["8月", "9月", "10月", "11月", "12月", "1月", "2月", "3月", "4月", "5月", "6月", "7月"];
+  const VOICE = [168, 182, 246, 402, 288, 214, 176, 232, 208, 264, 386, 224];
+  const CVR   = [2.86, 2.94, 3.12, 4.06, 3.42, 3.05, 2.78, 3.18, 3.02, 3.34, 3.96, 3.08];
+
+  /* ===== 4.5 派生量：全部现算，不复制数字 ===== */
+  const D = {};
+
+  /* 营销费用 / 带动营收 / 综合 ROI */
+  D.feeWan = sum(CAMPAIGNS.map((c) => c.fee));
+  D.revWan = sum(CAMPAIGNS.map((c) => c.rev));
+  D.fee = wan2yi(D.feeWan);                                 /* 营销费用合计（亿元） */
+  D.rev = wan2yi(D.revWan);                                 /* 活动带动营收（亿元） */
+  D.roi = D.revWan / D.feeWan;                              /* 综合 ROI */
+  D.feeRate = D.fee / BASE.revenue * 100;                   /* 营销费率（%） */
+  D.revShare = D.rev / BASE.revenue * 100;                  /* 带动营收占全年营收 */
+  D.breakeven = 100 / BASE.grossMargin;                     /* 盈亏线 ROI = 1 ÷ 毛利率 */
+  D.goodLine = D.breakeven * 1.5;                           /* 「优」的门槛 */
+
+  CAMPAIGNS.forEach((c) => {
+    c.roi = c.rev / c.fee;
+    c.feeShare = c.fee / D.feeWan * 100;
+    c.verdict = c.roi >= D.goodLine ? { t: "优", c: "is-good" }
+              : c.roi >= D.breakeven ? { t: "达标", c: "is-mid" }
+              : { t: "待优化", c: "is-bad" };
+  });
+  D.roiRank = CAMPAIGNS.slice().sort((a, b) => b.roi - a.roi);   /* 排序条用（同为标量对象数组，不进 option） */
+  D.badCnt = CAMPAIGNS.filter((c) => c.roi < D.breakeven).length;
+  D.best = D.roiRank[0];
+  D.worst = D.roiRank[D.roiRank.length - 1];
+
+  /* 大促三役投入占比 —— 与「大促期 86 天贡献线上 39.6%」对照 */
+  D.promoFeeWan = sum(CAMPAIGNS.filter((c) => c.promo).map((c) => c.fee));
+  D.promoFeeShare = D.promoFeeWan / D.feeWan * 100;
+  D.promoDaysShare = BASE.promoDays / 365 * 100;
+
+  /* 投放结构：媒介小计与总计逐层求和，与费用合计必须相等 */
+  MEDIA.forEach((m) => { m.total = sum(m.items.map((it) => it.v)); m.share = 0; });
+  D.mediaTotalWan = sum(MEDIA.map((m) => m.total));
+  MEDIA.forEach((m) => { m.share = m.total / D.mediaTotalWan * 100; });
+  D.mediaTop = MEDIA.slice().sort((a, b) => b.total - a.total)[0];
+
+  /* 新品：营收 = 销量 × 均价；达成率 = 首销 ÷ 首销目标 */
+  NEWS.forEach((p) => {
+    p.revYi = p.vol * p.price / 10000;                      /* 万台 × 元 ÷ 1e4 = 亿元 */
+    p.hit = p.first30 / p.target30 * 100;
+    p.ok = p.first30 >= p.target30;
+  });
+  D.newVol = sum(NEWS.map((p) => p.vol));                   /* 新品年销量合计（万台） */
+  D.newRev = sum(NEWS.map((p) => p.revYi));                 /* 新品年营收合计（亿元） */
+  D.newVolShare = D.newVol / BASE.volume * 100;             /* 占年销量 866 万台 */
+  D.newRevShare = D.newRev / BASE.revenue * 100;            /* 新品贡献率 */
+  D.newFirst30 = sum(NEWS.map((p) => p.first30));
+  D.rampOk = NEWS.filter((p) => p.ok).length;
+  D.rampMiss = NEWS.filter((p) => !p.ok);
+
+  /* 新品按产品线归集（P7/P8 口径衔接）：键是产品线名，值是标量 */
+  D.byLine = {};
+  NEWS.forEach((p) => { D.byLine[p.line] = (D.byLine[p.line] || 0) + p.vol; });
+  D.byLineTotal = sum(Object.keys(D.byLine).map((k) => D.byLine[k]));
+
+  /* 上市节奏：预热 0.8 月 → 首发 0.8 月 → 铺货 1.6 月 → 放量至窗口末（12 = 2026-07 末） */
+  const WIN_END = 12, PRE = 0.8, LAUNCH = 0.8, ROLL = 1.6;
+  NEWS.forEach((p) => {
+    p.preStart = p.launch - PRE;
+    p.rampUp = Math.max(0, WIN_END - (p.launch + LAUNCH + ROLL));   /* 放量窗口长度（月） */
+    p.onMarket = WIN_END - p.launch;                                 /* 在架月数 */
+  });
+
+  /* 首销 30 天爬坡：确定性 S 曲线（不用 Math.random，kiosk 每次打开须一致），
+     日增量归一后按首销总量摊回，末点强制锚定 = first30，保证与达成率勾稽 */
+  NEWS.forEach((p, pi) => {
+    const daily = [];
+    for (let d = 0; d < 30; d++) {
+      const g0 = 1 / (1 + Math.exp(-(d - 8 - pi * 0.55) / 4.2));
+      const g1 = 1 / (1 + Math.exp(-(d + 1 - 8 - pi * 0.55) / 4.2));
+      daily.push(Math.max((g1 - g0) * (1 + 0.18 * Math.sin(d * 1.1 + pi * 0.9)), 0.0015));
+    }
+    const tot = sum(daily);
+    let acc = 0;
+    p.ramp = daily.map((v) => { acc += v / tot * p.first30; return Number(acc.toFixed(4)); });
+    p.ramp[29] = Number(p.first30.toFixed(4));               /* 末点锚定，勾稽用 */
+    p.day1 = p.ramp[0];
+  });
+
+  /* 声量 × 转化：峰值月、声量加权的年度平均转化率 */
+  D.voiceMax = Math.max.apply(null, VOICE);
+  D.voiceMaxIdx = VOICE.indexOf(D.voiceMax);
+  D.cvrMax = Math.max.apply(null, CVR);
+  D.cvrMaxIdx = CVR.indexOf(D.cvrMax);
+  D.cvrAvg = sum(VOICE.map((v, i) => v * CVR[i])) / sum(VOICE);   /* 按声量加权 */
+  D.cvrMom = CVR[11] - CVR[10];
+  D.voiceTotal = sum(VOICE);
+
+  /* ===== 5. 顶部时钟与页头文案 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("yx-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("yx-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("yx-chip-roi").textContent = fmtDec(D.roi, 2);
+  $("yx-meta-camp").textContent = CAMPAIGNS.length;
+  $("yx-meta-new").textContent = NEWS.length;
+  $("yx-meta-rate").textContent = fmtDec(D.feeRate, 2) + "%";
+  $("yx-roi-be").textContent = fmtDec(D.breakeven, 2);
+  $("yx-roi-bad").textContent = D.badCnt;
+  $("yx-sun-total").textContent = fmtDec(wan2yi(D.mediaTotalWan), 2);
+  $("yx-tbl-fee").textContent = fmtDec(D.fee, 2);
+  $("yx-ramp-ok").textContent = D.rampOk;
+  $("yx-ramp-all").textContent = NEWS.length;
+  $("yx-voice-peak").textContent = MONTHS12[D.voiceMaxIdx] + " " + D.voiceMax + " 万次 / 转化 " + fmtDec(CVR[D.voiceMaxIdx], 2) + "%";
+
+  /* ===== 6. KPI 带：5 枚，数值翻牌缓动 ===== */
+  const KPI_DEFS = [
+    { icon: "¥", label: "年营销费用", val: D.fee, unit: "亿元", dec: 2, warn: false,
+      sub: () => "营销费率 <b>" + fmtDec(D.feeRate, 2) + "%</b> · 营收 " + fmtDec(BASE.revenue, 1) + " 亿元" },
+    { icon: "◎", label: "综合 ROI", val: D.roi, unit: "倍", dec: 2, warn: false,
+      sub: () => "盈亏线 <b>" + fmtDec(D.breakeven, 2) + "</b>（毛利率 " + fmtDec(BASE.grossMargin, 1) + "%）· 低于线 <b class=\"yx-down\">" + D.badCnt + "</b> 项" },
+    { icon: "↗", label: "活动带动营收", val: D.rev, unit: "亿元", dec: 2, warn: false,
+      sub: () => "占全年营收 <b>" + fmtDec(D.revShare, 1) + "%</b> · " + CAMPAIGNS.length + " 项活动合计" },
+    { icon: "✦", label: "新品营收贡献", val: D.newRev, unit: "亿元", dec: 2, warn: false,
+      sub: () => NEWS.length + " 款 · 销量 <b>" + fmtDec(D.newVol, 1) + "</b> 万台计入六产品线" },
+    { icon: "⚑", label: "大促投入占比", val: D.promoFeeShare, unit: "%", dec: 1, warn: true,
+      sub: () => "大促 <b>" + BASE.promoDays + "</b> 天（占 " + fmtDec(D.promoDaysShare, 1) + "%）贡献线上 <b>" + fmtDec(BASE.promoShare, 1) + "%</b>" }
+  ];
+  const band = $("yx-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="yx-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="yx-kpi-icon">' + k.icon + "</div>" +
+      '<div class="yx-kpi-main">' +
+        '<div class="yx-kpi-label">' + k.label + "</div>" +
+        '<div class="yx-kpi-num"><span class="yx-kpi-val" id="yx-kpi-' + i + '">0</span><span class="yx-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="yx-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值 */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("yx-kpi-" + i), k.val, k.dec));
+
+  /* ===== 7. 活动投产明细表（右栏下） ===== */
+  const tbody = $("yx-tbody");
+  tbody.innerHTML = CAMPAIGNS.map((c, i) => (
+    "<li data-i=\"" + i + "\">" +
+      "<span><b>" + c.name + "</b></span>" +
+      "<span>" + fmtDec(wan2yi(c.fee), 2) + "</span>" +
+      "<span>" + fmtDec(wan2yi(c.rev), 2) + "</span>" +
+      "<span style=\"color:" + (c.roi < D.breakeven ? C.red : c.roi < D.goodLine ? C.amber : C.green) + "\">" + fmtDec(c.roi, 2) + "</span>" +
+      '<span class="yx-badge ' + c.verdict.c + '">' + c.verdict.t + "</span>" +
+    "</li>"
+  )).join("");
+  const tbodyRows = Array.from(tbody.children);
+
+  /* ===== 8. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = {
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  };
+
+  /* 8.1 活动 ROI 排序条：横向柱按 ROI 降序，橙色基准线 = 盈亏线（1 ÷ 毛利率，现算）
+         ★ series.data 只放数字，tooltip 靠 dataIndex 反查 D.roiRank —— 不塞业务对象 */
+  const roiChart = makeChart("yx-chart-roi");
+  roiChart.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 4, right: 40, top: 26, bottom: 2, containLabel: true },
+    tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: (ps) => {
+        const c = D.roiRank[ps[0].dataIndex];
+        return "<b>" + c.name + "</b>　<span style=\"color:" + C.textDim + "\">" + c.kind + "</span><br/>" +
+          "费用 <b>" + fmtDec(wan2yi(c.fee), 2) + "</b> 亿元（占 " + fmtDec(c.feeShare, 1) + "%）<br/>" +
+          "带动营收 <b style=\"color:" + C.cyan + "\">" + fmtDec(wan2yi(c.rev), 2) + "</b> 亿元<br/>" +
+          "ROI <b style=\"color:" + (c.roi < D.breakeven ? C.red : C.green) + "\">" + fmtDec(c.roi, 2) + "</b>　盈亏线 " + fmtDec(D.breakeven, 2) + "<br/>" +
+          "<span style=\"color:" + C.textDim + "\">" + c.note + "</span>";
+      } }, TIP),
+    xAxis: {
+      type: "value", name: "ROI", nameTextStyle: { color: C.textDim, fontSize: 10 },
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }, max: 7.6
+    },
+    yAxis: {
+      type: "category", inverse: true, data: D.roiRank.map((c) => c.short),
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 11 })
+    },
+    series: [{
+      type: "bar", barWidth: "58%", data: D.roiRank.map((c) => Number(fmtDec(c.roi, 2))),
+      itemStyle: {
+        borderRadius: [0, 4, 4, 0],
+        color: (p) => {
+          const v = p.value;
+          const c1 = v < D.breakeven ? C.red : v < D.goodLine ? C.amber : C.cyan;
+          const c2 = v < D.breakeven ? "rgba(255,95,107,.45)" : v < D.goodLine ? "rgba(255,201,77,.45)" : C.cyanDeep;
+          return new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: c2 }, { offset: 1, color: c1 }]);
+        }
+      },
+      label: { show: true, position: "right", color: "#cfe9e6", fontSize: 11, fontWeight: 700,
+        formatter: (p) => fmtDec(p.value, 2) },
+      markLine: {
+        silent: true, symbol: "none",
+        data: [{ xAxis: Number(fmtDec(D.breakeven, 2)) }],
+        lineStyle: { color: C.orange, type: "dashed", width: 1.6 },
+        label: { formatter: "盈亏线 " + fmtDec(D.breakeven, 2), color: C.orange, fontSize: 10, position: "insideEndTop" }
+      }
+    }]
+  });
+
+  /* 8.2 投放结构旭日（媒介 → 平台）
+         ★ data 是递归树，节点全部**新建的纯对象**（name / value / itemStyle / children），
+           不引用 MEDIA 里的业务对象，杜绝循环引用 */
+  const sunChart = makeChart("yx-chart-sun");
+  const SUN_TREE = MEDIA.map((m) => ({
+    name: m.name,
+    value: m.total,
+    itemStyle: { color: m.color },
+    children: m.items.map((it, k) => ({
+      name: it.name,
+      value: it.v,
+      itemStyle: { color: m.color + ["dd", "aa", "80", "5c"][k % 4] }
+    }))
+  }));
+  sunChart.setOption({
+    backgroundColor: "transparent",
+    tooltip: Object.assign({ trigger: "item",
+      formatter: (p) => {
+        const path = (p.treePathInfo || []).slice(1).map((n) => n.name).join(" › ");
+        return "<b>" + (path || p.name) + "</b><br/>投放 <b style=\"color:" + C.cyan + "\">" +
+          fmtDec(wan2yi(p.value), 2) + "</b> 亿元<br/>占营销费用 <b>" + fmtDec(p.value / D.mediaTotalWan * 100, 1) + "%</b>";
+      } }, TIP),
+    series: [{
+      type: "sunburst", radius: ["17%", "94%"], center: ["50%", "52%"],
+      sort: null, nodeClick: false, animationDuration: 900,
+      data: SUN_TREE,
+      levels: [
+        {},
+        { r0: "17%", r: "50%",
+          itemStyle: { borderWidth: 2, borderColor: "rgba(7,27,30,.9)" },
+          label: { rotate: "tangential", color: "#04191a", fontSize: 11, fontWeight: 700, minAngle: 12 } },
+        { r0: "52%", r: "92%",
+          itemStyle: { borderWidth: 1.5, borderColor: "rgba(7,27,30,.85)" },
+          label: { rotate: "radial", color: "#e6fbf8", fontSize: 9.5, minAngle: 9 } }
+      ]
+    }]
+  });
+
+  /* 8.3 新品上市节奏时间轴（甘特）：占位段透明 + 预热/首发/铺货/放量四段堆叠
+         x 轴是月序（0 = 2025-08，12 = 2026-08 之交），今日线 = 期次末 */
+  const gantt = makeChart("yx-chart-gantt");
+  const PHASES = [
+    { key: "pre", label: "预热", color: C.blue, len: (p) => PRE },
+    { key: "lch", label: "首发", color: C.orange, len: () => LAUNCH },
+    { key: "rol", label: "铺货", color: C.amber, len: () => ROLL },
+    { key: "up", label: "放量", color: C.cyan, len: (p) => p.rampUp }
+  ];
+  gantt.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 6, right: 108, top: 28, bottom: 2, containLabel: true },
+    legend: { show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: PHASES.map((f) => f.label) },
+    tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: (ps) => {
+        const p = NEWS[ps[0].dataIndex];
+        return "<b>" + p.name + "</b>　<span style=\"color:" + C.textDim + "\">计入 " + p.line + "</span><br/>" +
+          "上市 <b>" + monthLabel(p.launch) + "</b> · 在架 <b>" + fmtDec(p.onMarket, 1) + "</b> 个月<br/>" +
+          "首销 30 天 <b style=\"color:" + (p.ok ? C.green : C.orange) + "\">" + fmtDec(p.first30, 2) + "</b> 万台（达成 " + fmtDec(p.hit, 1) + "%）<br/>" +
+          "年累计 <b>" + fmtDec(p.vol, 1) + "</b> 万台 · 均价 " + p.price + " 元 · 营收 <b>" + fmtDec(p.revYi, 2) + "</b> 亿元";
+      } }, TIP),
+    xAxis: {
+      type: "value", min: 0, max: WIN_END, interval: 1,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10.5, formatter: (v) => (v < WIN_END ? MONTHS12[v] : "") }),
+      splitLine: SPLIT_LINE
+    },
+    yAxis: {
+      type: "category", inverse: true, data: NEWS.map((p) => p.short),
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 11 })
+    },
+    series: [
+      { name: "_占位", type: "bar", stack: "g", silent: true, barWidth: "48%",
+        itemStyle: { color: "transparent" }, tooltip: { show: false },
+        data: NEWS.map((p) => Number(p.preStart.toFixed(2))) }
+    ].concat(PHASES.map((f) => ({
+      name: f.label, type: "bar", stack: "g", barWidth: "48%",
+      itemStyle: { color: f.color, borderColor: "rgba(7,27,30,.7)", borderWidth: 1 },
+      data: NEWS.map((p) => Number(f.len(p).toFixed(2)))
+    }))).concat([
+      /* 年累计销量标签挂在右侧，靠一条透明散点承载 */
+      { name: "_标注", type: "scatter", symbolSize: 0, silent: true, tooltip: { show: false },
+        data: NEWS.map((p, i) => [WIN_END, i]),
+        label: { show: true, position: "right", distance: 10, fontSize: 10.5, color: C.textDim,
+          formatter: (p) => NEWS[p.dataIndex].line + " " + fmtDec(NEWS[p.dataIndex].vol, 1) + " 万台" },
+        markLine: {
+          silent: true, symbol: "none",
+          data: [{ xAxis: WIN_END - 0.02 }],
+          lineStyle: { color: C.orange, type: "dashed", width: 1.4 },
+          label: { formatter: "期末", color: C.orange, fontSize: 10, position: "insideEndTop" }
+        } }
+    ])
+  });
+  function monthLabel(idx) {
+    const y = idx <= 4 ? 2025 : 2026;
+    const m = idx <= 4 ? idx + 8 : idx - 4;
+    return y + "-" + pad(m);
+  }
+
+  /* 8.4 新品首销 30 天爬坡小多图：6 个 grid（2 行 × 3 列），各自一条累计曲线 + 目标线 */
+  const ramp = makeChart("yx-chart-ramp");
+  const RM_COLS = 3;
+  const rmGrids = [], rmXs = [], rmYs = [], rmSeries = [], rmTitles = [];
+  const DAYS30 = Array.from({ length: 30 }, (_, i) => "D" + (i + 1));
+  NEWS.forEach((p, i) => {
+    const r = Math.floor(i / RM_COLS), c = i % RM_COLS;
+    rmGrids.push({ left: (4 + c * 32.4) + "%", width: "27%", top: (18 + r * 47) + "%", height: "29%" });
+    rmTitles.push({
+      text: p.short + "  " + p.line,
+      textStyle: { color: C.textDim, fontSize: 11, fontWeight: 400 },
+      subtext: fmtDec(p.first30, 2) + " 万台 · 达成 " + fmtDec(p.hit, 1) + "%",
+      subtextStyle: { color: p.ok ? C.cyan : C.orange, fontSize: 12, fontWeight: 700 },
+      left: (4 + c * 32.4) + "%", top: (2 + r * 47) + "%", itemGap: 1
+    });
+    rmXs.push({
+      gridIndex: i, type: "category", boundaryGap: false, data: DAYS30,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }, axisLabel: { show: false }
+    });
+    rmYs.push({
+      gridIndex: i, type: "value", min: 0, max: Math.max(p.first30, p.target30) * 1.12,
+      axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false },
+      splitLine: { show: false }
+    });
+    rmSeries.push({
+      name: p.short, type: "line", xAxisIndex: i, yAxisIndex: i,
+      data: p.ramp, smooth: true, symbol: "none",
+      lineStyle: { width: 1.9, color: p.ok ? C.cyan : C.orange },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: p.ok ? "rgba(53,224,208,.30)" : "rgba(255,157,69,.28)" },
+        { offset: 1, color: "rgba(53,224,208,0)" }
+      ]) },
+      markLine: {
+        silent: true, symbol: "none",
+        data: [{ yAxis: p.target30 }],
+        lineStyle: { color: "rgba(255,201,77,.6)", type: "dashed", width: 1 },
+        label: { show: true, formatter: "目标 " + fmtDec(p.target30, 2), color: C.amber, fontSize: 9, position: "insideStartTop" }
+      }
+    });
+  });
+  ramp.setOption({
+    backgroundColor: "transparent",
+    title: rmTitles,
+    tooltip: Object.assign({ trigger: "axis",
+      formatter: (ps) => {
+        const si = ps[0].seriesIndex, p = NEWS[si];
+        return "<b>" + p.name + "</b>　" + ps[0].name + "<br/>累计 <b style=\"color:" + C.cyan + "\">" +
+          fmtDec(ps[0].value, 2) + "</b> 万台<br/><span style=\"color:" + C.textDim + "\">首日 " +
+          fmtDec(p.day1, 2) + " 万台 · 目标 " + fmtDec(p.target30, 2) + " 万台</span>";
+      } }, TIP),
+    grid: rmGrids, xAxis: rmXs, yAxis: rmYs, series: rmSeries
+  });
+
+  /* 8.5 品牌声量 × 转化双轴走势：柱 = 声量（万次），线 = 线上转化率（%） */
+  const voice = makeChart("yx-chart-voice");
+  voice.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 4, right: 6, top: 30, bottom: 2, containLabel: true },
+    legend: { show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["品牌声量", "线上转化率"] },
+    tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: (ps) => {
+        const i = ps[0].dataIndex;
+        const tagPromo = (i === 3 ? "双 11" : i === 10 ? "618" : i === 4 ? "双 12" : "");
+        return "<b>" + MONTHS12[i] + "</b>" + (tagPromo ? "　<span style=\"color:" + C.orange + "\">" + tagPromo + "</span>" : "") +
+          "<br/>品牌声量 <b style=\"color:" + C.cyan + "\">" + VOICE[i] + "</b> 万次<br/>" +
+          "线上转化率 <b style=\"color:" + C.orange + "\">" + fmtDec(CVR[i], 2) + "%</b><br/>" +
+          "<span style=\"color:" + C.textDim + "\">加权年均 " + fmtDec(D.cvrAvg, 2) + "%</span>";
+      } }, TIP),
+    xAxis: {
+      type: "category", data: MONTHS12,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 1, fontSize: 10 })
+    },
+    yAxis: [
+      { type: "value", name: "万次", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false } },
+      { type: "value", name: "%", min: 2.4, max: 4.4, nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: Object.assign({}, AXIS_LABEL, { formatter: "{value}" }),
+        splitLine: { show: false }, axisLine: { show: false } }
+    ],
+    series: [
+      { name: "品牌声量", type: "bar", barWidth: "52%", data: VOICE.slice(),
+        itemStyle: {
+          borderRadius: [3, 3, 0, 0],
+          color: (p) => (p.value >= 380
+            ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: C.orange }, { offset: 1, color: "rgba(255,157,69,.30)" }])
+            : new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: C.cyan }, { offset: 1, color: "rgba(53,224,208,.18)" }]))
+        } },
+      { name: "线上转化率", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 5,
+        data: CVR.slice(),
+        lineStyle: { color: C.orange, width: 2.2 }, itemStyle: { color: C.orange },
+        markLine: {
+          silent: true, symbol: "none",
+          data: [{ yAxis: Number(fmtDec(D.cvrAvg, 2)) }],
+          lineStyle: { color: C.amber, type: "dashed", width: 1 },
+          label: { formatter: "年均 " + fmtDec(D.cvrAvg, 2) + "%", color: C.amber, fontSize: 10, position: "insideStartTop" }
+        } }
+    ]
+  });
+
+  /* ===== 9. 底部营销洞察滚动条（全部由上面的派生量现算，不另编数字） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: D.worst.name + " ROI " + fmtDec(D.worst.roi, 2) + "，低于盈亏线 " + fmtDec(D.breakeven, 2) +
+        "（缺口 " + fmtDec(D.breakeven - D.worst.roi, 2) + "），建议按长周期品牌投入单列考核" },
+    { lv: "高", c: C.red, t: "新品首销未达标 " + D.rampMiss.length + " 款：" +
+        D.rampMiss.map((p) => p.short + " " + fmtDec(p.hit, 1) + "%").join("、") },
+    { lv: "中", c: C.orange, t: "大促三役投入 " + fmtDec(wan2yi(D.promoFeeWan), 2) + " 亿元，占营销费用 " +
+        fmtDec(D.promoFeeShare, 1) + "%；大促期 " + BASE.promoDays + " 天（占全年 " + fmtDec(D.promoDaysShare, 1) + "%）贡献线上 " + fmtDec(BASE.promoShare, 1) + "%" },
+    { lv: "中", c: C.orange, t: "投放最重的媒介为「" + D.mediaTop.name + "」" + fmtDec(wan2yi(D.mediaTop.total), 2) +
+        " 亿元，占 " + fmtDec(D.mediaTop.share, 1) + "%，单一媒介依赖需关注" },
+    { lv: "低", c: C.amber, t: "新品 " + NEWS.length + " 款年销量 " + fmtDec(D.newVol, 1) + " 万台，占年销量 " +
+        fmtDec(BASE.volume, 0) + " 万台的 " + fmtDec(D.newVolShare, 1) + "%；新品贡献率 " + fmtDec(D.newRevShare, 1) + "%" },
+    { lv: "低", c: C.green, t: D.best.name + " ROI " + fmtDec(D.best.roi, 2) + " 居首；综合 ROI " + fmtDec(D.roi, 2) +
+        "，营销费率 " + fmtDec(D.feeRate, 2) + "%（费用 " + fmtDec(D.fee, 2) + " 亿 ÷ 营收 " + fmtDec(BASE.revenue, 1) + " 亿）" },
+    { lv: "低", c: C.green, t: "品牌声量峰值 " + MONTHS12[D.voiceMaxIdx] + " " + D.voiceMax + " 万次，转化率峰值同月 " +
+        fmtDec(D.cvrMax, 2) + "%，末月转化环比 " + signed(D.cvrMom, 2) + "pp " + arrow(D.cvrMom) }
+  ];
+  const track = $("yx-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="yx-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                      /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 10. 活性轮播：明细表 ↔ ROI 排序条 联动；旭日与小多图各自轮巡 ===== */
+  let campIdx = 0;
+  function playCamp() {
+    tbodyRows.forEach((r, i) => r.classList.toggle("is-active", i === campIdx));
+    const rankIdx = D.roiRank.indexOf(CAMPAIGNS[campIdx]);
+    roiChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    roiChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: rankIdx });
+    campIdx = (campIdx + 1) % CAMPAIGNS.length;
+  }
+  playCamp();
+  setInterval(playCamp, 2600);
+
+  let newIdx = 0;
+  function playNew() {
+    ramp.dispatchAction({ type: "showTip", seriesIndex: newIdx, dataIndex: 29 });
+    gantt.dispatchAction({ type: "downplay", seriesIndex: 4 });
+    gantt.dispatchAction({ type: "highlight", seriesIndex: 4, dataIndex: newIdx });
+    newIdx = (newIdx + 1) % NEWS.length;
+  }
+  playNew();
+  setInterval(playNew, 2400);
+
+  let mediaIdx = 0;
+  setInterval(() => {
+    sunChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    sunChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: mediaIdx });
+    mediaIdx = (mediaIdx + 1) % MEDIA.length;
+  }, 3000);
+
+  /* ===== 11. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const eq = (a, b, tol) => Math.abs(a - b) < (tol == null ? 1e-9 : tol);
+  const checks = [
+    ["营销费用合计 = 各 campaign 之和", eq(D.feeWan, sum(CAMPAIGNS.map((c) => c.fee)))],
+    ["投放结构合计 = 营销费用合计", eq(D.mediaTotalWan, D.feeWan)],
+    ["旭日叶子之和 = 各媒介小计之和", eq(sum(MEDIA.map((m) => sum(m.items.map((it) => it.v)))), D.mediaTotalWan)],
+    ["各 campaign 费用占比合计 = 100%", eq(sum(CAMPAIGNS.map((c) => c.feeShare)), 100, 1e-9)],
+    ["综合 ROI = 带动营收 ÷ 营销费用", eq(D.roi, D.revWan / D.feeWan)],
+    ["营销费率 = 费用 ÷ 年营收 112.6 亿", eq(D.feeRate, D.fee / BASE.revenue * 100)],
+    ["盈亏线 ROI = 1 ÷ 毛利率", eq(D.breakeven, 100 / BASE.grossMargin)],
+    ["大促投入占比 = 三大促费用 ÷ 合计", eq(D.promoFeeShare, D.promoFeeWan / D.feeWan * 100)],
+    ["新品销量合计 = 六款之和", eq(D.newVol, sum(NEWS.map((p) => p.vol)))],
+    ["新品按产品线归集之和 = 新品销量合计", eq(D.byLineTotal, D.newVol, 1e-9)],
+    ["新品覆盖六产品线（与 P7/P8 口径衔接）", Object.keys(D.byLine).length === 6],
+    ["新品销量不超过年销量 866 万台", D.newVol < BASE.volume],
+    ["新品营收合计 = Σ(销量 × 均价)", eq(D.newRev, sum(NEWS.map((p) => p.vol * p.price / 10000)))],
+    ["首销爬坡末点 = 首销 30 天销量", NEWS.every((p) => eq(p.ramp[29], p.first30, 5e-3))],
+    ["首销爬坡单调不减", NEWS.every((p) => p.ramp.every((v, i) => i === 0 || v >= p.ramp[i - 1] - 1e-9))],
+    ["首销达成率 = 首销 ÷ 目标", NEWS.every((p) => eq(p.hit, p.first30 / p.target30 * 100))],
+    ["带动营收 ≤ 年营收", D.rev < BASE.revenue],
+    ["加权转化率落在序列区间内", D.cvrAvg > Math.min.apply(null, CVR) && D.cvrAvg < Math.max.apply(null, CVR)]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[营销活动] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

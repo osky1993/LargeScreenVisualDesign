@@ -1,0 +1,1063 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电用户会员运营</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --yh-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：会员等级明细（等级 / 人数 / 占比 / 活跃 / 复购 / ARPU / 判定） */
+    --yh-tcols: 66px 52px 1fr 1fr 1fr 54px 42px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .yh-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 132px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .yh-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .yh-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .yh-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .yh-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .yh-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .yh-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .yh-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .yh-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .yh-crumb em { font-style: normal; color: #cfeae7; }
+  .yh-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .yh-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .yh-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .yh-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .yh-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .yh-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .yh-chips { display: flex; align-items: center; gap: 9px; }
+  .yh-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .yh-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .yh-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .yh-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .yh-chip.is-key b { color: var(--mfg-cyan); }
+  .yh-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .yh-clock-time { font: 700 26px/1 var(--yh-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .yh-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .yh-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .yh-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .yh-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .yh-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .yh-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .yh-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .yh-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .yh-kpi.is-warn .yh-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .yh-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .yh-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .yh-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .yh-kpi-val { font: 700 30px/1 var(--yh-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .yh-kpi.is-warn .yh-kpi-val { color: #ffd9b0; }
+  .yh-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .yh-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .yh-kpi-sub b { font-weight: 700; }
+  .yh-up { color: var(--mfg-green); }
+  .yh-down { color: var(--mfg-red); }
+
+  /* ===== 三栏主体 ===== */
+  .yh-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .yh-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .yh-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .yh-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .yh-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .yh-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .yh-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .yh-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  /* ★ flex:1 只在直接父级也是 flex 时才有高度：图表 div 是 .yh-panel 的直接子元素，中间不套 wrapper */
+  .yh-chart { flex: 1; min-height: 0; width: 100%; }
+  /* NPS 仪表所在面板是 flex:none（高度随内容），图表必须给显式高度，不能靠 flex:1 */
+  .yh-chart.is-gauge { flex: none; height: 176px; }
+
+  /* ===== 分层小卡（漏斗分层转化率 / NPS 三分类） ===== */
+  .yh-steps { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
+  .yh-step {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 6px 4px 7px; border-radius: 8px;
+    border: 1px solid rgba(64, 196, 190, 0.16); background: rgba(10, 38, 42, 0.5);
+    transition: border-color .25s, background .25s;
+  }
+  .yh-step.is-active { border-color: rgba(53, 224, 208, 0.55); background: rgba(18, 68, 68, 0.55); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.12); }
+  .yh-step span { font-size: 10.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.9); white-space: nowrap; }
+  .yh-step b { font: 700 17px/1 var(--yh-mono); font-variant-numeric: tabular-nums; }
+
+  /* ===== CSS grid 模拟表格 ===== */
+  .yh-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .yh-thead, .yh-tbody li {
+    display: grid; grid-template-columns: var(--yh-tcols); align-items: center; gap: 6px;
+  }
+  .yh-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .yh-thead span:not(:first-child), .yh-tbody li span:not(:first-child) { text-align: right; }
+  .yh-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .yh-tbody li {
+    padding: 0 8px; height: 32px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .yh-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .yh-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .yh-tbody li b { font-weight: 700; color: #eafcfa; }
+  .yh-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .yh-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .yh-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .yh-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+
+  /* ===== 表尾合计行（与表体同列宽，验合计 = 分项之和） ===== */
+  .yh-tfoot {
+    flex: none; display: grid; grid-template-columns: var(--yh-tcols); align-items: center; gap: 6px;
+    margin-top: 4px; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.45); border: 1px solid rgba(64, 196, 190, 0.18);
+    font-size: 12px; color: #9fd0cb; font-variant-numeric: tabular-nums;
+  }
+  .yh-tfoot span:not(:first-child) { text-align: right; }
+  .yh-tfoot b { font-weight: 700; color: #eafcfa; }
+
+  /* ===== 底部洞察滚动条 ===== */
+  .yh-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .yh-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .yh-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: yh-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes yh-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .yh-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .yh-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .yh-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .yh-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .yh-foot-item b { font-weight: 700; }
+  .yh-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .yh-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="yh-stage" id="yh-stage">
+    <!-- mockflag:begin --><div class="yh-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="yh-error" id="yh-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="yh-header">
+      <div class="yh-head-left">
+        <div class="yh-crumb"><b>云麓厨电</b><i>›</i><em>用户会员运营</em></div>
+        <div class="yh-head-title-row">
+          <div class="yh-head-title">用户会员运营</div>
+          <div class="yh-head-meta">
+            <span>会员体系 <b>5</b> 级</span><i>|</i>
+            <span><b>7</b> 大获客渠道 · 年新增 <b id="yh-meta-new">--</b> 万</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="yh-head-right">
+        <div class="yh-chips">
+          <div class="yh-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="yh-chip is-key"><span>NPS</span><b id="yh-chip-nps">--</b></div>
+        </div>
+        <div class="yh-clock" aria-label="实时时钟">
+          <span class="yh-clock-time" id="yh-clock-time">--:--:--</span>
+          <span class="yh-clock-date" id="yh-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="yh-band" id="yh-band"></div>
+
+    <!-- 左栏 -->
+    <div class="yh-col">
+      <section class="yh-panel" id="yh-tier-scope" style="flex: 1.06;">
+        <div class="yh-panel-head">
+          <h2>会员等级金字塔 · 各级 ARPU</h2>
+          <span class="yh-panel-tag">全员 ARPU <b id="yh-arpu-all">--</b> 元</span>
+        </div>
+        <div class="yh-chart" id="yh-chart-pyramid"></div>
+      </section>
+      <section class="yh-panel" style="flex: 1;">
+        <div class="yh-panel-head">
+          <h2>复购间隔分布</h2>
+          <span class="yh-panel-tag">中位 <b id="yh-gap-med">--</b> 天 · 均值 <b id="yh-gap-avg">--</b> 天</span>
+        </div>
+        <div class="yh-chart" id="yh-chart-gap"></div>
+      </section>
+    </div>
+
+    <!-- 中栏 -->
+    <div class="yh-col">
+      <section class="yh-panel" id="yh-funnel-scope" style="flex: 1.12;">
+        <div class="yh-panel-head">
+          <h2>会员资产转化漏斗</h2>
+          <span class="yh-panel-tag">注册 → 绑定 → 活跃 → 复购 · 整体 <b id="yh-funnel-cum">--</b></span>
+        </div>
+        <div class="yh-chart" id="yh-chart-funnel"></div>
+        <div class="yh-steps" id="yh-steps"></div>
+      </section>
+      <section class="yh-panel" style="flex: 1;">
+        <div class="yh-panel-head">
+          <h2>新增会员来源桑基</h2>
+          <span class="yh-panel-tag" id="yh-sankey-scope">年新增会员 → 7 渠道 → 5 等级</span>
+        </div>
+        <div class="yh-chart" id="yh-chart-sankey"></div>
+      </section>
+    </div>
+
+    <!-- 右栏 -->
+    <div class="yh-col">
+      <section class="yh-panel" style="flex: none;">
+        <div class="yh-panel-head">
+          <h2>用户 NPS 净推荐值</h2>
+          <span class="yh-panel-tag">样本 <b id="yh-nps-n">--</b> 份 · 与驾驶舱同源</span>
+        </div>
+        <div class="yh-chart is-gauge" id="yh-chart-nps"></div>
+        <div class="yh-steps" id="yh-nps-mix"></div>
+      </section>
+      <section class="yh-panel" style="flex: 1;">
+        <div class="yh-panel-head">
+          <h2>会员等级明细</h2>
+          <span class="yh-panel-tag">贡献营收 <b id="yh-tbl-gmv">--</b> 亿元</span>
+        </div>
+        <div class="yh-table">
+          <div class="yh-thead">
+            <span>等级</span><span>人数</span><span>占比</span><span>活跃</span><span>复购</span><span>ARPU</span><span>判定</span>
+          </div>
+          <ul class="yh-tbody" id="yh-tbody"></ul>
+          <div class="yh-tfoot" id="yh-tfoot"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部洞察滚动条 -->
+    <div class="yh-foot">
+      <div class="yh-foot-tag">会员洞察</div>
+      <div class="yh-foot-view"><div class="yh-foot-track" id="yh-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("yh-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("yh-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         口径与全系列基准盘一致：会员 1860 万、年营收 112.6 亿、用户 NPS 34。
+         合计一律由分项求和，比率/ARPU 一律现算，页面上不出现任何硬编码的合计值。
+
+         ★ 建模铁律（本专题踩过的最难查的坑）：`setOption` 会深拷贝整个 option，
+           option 里只要有循环引用就无限递归 → RangeError，整页图表全空且堆栈指不到自己的代码。
+           所以业务对象之间**只用 name/索引关联，绝不互相持有对象引用**；
+           进 option 的 data 只放标量与数组（下面所有 series.data 都遵守这一条）。 ===== */
+
+  const REV_TOTAL = 112.6;                                  /* 年营收（亿元）：线下 48.4 + 线上 58.7 + 工程 5.5 */
+
+  /* 4.1 五级会员体系：人数(万人) · 绑定率/活跃率(占绑定)/复购率(占活跃)(%) · ARPU(元/人·年)
+         全页所有会员口径都从这张表求和派生，漏斗、金字塔、表格三处共用同一份分项。 */
+  const TIERS = [
+    { name: "黑金卡", short: "黑金", members: 18.6,   bind: 98.5, act: 96.0, rep: 68.0, arpu: 4600, color: PAL.orange,   note: "年消费 2 万元以上 · 专属管家" },
+    { name: "白金卡", short: "白金", members: 74.4,   bind: 96.2, act: 92.5, rep: 56.0, arpu: 2050, color: PAL.amber,    note: "年消费 8 千元以上 · 优先上门" },
+    { name: "金卡",   short: "金卡", members: 195.3,  bind: 91.4, act: 86.0, rep: 42.0, arpu: 880,  color: PAL.violet,   note: "累计 2 件以上 · 延保权益" },
+    { name: "银卡",   short: "银卡", members: 465.0,  bind: 78.6, act: 72.0, rep: 28.0, arpu: 330,  color: PAL.blue,     note: "完成设备绑定 · 保养提醒" },
+    { name: "普通会员", short: "普通", members: 1106.7, bind: 52.4, act: 51.5, rep: 16.0, arpu: 60, color: PAL["cyan-deep"], note: "注册未深度绑定 · 待激活池" }
+  ];
+
+  /* 4.2 NPS 调研样本三分类（与门户驾驶舱 kd 页取同一份样本，NPS 由此现算，两页必然同值） */
+  const NPS_SURVEY = { promoter: 7040, passive: 3072, detractor: 2688 };   /* 合计 12800 份 */
+
+  /* 4.3 复购间隔分布：桶边界(天) + 权重。权重只定形状，实际人数按 D.repeat 归一，
+         所以「各桶人数之和 = 复购会员数」是结构性成立的，不靠手工凑数。 */
+  const GAP_BUCKETS = [
+    { label: "≤30",    lo: 0,   hi: 30,  w: 6.2 },
+    { label: "31-60",  lo: 31,  hi: 60,  w: 9.8 },
+    { label: "61-90",  lo: 61,  hi: 90,  w: 13.5 },
+    { label: "91-120", lo: 91,  hi: 120, w: 12.4 },
+    { label: "121-180",lo: 121, hi: 180, w: 18.6 },
+    { label: "181-270",lo: 181, hi: 270, w: 16.2 },
+    { label: "271-365",lo: 271, hi: 365, w: 12.8 },
+    { label: ">365",   lo: 366, hi: 494, w: 10.5 }
+  ];
+
+  /* 4.4 新增会员获客渠道：年新增总量(万人) + 各渠道的等级分布权重（顺序同 TIERS）。
+         桑基矩阵 M[i][j] = 渠道 i 总量 × 权重 j / Σ权重 —— 行和恒等于渠道总量，
+         列和即各等级新增，根节点 = 全矩阵之和，三层守恒是结构性的（页尾自检逐条验）。 */
+  const CHANNELS = [
+    { name: "门店导购",   short: "门店", total: 96.4, w: [1.2, 4.6, 12.5, 28.4, 53.3], color: PAL.cyan,        note: "3240 家门店 · 导购扫码入会" },
+    { name: "京东",       short: "京东", total: 78.2, w: [0.5, 2.4, 8.6,  24.5, 64.0], color: PAL.orange,      note: "平台订单自动建档" },
+    { name: "天猫",       short: "天猫", total: 64.6, w: [0.6, 2.8, 9.4,  25.2, 62.0], color: PAL.blue,        note: "平台订单自动建档" },
+    { name: "抖音",       short: "抖音", total: 52.8, w: [0.3, 1.6, 6.2,  20.4, 71.5], color: PAL.green,       note: "直播间引流 · 新客占比最高" },
+    { name: "苏宁易购",   short: "苏宁", total: 26.4, w: [0.4, 2.0, 7.4,  22.6, 67.6], color: PAL.amber,       note: "平台订单自动建档" },
+    { name: "品牌自营",   short: "自营", total: 38.5, w: [1.6, 5.8, 14.2, 29.6, 48.8], color: PAL.violet,      note: "官网小程序 · 高等级转化最好" },
+    { name: "售后激活",   short: "售后", total: 29.1, w: [0.8, 3.4, 10.6, 26.8, 58.4], color: PAL["cyan-deep"],note: "上门服务现场引导注册" }
+  ];
+
+  /* ===== 4.5 派生量：全部现算，不复制数字 ===== */
+  const D = {};
+
+  /* 4.5.1 会员漏斗四层：每层都由五等级分层求和得到，因此逐层递减是结构性的
+           （bind/act/rep 都是「占上一层」的比率，均 < 100%）。 */
+  TIERS.forEach((t) => {
+    t.bound = t.members * t.bind / 100;                     /* 绑定设备人数 */
+    t.active = t.bound * t.act / 100;                       /* 年活跃人数 */
+    t.repeat = t.active * t.rep / 100;                      /* 年复购人数 */
+    t.gmv = t.members * t.arpu / 1e4;                        /* 万人 × 元 = 万元 → /1e4 = 亿元 */
+  });
+  D.reg = sum(TIERS.map((t) => t.members));                 /* 注册会员合计 = 1860 万 */
+  D.bound = sum(TIERS.map((t) => t.bound));
+  D.active = sum(TIERS.map((t) => t.active));
+  D.repeat = sum(TIERS.map((t) => t.repeat));
+  D.gmv = sum(TIERS.map((t) => t.gmv));                     /* 会员贡献营收（亿元） */
+  D.arpuAll = D.gmv * 1e4 / D.reg;                          /* 全员 ARPU（元/人·年） */
+  D.gmvShare = D.gmv / REV_TOTAL * 100;                     /* 占年营收 */
+  TIERS.forEach((t) => {
+    t.share = t.members / D.reg * 100;                      /* 人数占比 */
+    t.actOfReg = t.active / t.members * 100;                /* 活跃率（占本级注册） */
+    t.repOfReg = t.repeat / t.members * 100;                /* 复购率（占本级注册） */
+    t.gmvShare = t.gmv / D.gmv * 100;
+    t.verdict = t.rep >= 50 ? { t: "优", c: "is-good" }
+              : t.rep >= 25 ? { t: "良", c: "is-mid" }
+              : { t: "待育", c: "is-bad" };
+  });
+
+  /* 漏斗四层：值 = 人数（万人），逐层转化率与累计留存现算 */
+  const FUNNEL = [
+    { name: "注册会员", key: "REGISTER", v: D.reg,    note: "全渠道累计注册用户池" },
+    { name: "绑定设备", key: "BINDING",  v: D.bound,  note: "至少绑定 1 台厨电设备" },
+    { name: "年活跃",   key: "ACTIVE",   v: D.active, note: "12 个月内有登录/服务/交互" },
+    { name: "年复购",   key: "REPEAT",   v: D.repeat, note: "12 个月内产生第 2 次及以上购买" }
+  ];
+  FUNNEL.forEach((s, i) => {
+    s.step = i === 0 ? 100 : s.v / FUNNEL[i - 1].v * 100;   /* 相对上一层的转化率 */
+    s.cum = s.v / FUNNEL[0].v * 100;                        /* 相对注册的累计留存 */
+    s.color = [C.cyan, C.blue, C.violet, C.orange][i];
+  });
+  D.bindRate = FUNNEL[1].cum;
+  D.activeRate = FUNNEL[2].cum;
+  D.repeatRate = FUNNEL[3].cum;
+  D.funnelSpan = FUNNEL[0].v / FUNNEL[FUNNEL.length - 1].v; /* 首末层跨度，用于选宽度编码 */
+  D.tierSpan = TIERS[TIERS.length - 1].members / TIERS[0].members;
+
+  /* 4.5.2 NPS：推荐占比 − 贬损占比（口径与门户驾驶舱完全一致，同一份样本、同一条公式） */
+  D.npsN = NPS_SURVEY.promoter + NPS_SURVEY.passive + NPS_SURVEY.detractor;
+  D.npsPro = NPS_SURVEY.promoter / D.npsN * 100;
+  D.npsPas = NPS_SURVEY.passive / D.npsN * 100;
+  D.npsDet = NPS_SURVEY.detractor / D.npsN * 100;
+  D.nps = D.npsPro - D.npsDet;                              /* = 55.0 − 21.0 = 34 */
+
+  /* 4.5.3 复购间隔：权重归一到复购人数；中位数在所落桶内线性内插；均值取桶中点加权 */
+  D.gapW = sum(GAP_BUCKETS.map((b) => b.w));
+  let gapAcc = 0;
+  GAP_BUCKETS.forEach((b) => {
+    b.n = b.w / D.gapW * D.repeat;                          /* 万人 */
+    b.share = b.w / D.gapW * 100;
+    gapAcc += b.share;
+    b.cum = gapAcc;
+    b.mid = (b.lo + b.hi) / 2;
+  });
+  D.gapAvg = sum(GAP_BUCKETS.map((b) => b.mid * b.w)) / D.gapW;
+  D.gapMedian = (() => {
+    let prev = 0;
+    for (let i = 0; i < GAP_BUCKETS.length; i++) {
+      const b = GAP_BUCKETS[i];
+      if (b.cum >= 50) return b.lo + (50 - prev) / b.share * (b.hi - b.lo);
+      prev = b.cum;
+    }
+    return GAP_BUCKETS[GAP_BUCKETS.length - 1].hi;
+  })();
+  D.gapWithin90 = GAP_BUCKETS[2].cum;                       /* 90 天内完成复购的占比 */
+  D.gapTop = GAP_BUCKETS.slice().sort((a, b) => b.n - a.n)[0];
+  D.gapSum = sum(GAP_BUCKETS.map((b) => b.n));              /* 须 = D.repeat */
+
+  /* 4.5.4 桑基矩阵：渠道 × 等级（万人）。行和 = 渠道总量，列和 = 各等级新增，全和 = 年新增。 */
+  const NEW_MTX = CHANNELS.map((ch) => {
+    const ws = sum(ch.w);
+    return ch.w.map((w) => ch.total * w / ws);
+  });
+  CHANNELS.forEach((ch, i) => { ch.newSum = sum(NEW_MTX[i]); });          /* 行和 */
+  const TIER_NEW = TIERS.map((t, j) => sum(NEW_MTX.map((row) => row[j]))); /* 列和 */
+  D.newTotal = sum(CHANNELS.map((ch) => ch.newSum));
+  D.newByTier = sum(TIER_NEW);
+  D.newShare = D.newTotal / D.reg * 100;                                   /* 新增占存量 */
+  CHANNELS.forEach((ch, i) => {
+    ch.newShare = ch.newSum / D.newTotal * 100;
+    /* 高等级（黑金 + 白金 + 金卡）占比，衡量该渠道的「拉新质量」 */
+    ch.highShare = (NEW_MTX[i][0] + NEW_MTX[i][1] + NEW_MTX[i][2]) / ch.newSum * 100;
+  });
+  D.chTop = CHANNELS.slice().sort((a, b) => b.newSum - a.newSum)[0];
+  D.chBestQ = CHANNELS.slice().sort((a, b) => b.highShare - a.highShare)[0];
+  D.chWorstQ = CHANNELS.slice().sort((a, b) => a.highShare - b.highShare)[0];
+  TIERS.forEach((t, j) => { t.newIn = TIER_NEW[j]; });
+
+  /* 4.5.5 其他叙事量 */
+  D.tierTop = TIERS[0];                                     /* 黑金卡 */
+  D.tierBase = TIERS[TIERS.length - 1];                     /* 普通会员（待激活池） */
+  D.dormant = D.reg - D.active;                             /* 未活跃会员 */
+  D.dormantShare = D.dormant / D.reg * 100;
+  D.highTierGmvShare = (TIERS[0].gmv + TIERS[1].gmv) / D.gmv * 100;
+  D.highTierShare = (TIERS[0].members + TIERS[1].members) / D.reg * 100;
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("yh-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("yh-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("yh-chip-nps").textContent = fmtDec(D.nps, 0);
+  $("yh-meta-new").textContent = fmtDec(D.newTotal, 0);
+  $("yh-nps-n").textContent = fmtDec(D.npsN, 0);
+
+  /* ===== 6. KPI 带：5 枚，数值翻牌缓动 ===== */
+  const KPI_DEFS = [
+    { icon: "👥", label: "注册会员", val: D.reg, unit: "万人", dec: 0, warn: false,
+      sub: () => "年新增 <b>" + fmtDec(D.newTotal, 0) + "</b> 万 · 占存量 <b>" + fmtDec(D.newShare, 1) + "%</b>" },
+    { icon: "⧉", label: "设备绑定率", val: D.bindRate, unit: "%", dec: 1, warn: false,
+      sub: () => "绑定 <b>" + fmtDec(D.bound, 0) + "</b> 万人 · 保有量 3227 万台" },
+    { icon: "◐", label: "年活跃会员", val: D.active, unit: "万人", dec: 0, warn: false,
+      sub: () => "活跃率 <b>" + fmtDec(D.activeRate, 1) + "%</b> · 沉睡 <b class=\"yh-down\">" + fmtDec(D.dormant, 0) + "</b> 万" },
+    { icon: "↻", label: "年复购率", val: D.repeatRate, unit: "%", dec: 2, warn: true,
+      sub: () => "复购 <b>" + fmtDec(D.repeat, 0) + "</b> 万人 · 中位间隔 <b>" + fmtDec(D.gapMedian, 0) + "</b> 天" },
+    { icon: "¥", label: "会员 ARPU", val: D.arpuAll, unit: "元", dec: 0, warn: false,
+      sub: () => "贡献 <b>" + fmtDec(D.gmv, 2) + "</b> 亿元 · 占营收 <b>" + fmtDec(D.gmvShare, 1) + "%</b>" }
+  ];
+  const band = $("yh-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="yh-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="yh-kpi-icon">' + k.icon + "</div>" +
+      '<div class="yh-kpi-main">' +
+        '<div class="yh-kpi-label">' + k.label + "</div>" +
+        '<div class="yh-kpi-num"><span class="yh-kpi-val" id="yh-kpi-' + i + '">0</span><span class="yh-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="yh-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值 */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("yh-kpi-" + i), k.val, k.dec));
+
+  /* ===== 7. 漏斗分层转化条 + NPS 三分类条 ===== */
+  const stepsBox = $("yh-steps");
+  stepsBox.innerHTML = FUNNEL.slice(1).map((s, i) => (
+    '<div class="yh-step" data-i="' + i + '">' +
+      "<span>" + FUNNEL[i].name + " → " + s.name + "</span>" +
+      '<b style="color:' + s.color + '">' + fmtDec(s.step, 1) + "%</b>" +
+    "</div>"
+  )).join("");
+  const stepEls = Array.from(stepsBox.children);
+  $("yh-funnel-cum").textContent = fmtDec(D.repeatRate, 2) + "%";
+
+  const NPS_MIX = [
+    { name: "推荐者 9-10", v: D.npsPro, n: NPS_SURVEY.promoter, color: C.green },
+    { name: "中立者 7-8",  v: D.npsPas, n: NPS_SURVEY.passive,  color: C.amber },
+    { name: "贬损者 0-6",  v: D.npsDet, n: NPS_SURVEY.detractor, color: C.red }
+  ];
+  $("yh-nps-mix").innerHTML = NPS_MIX.map((m) => (
+    '<div class="yh-step">' +
+      "<span>" + m.name + "</span>" +
+      '<b style="color:' + m.color + '">' + fmtDec(m.v, 1) + "%</b>" +
+    "</div>"
+  )).join("");
+
+  /* ===== 8. 会员等级明细表（右栏下） ===== */
+  const tbody = $("yh-tbody");
+  tbody.innerHTML = TIERS.map((t, i) => (
+    '<li data-i="' + i + '">' +
+      '<span><b style="color:' + t.color + '">' + t.name + "</b></span>" +
+      "<span>" + fmtDec(t.members, 1) + "</span>" +
+      "<span>" + fmtDec(t.share, 1) + "%</span>" +
+      "<span>" + fmtDec(t.actOfReg, 1) + "%</span>" +
+      '<span style="color:' + (t.repOfReg >= 30 ? C.green : t.repOfReg >= 15 ? C.amber : C.textDim) + '">' + fmtDec(t.repOfReg, 1) + "%</span>" +
+      "<span>" + fmtDec(t.arpu, 0) + "</span>" +
+      '<span class="yh-badge ' + t.verdict.c + '">' + t.verdict.t + "</span>" +
+    "</li>"
+  )).join("");
+  const tierRows = Array.from(tbody.children);
+  $("yh-tfoot").innerHTML =
+    "<span>合计</span>" +
+    "<span><b>" + fmtDec(D.reg, 1) + "</b></span>" +
+    "<span>100.0%</span>" +
+    "<span><b>" + fmtDec(D.activeRate, 1) + "%</b></span>" +
+    "<span><b>" + fmtDec(D.repeatRate, 1) + "%</b></span>" +
+    "<span><b>" + fmtDec(D.arpuAll, 0) + "</b></span>" +
+    "<span>万人</span>";
+  $("yh-tbl-gmv").textContent = fmtDec(D.gmv, 2);
+  $("yh-arpu-all").textContent = fmtDec(D.arpuAll, 0);
+  $("yh-gap-med").textContent = fmtDec(D.gapMedian, 0);
+  $("yh-gap-avg").textContent = fmtDec(D.gapAvg, 0);
+
+  /* ===== 9. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = (extra) => Object.assign({
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  }, extra || {});
+  const hGrad = (a, b) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+    { offset: 0, color: a }, { offset: 1, color: b }
+  ]);
+  const vGrad = (a, b) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: a }, { offset: 1, color: b }
+  ]);
+
+  /* 9.1 会员资产转化漏斗（本页招牌图）：注册 → 绑定 → 活跃 → 复购
+         ★ funnel 宽度编码的取舍（两个坑都要防，且必须显式给 min/max，别吃默认值）：
+           · 默认 min = 数据最小值 → 末层被钉死在 minSize，宽度不再与人数成正比，读数会骗人；
+           · 本页首末层跨度 = 1860 / 235 ≈ 7.9 : 1，属温和量级：
+             取 min:0 / max:注册数 的**线性**编码后，四段宽度落在 96% / 68.9% / 51.5% / 27.9%，
+             逐层拉得开、没有任何一层塌到 minSize，所以宽度可以直接当人数读；
+           · 因此这里**不用** P8 直播漏斗那套 √value 编码 —— 那是为 139:1 的极端跨度救场的，
+             在 8:1 的跨度上反而会把差距压平（√ 编码下变成 96 / 81 / 69 / 45.7，
+             末层的 12.6% 留存被画成近半宽，反而夸大了复购规模）。
+           同页的等级金字塔跨度 59:1，走的就是 √ 编码，两图的选择依据见 9.2。 */
+  const funnel = makeChart("yh-chart-funnel");
+  funnel.setOption({
+    backgroundColor: "transparent",
+    tooltip: TIP({
+      trigger: "item",
+      formatter: (p) => {
+        const s = FUNNEL[p.dataIndex];
+        return "<b>" + s.name + " · " + s.key + "</b><br/>规模 <b style=\"color:" + s.color + "\">" +
+          fmtDec(s.v, 1) + "</b> 万人<br/>较上一层 <b>" + fmtDec(s.step, 1) + "%</b>　累计留存 <b>" +
+          fmtDec(s.cum, 2) + "%</b><br/><span style=\"color:" + C.textDim + "\">" + s.note + "</span>";
+      }
+    }),
+    series: [{
+      type: "funnel", left: "7%", right: "7%", top: 10, bottom: 8,
+      min: 0, max: FUNNEL[0].v,
+      minSize: "18%", maxSize: "96%", sort: "descending", gap: 6,
+      label: {
+        show: true, position: "inside", color: "#04191a", fontSize: 12.5, fontWeight: 700,
+        formatter: (p) => FUNNEL[p.dataIndex].name + "  " + fmtDec(FUNNEL[p.dataIndex].v, 0) + " 万人"
+      },
+      labelLine: { show: false },
+      itemStyle: { borderColor: "rgba(7,27,30,.85)", borderWidth: 2 },
+      emphasis: { label: { fontSize: 13.5 } },
+      /* ★ data 只放标量：name / value / 颜色，不塞任何业务对象（塞了就可能成环 → setOption 深拷贝爆栈） */
+      data: FUNNEL.map((s) => ({
+        name: s.name, value: s.v,
+        itemStyle: { color: hGrad(s.color, s.color + "aa") }
+      }))
+    }]
+  });
+
+  /* 9.2 会员等级金字塔 + 各级 ARPU（同一实例里左 funnel、右 grid 柱，行位天然对齐）
+         ★ 金字塔跨度 = 普通 1106.7 : 黑金 18.6 ≈ 59.5 : 1，线性编码下五级宽度 =
+           19.3 / 23.2 / 31.8 / 50.8 / 96，顶三级全挤在 minSize(18%) 附近、黑白金分不出层；
+           所以这里改用 √value 编码（宽度 ∝ √人数，即面积正比，可视化标准做法），
+           并显式给 min:0 / max:√最大值。归一后五级宽度 = 28 / 38 / 51 / 69 / 96，塔形才立得住。
+           人数、占比一律由标签与 tooltip 给出，不靠宽度读数。 */
+  const pyramid = makeChart("yh-chart-pyramid");
+  const PY_MAX = Math.sqrt(TIERS[TIERS.length - 1].members);
+  pyramid.setOption({
+    backgroundColor: "transparent",
+    /* funnel 与 grid 上下边界对齐，5 条 band 与 5 个类目行一一对应 */
+    grid: { left: "56%", right: "14%", top: 12, bottom: 10, containLabel: false },
+    tooltip: TIP({
+      trigger: "item",
+      formatter: (p) => {
+        /* 两个系列的 dataIndex 都与 TIERS 同序：金字塔 funnel 按数组顺序排 band，
+           ARPU 柱的 yAxis 只是 inverse 了显示顺序、并不改 data 索引，所以直接用 dataIndex。 */
+        const t = TIERS[p.dataIndex];
+        return '<b style="color:' + t.color + '">' + t.name + "</b><br/>会员 <b>" + fmtDec(t.members, 1) +
+          "</b> 万人 · 占比 " + fmtDec(t.share, 1) + "%<br/>ARPU <b>" + fmtDec(t.arpu, 0) +
+          "</b> 元 · 贡献 <b>" + fmtDec(t.gmv, 2) + "</b> 亿元（" + fmtDec(t.gmvShare, 1) + "%）<br/>" +
+          "年新增 " + fmtDec(t.newIn, 1) + " 万人<br/>" +
+          '<span style="color:' + C.textDim + '">' + t.note + "</span>";
+      }
+    }),
+    xAxis: {
+      type: "value", show: false, max: TIERS[0].arpu * 1.28
+    },
+    yAxis: {
+      type: "category", inverse: true, data: TIERS.map((t) => t.short),
+      axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 11, margin: 8 })
+    },
+    series: [
+      {
+        type: "funnel", left: "1%", width: "46%", top: 12, bottom: 10,
+        min: 0, max: PY_MAX,
+        minSize: "18%", maxSize: "96%", sort: "ascending", gap: 5,
+        label: {
+          show: true, position: "inside", color: "#04191a", fontSize: 11.5, fontWeight: 700,
+          formatter: (p) => TIERS[p.dataIndex].short + " " + fmtDec(TIERS[p.dataIndex].members, 0)
+        },
+        labelLine: { show: false },
+        itemStyle: { borderColor: "rgba(7,27,30,.85)", borderWidth: 2 },
+        emphasis: { label: { fontSize: 12.5 } },
+        data: TIERS.map((t) => ({
+          name: t.name, value: Math.sqrt(t.members),
+          itemStyle: { color: hGrad(t.color, t.color + "aa") }
+        }))
+      },
+      {
+        name: "ARPU", type: "bar", barWidth: "52%",
+        /* yAxis 已 inverse，类目顺序与 TIERS 一致（黑金在上），data 直接同序 */
+        data: TIERS.map((t) => ({
+          value: t.arpu,
+          itemStyle: { color: hGrad(t.color + "cc", t.color + "44"), borderRadius: [0, 4, 4, 0] }
+        })),
+        label: {
+          show: true, position: "right", color: "#cfe9e6", fontSize: 11, fontWeight: 700,
+          formatter: (p) => fmtDec(p.value, 0) + " 元"
+        },
+        emphasis: { itemStyle: { borderColor: "rgba(255,255,255,.85)", borderWidth: 1 } }
+      }
+    ],
+    graphic: [{
+      type: "text", right: "13%", top: 0,
+      style: { text: "各级 ARPU（元/人·年）", fill: C.textDim, fontSize: 10.5 }
+    }]
+  });
+
+  /* 9.3 复购间隔分布直方 + 累计占比线（双轴），50% 处的中位线现算标注 */
+  const gap = makeChart("yh-chart-gap");
+  gap.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 6, right: 8, top: 30, bottom: 4, containLabel: true },
+    tooltip: TIP({
+      trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: (ps) => {
+        const b = GAP_BUCKETS[ps[0].dataIndex];
+        return "<b>" + b.label + " 天</b><br/>复购会员 <b style=\"color:" + C.cyan + "\">" + fmtDec(b.n, 1) +
+          "</b> 万人 · 占比 " + fmtDec(b.share, 1) + "%<br/>累计 <b style=\"color:" + C.orange + "\">" +
+          fmtDec(b.cum, 1) + "%</b><br/><span style=\"color:" + C.textDim + "\">桶中点 " + fmtDec(b.mid, 0) + " 天</span>";
+      }
+    }),
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["复购会员", "累计占比"]
+    },
+    xAxis: {
+      type: "category", data: GAP_BUCKETS.map((b) => b.label),
+      name: "天", nameTextStyle: { color: C.textDim, fontSize: 10 }, nameGap: 6,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, rotate: 30, fontSize: 10 })
+    },
+    yAxis: [
+      { type: "value", name: "万人", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false } },
+      { type: "value", name: "%", max: 100, nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: Object.assign({}, AXIS_LABEL, { formatter: "{value}" }), splitLine: { show: false }, axisLine: { show: false } }
+    ],
+    series: [
+      { name: "复购会员", type: "bar", barWidth: "58%",
+        data: GAP_BUCKETS.map((b) => Number(fmtDec(b.n, 2))),
+        itemStyle: {
+          borderRadius: [3, 3, 0, 0],
+          /* 90 天内复购视为「高粘性」，用主色；更长间隔转冷蓝 */
+          color: (p) => (p.dataIndex <= 2
+            ? vGrad(C.cyan, C.cyanDeep)
+            : p.dataIndex <= 5 ? vGrad(C.blue, "rgba(79,168,232,.35)") : "rgba(169,140,245,.45)")
+        } },
+      { name: "累计占比", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 6,
+        data: GAP_BUCKETS.map((b) => Number(fmtDec(b.cum, 1))),
+        lineStyle: { color: C.orange, width: 2 }, itemStyle: { color: C.orange },
+        markLine: {
+          silent: true, symbol: "none",
+          label: { formatter: "中位 " + fmtDec(D.gapMedian, 0) + " 天", color: C.amber, fontSize: 10, position: "insideEndTop" },
+          lineStyle: { color: C.amber, type: "dashed", width: 1 },
+          data: [{ yAxis: 50 }]
+        } }
+    ]
+  });
+
+  /* 9.4 新增会员来源桑基：年新增会员 → 7 渠道 → 5 等级
+         三层守恒由数据结构保证（根 = Σ渠道行和 = Σ等级列和 = Σ矩阵），改任一格三层同时变。
+         ★ 节点名跨层唯一（根名 / 渠道名 / 等级名互不重复），否则 sankey 会把同名节点合并、连线错乱。
+         ★ links 里只放 source/target/value 与标量附加字段，不放业务对象（防 setOption 深拷贝成环）。 */
+  const sankeyChart = makeChart("yh-chart-sankey");
+  const SK_ROOT = "年新增会员";
+  const skNodes = [];
+  const skLinks = [];
+  skNodes.push({
+    name: SK_ROOT, value: D.newTotal, depth: 0,
+    itemStyle: { color: C.cyan },
+    label: { show: true, position: "left", distance: 6, fontSize: 11.5, fontWeight: 700, color: "#eafcfa",
+      formatter: () => SK_ROOT + "\n" + fmtDec(D.newTotal, 0) + " 万人" }
+  });
+  CHANNELS.forEach((ch) => {
+    skNodes.push({
+      name: ch.name, value: ch.newSum, depth: 1,
+      itemStyle: { color: ch.color },
+      label: { show: true, position: "right", distance: 5, fontSize: 11, color: "#d8f2ef",
+        formatter: () => ch.name + "  " + fmtDec(ch.newSum, 1) }
+    });
+    skLinks.push({
+      source: SK_ROOT, target: ch.name, value: ch.newSum,
+      lineStyle: { color: hGrad(C.cyan + "66", ch.color + "88"), opacity: 0.6 }
+    });
+  });
+  TIERS.forEach((t) => {
+    skNodes.push({
+      name: t.name, value: t.newIn, depth: 2,
+      itemStyle: { color: t.color },
+      label: { show: true, position: "right", distance: 5, fontSize: 11, color: "#d8f2ef",
+        formatter: () => t.name + "  " + fmtDec(t.newIn, 1) }
+    });
+  });
+  CHANNELS.forEach((ch, i) => TIERS.forEach((t, j) => {
+    skLinks.push({
+      source: ch.name, target: t.name, value: NEW_MTX[i][j],
+      lineStyle: { color: hGrad(ch.color + "77", t.color + "55"), opacity: j <= 2 ? 0.66 : 0.34 }
+    });
+  }));
+  /* tooltip 的查表：纯标量字典，挂在闭包里而非 option 里 */
+  const META = {};
+  CHANNELS.forEach((ch) => {
+    META[ch.name] = { kind: "获客渠道", v: ch.newSum, share: ch.newShare,
+      note: ch.note + " · 高等级占 " + fmtDec(ch.highShare, 1) + "%" };
+  });
+  TIERS.forEach((t) => {
+    META[t.name] = { kind: "会员等级", v: t.newIn, share: t.newIn / D.newTotal * 100,
+      note: "存量 " + fmtDec(t.members, 1) + " 万人 · ARPU " + fmtDec(t.arpu, 0) + " 元" };
+  });
+  sankeyChart.setOption({
+    backgroundColor: "transparent",
+    animationDuration: 900, animationEasing: "cubicOut",
+    tooltip: TIP({
+      trigger: "item",
+      formatter: (p) => {
+        if (p.dataType === "edge") {
+          return '<b style="color:' + C.cyan + '">' + p.data.source + " → " + p.data.target +
+            "</b><br/>新增 <b>" + fmtDec(p.data.value, 2) + "</b> 万人 · 占年新增 " +
+            fmtDec(p.data.value / D.newTotal * 100, 2) + "%";
+        }
+        if (p.name === SK_ROOT) {
+          return '<b style="color:' + C.cyan + '">' + SK_ROOT + "</b><br/>新增 <b>" + fmtDec(D.newTotal, 0) +
+            "</b> 万人 · 占存量 " + fmtDec(D.newShare, 1) + "%<br/>= 7 渠道之和 = 5 等级之和";
+        }
+        const m = META[p.name];
+        return '<b style="color:' + C.cyan + '">' + p.name + "</b>（" + m.kind + "）<br/>新增 <b>" +
+          fmtDec(m.v, 1) + "</b> 万人 · 占年新增 " + fmtDec(m.share, 1) + '%<br/><span style="color:' +
+          C.textDim + '">' + m.note + "</span>";
+      }
+    }),
+    series: [{
+      type: "sankey", layout: "none", layoutIterations: 0,
+      left: 96, right: 128, top: 10, bottom: 8,
+      nodeWidth: 13, nodeGap: 9, nodeAlign: "justify", draggable: false,
+      data: skNodes, links: skLinks,
+      itemStyle: { borderWidth: 0 },
+      lineStyle: { curveness: 0.5 },
+      emphasis: { focus: "adjacency", lineStyle: { opacity: 0.92 } },
+      /* kiosk 常驻：非焦点保持可读，避免轮播时大半屏发暗 */
+      blur: { itemStyle: { opacity: 0.55 }, lineStyle: { opacity: 0.2 }, label: { opacity: 0.6 } }
+    }]
+  });
+
+  /* 9.5 NPS 仪表：刻度铺满 [-100, 100] 的完整 NPS 值域，分档着色（<0 差 / 0-30 及格 / 30-50 良 / >50 优）。
+         指针值由三分类样本现算，与门户驾驶舱同一条公式、同一份样本，两页必然同值。 */
+  const npsGauge = makeChart("yh-chart-nps");
+  const NPS_MIN = -100, NPS_MAX = 100;
+  const npsPos = (v) => (v - NPS_MIN) / (NPS_MAX - NPS_MIN);
+  npsGauge.setOption({
+    backgroundColor: "transparent",
+    tooltip: TIP({
+      trigger: "item",
+      formatter: () => "<b>用户 NPS</b><br/>推荐 <b style=\"color:" + C.green + "\">" + fmtDec(D.npsPro, 1) +
+        "%</b> − 贬损 <b style=\"color:" + C.red + "\">" + fmtDec(D.npsDet, 1) + "%</b> = <b>" +
+        fmtDec(D.nps, 0) + "</b><br/><span style=\"color:" + C.textDim + "\">样本 " + fmtDec(D.npsN, 0) +
+        " 份 · 三分类之和 = 总样本</span>"
+    }),
+    series: [{
+      type: "gauge", center: ["50%", "60%"], radius: 100,
+      min: NPS_MIN, max: NPS_MAX, startAngle: 208, endAngle: -28, splitNumber: 4,
+      progress: { show: true, width: 10, roundCap: true,
+        itemStyle: { color: C.cyan, shadowColor: C.cyan, shadowBlur: 10 } },
+      axisLine: { lineStyle: { width: 10, color: [
+        [npsPos(0), "rgba(255,95,107,.45)"],
+        [npsPos(30), "rgba(255,201,77,.45)"],
+        [npsPos(50), "rgba(53,224,208,.45)"],
+        [1, "rgba(126,224,138,.45)"]
+      ] } },
+      axisTick: { show: false },
+      splitLine: { length: 8, distance: 2, lineStyle: { color: "rgba(64,196,190,.32)", width: 1 } },
+      axisLabel: { distance: 12, color: C.textDim, fontSize: 9.5 },
+      pointer: { show: true, length: "62%", width: 4, itemStyle: { color: C.cyan } },
+      anchor: { show: true, size: 8, showAbove: true, itemStyle: { color: C.cyan } },
+      detail: {
+        valueAnimation: true, offsetCenter: [0, "36%"],
+        formatter: (v) => "{v|" + fmtDec(v, 0) + "}\n{s|净推荐值 · 行业参考 28}",
+        rich: {
+          v: { color: C.cyan, fontSize: 28, fontWeight: 700, lineHeight: 32 },
+          s: { color: "#5f8a87", fontSize: 10, lineHeight: 14 }
+        }
+      },
+      title: { show: false },
+      data: [{ value: D.nps }],
+      animationDuration: 1200
+    }]
+  });
+
+  /* ===== 10. 底部会员洞察滚动条（全部由上面的派生量现算，不另编数字） ===== */
+  const INSIGHTS = [
+    { lv: "高", c: C.red, t: "沉睡会员 " + fmtDec(D.dormant, 0) + " 万人（占注册 " + fmtDec(D.dormantShare, 1) +
+        "%），主要沉在「" + D.tierBase.name + "」池，该级绑定率仅 " + fmtDec(D.tierBase.bind, 1) + "%" },
+    { lv: "高", c: C.orange, t: "年复购率 " + fmtDec(D.repeatRate, 2) + "%，中位复购间隔 " + fmtDec(D.gapMedian, 0) +
+        " 天，90 天内完成复购的仅 " + fmtDec(D.gapWithin90, 1) + "%" },
+    { lv: "中", c: C.orange, t: "获客首位「" + D.chTop.name + "」年新增 " + fmtDec(D.chTop.newSum, 1) + " 万人（占 " +
+        fmtDec(D.chTop.newShare, 1) + "%）；拉新质量最好的是「" + D.chBestQ.name + "」，高等级占 " + fmtDec(D.chBestQ.highShare, 1) + "%" },
+    { lv: "中", c: C.amber, t: "「" + D.chWorstQ.name + "」高等级占比仅 " + fmtDec(D.chWorstQ.highShare, 1) +
+        "%，新增基本落在普通会员池，需接续权益承接" },
+    { lv: "低", c: C.cyan, t: "会员贡献营收 " + fmtDec(D.gmv, 2) + " 亿元 = Σ(人数 × ARPU)，占年营收 " +
+        fmtDec(REV_TOTAL, 1) + " 亿的 " + fmtDec(D.gmvShare, 1) + "%，全员 ARPU " + fmtDec(D.arpuAll, 0) + " 元" },
+    { lv: "低", c: C.green, t: "高价值会员（黑金 + 白金）仅占 " + fmtDec(D.highTierShare, 1) + "% 人数，却贡献 " +
+        fmtDec(D.highTierGmvShare, 1) + "% 的会员营收；用户 NPS " + fmtDec(D.nps, 0) + "（推荐 " +
+        fmtDec(D.npsPro, 1) + "% − 贬损 " + fmtDec(D.npsDet, 1) + "%），与驾驶舱同值" }
+  ];
+  const track = $("yh-foot-track");
+  const insightHtml = INSIGHTS.map((a) => (
+    '<div class="yh-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = insightHtml + insightHtml;                 /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 11. 活性轮播：漏斗 ↔ 分层条 / 金字塔 ↔ 明细表 / 桑基边巡航 / 直方桶巡航 ===== */
+  const funnelScope = $("yh-funnel-scope").querySelector(".yh-panel-tag");
+  let fnIdx = 0;
+  function playFunnel() {
+    stepEls.forEach((r, i) => r.classList.toggle("is-active", i === fnIdx));
+    funnel.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    funnel.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: fnIdx + 1 });
+    const s = FUNNEL[fnIdx + 1];
+    funnelScope.innerHTML = FUNNEL[fnIdx].name + " → " + s.name + "　<b>" + fmtDec(s.step, 1) +
+      "%</b> · 累计留存 <b>" + fmtDec(s.cum, 2) + "%</b>";
+    fnIdx = (fnIdx + 1) % stepEls.length;
+  }
+  playFunnel();
+  setInterval(playFunnel, 3000);
+
+  let tierIdx = 0;
+  function playTier() {
+    tierRows.forEach((r, i) => r.classList.toggle("is-active", i === tierIdx));
+    pyramid.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    pyramid.dispatchAction({ type: "downplay", seriesIndex: 1 });
+    pyramid.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: tierIdx });
+    pyramid.dispatchAction({ type: "highlight", seriesIndex: 1, dataIndex: tierIdx });
+    tierIdx = (tierIdx + 1) % TIERS.length;
+  }
+  playTier();
+  setInterval(playTier, 2600);
+
+  const sankeyScope = $("yh-sankey-scope");
+  let skIdx = -1;
+  function playSankey() {
+    sankeyChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    skIdx = (skIdx + 1) % skLinks.length;
+    const lk = skLinks[skIdx];
+    sankeyChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataType: "edge", dataIndex: skIdx });
+    sankeyScope.textContent = lk.source + " → " + lk.target + "　" + fmtDec(lk.value, 2) + " 万人 · 占年新增 " +
+      fmtDec(lk.value / D.newTotal * 100, 2) + "%";
+  }
+  playSankey();
+  setInterval(playSankey, 2200);
+
+  let gapIdx = 0;
+  setInterval(() => {
+    gap.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    gap.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: gapIdx });
+    gapIdx = (gapIdx + 1) % GAP_BUCKETS.length;
+  }, 2000);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const EPS = 1e-6;
+  const checks = [
+    ["注册会员 = 五等级之和 = 1860 万", Math.abs(D.reg - 1860) < EPS],
+    ["漏斗逐层递减（注册 > 绑定 > 活跃 > 复购）", FUNNEL.every((s, i) => i === 0 || s.v < FUNNEL[i - 1].v)],
+    ["漏斗每层 = 五等级该层之和", Math.abs(D.bound - sum(TIERS.map((t) => t.bound))) < EPS &&
+      Math.abs(D.active - sum(TIERS.map((t) => t.active))) < EPS &&
+      Math.abs(D.repeat - sum(TIERS.map((t) => t.repeat))) < EPS],
+    ["累计留存 = 逐层转化率连乘", Math.abs(D.repeatRate - FUNNEL.slice(1).reduce((a, s) => a * s.step / 100, 100)) < 1e-9],
+    ["NPS = 推荐% − 贬损% = 34（与门户驾驶舱同源同值）", Math.abs(D.nps - 34) < 1e-9],
+    ["NPS 样本三分类之和 = 12800 且占比合计 = 100%", D.npsN === 12800 &&
+      Math.abs(D.npsPro + D.npsPas + D.npsDet - 100) < 1e-9],
+    ["复购间隔各桶人数之和 = 复购会员数", Math.abs(D.gapSum - D.repeat) < EPS],
+    ["复购间隔累计占比末项 = 100%", Math.abs(GAP_BUCKETS[GAP_BUCKETS.length - 1].cum - 100) < 1e-9],
+    ["桑基三层守恒：根 = Σ渠道 = Σ等级 = Σ矩阵", Math.abs(D.newTotal - D.newByTier) < EPS &&
+      Math.abs(D.newTotal - sum(NEW_MTX.map((r) => sum(r)))) < EPS],
+    ["桑基根出边之和 = 根节点值", Math.abs(sum(skLinks.filter((k) => k.source === SK_ROOT).map((k) => k.value)) - D.newTotal) < EPS],
+    ["桑基渠道出边之和 = 各渠道节点值", CHANNELS.every((ch) => Math.abs(sum(skLinks.filter((k) => k.source === ch.name).map((k) => k.value)) - ch.newSum) < EPS)],
+    ["桑基等级入边之和 = 各等级节点值", TIERS.every((t) => Math.abs(sum(skLinks.filter((k) => k.target === t.name).map((k) => k.value)) - t.newIn) < EPS)],
+    ["桑基节点名跨层唯一", (() => { const n = skNodes.map((x) => x.name); return new Set(n).size === n.length; })()],
+    ["会员贡献营收 = Σ(人数 × ARPU) 且不超过年营收 112.6 亿",
+      Math.abs(D.gmv - sum(TIERS.map((t) => t.members * t.arpu / 1e4))) < EPS && D.gmv < REV_TOTAL],
+    ["全员 ARPU = 贡献营收 ÷ 注册会员", Math.abs(D.arpuAll - D.gmv * 1e4 / D.reg) < 1e-9]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[用户会员运营] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

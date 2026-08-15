@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电经营健康指数</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --jk-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：加权合成明细（维度 / 得分 / 上期 / 权重 / 加权值 / 环比拉动） */
+    --jk-tcols: 60px 44px 44px 42px 60px 1fr;
+    /* 表格列宽：原始指标追溯（维度 / 指标 / 数值 / 来源） */
+    --jk-mcols: 52px 1fr 86px 58px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .jk-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 132px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .jk-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .jk-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .jk-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .jk-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .jk-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .jk-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .jk-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .jk-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .jk-crumb em { font-style: normal; color: #cfeae7; }
+  .jk-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .jk-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .jk-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .jk-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .jk-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .jk-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .jk-chips { display: flex; align-items: center; gap: 9px; }
+  .jk-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .jk-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .jk-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .jk-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .jk-chip.is-key b { color: var(--mfg-cyan); }
+  .jk-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .jk-clock-time { font: 700 26px/1 var(--jk-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .jk-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .jk-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .jk-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .jk-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .jk-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .jk-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .jk-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .jk-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .jk-kpi.is-warn .jk-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .jk-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .jk-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .jk-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .jk-kpi-val { font: 700 30px/1 var(--jk-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .jk-kpi-val.is-word { font-size: 25px; letter-spacing: 0.1em; }
+  .jk-kpi.is-warn .jk-kpi-val { color: #ffd9b0; }
+  .jk-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .jk-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .jk-kpi-sub b { font-weight: 700; }
+  .jk-up { color: var(--mfg-green); }
+  .jk-down { color: var(--mfg-red); }
+
+  /* 区间徽章：四档分级（承压 / 关注 / 稳健 / 优秀） */
+  .jk-badge {
+    display: inline-flex; align-items: center; justify-self: end;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; white-space: nowrap;
+  }
+  .jk-badge.is-weak { color: #3d0a10; background: var(--mfg-red); }
+  .jk-badge.is-watch { color: #3a2405; background: var(--mfg-orange); }
+  .jk-badge.is-sound { color: #04211f; background: var(--mfg-cyan); }
+  .jk-badge.is-fine { color: #063a25; background: var(--mfg-green); }
+
+  /* ===== 三栏主体 ===== */
+  .jk-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .jk-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .jk-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .jk-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .jk-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .jk-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .jk-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .jk-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .jk-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 大仪表下方读数条 ===== */
+  .jk-gauge-foot {
+    flex: none; height: 42px; margin-top: 4px;
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    border-top: 1px solid rgba(64, 196, 190, 0.18); background: rgba(20, 66, 68, 0.24); border-radius: 8px;
+    font-size: 12.5px; color: var(--mfg-text-dim); letter-spacing: 0.03em; font-variant-numeric: tabular-nums;
+  }
+  .jk-gauge-foot b { font: 700 17px/1 var(--jk-mono); }
+  .jk-gauge-foot i { font-style: normal; color: rgba(127, 166, 163, 0.35); }
+  .jk-gauge-foot .jk-badge { font-size: 12px; padding: 3px 12px; }
+
+  /* ===== CSS grid 模拟表格：加权合成明细 ===== */
+  .jk-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .jk-thead, .jk-tbody li {
+    display: grid; grid-template-columns: var(--jk-tcols); align-items: center; gap: 6px;
+  }
+  .jk-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .jk-thead span:not(:first-child), .jk-tbody li span:not(:first-child) { text-align: right; }
+  .jk-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .jk-tbody li {
+    position: relative; padding: 0 8px; height: 32px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .jk-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .jk-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .jk-tbody li.is-active::before {
+    content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; border-radius: 2px;
+    background: var(--mfg-cyan); box-shadow: 0 0 10px var(--mfg-cyan);
+  }
+  .jk-tbody li b { font-weight: 700; color: #eafcfa; }
+  .jk-tname { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .jk-tname i { flex: none; width: 6px; height: 6px; border-radius: 50%; }
+  .jk-tfoot {
+    flex: none; margin-top: 5px; padding: 6px 8px 5px; border-radius: 6px;
+    border-top: 1px solid rgba(64, 196, 190, 0.22); background: rgba(20, 66, 68, 0.42);
+    font-size: 11.5px; color: var(--mfg-text-dim); font-variant-numeric: tabular-nums;
+  }
+  .jk-tfoot-row { display: grid; grid-template-columns: var(--jk-tcols); align-items: center; gap: 6px; }
+  .jk-tfoot-row > span:not(:first-child) { text-align: right; }
+  .jk-tfoot-row b { color: var(--mfg-cyan); font: 700 14px/1 var(--jk-mono); }
+  .jk-tfoot-note { margin-top: 5px; font-size: 11px; line-height: 1.5; color: #6f9895; letter-spacing: 0.02em; }
+  .jk-tfoot-note em { font-style: normal; color: var(--mfg-amber); }
+
+  /* ===== 原始指标追溯表（滚动轮播） ===== */
+  .jk-mhead {
+    flex: none; display: grid; grid-template-columns: var(--jk-mcols); align-items: center; gap: 6px;
+    padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .jk-mhead span:nth-child(n+3) { text-align: right; }
+  .jk-mview { flex: 1; min-height: 0; position: relative; overflow: hidden; margin-top: 4px; }
+  .jk-mbody {
+    position: absolute; left: 0; right: 0; top: 0; margin: 0; padding: 0; list-style: none;
+    transition: transform 0.7s cubic-bezier(0.3, 0.75, 0.35, 1);
+  }
+  .jk-mbody li {
+    position: relative; height: 26px;
+    display: grid; grid-template-columns: var(--jk-mcols); align-items: center; gap: 6px;
+    padding: 0 8px; font-size: 12px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(64, 196, 190, 0.08);
+  }
+  .jk-mbody li span:nth-child(n+3) { text-align: right; }
+  .jk-mbody li.is-active { background: rgba(53, 224, 208, 0.14); }
+  .jk-mdim { display: flex; align-items: center; gap: 5px; font-weight: 700; letter-spacing: 0.02em; }
+  .jk-mdim i { flex: none; width: 5px; height: 5px; border-radius: 50%; }
+  .jk-mval { font: 700 12.5px/1 var(--jk-mono); color: #eafcfa; }
+  .jk-mval u { text-decoration: none; font-size: 10.5px; font-weight: 400; color: var(--mfg-text-dim); margin-left: 2px; }
+  .jk-msrc { font-size: 10.5px; color: #6f9895; letter-spacing: 0.04em; }
+
+  /* ===== 底部解读滚动条 ===== */
+  .jk-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .jk-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .jk-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: jk-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes jk-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .jk-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .jk-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .jk-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .jk-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .jk-foot-item b { font-weight: 700; }
+  .jk-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .jk-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="jk-stage" id="jk-stage">
+    <!-- mockflag:begin --><div class="jk-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="jk-error" id="jk-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="jk-header">
+      <div class="jk-head-left">
+        <div class="jk-crumb"><b>云麓厨电</b><i>›</i><em>经营健康指数</em></div>
+        <div class="jk-head-title-row">
+          <div class="jk-head-title">经营健康指数</div>
+          <div class="jk-head-meta">
+            <span><b>6</b> 维加权合成 · 满分 100</span><i>|</i>
+            <span>目标线 <b>90 分</b></span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="jk-head-right">
+        <div class="jk-chips">
+          <div class="jk-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="jk-chip is-key"><span>HEALTH</span><b id="jk-chip-score">--</b></div>
+        </div>
+        <div class="jk-clock" aria-label="实时时钟">
+          <span class="jk-clock-time" id="jk-clock-time">--:--:--</span>
+          <span class="jk-clock-date" id="jk-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="jk-band" id="jk-band"></div>
+
+    <!-- 左栏 -->
+    <div class="jk-col">
+      <section class="jk-panel" style="flex: 1.06;">
+        <div class="jk-panel-head">
+          <h2>六分项健康雷达</h2>
+          <span class="jk-panel-tag">本期 vs 上期 · 目标 <b>90</b></span>
+        </div>
+        <div class="jk-chart" id="jk-chart-radar" role="img" aria-label="交付质量库存渠道服务增长六维健康雷达图"></div>
+      </section>
+      <section class="jk-panel" style="flex: 1;">
+        <div class="jk-panel-head">
+          <h2>分项加权贡献与缺口</h2>
+          <span class="jk-panel-tag">缺口合计 <b id="jk-gap-sum">--</b> 分</span>
+        </div>
+        <div class="jk-chart" id="jk-chart-gap" role="img" aria-label="六个维度加权得分与距目标缺口的堆叠条形图"></div>
+      </section>
+    </div>
+
+    <!-- 中栏 -->
+    <div class="jk-col">
+      <section class="jk-panel" style="flex: 1.62;">
+        <div class="jk-panel-head">
+          <h2>综合经营健康指数</h2>
+          <span class="jk-panel-tag">量程 0 - 100 · 四档区间</span>
+        </div>
+        <div class="jk-chart" id="jk-chart-gauge" role="img" aria-label="经营健康指数加权合成大仪表盘"></div>
+        <div class="jk-gauge-foot" id="jk-gauge-foot"></div>
+      </section>
+      <section class="jk-panel" style="flex: 1;">
+        <div class="jk-panel-head">
+          <h2>指数 24 个月 K 线</h2>
+          <span class="jk-panel-tag">区间 <b id="jk-kl-scope">--</b> · MA6</span>
+        </div>
+        <div class="jk-chart" id="jk-chart-kline" role="img" aria-label="经营健康指数近二十四个月月 K 线与六月均线"></div>
+      </section>
+    </div>
+
+    <!-- 右栏 -->
+    <div class="jk-col">
+      <section class="jk-panel" style="flex: none;">
+        <div class="jk-panel-head">
+          <h2>加权合成明细</h2>
+          <span class="jk-panel-tag">权重合计 <b id="jk-w-sum">--</b></span>
+        </div>
+        <div class="jk-table">
+          <div class="jk-thead">
+            <span>维度</span><span>得分</span><span>上期</span><span>权重</span><span>加权值</span><span>环比拉动</span>
+          </div>
+          <ul class="jk-tbody" id="jk-tbody"></ul>
+          <div class="jk-tfoot" id="jk-tfoot"></div>
+        </div>
+      </section>
+      <section class="jk-panel" style="flex: 1;">
+        <div class="jk-panel-head">
+          <h2>原始指标追溯</h2>
+          <span class="jk-panel-tag">取自 <b id="jk-src-cnt">--</b> 项 P1–P11 既有数字</span>
+        </div>
+        <div class="jk-mhead">
+          <span>维度</span><span>原始指标</span><span>数值</span><span>来源</span>
+        </div>
+        <div class="jk-mview"><ul class="jk-mbody" id="jk-mbody"></ul></div>
+      </section>
+    </div>
+
+    <!-- 底部解读滚动条 -->
+    <div class="jk-foot">
+      <div class="jk-foot-tag">指数解读</div>
+      <div class="jk-foot-view"><div class="jk-foot-track" id="jk-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("jk-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("jk-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const arrow = (v) => (v >= 0 ? "▲" : "▼");
+  const upDown = (v) => (v >= 0 ? "jk-up" : "jk-down");
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         本页是收官页：六维得分与权重与门户「经营健康雷达」同源同值，
+         每维的原始指标全部取自 P1–P11 的既有数字（见 metrics 的 src 标注）。
+         综合总分一律由 Σ(得分 × 权重) 现算，页面上不出现任何硬编码的总分。
+
+         ★ 进 ECharts option 的数据只放标量与数组，业务对象之间用索引/名称关联，
+           绝不把 DIMS 元素整个塞进 series.data —— 对象一旦互相回指，setOption 的
+           深拷贝会无限递归（RangeError: Maximum call stack size exceeded，整页图表全空）。 ===== */
+
+  /* 4.1 健康度分档：<70 承压 / 70-80 关注 / 80-90 稳健 / ≥90 优秀 */
+  const BANDS = [
+    { max: 70,       key: "weak",  name: "承压", color: C.red },
+    { max: 80,       key: "watch", name: "关注", color: C.orange },
+    { max: 90,       key: "sound", name: "稳健", color: C.cyan },
+    { max: Infinity, key: "fine",  name: "优秀", color: C.green }
+  ];
+  const bandOf = (v) => BANDS.find((b) => v < b.max);
+  const TARGET = 90;              /* 管理层设定的六维目标线，与门户雷达目标线同值 */
+  const GAUGE_MAX = 100;
+
+  /* 4.2 六个维度：得分 / 上期得分 / 权重 / 原始指标（取自各专题页的既有数字）
+         ——【铁律】得分与权重必须与门户「经营健康雷达」完全一致，两页同源同值。 */
+  const DIMS = [
+    { name: "交付", score: 88, prev: 86.6, w: 0.18, color: C.cyan, note: "干线 + 配送两级时效",
+      metrics: [
+        { k: "物流时效达成率", v: "97.26", u: "%",  src: "P6" },
+        { k: "全程平均时长",   v: "44.7",  u: "h",  src: "P6" },
+        { k: "破损率",         v: "0.38",  u: "%",  src: "P6" }
+      ] },
+    { name: "质量", score: 82, prev: 82.9, w: 0.20, color: C.blue, note: "四段质量链 · 权重最高",
+      metrics: [
+        { k: "制程直通率 FPY", v: "96.42", u: "%",  src: "P4" },
+        { k: "市场故障率",     v: "3.00",  u: "%",  src: "P4" },
+        { k: "来料合格率",     v: "99.15", u: "%",  src: "P4" }
+      ] },
+    { name: "库存", score: 76, prev: 74.2, w: 0.15, color: C.orange, note: "周转与库龄双压",
+      metrics: [
+        { k: "库存周转",        v: "44.0", u: "天",   src: "P5" },
+        { k: "成品库存",        v: "118",  u: "万台", src: "P5" },
+        { k: "90+ 天库龄占比",  v: "10.0", u: "%",    src: "P5" }
+      ] },
+    { name: "渠道", score: 90, prev: 88.4, w: 0.17, color: C.green, note: "线上线下双轮驱动",
+      metrics: [
+        { k: "线上占比",       v: "52.1",  u: "%", src: "P8" },
+        { k: "线上同比",       v: "+14.7", u: "%", src: "P8" },
+        { k: "线下同店增长",   v: "7.54",  u: "%", src: "P7" }
+      ] },
+    { name: "服务", score: 84, prev: 83.1, w: 0.15, color: C.amber, note: "工单承接与口碑",
+      metrics: [
+        { k: "年售后工单", v: "96.8", u: "万单", src: "P10" },
+        { k: "用户 NPS",   v: "34",   u: "",     src: "P10" }
+      ] },
+    { name: "增长", score: 79, prev: 77.6, w: 0.15, color: C.violet, note: "营收与产销规模",
+      metrics: [
+        { k: "年营收", v: "112.6", u: "亿元", src: "门户" },
+        { k: "年销量", v: "866",   u: "万台", src: "门户" },
+        { k: "年产量", v: "902",   u: "万台", src: "P3" }
+      ] }
+  ];
+
+  /* 4.3 指数 24 月收盘序列：前 22 月自编（确定性），末两月由现算总分填入（见 4.5），
+         因此 K 线最后一根的收盘价恒等于大仪表读数，两图不可能对不上。 */
+  const CLOSE_FIX = [
+    78.2, 77.6, 78.9, 79.4, 78.8, 79.9, 80.6, 80.1, 81.2, 81.8, 81.1, 82.0,
+    82.6, 81.9, 80.8, 81.4, 82.2, 82.9, 82.4, 81.7, 82.6, 81.9
+  ];
+  const KL_OPEN0 = 77.4;          /* 首月开盘（序列起点） */
+  const KL_MONTHS = 24;
+
+  /* 4.4 加权合成核心函数：一处定义，仪表 / 雷达 / K 线 / 明细表全部复用 */
+  const WEIGHTS = DIMS.map((d) => d.w);
+  const compose = (scores) => sum(scores.map((v, i) => v * WEIGHTS[i]));
+
+  /* 4.5 派生量：全部现算，不复制数字 */
+  const D = {};
+  D.wSum = sum(WEIGHTS);                                       /* 权重合计，须 = 1.00 */
+  D.total = compose(DIMS.map((d) => d.score));                 /* 本期综合总分（= 83.4，现算） */
+  D.totalPrev = compose(DIMS.map((d) => d.prev));              /* 上期综合总分 */
+  D.delta = D.total - D.totalPrev;
+  D.mean = sum(DIMS.map((d) => d.score)) / DIMS.length;        /* 简单平均对照口径 */
+  D.band = bandOf(D.total);
+  D.gapTotal = TARGET - D.total;                               /* 距目标线的总缺口 */
+  /* 逐维派生：加权值 = 得分 × 权重；拉动 = 环比 × 权重；缺口 = (目标 − 得分) × 权重
+     —— Σ加权值 = 总分、Σ拉动 = 总分环比、Σ缺口 = 目标 − 总分，三条恒等式页尾自检。 */
+  DIMS.forEach((d) => {
+    d.wv = d.score * d.w;
+    d.mom = d.score - d.prev;
+    d.pull = d.mom * d.w;
+    d.gap = (TARGET - d.score) * d.w;
+    d.tgtWv = TARGET * d.w;
+    d.band = bandOf(d.score);
+  });
+  D.wvSum = sum(DIMS.map((d) => d.wv));
+  D.pullSum = sum(DIMS.map((d) => d.pull));
+  D.gapSum = sum(DIMS.map((d) => d.gap));
+  D.best = DIMS.slice().sort((a, b) => b.score - a.score)[0];
+  D.worst = DIMS.slice().sort((a, b) => a.score - b.score)[0];
+  D.bleed = DIMS.slice().sort((a, b) => b.gap - a.gap)[0];     /* 失血最重：缺口最大的维度 */
+  D.topPull = DIMS.slice().sort((a, b) => b.pull - a.pull)[0];
+  D.dragPull = DIMS.slice().sort((a, b) => a.pull - b.pull)[0];
+  D.rising = DIMS.filter((d) => d.mom >= 0).length;
+  D.reach = DIMS.filter((d) => d.score >= TARGET).length;      /* 已达目标线的维度数 */
+  D.metricCnt = sum(DIMS.map((d) => d.metrics.length));
+
+  /* 4.6 K 线：末两月收盘由现算总分填入 */
+  const CLOSES = CLOSE_FIX.concat([D.totalPrev, D.total]);
+  const KL_LABELS = [];
+  (function buildLabels() {
+    let y = 2024, m = 8;                                       /* 序列起点 2024-08，终点 2026-07 */
+    for (let i = 0; i < KL_MONTHS; i++) {
+      KL_LABELS.push(pad(y % 100) + "/" + pad(m));
+      m += 1; if (m > 12) { m = 1; y += 1; }
+    }
+  })();
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("jk-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("jk-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("jk-chip-score").textContent = fmtDec(D.total, 1) + " 分";
+
+  /* ===== 6. KPI 带：5 枚（数值枚翻牌缓动，区间枚为分档徽章） ===== */
+  const KPI_DEFS = [
+    { icon: "◎", label: "综合健康指数", val: D.total, unit: "分", dec: 1, warn: false,
+      sub: () => "6 维加权合成 · 权重合计 <b>" + D.wSum.toFixed(2) + "</b>" },
+    { icon: "↗", label: "较上期变动", val: D.delta, unit: "分", dec: 2, plus: true, warn: false,
+      sub: () => "上期 <b>" + fmtDec(D.totalPrev, 2) + "</b> · <b class=\"" + upDown(D.delta) + "\">" +
+        D.rising + " / " + DIMS.length + " 维上行</b>" },
+    { icon: "◑", label: "所处健康区间", word: D.band.name, wordColor: D.band.color, badge: D.band, warn: false,
+      sub: () => "四档分级 · 优秀线 <b>" + TARGET + "</b> 分 · 距优秀 <b>" + fmtDec(D.gapTotal, 2) + "</b> 分" },
+    { icon: "▲", label: "最强维度 · " + D.best.name, val: D.best.score, unit: "分", dec: 0, warn: false,
+      sub: () => "环比 <b class=\"" + upDown(D.best.mom) + "\">" + arrow(D.best.mom) + " " + signed(D.best.mom) +
+        "</b> · 权重 <b>" + fmtDec(100 * D.best.w, 0) + "%</b>" },
+    { icon: "▼", label: "失血最重 · " + D.bleed.name, val: D.bleed.score, unit: "分", dec: 0, warn: true,
+      sub: () => "缺口 <b class=\"jk-down\">" + fmtDec(D.bleed.gap, 2) + "</b> 分 = (90 − " + fmtDec(D.bleed.score, 0) +
+        ") × " + D.bleed.w.toFixed(2) }
+  ];
+  const band = $("jk-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="jk-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="jk-kpi-icon">' + k.icon + "</div>" +
+      '<div class="jk-kpi-main">' +
+        '<div class="jk-kpi-label">' + k.label + "</div>" +
+        (k.word
+          ? '<div class="jk-kpi-num"><span class="jk-kpi-val is-word" style="color:' + k.wordColor + '">' + k.word + "</span>" +
+            '<span class="jk-badge is-' + k.badge.key + '" style="margin-left:6px">' + fmtDec(D.total, 1) + " 分</span></div>"
+          : '<div class="jk-kpi-num"><span class="jk-kpi-val" id="jk-kpi-' + i + '">0</span><span class="jk-kpi-unit">' + k.unit + "</span></div>") +
+        '<div class="jk-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值（截图时中途值不算勾稽错误） */
+  function countUp(el, target, dec, plus) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      const v = target * e;
+      el.textContent = (plus && v >= 0 ? "+" : "") + fmtDec(v, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = (plus && target >= 0 ? "+" : "") + fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => { if (!k.word) countUp($("jk-kpi-" + i), k.val, k.dec, k.plus); });
+
+  /* ===== 7. 右上：加权合成明细表（逐行可验算：加权值 = 得分 × 权重） ===== */
+  const tbody = $("jk-tbody");
+  tbody.innerHTML = DIMS.map((d, i) => (
+    '<li data-i="' + i + '" title="' + d.name + "：" + fmtDec(d.score, 0) + " × " + d.w.toFixed(2) + " = " + fmtDec(d.wv, 2) + ' 分">' +
+      '<span class="jk-tname"><i style="background:' + d.color + ';box-shadow:0 0 7px ' + d.color + '"></i><b>' + d.name + "</b></span>" +
+      '<span style="color:' + d.band.color + ';font-weight:700">' + fmtDec(d.score, 0) + "</span>" +
+      '<span style="color:#8fb5b1">' + fmtDec(d.prev, 1) + "</span>" +
+      "<span>" + d.w.toFixed(2) + "</span>" +
+      "<span><b>" + fmtDec(d.wv, 2) + "</b></span>" +
+      '<span class="' + upDown(d.pull) + '">' + arrow(d.pull) + " " + signed(d.pull, 2) + "</span>" +
+    "</li>"
+  )).join("");
+  const tbodyRows = Array.from(tbody.children);
+  $("jk-w-sum").textContent = D.wSum.toFixed(2);
+  $("jk-tfoot").innerHTML =
+    '<div class="jk-tfoot-row">' +
+      "<span>合计（现算）</span>" +
+      "<span>" + fmtDec(D.mean, 1) + "</span>" +
+      "<span>—</span>" +
+      "<span>" + D.wSum.toFixed(2) + "</span>" +
+      "<span><b>" + fmtDec(D.wvSum, 2) + "</b></span>" +
+      '<span class="' + upDown(D.pullSum) + '">' + arrow(D.pullSum) + " " + signed(D.pullSum, 2) + "</span>" +
+    "</div>" +
+    '<div class="jk-tfoot-note">加权值 = 得分 × 权重，逐行可验算；<em>Σ 加权值 = ' + fmtDec(D.wvSum, 2) +
+      " 分</em>即综合健康指数（「得分」列合计位为简单平均对照 " + fmtDec(D.mean, 2) + "）<br/>" +
+      "Σ 环比拉动 = <em>" + signed(D.pullSum, 2) + " 分</em>，与总分变动完全吻合；Σ 缺口 = <em>" +
+      fmtDec(D.gapSum, 2) + " 分</em> = 目标 " + TARGET + " − 总分 " + fmtDec(D.total, 2) + "</div>";
+  $("jk-gap-sum").textContent = fmtDec(D.gapSum, 2);
+
+  /* ===== 8. 右下：原始指标追溯表（每行一个 P1–P11 的既有数字，滚动轮播） ===== */
+  const MROWS = [];
+  DIMS.forEach((d, di) => {
+    d.metrics.forEach((m) => {
+      MROWS.push({ dim: d.name, color: d.color, di: di, k: m.k, v: m.v, u: m.u, src: m.src });
+    });
+  });
+  const mBody = $("jk-mbody");
+  const buildMRow = (r) => (
+    "<li>" +
+      '<span class="jk-mdim" style="color:' + r.color + '"><i style="background:' + r.color + '"></i>' + r.dim + "</span>" +
+      "<span>" + r.k + "</span>" +
+      '<span class="jk-mval">' + r.v + (r.u ? "<u>" + r.u + "</u>" : "") + "</span>" +
+      '<span class="jk-msrc">' + r.src + "</span>" +
+    "</li>"
+  );
+  mBody.innerHTML = MROWS.map(buildMRow).join("") + MROWS.map(buildMRow).join("");  /* 两份首尾相接，滚动无缝 */
+  const mRows = Array.from(mBody.children);
+  $("jk-src-cnt").textContent = D.metricCnt;
+
+  const M_ROW = 26;
+  let mIdx = 0;
+  function scrollMetrics() {
+    mIdx += 1;
+    mBody.style.transition = "transform 0.7s cubic-bezier(0.3, 0.75, 0.35, 1)";
+    mBody.style.transform = "translateY(" + (-mIdx * M_ROW) + "px)";
+    if (mIdx >= MROWS.length) {
+      setTimeout(() => {
+        mBody.style.transition = "none";
+        mIdx = 0;
+        mBody.style.transform = "translateY(0px)";
+      }, 760);
+    }
+  }
+  setInterval(scrollMetrics, 2400);
+
+  /* ===== 9. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const TIP = {
+    trigger: "item", confine: true,
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  };
+  const tip = (extra) => Object.assign({}, TIP, extra || {});
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const hGrad = (from, to) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: from }, { offset: 1, color: to }]);
+
+  /* 9.1 招牌图：加权合成大仪表（四档区间 + 指针回摆 + 中心翻牌） */
+  $("jk-gauge-foot").innerHTML =
+    '较上期 <b class="' + upDown(D.delta) + '">' + arrow(D.delta) + " " + signed(D.delta, 2) + "</b>" +
+    "<i>|</i>" + '<span class="jk-badge is-' + D.band.key + '">' + D.band.name + "区间</span>" +
+    "<i>|</i>上期 <b style=\"color:#bfe4e0\">" + fmtDec(D.totalPrev, 2) + "</b>" +
+    "<i>|</i>最大拉动 <b style=\"color:" + C.green + "\">" + D.topPull.name + " " + signed(D.topPull.pull, 2) + "</b>" +
+    "<i>|</i>最大拖累 <b style=\"color:" + C.red + "\">" + D.dragPull.name + " " + signed(D.dragPull.pull, 2) + "</b>";
+
+  const gauge = makeChart("jk-chart-gauge");
+  /* ★ axisLine.lineStyle.color 是 [[累进比例, 颜色], ...]，比例是 0~1 的累计位置而非区段宽度 */
+  const gaugeBands = BANDS.map((b, i) => [
+    Math.min(1, (b.max === Infinity ? GAUGE_MAX : b.max) / GAUGE_MAX),
+    i === 2 ? hGrad(C.cyanDeep, C.cyan) : b.color
+  ]);
+  const GAUGE_TITLE = "综合经营健康指数（六维加权 · 满分 100）";
+  const gaugeSeries = (value) => ({
+    type: "gauge", min: 0, max: GAUGE_MAX, startAngle: 212, endAngle: -32,
+    center: ["50%", "50%"], radius: "74%", splitNumber: 10,
+    progress: { show: false },
+    axisLine: { roundCap: true, lineStyle: { width: 20, color: gaugeBands } },
+    pointer: { show: true, length: "58%", width: 6, itemStyle: { color: C.cyan, shadowBlur: 18, shadowColor: "rgba(53,224,208,.75)" } },
+    anchor: { show: true, size: 20, showAbove: true, itemStyle: { color: "#04191a", borderColor: C.cyan, borderWidth: 4, shadowBlur: 14, shadowColor: "rgba(53,224,208,.6)" } },
+    axisTick: { show: true, distance: -27, splitNumber: 5, length: 5, lineStyle: { color: "rgba(216,242,239,.4)", width: 1 } },
+    splitLine: { show: true, distance: -29, length: 12, lineStyle: { color: "rgba(216,242,239,.6)", width: 2 } },
+    /* 刻度数字画在弧外侧（distance 为负），色带不压字 */
+    axisLabel: { show: true, distance: -26, color: "#9dc4c0", fontSize: 13, fontWeight: 700, formatter: (v) => (v % 20 === 0 ? v : "") },
+    /* 指针扫过圆心，读数移到底部弧口内（startAngle 212 / endAngle -32 在下方留了 116° 缺口） */
+    title: { show: true, offsetCenter: [0, "96%"], color: C.textDim, fontSize: 12.5, fontWeight: 400 },
+    detail: {
+      show: true, valueAnimation: true, offsetCenter: [0, "62%"],
+      color: "#eafcfa", fontSize: 46, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif",
+      formatter: (v) => fmtDec(v, 1)
+    },
+    data: [{ value: value, name: GAUGE_TITLE }],
+    z: 3
+  });
+  gauge.setOption({
+    backgroundColor: "transparent",
+    tooltip: tip({
+      formatter: () => "综合健康指数 <b style=\"color:" + C.cyan + "\">" + fmtDec(D.total, 2) + "</b> 分<br/>" +
+        "区间：" + D.band.name + "　目标线 " + TARGET + " 分<br/>上期 " + fmtDec(D.totalPrev, 2) +
+        " · 较上期 " + signed(D.delta, 2) + "<br/>= Σ(六维得分 × 权重)，权重合计 " + D.wSum.toFixed(2)
+    }),
+    animationDuration: 2400, animationEasing: "elasticOut",
+    animationDurationUpdate: 2000, animationEasingUpdate: "elasticOut",
+    series: [gaugeSeries(D.total)],
+    /* 四档区间图例：色块 + 文字成对铺开，与 axisLine 分区配色一一对应 */
+    graphic: (() => {
+      const legend = [], gap = 104, left0 = 18;
+      BANDS.forEach((b, i) => {
+        const x = left0 + i * gap;
+        legend.push({ type: "rect", left: x, top: 10, shape: { width: 11, height: 11, r: 2 }, style: { fill: b.color } });
+        legend.push({
+          type: "text", left: x + 16, top: 10,
+          style: {
+            text: (i === 0 ? "<70 " : i === BANDS.length - 1 ? "≥90 " : BANDS[i - 1].max + "-" + b.max + " ") + b.name,
+            fill: "#6f9895", fontSize: 11.5
+          }
+        });
+      });
+      return legend;
+    })()
+  });
+  /* 指针每 20 秒回零重播一次（valueAnimation 中途值不是数据错误） */
+  setInterval(() => {
+    gauge.setOption({ series: [{ data: [{ value: 0, name: GAUGE_TITLE }] }] });
+    setTimeout(() => {
+      gauge.setOption({ series: [{ data: [{ value: D.total, name: GAUGE_TITLE }] }] });
+    }, 460);
+  }, 20000);
+
+  /* 9.2 六分项健康雷达：本期 / 上期 / 目标线三圈（与门户雷达同源同值） */
+  const radar = makeChart("jk-chart-radar");
+  radar.setOption({
+    backgroundColor: "transparent",
+    tooltip: tip({
+      formatter: (p) => {
+        const key = p.name === "上期" ? "prev" : p.name === "目标线" ? null : "score";
+        const rows = DIMS.map((d, i) => (
+          d.name + "　<b style=\"color:" + (p.value[i] >= TARGET ? C.green : p.value[i] >= 80 ? C.cyan : C.orange) + "\">" +
+          fmtDec(p.value[i], key === "prev" ? 1 : 0) + "</b>　<span style=\"color:" + C.textDim + "\">权重 " +
+          fmtDec(100 * d.w, 0) + "%</span>"
+        )).join("<br/>");
+        return "<b>" + p.name + "</b>　合成 <b style=\"color:" + C.cyan + "\">" + fmtDec(compose(p.value), 2) + "</b> 分<br/>" + rows;
+      }
+    }),
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8, itemGap: 12,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["本期", "上期", "目标线"]
+    },
+    radar: {
+      center: ["50%", "56%"], radius: "63%", shape: "polygon", splitNumber: 4,
+      indicator: DIMS.map((d) => ({ name: d.name, min: 60, max: 100 })),
+      axisName: { color: "#c3e2de", fontSize: 12, fontWeight: 700 },
+      axisLine: { lineStyle: { color: "rgba(53,224,208,.2)" } },
+      splitLine: { lineStyle: { color: "rgba(53,224,208,.16)" } },
+      splitArea: { show: true, areaStyle: { color: ["rgba(79,168,232,.03)", "rgba(53,224,208,.06)"] } }
+    },
+    series: [{
+      type: "radar", z: 3,
+      emphasis: { lineStyle: { width: 3.4 } },
+      blur: { itemStyle: { opacity: 0.5 }, lineStyle: { opacity: 0.22 }, areaStyle: { opacity: 0.05 } },
+      data: [
+        { name: "本期", value: DIMS.map((d) => d.score), symbol: "circle", symbolSize: 6,
+          lineStyle: { color: C.cyan, width: 2.6, shadowBlur: 10, shadowColor: C.cyan },
+          itemStyle: { color: C.cyan, borderColor: "#04191a", borderWidth: 1.5 },
+          areaStyle: { color: C.cyan, opacity: 0.2 } },
+        { name: "上期", value: DIMS.map((d) => d.prev), symbol: "circle", symbolSize: 5,
+          lineStyle: { color: C.blue, width: 1.8, type: "dashed" },
+          itemStyle: { color: C.blue, borderColor: "#04191a", borderWidth: 1.5 },
+          areaStyle: { color: C.blue, opacity: 0.06 } },
+        { name: "目标线", value: DIMS.map(() => TARGET), symbol: "none",
+          lineStyle: { color: C.orange, width: 1.6, type: "dotted" },
+          itemStyle: { color: C.orange }, areaStyle: { opacity: 0 } }
+      ]
+    }]
+  });
+
+  /* 9.3 分项加权贡献与缺口：横向堆叠条（加权值 + 缺口 = 目标加权值 = 90 × 权重）
+         ——「哪个维度在失血」一眼可读：橙色缺口段最长的就是失血最重的维度。 */
+  const gapChart = makeChart("jk-chart-gap");
+  const GAP_NAMES = DIMS.map((d) => d.name);
+  gapChart.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 6, right: 42, top: 28, bottom: 2, containLabel: true },
+    tooltip: tip({
+      trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: (ps) => {
+        const i = ps[0].dataIndex, d = DIMS[i];
+        return "<b>" + d.name + "</b>　" + d.note + "<br/>" +
+          "得分 <b style=\"color:" + d.band.color + "\">" + fmtDec(d.score, 0) + "</b> × 权重 " + d.w.toFixed(2) +
+          " = 加权 <b style=\"color:" + C.cyan + "\">" + fmtDec(d.wv, 2) + "</b> 分<br/>" +
+          "距目标 (90 − " + fmtDec(d.score, 0) + ") × " + d.w.toFixed(2) + " = 缺口 <b style=\"color:" + C.orange + "\">" +
+          fmtDec(d.gap, 2) + "</b> 分<br/>" +
+          "<span style=\"color:" + C.textDim + "\">目标加权 " + fmtDec(d.tgtWv, 2) + " 分 · 环比拉动 " + signed(d.pull, 2) + " 分</span>";
+      }
+    }),
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8, itemGap: 12,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["加权得分", "距目标缺口"]
+    },
+    xAxis: {
+      type: "value", max: TARGET * Math.max.apply(null, WEIGHTS) * 1.02,
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10.5 }),
+      axisLine: { show: false }, splitLine: SPLIT_LINE
+    },
+    yAxis: {
+      type: "category", data: GAP_NAMES, inverse: true,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 12, fontWeight: 700, color: "#c3e2de" })
+    },
+    series: [
+      { name: "加权得分", type: "bar", stack: "wv", barWidth: "52%",
+        data: DIMS.map((d) => Number(fmtDec(d.wv, 2))),
+        itemStyle: {
+          borderRadius: [3, 0, 0, 3],
+          color: (p) => hGrad(C.cyanDeep, DIMS[p.dataIndex].color)
+        },
+        label: {
+          show: true, position: "insideLeft", distance: 8, color: "#04191a", fontSize: 11, fontWeight: 700,
+          formatter: (p) => fmtDec(DIMS[p.dataIndex].score, 0) + " × " + DIMS[p.dataIndex].w.toFixed(2)
+        } },
+      { name: "距目标缺口", type: "bar", stack: "wv", barWidth: "52%",
+        data: DIMS.map((d) => Number(fmtDec(d.gap, 2))),
+        itemStyle: { borderRadius: [0, 3, 3, 0], color: "rgba(255,157,69,.5)", borderColor: "rgba(255,157,69,.85)", borderWidth: 1 },
+        label: {
+          show: true, position: "right", color: C.orange, fontSize: 10.5, fontWeight: 700,
+          formatter: (p) => (p.value > 0 ? "−" + fmtDec(p.value, 2) : "达标")
+        } }
+    ]
+  });
+
+  /* 9.4 指数 24 月 K 线 + MA6 + 稳健区间背景带
+         ★ candlestick 的 data 顺序固定为 [open, close, low, high]，写错顺序图形会静默错乱。
+         月开盘 = 上月收盘，序列连续；末月收盘 = 现算总分。 */
+  const KL = [], KL_RAW = [];
+  CLOSES.forEach((c, i) => {
+    const o = i === 0 ? KL_OPEN0 : CLOSES[i - 1];
+    const hAmp = 0.45 + ((i * 7) % 5) * 0.22;                   /* 确定性影线幅度（不用 Math.random） */
+    const lAmp = 0.40 + ((i * 11) % 4) * 0.25;
+    const h = +(Math.max(o, c) + hAmp).toFixed(2);
+    const l = +(Math.min(o, c) - lAmp).toFixed(2);
+    const b = bandOf(c);
+    const tone = b.key === "sound" ? (c >= o ? C.cyan : C.blue) : b.color;
+    KL_RAW.push({ o: o, c: c, l: l, h: h, bandName: b.name, bandKey: b.key, bandColor: b.color, tone: tone });
+    KL.push({
+      value: [+o.toFixed(2), +c.toFixed(2), l, h],             /* [开, 收, 低, 高] */
+      itemStyle: {
+        color: tone, borderColor: tone,
+        color0: "rgba(7,27,30,.55)", borderColor0: tone,
+        borderWidth: 1.4,
+        shadowBlur: b.key === "sound" ? 0 : 8, shadowColor: tone
+      }
+    });
+  });
+  const MA_N = 6;
+  const MA6 = CLOSES.map((_, i) => (i < MA_N - 1 ? "-" : +(sum(CLOSES.slice(i - MA_N + 1, i + 1)) / MA_N).toFixed(2)));
+  const klLo = Math.min.apply(null, KL_RAW.map((k) => k.l));
+  const klHi = Math.max.apply(null, KL_RAW.map((k) => k.h));
+  D.klOutside = KL_RAW.filter((k) => k.bandKey !== "sound").length;
+  $("jk-kl-scope").textContent = fmtDec(klLo, 1) + " ~ " + fmtDec(klHi, 1);
+
+  const kline = makeChart("jk-chart-kline");
+  kline.setOption({
+    backgroundColor: "transparent",
+    tooltip: tip({
+      trigger: "axis",
+      axisPointer: { type: "cross", crossStyle: { color: "rgba(127,166,163,.5)" }, label: { backgroundColor: "rgba(20,66,68,.95)", color: C.text } },
+      formatter: (ps) => {
+        const i = ps[0].dataIndex, k = KL_RAW[i];
+        const ma = MA6[i] === "-" ? "—" : fmtDec(MA6[i], 2);
+        return "<b style=\"color:" + C.cyan + "\">" + KL_LABELS[i] + "</b>　<span style=\"color:" + k.bandColor + "\">" + k.bandName + "</span><br/>" +
+          "开 " + fmtDec(k.o, 2) + " · 收 <b style=\"color:" + k.tone + "\">" + fmtDec(k.c, 2) + "</b><br/>" +
+          "低 " + fmtDec(k.l, 2) + " · 高 " + fmtDec(k.h, 2) + "<br/>" +
+          "月内振幅 " + fmtDec(k.h - k.l, 2) + " 分 · 环比 " + signed(k.c - k.o, 2) + "<br/>MA" + MA_N + " " + ma +
+          (i === KL_RAW.length - 1 ? "<br/><span style=\"color:" + C.amber + "\">末月收盘 = 现算总分</span>" : "");
+      }
+    }),
+    legend: { show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8, itemGap: 12,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["月 K", "MA6"] },
+    grid: { left: 6, right: 12, top: 28, bottom: 2, containLabel: true },
+    xAxis: {
+      type: "category", data: KL_LABELS, boundaryGap: true,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10, interval: 1 })
+    },
+    yAxis: {
+      type: "value", scale: true, min: 74, max: 92,
+      axisLine: { show: false }, splitLine: SPLIT_LINE,
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10 })
+    },
+    series: [
+      { name: "月 K", type: "candlestick", barWidth: "56%", data: KL, z: 3,
+        markArea: {
+          silent: true, z: 0,
+          itemStyle: { color: "rgba(53,224,208,.07)", borderColor: "rgba(53,224,208,.3)", borderWidth: 1, borderType: "dashed" },
+          label: { show: true, position: "insideTopLeft", color: "#6f9895", fontSize: 10.5, formatter: "稳健区间 80 - 90" },
+          data: [[{ yAxis: 80 }, { yAxis: 90 }]]
+        },
+        markLine: {
+          silent: true, symbol: "none",
+          data: [{ yAxis: TARGET }],
+          lineStyle: { color: C.orange, type: "dashed", width: 1 },
+          label: { formatter: "目标 " + TARGET, color: C.orange, fontSize: 10, position: "insideEndTop" }
+        } },
+      { name: "MA6", type: "line", data: MA6, smooth: true, symbol: "none", z: 4,
+        lineStyle: { width: 2.4, color: hGrad(C.blue, C.amber), shadowColor: "rgba(255,201,77,.35)", shadowBlur: 10 } }
+    ]
+  });
+
+  /* ===== 10. 底部指数解读（数字全部由上面的派生量现算，不另编） ===== */
+  const NEWS = [
+    { lv: "总分", c: C.cyan, t: "2026 年 7 月经营健康指数 " + fmtDec(D.total, 2) + " 分，处于「" + D.band.name +
+      "」区间，较上期 " + signed(D.delta, 2) + " 分（上期 " + fmtDec(D.totalPrev, 2) + "）" },
+    { lv: "算法", c: C.blue, t: "总分 = Σ(维度得分 × 权重)，" + DIMS.length + " 维权重合计 " + D.wSum.toFixed(2) +
+      "；Σ 加权值 = " + fmtDec(D.wvSum, 2) + " 分，明细表逐行可验算，简单平均对照 " + fmtDec(D.mean, 2) + " 分" },
+    { lv: "失血", c: C.orange, t: "距目标线 " + TARGET + " 分尚缺 " + fmtDec(D.gapTotal, 2) + " 分，其中「" + D.bleed.name +
+      "」贡献缺口 " + fmtDec(D.bleed.gap, 2) + " 分（得分 " + fmtDec(D.bleed.score, 0) + " · 权重 " + D.bleed.w.toFixed(2) +
+      "），为六维失血最重" },
+    { lv: "拉动", c: C.green, t: "最大拉动来自「" + D.topPull.name + "」" + signed(D.topPull.pull, 2) + " 分（环比 " +
+      signed(D.topPull.mom, 1) + " × 权重 " + D.topPull.w.toFixed(2) + "），最大拖累「" + D.dragPull.name + "」" +
+      signed(D.dragPull.pull, 2) + " 分；拉动合计 " + signed(D.pullSum, 2) + " 分与总分变动完全吻合" },
+    { lv: "达标", c: C.amber, t: "六维中 " + D.reach + " 维已达 " + TARGET + " 分目标线，" + D.rising +
+      " 维环比上行；最强「" + D.best.name + "」" + fmtDec(D.best.score, 0) + " 分，最弱「" + D.worst.name + "」" +
+      fmtDec(D.worst.score, 0) + " 分" },
+    { lv: "走势", c: C.violet, t: "近 " + KL_MONTHS + " 个月指数在 " + fmtDec(klLo, 1) + " ~ " + fmtDec(klHi, 1) +
+      " 分区间运行，其中 " + D.klOutside + " 个月落在 80-90 稳健带外，末月收盘 " + fmtDec(D.total, 2) + " 分即本页现算总分" },
+    { lv: "追溯", c: C.textDim, t: "六维得分背后共 " + D.metricCnt + " 项原始指标，全部取自 P1–P11 专题页既有数字：" +
+      "物流时效 97.26% · FPY 96.42% · 库存周转 44.0 天 · 线上占比 52.1% · NPS 34 · 年营收 112.6 亿元" }
+  ];
+  const track = $("jk-foot-track");
+  const newsHtml = NEWS.map((n) => (
+    '<div class="jk-foot-item"><i style="color:' + n.c + '">[' + n.lv + "]</i><em>" + n.t + "</em></div>"
+  )).join("");
+  track.innerHTML = newsHtml + newsHtml;                        /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 11. 活性轮播：明细表 ↔ 雷达 ↔ 缺口条 三处联动高亮 ===== */
+  let dimIdx = 0;
+  function playDim() {
+    tbodyRows.forEach((r, i) => r.classList.toggle("is-active", i === dimIdx));
+    mRows.forEach((r, i) => r.classList.toggle("is-active", MROWS[i % MROWS.length].di === dimIdx));
+    gapChart.dispatchAction({ type: "downplay", seriesIndex: 1 });
+    gapChart.dispatchAction({ type: "highlight", seriesIndex: 1, dataIndex: dimIdx });
+    dimIdx = (dimIdx + 1) % DIMS.length;
+  }
+  playDim();
+  setInterval(playDim, 2800);
+
+  let klIdx = KL.length - 6;
+  setInterval(() => {
+    kline.dispatchAction({ type: "hideTip" });
+    klIdx = klIdx + 1 >= KL.length ? KL.length - 6 : klIdx + 1;
+    kline.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: klIdx });
+  }, 2800);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const checks = [
+    ["权重合计 = 1.00", Math.abs(D.wSum - 1) < 1e-9],
+    ["总分 = Σ(得分 × 权重)", Math.abs(D.total - D.wvSum) < 1e-9],
+    ["总分 ≈ 83.4 分（与门户健康雷达同源同值）", Math.abs(D.total - 83.4) < 0.05],
+    ["Σ 环比拉动 = 总分环比", Math.abs(D.pullSum - D.delta) < 1e-9],
+    ["Σ 距目标缺口 = 目标 − 总分", Math.abs(D.gapSum - (TARGET - D.total)) < 1e-9],
+    ["K 线末月收盘 = 现算总分", Math.abs(CLOSES[CLOSES.length - 1] - D.total) < 1e-9],
+    ["K 线倒数第二月收盘 = 上期总分", Math.abs(CLOSES[CLOSES.length - 2] - D.totalPrev) < 1e-9],
+    ["K 线每根 低 ≤ min(开,收) ≤ max(开,收) ≤ 高", KL_RAW.every((k) => k.l <= Math.min(k.o, k.c) && Math.max(k.o, k.c) <= k.h)],
+    ["原始指标行数 = 各维指标之和", MROWS.length === D.metricCnt]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[经营健康指数] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
