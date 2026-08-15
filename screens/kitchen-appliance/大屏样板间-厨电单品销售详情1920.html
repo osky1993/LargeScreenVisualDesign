@@ -1,0 +1,1105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电单品销售详情</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --pd-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：明星单品切换器（型号 / 产品线 / GMV / 销量 / 毛利 / 判定） */
+    --pd-tcols: 1fr 40px 50px 46px 44px 46px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .pd-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    /* 顶栏 / KPI 带 / 三栏主体 / 全宽热力 / 页脚 —— 12+84+14+132+14+450+14+274+14+56+16 = 1080 */
+    grid-template-rows: 84px 132px 450px 274px 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .pd-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .pd-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .pd-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .pd-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .pd-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .pd-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .pd-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .pd-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .pd-crumb em { font-style: normal; color: #cfeae7; }
+  /* 返回上级：本页是「电商全渠道」的单品下钻，同时兼作「门店零售」的次要入口 */
+  .pd-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px 3px; border-radius: 7px;
+    color: #a9d9d4; text-decoration: none; letter-spacing: 0.06em;
+    border: 1px solid rgba(64, 196, 190, 0.3); background: rgba(14, 52, 56, 0.55);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .pd-crumb-up:hover { color: #eafcfa; border-color: rgba(53, 224, 208, 0.85); box-shadow: 0 0 14px rgba(53, 224, 208, 0.32); }
+  .pd-crumb-alt {
+    display: inline-flex; align-items: center; padding: 2px 9px 3px; border-radius: 7px;
+    color: rgba(169, 140, 245, 0.92); text-decoration: none; letter-spacing: 0.06em; font-size: 12px;
+    border: 1px dashed rgba(169, 140, 245, 0.42); background: rgba(30, 26, 56, 0.42);
+    transition: color .18s, border-color .18s;
+  }
+  .pd-crumb-alt:hover { color: #ded2ff; border-color: rgba(169, 140, 245, 0.85); }
+  .pd-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .pd-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .pd-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .pd-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .pd-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .pd-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .pd-chips { display: flex; align-items: center; gap: 9px; }
+  .pd-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .pd-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .pd-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .pd-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .pd-chip.is-key b { color: var(--mfg-cyan); }
+  .pd-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .pd-clock-time { font: 700 26px/1 var(--pd-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .pd-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .pd-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .pd-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .pd-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .pd-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .pd-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .pd-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .pd-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .pd-kpi.is-warn .pd-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .pd-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .pd-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .pd-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .pd-kpi-val { font: 700 30px/1 var(--pd-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .pd-kpi.is-warn .pd-kpi-val { color: #ffd9b0; }
+  .pd-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .pd-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pd-kpi-sub b { font-weight: 700; }
+  .pd-up { color: var(--mfg-green); }
+  .pd-down { color: var(--mfg-red); }
+
+  /* ===== 三栏主体 ===== */
+  .pd-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .pd-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .pd-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .pd-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .pd-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .pd-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .pd-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .pd-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  /* ★ flex:1 只在直接父级也是 flex 时才有高度：图表 div 是 .pd-panel 的直接子元素，中间不套 wrapper */
+  .pd-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 选中单品档案（左下，固定高度）=====
+     ★ 它是 .pd-col 里的 flex 兄弟，内容由 JS 在切换时重填；写死高度 + overflow:hidden，
+       保证任何时候都不会把同列/邻列按 flex 分配的图表容器挤矮。 */
+  .pd-dossier {
+    flex: none; height: 104px; min-height: 104px; overflow: hidden;
+    display: flex; flex-direction: column; gap: 6px;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 9px 14px 10px; position: relative;
+  }
+  .pd-dossier::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-orange), transparent);
+  }
+  .pd-dos-title { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+  .pd-dos-title b { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; color: #eafcfa; white-space: nowrap; }
+  .pd-dos-title span { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pd-dos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .pd-dos-cell {
+    display: flex; flex-direction: column; gap: 3px; padding: 5px 8px 6px; border-radius: 8px;
+    border: 1px solid rgba(64, 196, 190, 0.16); background: rgba(10, 38, 42, 0.5);
+  }
+  .pd-dos-cell span { font-size: 10.5px; letter-spacing: 0.08em; color: rgba(127, 166, 163, 0.9); white-space: nowrap; }
+  .pd-dos-cell b { font: 700 14px/1.15 var(--pd-mono); font-variant-numeric: tabular-nums; color: #cfe9e6; white-space: nowrap; }
+
+  /* ===== CSS grid 模拟表格（明星单品切换器） ===== */
+  .pd-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .pd-thead, .pd-tbody li {
+    display: grid; grid-template-columns: var(--pd-tcols); align-items: center; gap: 6px;
+  }
+  .pd-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .pd-thead span:not(:first-child), .pd-tbody li span:not(:first-child) { text-align: right; }
+  .pd-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .pd-tbody li {
+    padding: 0 8px; height: 28px; border-radius: 5px; cursor: pointer; user-select: none;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    border: 1px solid transparent;
+    transition: background .25s, border-color .2s;
+  }
+  .pd-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .pd-tbody li:hover { border-color: rgba(53, 224, 208, 0.45); }
+  .pd-tbody li.is-active { background: rgba(53, 224, 208, 0.16); border-color: rgba(53, 224, 208, 0.6); }
+  .pd-tbody li b { font-weight: 700; color: #eafcfa; }
+  .pd-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .pd-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .pd-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .pd-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+
+  /* ===== 全宽热力面板 ===== */
+  .pd-heat { grid-column: 1 / -1; }
+
+  /* ===== 底部洞察滚动条 ===== */
+  .pd-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .pd-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .pd-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: pd-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes pd-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .pd-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .pd-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .pd-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .pd-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .pd-foot-item b { font-weight: 700; }
+  .pd-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .pd-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="pd-stage" id="pd-stage">
+    <!-- mockflag:begin --><div class="pd-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="pd-error" id="pd-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空：留给统一注入的「模拟数据」标识） -->
+    <header class="pd-header">
+      <div class="pd-head-left">
+        <div class="pd-crumb">
+          <b>云麓厨电</b><i>›</i>
+          <a class="pd-crumb-up" href="大屏样板间-厨电电商全渠道1920.html" title="返回上级专题页（Esc）">‹ 返回 电商全渠道</a><i>›</i>
+          <em id="pd-crumb-obj">--</em>
+          <a class="pd-crumb-alt" href="大屏样板间-厨电门店零售1920.html" title="线下口径请看门店零售专题">线下口径 › 门店零售</a>
+        </div>
+        <div class="pd-head-title-row">
+          <div class="pd-head-title" id="pd-title">-- 销售详情</div>
+          <div class="pd-head-meta">
+            <span>明星单品 <b id="pd-meta-sku">--</b> 款</span><i>|</i>
+            <span>渠道 <b>6</b> 条 × 月度 <b>12</b> 期</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="pd-head-right">
+        <div class="pd-chips">
+          <div class="pd-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="pd-chip is-key"><span>SKU GMV</span><b id="pd-chip-gmv">--</b></div>
+        </div>
+        <div class="pd-clock" aria-label="实时时钟">
+          <span class="pd-clock-time" id="pd-clock-time">--:--:--</span>
+          <span class="pd-clock-date" id="pd-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="pd-band" id="pd-band"></div>
+
+    <!-- 左栏：明星单品切换器 + 选中单品档案 -->
+    <div class="pd-col">
+      <section class="pd-panel" id="pd-list-panel" style="flex: 1;">
+        <div class="pd-panel-head">
+          <h2>明星单品切换器</h2>
+          <span class="pd-panel-tag" id="pd-list-tag">--</span>
+        </div>
+        <div class="pd-table">
+          <div class="pd-thead">
+            <span>型号</span><span>线</span><span>GMV</span><span>销量</span><span>毛利</span><span>判定</span>
+          </div>
+          <ul class="pd-tbody" id="pd-tbody"></ul>
+        </div>
+      </section>
+      <section class="pd-dossier" id="pd-dossier"></section>
+    </div>
+
+    <!-- 中栏：价格带定位散点 -->
+    <div class="pd-col">
+      <section class="pd-panel" style="flex: 1;">
+        <div class="pd-panel-head">
+          <h2>价格带定位散点</h2>
+          <span class="pd-panel-tag" id="pd-scatter-tag">--</span>
+        </div>
+        <div class="pd-chart" id="pd-chart-scatter"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：月度走势 + 渠道构成 -->
+    <div class="pd-col">
+      <section class="pd-panel" style="flex: 1.05;">
+        <div class="pd-panel-head">
+          <h2>单品月度走势</h2>
+          <span class="pd-panel-tag" id="pd-month-tag">--</span>
+        </div>
+        <div class="pd-chart" id="pd-chart-month"></div>
+      </section>
+      <section class="pd-panel" style="flex: 1;">
+        <div class="pd-panel-head">
+          <h2>渠道构成</h2>
+          <span class="pd-panel-tag" id="pd-mix-tag">--</span>
+        </div>
+        <div class="pd-chart" id="pd-chart-mix"></div>
+      </section>
+    </div>
+
+    <!-- 全宽：渠道 × 月度销售热力表 -->
+    <section class="pd-panel pd-heat">
+      <div class="pd-panel-head">
+        <h2>渠道 × 月度销售热力表</h2>
+        <span class="pd-panel-tag" id="pd-heat-tag">--</span>
+      </div>
+      <div class="pd-chart" id="pd-chart-heat"></div>
+    </section>
+
+    <!-- 底部洞察滚动条 -->
+    <div class="pd-foot">
+      <div class="pd-foot-tag">单品洞察</div>
+      <div class="pd-foot-view"><div class="pd-foot-track" id="pd-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("pd-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("pd-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         口径与上级页「电商全渠道」完全同源，本页只往下加一层「明星单品」粒度：
+
+           年营收 112.6 亿 = 线下 48.4 + 线上 58.7 + 工程 5.5
+           线上 58.70 亿 = 5 平台之和 = 6 产品线之和（下面 GMV 矩阵，与上级页逐格一致）
+
+         ★★ 建模铁律（这一条踩过一次，整页图表会全空）：
+            setOption 会深拷贝整个 option，option 里只要有循环引用就无限递归、
+            浏览器直接 RangeError: Maximum call stack size exceeded。
+            所以本页所有业务对象之间**只用下标 / 名字关联，绝不互相持有对象引用**：
+            单品用 `li`（产品线下标）指向产品线，产品线不持有单品数组（只存现算的合计标量）；
+            进 option 的 series.data 一律只放标量与数组（散点用 [x, y, gmv, skuIdx]，
+            热力用 [m, c, v]），tooltip 里再按下标回查业务对象。 ===== */
+
+  /* 4.0 全渠道基准（跨页共用） */
+  const REV_OFFLINE = 48.4;      /* 线下门店零售，亿元 */
+  const REV_PROJECT = 5.5;       /* 工程渠道，亿元 */
+  const REV_TOTAL = 112.6;       /* 年营收，亿元 */
+  const UNITS_TOTAL = 866;       /* 年销量，万台（全渠道） */
+
+  /* 4.1 六大产品线（顺序 = 上级页 GMV 矩阵的列序） */
+  const LINES = [
+    { name: "吸油烟机",   short: "烟机", lo:  980, hi:  4680, tails: 7 },
+    { name: "燃气灶具",   short: "灶具", lo:  580, hi:  2280, tails: 6 },
+    { name: "洗碗机",     short: "洗碗", lo: 1980, hi:  7980, tails: 5 },
+    { name: "蒸烤一体机", short: "蒸烤", lo: 2280, hi:  6680, tails: 5 },
+    { name: "集成灶",     short: "集成", lo: 4980, hi: 12800, tails: 4 },
+    { name: "净水热水",   short: "净水", lo:  880, hi:  3980, tails: 6 }
+  ];
+  LINES.forEach((l, j) => { l.color = PAL.series[j % PAL.series.length]; });
+
+  /* 4.2 五大线上平台（顺序 = 上级页 GMV 矩阵的行序）+ 线下门店，合成本页的 6 条渠道 */
+  const CHANNELS = [
+    { name: "京东",     short: "京东", online: true,  color: PAL.series[0] },
+    { name: "天猫",     short: "天猫", online: true,  color: PAL.series[1] },
+    { name: "抖音",     short: "抖音", online: true,  color: PAL.series[5] },
+    { name: "苏宁易购", short: "苏宁", online: true,  color: PAL.series[2] },
+    { name: "品牌自营", short: "自营", online: true,  color: PAL.series[3] },
+    { name: "线下门店", short: "线下", online: false, color: PAL.series[4] }
+  ];
+  const N_ON = 5;                                   /* 前 5 条是线上平台 */
+
+  /* 4.3 ★ 上级页的 GMV 矩阵（行 = 平台，列 = 产品线；亿元），逐格照抄，全矩阵求和 = 58.70 */
+  const GMV = [
+    /*            烟机    灶具    洗碗    蒸烤    集成    净水  */
+    /* 京东   */ [4.86,  3.92,  3.24,  2.35,  2.08,  2.15],
+    /* 天猫   */ [4.28,  3.46,  2.78,  2.12,  1.84,  1.72],
+    /* 抖音   */ [2.64,  2.18,  1.96,  1.62,  1.58,  1.42],
+    /* 苏宁   */ [1.62,  1.34,  1.05,  0.82,  0.78,  0.69],
+    /* 自营   */ [1.42,  1.08,  1.12,  0.96,  0.86,  0.76]
+  ];
+
+  /* 4.4 明星单品（本页新增粒度，型号全部虚构）
+         on / off = 该单品的线上 / 线下 GMV（亿元）；price = 全渠道成交均价（元/台）；
+         tilt = 相对所属产品线平台结构的偏好系数（归一后仍严格等于 on，见 4.7）；
+         ramp = 月度走势的上市爬坡倾斜（正 = 越卖越好） */
+  const STARS = [
+    { li: 0, code: "CXW-260-Z8Pro", nick: "Z8 Pro 大吸力",  price: 3480, on: 4.20, off: 3.10, gm: 32.6, score: 4.8, launch: "2024-09", pos: "高端旗舰", tilt: [1.10, 1.02, 1.18, 0.86, 1.05], ramp:  0.22 },
+    { li: 0, code: "CXW-230-S3",    nick: "S3 侧吸经典",    price: 1580, on: 2.85, off: 2.40, gm: 26.4, score: 4.6, launch: "2022-03", pos: "走量主力", tilt: [1.04, 1.08, 0.88, 1.06, 0.96], ramp: -0.14 },
+    { li: 1, code: "JZT-5B2",       nick: "炽焰 5.2kW",     price: 1180, on: 3.60, off: 3.20, gm: 24.8, score: 4.7, launch: "2023-05", pos: "走量主力", tilt: [1.06, 1.04, 0.92, 1.02, 0.98], ramp: -0.06 },
+    { li: 2, code: "WQP15-X9",      nick: "星海 15 套嵌入", price: 5680, on: 3.40, off: 1.85, gm: 35.2, score: 4.9, launch: "2025-03", pos: "增长引擎", tilt: [1.12, 1.00, 1.26, 0.82, 1.08], ramp:  0.34 },
+    { li: 2, code: "WQP8-M2",       nick: "悦净 8 套台式",  price: 2280, on: 1.92, off: 0.68, gm: 22.6, score: 4.5, launch: "2023-11", pos: "入门引流", tilt: [1.00, 1.06, 1.22, 0.88, 0.94], ramp:  0.08 },
+    { li: 3, code: "ZKD-60-V7",     nick: "珍馐 V7 蒸烤炸", price: 4280, on: 3.05, off: 1.42, gm: 33.8, score: 4.7, launch: "2025-01", pos: "增长引擎", tilt: [1.08, 1.02, 1.24, 0.84, 1.06], ramp:  0.30 },
+    { li: 4, code: "JJZT-A9",       nick: "擎云 A9 集成灶", price: 8880, on: 2.68, off: 4.60, gm: 38.4, score: 4.6, launch: "2024-06", pos: "高端旗舰", tilt: [1.02, 0.98, 1.10, 0.94, 1.08], ramp:  0.16 },
+    { li: 5, code: "JSQ-16-T5",     nick: "恒沐 T5 零冷水", price: 2680, on: 2.15, off: 2.05, gm: 28.2, score: 4.6, launch: "2024-02", pos: "稳态主力", tilt: [1.06, 1.02, 0.96, 1.02, 1.00], ramp:  0.04 },
+    { li: 5, code: "RO-800G-P3",    nick: "澈泉 P3 800G",   price: 1980, on: 1.42, off: 0.62, gm: 30.5, score: 4.4, launch: "2023-08", pos: "入门引流", tilt: [1.04, 1.00, 1.14, 0.90, 0.98], ramp: -0.02 }
+  ];
+  const BRAND = "云麓 ";
+  STARS.forEach((s) => { s.name = BRAND + s.code; });
+
+  /* 4.5 产品线派生：线上 GMV = 矩阵列和；明星合计 / 长尾余量全部现算 */
+  const D = {};
+  LINES.forEach((l, j) => {
+    l.online = sum(GMV.map((row) => row[j]));                       /* 该线线上 GMV */
+    l.platShare = GMV.map((row) => row[j] / l.online);              /* 该线的平台结构（占比） */
+    /* ★ 只存标量，不持有单品对象——避免 option 深拷贝时成环 */
+    l.starOn = sum(STARS.filter((s) => s.li === j).map((s) => s.on));
+    l.starCnt = STARS.filter((s) => s.li === j).length;
+    l.starShare = l.starOn / l.online * 100;                        /* 明星占本线线上 GMV */
+    l.tailOn = l.online - l.starOn;                                 /* 长尾余量，必 > 0 */
+  });
+  D.online = sum(LINES.map((l) => l.online));                       /* = 58.70 亿 */
+  D.onlineByPlat = sum(GMV.map((row) => sum(row)));                 /* 另一维度求和，须相等 */
+  D.starOn = sum(STARS.map((s) => s.on));
+  D.starOff = sum(STARS.map((s) => s.off));
+  D.starGmv = D.starOn + D.starOff;
+  D.starOnShare = D.starOn / D.online * 100;
+  D.starOffShare = D.starOff / REV_OFFLINE * 100;
+
+  /* 4.6 单品自身派生：全渠道 GMV / 年销量 / 均价（均价用 GMV ÷ 销量现算，与 price 互为验证） */
+  STARS.forEach((s) => {
+    s.gmv = s.on + s.off;                                           /* 全渠道 GMV，亿元 */
+    s.units = s.gmv * 1e8 / s.price / 1e4;                          /* 年销量，万台 */
+    s.aov = s.gmv * 1e8 / (s.units * 1e4);                          /* 成交均价，元（= price） */
+    s.onUnits = s.on * 1e8 / s.price / 1e4;                         /* 线上年销量，万台 */
+    s.onShare = s.on / s.gmv * 100;                                 /* 线上占该单品 GMV */
+    s.lineShare = s.on / LINES[s.li].online * 100;                  /* 占所属产品线线上 GMV */
+    s.profit = s.gmv * s.gm / 100;                                  /* 年毛利额，亿元 */
+    s.verdict = s.gm >= 33 ? { t: "高毛利", c: "is-good" }
+              : s.gm >= 26 ? { t: "中毛利", c: "is-mid" }
+              : { t: "低毛利", c: "is-bad" };
+  });
+  D.starUnits = sum(STARS.map((s) => s.units));
+  D.starUnitShare = D.starUnits / UNITS_TOTAL * 100;
+  D.starProfit = sum(STARS.map((s) => s.profit));
+  D.starGm = D.starProfit / D.starGmv * 100;                        /* 明星盘加权毛利率 */
+  D.gmvTop = STARS.slice().sort((a, b) => b.gmv - a.gmv)[0];
+  D.unitTop = STARS.slice().sort((a, b) => b.units - a.units)[0];
+  D.gmTop = STARS.slice().sort((a, b) => b.gm - a.gm)[0];
+  D.scoreTop = STARS.slice().sort((a, b) => b.score - a.score)[0];
+
+  /* 4.7 全量在售机型（明星 + 长尾）——散点底图。
+         长尾按「该产品线线上 GMV − 明星合计」的余量确定性摊开：
+         权重是 sin 驼峰（不用 Math.random，kiosk 每次打开须一致），价格在价格带内等距铺开。
+         所以「全部散点的线上 GMV 之和 = 58.70 亿」是结构性成立的，页尾自检验这一条。 */
+  const SKUS = [];
+  STARS.forEach((s, si) => {
+    SKUS.push({ li: s.li, code: s.code, name: s.name, price: s.price, on: s.on, star: true, si: si });
+  });
+  LINES.forEach((l, j) => {
+    const n = l.tails;
+    const w = Array.from({ length: n }, (_, k) => 0.55 + 0.85 * Math.sin(Math.PI * (k + 0.75) / (n + 0.5)));
+    const wSum = sum(w);
+    for (let k = 0; k < n; k++) {
+      const price = Math.round((l.lo + (l.hi - l.lo) * (k + 0.5) / n) / 10) * 10;
+      SKUS.push({
+        li: j, code: l.short + "-长尾" + pad(k + 1), name: l.name + " 长尾机型 " + pad(k + 1),
+        price: price, on: l.tailOn * w[k] / wSum, star: false, si: -1
+      });
+    }
+  });
+  SKUS.forEach((k) => { k.onUnits = k.on * 1e8 / k.price / 1e4; });  /* 线上年销量，万台 */
+  D.skuOn = sum(SKUS.map((k) => k.on));                              /* 须 = 58.70 */
+  D.skuCnt = SKUS.length;
+  LINES.forEach((l, j) => { l.skuCnt = SKUS.filter((k) => k.li === j).length; });
+
+  /* 价格带分区（三档，散点用 markArea 铺底） */
+  const BANDS = [
+    { name: "入门带", lo: 0,    hi: 2000,  color: "rgba(79,168,232,.055)" },
+    { name: "主流带", lo: 2000, hi: 5000,  color: "rgba(53,224,208,.06)" },
+    { name: "高端带", lo: 5000, hi: 13500, color: "rgba(255,157,69,.055)" }
+  ];
+  const PRICE_MAX = 13500;
+
+  /* 4.8 渠道 × 月度热力（每个单品一张 6 × 12 矩阵，单位万元）
+         · 渠道方向：前 5 条 = 该单品所属产品线的平台结构 × 单品偏好 tilt，归一后严格等于 s.on；
+                     第 6 条 = 线下门店，直接等于 s.off。
+         · 月度方向：大促节奏（双11 / 618 / 双12 / 年货节）× 渠道放大系数 × 上市爬坡，
+                     每条渠道各自归一到自己的渠道合计，所以行和、总和都不会漂。 */
+  const MONTHS = ["8月", "9月", "10月", "11月", "12月", "1月", "2月", "3月", "4月", "5月", "6月", "7月"];
+  const MON_WINDOW = "2025-08 ~ 2026-07";
+  /*                8月   9月   10月  11月  12月  1月    2月    3月    4月    5月    6月    7月 */
+  const MON_BASE = [1.00, 1.06, 1.28, 2.35, 1.45, 1.18, 0.72, 1.10, 0.96, 1.12, 2.05, 0.92];
+  const CH_AMP   = [1.00, 1.05, 1.45, 0.90, 1.00, 0.35];      /* 各渠道对大促的放大倍数 */
+  const OFF_SEAS = [1.00, 1.02, 1.22, 1.05, 1.06, 1.16, 0.88, 1.04, 1.00, 1.12, 1.08, 1.00]; /* 线下自有节奏 */
+
+  STARS.forEach((s) => {
+    /* 渠道合计（亿元 → 万元） */
+    const wCh = LINES[s.li].platShare.map((sh, i) => sh * s.tilt[i]);
+    const wChSum = sum(wCh);
+    s.chTotal = wCh.map((w) => s.on * w / wChSum * 1e4);          /* 前 5 条，万元 */
+    s.chTotal.push(s.off * 1e4);                                  /* 第 6 条：线下，万元 */
+    s.chShare = s.chTotal.map((v) => v / (s.gmv * 1e4) * 100);
+
+    /* 月度铺开：每条渠道独立归一到自己的合计 */
+    s.heat = s.chTotal.map((tot, c) => {
+      const raw = MON_BASE.map((b, m) => {
+        const promo = 1 + (b - 1) * CH_AMP[c];
+        const seas = c < N_ON ? 1 : OFF_SEAS[m];
+        const ramp = 1 + s.ramp * (m - 5.5) / 5.5;
+        return promo * seas * ramp;
+      });
+      const rs = sum(raw);
+      return raw.map((v) => tot * v / rs);
+    });
+    s.monTotal = MONTHS.map((_, m) => sum(s.heat.map((row) => row[m])));
+    s.monOnline = MONTHS.map((_, m) => sum(s.heat.slice(0, N_ON).map((row) => row[m])));
+    s.monOnShare = s.monTotal.map((v, m) => s.monOnline[m] / v * 100);
+    s.heatMax = Math.max.apply(null, s.heat.map((r) => Math.max.apply(null, r)));
+    s.heatMin = Math.min.apply(null, s.heat.map((r) => Math.min.apply(null, r)));
+    s.heatSum = sum(s.monTotal);                                  /* 须 = s.gmv × 1e4 */
+    s.peakM = s.monTotal.indexOf(Math.max.apply(null, s.monTotal));
+    s.chTopI = s.chTotal.indexOf(Math.max.apply(null, s.chTotal));
+    s.onTopI = s.chTotal.slice(0, N_ON).indexOf(Math.max.apply(null, s.chTotal.slice(0, N_ON)));
+  });
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("pd-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("pd-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("pd-meta-sku").textContent = STARS.length;
+
+  /* ===== 6. hash 传参：打开时按 #<型号名> 定位，未命中落第 0 个 ===== */
+  const PARENT = "大屏样板间-厨电电商全渠道1920.html";
+  function hashIdx() {
+    let h = "";
+    try { h = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim(); }
+    catch (e) { h = (location.hash || "").replace(/^#/, "").trim(); }   /* 坏码兜底 */
+    if (!h) return -1;
+    let k = STARS.findIndex((s) => s.name === h);                        /* 全名：云麓 CXW-260-Z8Pro */
+    if (k < 0) k = STARS.findIndex((s) => s.code === h);                 /* 型号编码 */
+    if (k < 0) k = STARS.findIndex((s) => s.nick === h);                 /* 简称 */
+    if (k < 0) k = STARS.findIndex((s) => s.code.toUpperCase() === h.toUpperCase());
+    return k;
+  }
+  let idx = Math.max(0, hashIdx());
+
+  /* ===== 7. 静态 DOM 渲染（KPI 带 / 清单表 / 档案 / 各面板 tag / 页脚）
+         ★ 必须在 echarts.init 之前把「与图表同属一个 flex 容器」的兄弟块全部填满：
+           面板标题行 .pd-panel-head 是 .pd-chart 的 flex 兄弟，若等到 init 之后再填文案，
+           它会把 flex:1 的图表容器压矮、图表按旧高度布局（同批物流线路详情页栽过）。
+           左下 .pd-dossier 另外写死了高度，双保险。 ===== */
+
+  /* 7.1 KPI 带骨架（5 枚，数值由 renderKpi 翻牌） */
+  const KPI_META = [
+    { icon: "⬒", label: "年销量",     unit: "万台", dec: 2, warn: false },
+    { icon: "▤", label: "全渠道 GMV", unit: "亿元", dec: 2, warn: false },
+    { icon: "¥",  label: "成交均价",   unit: "元",   dec: 0, warn: false },
+    { icon: "◈", label: "毛利率",     unit: "%",    dec: 1, warn: false },
+    { icon: "★", label: "用户评分",   unit: "/ 5",  dec: 1, warn: true }
+  ];
+  $("pd-band").innerHTML = KPI_META.map((k, i) => (
+    '<div class="pd-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="pd-kpi-icon">' + k.icon + "</div>" +
+      '<div class="pd-kpi-main">' +
+        '<div class="pd-kpi-label">' + k.label + "</div>" +
+        '<div class="pd-kpi-num"><span class="pd-kpi-val" id="pd-kpi-' + i + '">0</span><span class="pd-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="pd-kpi-sub" id="pd-kpisub-' + i + '">—</div>' +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值 */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+
+  function renderKpi(s) {
+    const vals = [s.units, s.gmv, s.aov, s.gm, s.score];
+    const subs = [
+      "占全渠道年销量 <b>" + fmtDec(s.units / UNITS_TOTAL * 100, 2) + "%</b> · 线上 " + fmtDec(s.onUnits, 2) + " 万台",
+      "线上 <b>" + fmtDec(s.on, 2) + "</b> + 线下 <b>" + fmtDec(s.off, 2) + "</b> · 占本线线上 <b>" + fmtDec(s.lineShare, 1) + "%</b>",
+      "= GMV ÷ 销量 · " + LINES[s.li].name + "价格带 " + LINES[s.li].lo + "~" + LINES[s.li].hi + " 元",
+      "年毛利额 <b>" + fmtDec(s.profit, 2) + "</b> 亿元 · 明星盘加权 " + fmtDec(D.starGm, 1) + "%",
+      "九款最高 <b>" + D.scoreTop.nick + " " + fmtDec(D.scoreTop.score, 1) + "</b> · 定位 " + s.pos
+    ];
+    KPI_META.forEach((k, i) => {
+      countUp($("pd-kpi-" + i), vals[i], k.dec);
+      $("pd-kpisub-" + i).innerHTML = subs[i];
+    });
+  }
+
+  /* 7.2 明星单品切换器（CSS grid 模拟表格，行即 tab） */
+  const tbody = $("pd-tbody");
+  tbody.innerHTML = STARS.map((s, i) => (
+    '<li data-i="' + i + '" title="' + s.name + "　" + s.nick + "（← → 方向键切换）\">" +
+      '<span><b style="color:' + LINES[s.li].color + '">' + s.code + "</b></span>" +
+      "<span>" + LINES[s.li].short + "</span>" +
+      "<span>" + fmtDec(s.gmv, 2) + "</span>" +
+      "<span>" + fmtDec(s.units, 1) + "</span>" +
+      '<span style="color:' + (s.gm >= 33 ? C.green : s.gm >= 26 ? C.amber : C.orange) + '">' + fmtDec(s.gm, 1) + "</span>" +
+      '<span class="pd-badge ' + s.verdict.c + '">' + s.verdict.t + "</span>" +
+    "</li>"
+  )).join("");
+  const listRows = Array.from(tbody.children);
+  $("pd-list-tag").innerHTML = "共 <b>" + STARS.length + "</b> 款 · 合计 " + fmtDec(D.starGmv, 2) + " 亿 · ← → 切换";
+
+  /* 7.3 选中单品档案（固定高度块） */
+  function renderDossier(s) {
+    const l = LINES[s.li];
+    $("pd-dossier").innerHTML =
+      '<div class="pd-dos-title"><b style="color:' + l.color + '">' + s.name + "</b><span>" + s.nick +
+        " · " + l.name + " · " + s.pos + "</span></div>" +
+      '<div class="pd-dos-grid">' +
+        '<div class="pd-dos-cell"><span>上市时间</span><b>' + s.launch + "</b></div>" +
+        '<div class="pd-dos-cell"><span>线上 / 线下</span><b>' + fmtDec(s.onShare, 1) + "% / " + fmtDec(100 - s.onShare, 1) + "%</b></div>" +
+        '<div class="pd-dos-cell"><span>本线明星合计占比</span><b>' + fmtDec(l.starShare, 1) + "%</b></div>" +
+      "</div>";
+  }
+
+  /* 7.4 各面板 tag（必须与图表同批次、在 init 前落定文案） */
+  function renderTags(s) {
+    const l = LINES[s.li];
+    $("pd-crumb-obj").textContent = s.name;
+    $("pd-title").textContent = s.nick + " 销售详情";
+    $("pd-chip-gmv").textContent = fmtDec(s.gmv, 2) + " 亿";
+    $("pd-scatter-tag").innerHTML = l.name + " 在售 <b>" + l.skuCnt + "</b> 款 · 明星 " + l.starCnt +
+      " 款合计 " + fmtDec(l.starOn, 2) + " 亿 · 占该产品线线上 GMV 的 <b>" + fmtDec(l.starShare, 1) + "%</b>";
+    $("pd-month-tag").innerHTML = MON_WINDOW + " · 峰值 <b>" + MONTHS[s.peakM] + " " +
+      fmtDec(s.monTotal[s.peakM], 0) + "</b> 万元";
+    $("pd-mix-tag").innerHTML = "线上 " + fmtDec(s.on, 2) + " + 线下 " + fmtDec(s.off, 2) +
+      " = <b>" + fmtDec(s.gmv, 2) + "</b> 亿元";
+    $("pd-heat-tag").innerHTML = "6 渠道 × 12 月 = <b>72</b> 格 · 合计 " + fmtDec(s.heatSum, 0) +
+      " 万元 = 该单品全渠道 GMV";
+  }
+
+  /* 7.5 底部洞察（随单品重算，不另编数字） */
+  const track = $("pd-foot-track");
+  let footX = 0;
+  function renderFoot(s) {
+    const l = LINES[s.li];
+    const items = [
+      { lv: "高", c: C.cyan, t: s.name + "（" + s.nick + "）年销量 " + fmtDec(s.units, 2) + " 万台、全渠道 GMV " +
+          fmtDec(s.gmv, 2) + " 亿元 = 线上 " + fmtDec(s.on, 2) + " + 线下 " + fmtDec(s.off, 2) },
+      { lv: "高", c: C.amber, t: "线上 " + fmtDec(s.on, 2) + " 亿元占 " + l.name + "线上 GMV（" + fmtDec(l.online, 2) +
+          " 亿）的 " + fmtDec(s.lineShare, 1) + "%；该线 " + l.starCnt + " 款明星合计占 " + fmtDec(l.starShare, 1) + "%" },
+      { lv: "中", c: CHANNELS[s.chTopI].color, t: "第一渠道 " + CHANNELS[s.chTopI].name + " " +
+          fmtDec(s.chTotal[s.chTopI] / 1e4, 2) + " 亿元、占 " + fmtDec(s.chShare[s.chTopI], 1) + "%；线上第一 " +
+          CHANNELS[s.onTopI].name + " " + fmtDec(s.chShare[s.onTopI], 1) + "%" },
+      { lv: "中", c: C.orange, t: "月度峰值 " + MONTHS[s.peakM] + " " + fmtDec(s.monTotal[s.peakM], 0) +
+          " 万元，为月均（" + fmtDec(s.heatSum / 12, 0) + " 万元）的 " + fmtDec(s.monTotal[s.peakM] / (s.heatSum / 12), 2) + " 倍" },
+      { lv: "低", c: s.gm >= 33 ? C.green : C.amber, t: "毛利率 " + fmtDec(s.gm, 1) + "%（" + s.verdict.t +
+          "）· 年毛利额 " + fmtDec(s.profit, 2) + " 亿元 · 用户评分 " + fmtDec(s.score, 1) + " / 5" },
+      { lv: "低", c: C.violet, t: "定位 " + s.pos + " · 成交均价 " + fmtDec(s.aov, 0) + " 元，落在 " +
+          (s.price < 2000 ? "入门带" : s.price < 5000 ? "主流带" : "高端带") + "（" + l.name + "价格带 " + l.lo + "~" + l.hi + " 元）" },
+      { lv: "低", c: C.green, t: "九款明星单品线上合计 " + fmtDec(D.starOn, 2) + " 亿元、占线上大盘 " +
+          fmtDec(D.starOnShare, 1) + "%；线下合计 " + fmtDec(D.starOff, 2) + " 亿元、占线下 " + fmtDec(D.starOffShare, 1) + "%" }
+    ];
+    const html = items.map((a) => (
+      '<div class="pd-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+    )).join("");
+    track.innerHTML = html + html;                                  /* 两份首尾相接，滚动无缝 */
+    footX = 0;
+    track.style.transform = "translateX(0px)";
+  }
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ★ init 之前先把初始单品的全部文案落定 */
+  function renderStatic(s) {
+    renderKpi(s); renderDossier(s); renderTags(s); renderFoot(s);
+    listRows.forEach((r, i) => r.classList.toggle("is-active", i === idx));
+  }
+  renderStatic(STARS[idx]);
+
+  /* ===== 8. 图表初始化 =====
+     ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = (extra) => Object.assign({
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  }, extra || {});
+
+  const scatter = makeChart("pd-chart-scatter");
+  const monthChart = makeChart("pd-chart-month");
+  const mixChart = makeChart("pd-chart-mix");
+  const heatChart = makeChart("pd-chart-heat");
+
+  /* 8.1 价格带定位散点（本页招牌图）
+         横轴 = 成交均价，纵轴 = 线上年销量，气泡面积 ∝ 线上 GMV。
+         三层：其他产品线（灰底噪声）/ 同产品线其他机型（本线主色）/ 选中单品（高亮 + 标注）。
+         ★ series.data 只放数组 [price, units, gmv, skuIdx]，业务对象靠 skuIdx 回查，不回指。 */
+  function scatterPoint(k, ki) { return [k.price, k.onUnits, k.on, ki]; }
+  function scatterOption(s) {
+    const other = [], same = [], me = [];
+    SKUS.forEach((k, ki) => {
+      const p = scatterPoint(k, ki);
+      if (k.star && k.si === idx) me.push(p);
+      else if (k.li === s.li) same.push(p);
+      else other.push(p);
+    });
+    const lc = LINES[s.li].color;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 10, right: 22, top: 36, bottom: 6, containLabel: true },
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 12,
+        textStyle: { color: C.textDim, fontSize: 11 },
+        data: ["其他产品线机型", "同产品线机型", "选中单品"]
+      },
+      tooltip: TIP({
+        trigger: "item",
+        formatter: (p) => {
+          const k = SKUS[p.data[3]];
+          const l = LINES[k.li];
+          const head = k.star
+            ? '<b style="color:' + l.color + '">' + k.name + "</b>（" + STARS[k.si].nick + "）<br/>"
+            : '<b style="color:' + C.textDim + '">' + k.name + "</b><br/>";
+          return head + l.name + " · 成交均价 <b>" + fmtDec(k.price, 0) + "</b> 元<br/>" +
+            "线上销量 <b>" + fmtDec(k.onUnits, 2) + "</b> 万台 · 线上 GMV <b>" + fmtDec(k.on, 2) + "</b> 亿元<br/>" +
+            '<span style="color:' + C.textDim + '">占 ' + l.name + "线上 GMV " + fmtDec(k.on / l.online * 100, 1) + "%</span>";
+        }
+      }),
+      xAxis: {
+        type: "value", name: "成交均价（元）", min: 0, max: PRICE_MAX,
+        nameTextStyle: { color: C.textDim, fontSize: 10 }, nameGap: 20,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE
+      },
+      yAxis: {
+        type: "value", name: "线上年销量（万台）", min: 0,
+        nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE
+      },
+      series: [
+        {
+          name: "其他产品线机型", type: "scatter", data: other,
+          symbolSize: (v) => 5 + Math.sqrt(v[2]) * 6,
+          itemStyle: { color: "rgba(127,166,163,.34)", borderColor: "rgba(127,166,163,.5)", borderWidth: 0.6 },
+          /* 价格带分区铺底：挂在最底层系列上，silent 不抢 tooltip */
+          markArea: {
+            silent: true,
+            label: { show: true, position: "insideTop", color: "rgba(127,166,163,.75)", fontSize: 10.5, distance: 4 },
+            data: BANDS.map((b) => ([
+              { name: b.name, xAxis: b.lo, itemStyle: { color: b.color } },
+              { xAxis: b.hi }
+            ]))
+          }
+        },
+        {
+          name: "同产品线机型", type: "scatter", data: same,
+          symbolSize: (v) => 6 + Math.sqrt(v[2]) * 7,
+          itemStyle: { color: lc + "66", borderColor: lc, borderWidth: 1 }
+        },
+        {
+          name: "选中单品", type: "scatter", data: me, z: 10,
+          symbolSize: (v) => 14 + Math.sqrt(v[2]) * 8,
+          itemStyle: { color: lc, borderColor: "#eafcfa", borderWidth: 2, shadowBlur: 16, shadowColor: lc },
+          label: {
+            show: true, position: "top", distance: 8, color: "#eafcfa", fontSize: 12, fontWeight: 700,
+            formatter: () => s.code + "  " + fmtDec(s.price, 0) + " 元"
+          },
+          markLine: {
+            silent: true, symbol: "none",
+            lineStyle: { color: lc, type: "dashed", width: 1, opacity: 0.55 },
+            label: { show: false },
+            data: [{ xAxis: s.price }, { yAxis: s.onUnits }]
+          }
+        }
+      ]
+    };
+  }
+
+  /* 8.2 单品月度走势：柱 = 月度全渠道 GMV（万元），线 = 当月线上占比（%） */
+  function monthOption(s) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 6, top: 26, bottom: 2, containLabel: true },
+      legend: { show: true, top: 0, right: 2, itemWidth: 12, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["月度 GMV", "线上占比"] },
+      tooltip: TIP({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const m = ps[0].dataIndex;
+          return "<b>" + MONTHS[m] + "</b>　全渠道 <b>" + fmtDec(s.monTotal[m], 0) + "</b> 万元<br/>" +
+            "线上 " + fmtDec(s.monOnline[m], 0) + " 万元（<b>" + fmtDec(s.monOnShare[m], 1) + "%</b>）· 线下 " +
+            fmtDec(s.monTotal[m] - s.monOnline[m], 0) + " 万元";
+        }
+      }),
+      xAxis: {
+        type: "category", data: MONTHS,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10, interval: 0, rotate: 34 })
+      },
+      yAxis: [
+        { type: "value", name: "万元", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false } },
+        { type: "value", name: "%", min: 0, max: 100, nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10 }), splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "月度 GMV", type: "bar", barWidth: "58%",
+          data: s.monTotal.map((v) => Number(fmtDec(v, 0))),
+          itemStyle: {
+            borderRadius: [3, 3, 0, 0],
+            color: (p) => (p.dataIndex === s.peakM
+              ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: C.orange }, { offset: 1, color: "rgba(255,157,69,.25)" }])
+              : new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: C.cyan }, { offset: 1, color: "rgba(53,224,208,.18)" }]))
+          } },
+        { name: "线上占比", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 5,
+          data: s.monOnShare.map((v) => Number(fmtDec(v, 1))),
+          lineStyle: { color: C.violet, width: 2 }, itemStyle: { color: C.violet } }
+      ]
+    };
+  }
+
+  /* 8.3 渠道构成：横向条形，6 条渠道（前 5 线上 + 线下），标签直接给出 GMV 与占比 */
+  function mixOption(s) {
+    const order = CHANNELS.map((_, i) => i).reverse();               /* 横向条形自下而上，反序渲染 */
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 96, top: 8, bottom: 2, containLabel: true },
+      tooltip: TIP({
+        trigger: "item",
+        formatter: (p) => {
+          const c = order[p.dataIndex];
+          return '<b style="color:' + CHANNELS[c].color + '">' + CHANNELS[c].name + "</b>（" +
+            (CHANNELS[c].online ? "线上" : "线下") + "）<br/>GMV <b>" + fmtDec(s.chTotal[c] / 1e4, 2) +
+            "</b> 亿元 · 占该单品 <b>" + fmtDec(s.chShare[c], 1) + "%</b><br/>" +
+            '<span style="color:' + C.textDim + '">' + fmtDec(s.chTotal[c], 0) + " 万元 · 12 个月合计</span>";
+        }
+      }),
+      xAxis: { type: "value", axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { show: false }, splitLine: { show: false } },
+      yAxis: {
+        type: "category", data: order.map((c) => CHANNELS[c].name),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 11.5 })
+      },
+      series: [{
+        type: "bar", barWidth: 13,
+        data: order.map((c) => ({
+          value: Number(fmtDec(s.chTotal[c] / 1e4, 4)),
+          itemStyle: {
+            borderRadius: [0, 4, 4, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: CHANNELS[c].color + "55" }, { offset: 1, color: CHANNELS[c].color }
+            ])
+          }
+        })),
+        label: {
+          show: true, position: "right", distance: 7, color: "#cfe9e6", fontSize: 11, fontWeight: 700,
+          formatter: (p) => fmtDec(p.value, 2) + " 亿 · " + fmtDec(s.chShare[order[p.dataIndex]], 1) + "%"
+        }
+      }]
+    };
+  }
+
+  /* 8.4 渠道 × 月度销售热力表（全宽招牌图）
+         ★ visualMap 用连续式：分段式一旦设了两端 text，showLabel 默认变 false、每档 label 会被整体吞掉。 */
+  function heatOption(s) {
+    const data = [];
+    s.heat.forEach((row, c) => row.forEach((v, m) => data.push([m, c, Number(fmtDec(v, 0))])));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 78, right: 22, top: 10, bottom: 46, containLabel: false },
+      tooltip: TIP({
+        position: "top",
+        formatter: (p) => {
+          const m = p.data[0], c = p.data[1], v = p.data[2];
+          return '<b style="color:' + CHANNELS[c].color + '">' + CHANNELS[c].name + " · " + MONTHS[m] + "</b><br/>" +
+            "GMV <b>" + fmtDec(v, 0) + "</b> 万元<br/>占该渠道 " + fmtDec(v / s.chTotal[c] * 100, 1) +
+            "% · 占该月 " + fmtDec(v / s.monTotal[m] * 100, 1) + "%<br/>" +
+            '<span style="color:' + C.textDim + '">' + s.name + " · " + MON_WINDOW + "</span>";
+        }
+      }),
+      xAxis: {
+        type: "category", data: MONTHS, splitArea: { show: true, areaStyle: { color: ["transparent", "rgba(64,196,190,.03)"] } },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 11.5 })
+      },
+      yAxis: {
+        type: "category", data: CHANNELS.map((c) => c.name), inverse: true,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: {
+          color: C.textDim, fontSize: 12,
+          formatter: (n) => {
+            const c = CHANNELS.map((x) => x.name).indexOf(n);
+            return "{" + (CHANNELS[c].online ? "on" : "off") + "|" + n + "}";
+          },
+          rich: {
+            on: { color: "#cfe9e6", fontSize: 12, fontWeight: 700 },
+            off: { color: PAL.series[4], fontSize: 12, fontWeight: 700 }
+          }
+        }
+      },
+      visualMap: {
+        type: "continuous", min: Math.floor(s.heatMin), max: Math.ceil(s.heatMax),
+        calculable: false, orient: "horizontal", left: "center", bottom: 2,
+        itemWidth: 13, itemHeight: 200,
+        textStyle: { color: C.textDim, fontSize: 10.5 },
+        text: ["高 " + fmtDec(s.heatMax, 0) + " 万元", fmtDec(s.heatMin, 0) + " 低"],
+        inRange: { color: ["rgba(26,158,150,.16)", "rgba(53,224,208,.55)", "#ffc94d", "#ff9d45", "#ff5f6b"] }
+      },
+      series: [{
+        type: "heatmap", data: data,
+        label: { show: true, color: "#04191a", fontSize: 10.5, fontWeight: 700, formatter: (p) => fmtDec(p.data[2], 0) },
+        itemStyle: { borderColor: "rgba(7,27,30,.9)", borderWidth: 1.5, borderRadius: 3 },
+        emphasis: { itemStyle: { borderColor: "#eafcfa", borderWidth: 2, shadowBlur: 10, shadowColor: "rgba(53,224,208,.5)" } }
+      }]
+    };
+  }
+
+  /* ===== 9. 切换：整页随单品重绘 + hash 同步 ===== */
+  /* ★ heatIdx 必须在 applyItem 之前用 let 声明：applyItem 里要复位它，
+       若声明写在下面的「活性」段落，首次 applyItem 会撞进暂时性死区直接抛 ReferenceError。 */
+  let heatIdx = -1;
+  function applyItem(i) {
+    const n = STARS.length;
+    idx = ((i % n) + n) % n;
+    const s = STARS[idx];
+
+    renderStatic(s);
+    scatter.setOption(scatterOption(s), true);                       /* 三层点集长度随单品变 → notMerge */
+    monthChart.setOption(monthOption(s), true);
+    mixChart.setOption(mixOption(s), true);
+    heatChart.setOption(heatOption(s), true);
+
+    heatIdx = -1;
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    try { history.replaceState(null, "", "#" + encodeURIComponent(s.name)); }
+    catch (e) { /* file:// 下部分浏览器禁止 replaceState，忽略即可 */ }
+  }
+  applyItem(idx);
+
+  /* ===== 10. 活性：热力格巡航 + 月度柱提示 ===== */
+  setInterval(() => {
+    heatChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    heatIdx = (heatIdx + 1) % (CHANNELS.length * MONTHS.length);
+    heatChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: heatIdx });
+  }, 900);
+
+  let monIdx = 0;
+  setInterval(() => {
+    monthChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: monIdx });
+    monIdx = (monIdx + 1) % MONTHS.length;
+  }, 3200);
+
+  /* ===== 11. 交互：清单点击 / 键盘 ← → / Esc 回上级 / hashchange / kiosk 轮换 ===== */
+  listRows.forEach((r) => r.addEventListener("click", () => { applyItem(Number(r.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyItem(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyItem(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = hashIdx();
+    if (k >= 0 && k !== idx) { applyItem(k); restart(); }
+  });
+
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => applyItem(idx + 1), 15000); }
+  restart();
+  const listPanel = $("pd-list-panel");
+  listPanel.addEventListener("mouseenter", () => clearInterval(timer));
+  listPanel.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const EPS = 1e-6;
+  const checks = [
+    ["线上大盘 = 6 产品线之和 = 5 平台之和 = 58.70 亿",
+      Math.abs(D.online - 58.70) < EPS && Math.abs(D.online - D.onlineByPlat) < EPS],
+    ["全渠道：线上 58.70 + 线下 48.4 + 工程 5.5 = 112.6 亿",
+      Math.abs(D.online + REV_OFFLINE + REV_PROJECT - REV_TOTAL) < EPS],
+    ["各产品线明星单品线上 GMV 之和 < 该产品线线上 GMV",
+      LINES.every((l) => l.starOn < l.online && l.tailOn > 0)],
+    ["明星单品线上合计 = 各产品线明星合计之和",
+      Math.abs(D.starOn - sum(LINES.map((l) => l.starOn))) < EPS],
+    ["散点全量（明星 + 长尾）线上 GMV 之和 = 58.70 亿",
+      Math.abs(D.skuOn - D.online) < 1e-6],
+    ["各产品线散点线上 GMV 之和 = 该线线上 GMV",
+      LINES.every((l, j) => Math.abs(sum(SKUS.filter((k) => k.li === j).map((k) => k.on)) - l.online) < 1e-9)],
+    ["明星单品线下合计 ≤ 线下大盘 48.4 亿", D.starOff <= REV_OFFLINE + EPS],
+    ["各单品年销量 = 全渠道 GMV ÷ 成交均价",
+      STARS.every((s) => Math.abs(s.units - s.gmv * 1e8 / s.price / 1e4) < 1e-9 && Math.abs(s.aov - s.price) < 1e-6)],
+    ["九款明星单品年销量合计 < 全渠道 866 万台", D.starUnits < UNITS_TOTAL],
+    ["各单品热力 6 × 12 合计 = 该单品全渠道 GMV",
+      STARS.every((s) => Math.abs(s.heatSum - s.gmv * 1e4) < 1e-3)],
+    ["各单品前 5 行（平台）合计 = 线上 GMV，第 6 行 = 线下 GMV",
+      STARS.every((s) => Math.abs(sum(s.chTotal.slice(0, N_ON)) - s.on * 1e4) < 1e-6 &&
+                         Math.abs(s.chTotal[N_ON] - s.off * 1e4) < 1e-9)],
+    ["各单品每行 12 月合计 = 该渠道合计",
+      STARS.every((s) => s.heat.every((row, c) => Math.abs(sum(row) - s.chTotal[c]) < 1e-6))],
+    ["各单品渠道占比合计 = 100%",
+      STARS.every((s) => Math.abs(sum(s.chShare) - 100) < 1e-6)],
+    ["各单品 12 月合计 = 全渠道 GMV（列向求和一致）",
+      STARS.every((s) => Math.abs(sum(s.monTotal) - s.gmv * 1e4) < 1e-3)],
+    ["热力矩阵格数 = 6 渠道 × 12 月 = 72", CHANNELS.length * MONTHS.length === 72],
+    ["option 内无循环引用（可 JSON 序列化）", (() => {
+      try {
+        const s = STARS[idx];
+        JSON.stringify([scatterOption(s), monthOption(s), mixOption(s), heatOption(s)]);
+        return true;
+      } catch (e) { return false; }
+    })()]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单品销售详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

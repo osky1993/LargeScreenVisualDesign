@@ -1,0 +1,1193 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电故障部件分析</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --bj-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 部件清单列宽：部件 / 主责缺陷 / 缺陷件数 / 占比 / 工单 / 故障率 */
+    --bj-pcols: 76px 1fr 52px 46px 52px 52px;
+    /* 批次追溯列宽：批次号 / 基地 / 生产日期 / 供应商 / 级别 / 涉及台数 / 故障台数 / 故障率 / 处置 */
+    --bj-bcols: 96px 72px 76px 1fr 40px 64px 60px 52px 56px;
+    /* 供应商列宽：供应商 / 级别 / 批次 / 涉及台数 / 故障率 */
+    --bj-scols: 1fr 36px 40px 64px 52px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .bj-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 560px 1fr 452px;
+    grid-template-rows: 84px 132px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .bj-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .bj-error.is-visible { display: block; }
+
+  /* ===== 顶栏：面包屑（含返回上级 + 兄弟页链接） + 部件切换器 + 芯片 + 时钟 ===== */
+  .bj-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 10px;
+  }
+  .bj-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .bj-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .bj-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .bj-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .bj-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .bj-crumb em { font-style: normal; color: #cfeae7; }
+  /* 返回上级：本页是「品质管理」的下钻页，也兼作「售后服务」的下钻页 */
+  .bj-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px 3px; border-radius: 7px;
+    color: #a9d9d4; text-decoration: none; letter-spacing: 0.06em;
+    border: 1px solid rgba(64, 196, 190, 0.3); background: rgba(14, 52, 56, 0.55);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .bj-crumb-up:hover { color: #eafcfa; border-color: rgba(53, 224, 208, 0.85); box-shadow: 0 0 14px rgba(53, 224, 208, 0.32); }
+  /* 次要链接：兄弟页（售后服务），不带边框，弱一档 */
+  .bj-crumb-alt {
+    color: rgba(169, 217, 212, 0.78); text-decoration: none; letter-spacing: 0.06em;
+    border-bottom: 1px dashed rgba(64, 196, 190, 0.35); padding-bottom: 1px;
+    transition: color .18s, border-color .18s;
+  }
+  .bj-crumb-alt:hover { color: #eafcfa; border-color: rgba(53, 224, 208, 0.8); }
+  .bj-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .bj-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .bj-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .bj-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .bj-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .bj-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+  /* 部件切换器：8 枚部件 tab（= 8 类主责缺陷部件） */
+  .bj-switcher { display: flex; align-items: stretch; gap: 6px; }
+  .bj-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 62px; padding: 6px 7px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9d9d4;
+    border: 1px solid rgba(64, 196, 190, 0.28); background: rgba(12, 44, 48, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .bj-sw-tab b { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+  .bj-sw-tab span { font-size: 10px; letter-spacing: 0.04em; color: rgba(127, 166, 163, 0.9); font-variant-numeric: tabular-nums; }
+  .bj-sw-tab:hover { color: #eafcfa; border-color: rgba(53, 224, 208, 0.6); }
+  .bj-sw-tab.is-active {
+    color: #04191a; border-color: transparent;
+    background: linear-gradient(160deg, var(--mfg-cyan), var(--mfg-cyan-deep));
+    box-shadow: 0 0 16px rgba(53, 224, 208, 0.42);
+  }
+  .bj-sw-tab.is-active span { color: rgba(4, 25, 26, 0.72); }
+
+  .bj-chips { display: flex; align-items: center; gap: 9px; }
+  .bj-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 108px; padding: 7px 13px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .bj-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .bj-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .bj-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .bj-chip.is-key b { color: var(--mfg-cyan); }
+  .bj-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 16px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .bj-clock-time { font: 700 26px/1 var(--bj-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .bj-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .bj-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .bj-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .bj-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .bj-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .bj-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .bj-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .bj-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .bj-kpi.is-warn .bj-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .bj-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .bj-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .bj-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .bj-kpi-val { font: 700 30px/1 var(--bj-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .bj-kpi.is-warn .bj-kpi-val { color: #ffd9b0; }
+  .bj-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .bj-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bj-kpi-sub b { font-weight: 700; }
+  .bj-up { color: var(--mfg-green); }
+  .bj-down { color: var(--mfg-red); }
+
+  /* ===== 三栏主体 ===== */
+  .bj-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .bj-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .bj-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .bj-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .bj-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .bj-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .bj-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .bj-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .bj-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* 旭日视角切换 + 下钻复位（panel-head 内，flex:none，init 前就已定型） */
+  .bj-modes { display: flex; align-items: center; gap: 6px; }
+  .bj-mode {
+    font-family: inherit; font-size: 11px; letter-spacing: 0.04em; cursor: pointer;
+    padding: 3px 9px 4px; border-radius: 6px; white-space: nowrap;
+    color: #a9d9d4; border: 1px solid rgba(64, 196, 190, 0.28); background: rgba(12, 44, 48, 0.5);
+    transition: color .18s, border-color .18s, background .18s;
+  }
+  .bj-mode:hover { color: #eafcfa; border-color: rgba(53, 224, 208, 0.6); }
+  .bj-mode.is-active { color: #04191a; border-color: transparent; background: linear-gradient(160deg, var(--mfg-cyan), var(--mfg-cyan-deep)); }
+  .bj-mode.is-reset { color: var(--mfg-amber); border-color: rgba(255, 201, 77, 0.45); background: rgba(60, 44, 12, 0.5); }
+  .bj-mode.is-hidden { display: none; }
+
+  /* ===== CSS grid 模拟表格（三处共用骨架，列宽各自变量） ===== */
+  .bj-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .bj-thead, .bj-tbody li {
+    display: grid; align-items: center; gap: 6px;
+  }
+  .bj-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.06em; color: #7fc0ba;
+  }
+  .bj-thead span:not(:first-child), .bj-tbody li span:not(:first-child) { text-align: right; }
+  .bj-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .bj-tbody li {
+    padding: 0 8px; height: 30px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .bj-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .bj-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .bj-tbody li.is-mute { color: rgba(127, 166, 163, 0.72); }
+  .bj-tbody li b { font-weight: 700; color: #eafcfa; }
+  .bj-tbody li.is-click { cursor: pointer; }
+  .bj-tbody li.is-click:hover { background: rgba(53, 224, 208, 0.1); }
+  /* 三张表各自的列宽 */
+  #bj-parts-head, #bj-parts-body li { grid-template-columns: var(--bj-pcols); }
+  #bj-batch-head, #bj-batch-body li { grid-template-columns: var(--bj-bcols); }
+  #bj-sup-head, #bj-sup-body li { grid-template-columns: var(--bj-scols); }
+  /* 文本列不右对齐（thead 规则默认把非首列全部右对齐） */
+  #bj-parts-head span:nth-child(2), #bj-parts-body li span:nth-child(2),
+  #bj-batch-head span:nth-child(2), #bj-batch-body li span:nth-child(2),
+  #bj-batch-head span:nth-child(3), #bj-batch-body li span:nth-child(3),
+  #bj-batch-head span:nth-child(4), #bj-batch-body li span:nth-child(4) { text-align: left; }
+  .bj-ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .bj-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .bj-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .bj-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .bj-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+  .bj-badge.is-info { color: #04222e; background: var(--mfg-blue); }
+  /* 供应商级别徽章：S 战略 / A 优选 / B 合格 / C 观察 */
+  .bj-badge.is-s { color: #04191a; background: var(--mfg-cyan); }
+  .bj-badge.is-a { color: #04222e; background: var(--mfg-blue); }
+  .bj-badge.is-b { color: #063a25; background: var(--mfg-green); }
+  .bj-badge.is-c { color: #3a2405; background: var(--mfg-orange); }
+
+  /* ===== 底部预警滚动条 ===== */
+  .bj-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .bj-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .bj-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: bj-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes bj-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .bj-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .bj-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .bj-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .bj-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .bj-foot-item b { font-weight: 700; }
+  .bj-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .bj-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="bj-stage" id="bj-stage">
+    <!-- mockflag:begin --><div class="bj-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="bj-error" id="bj-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（页头正中留空：留给 tools/inject_mock_flag.py 注入的「模拟数据」标识） -->
+    <header class="bj-header">
+      <div class="bj-head-left">
+        <div class="bj-crumb">
+          <b>云麓厨电</b><i>›</i>
+          <a class="bj-crumb-up" href="大屏样板间-厨电品质管理1920.html" title="返回上级专题页（Esc）">‹ 返回 品质管理</a><i>›</i>
+          <em id="bj-crumb-obj">--</em><i>|</i>
+          <a class="bj-crumb-alt" href="大屏样板间-厨电售后服务1920.html" title="本页兼作售后服务页的下钻页">亦可回 售后服务 ›</a>
+        </div>
+        <div class="bj-head-title-row">
+          <div class="bj-head-title" id="bj-title">-- 故障部件分析</div>
+          <div class="bj-head-meta">
+            <span>部件 <b>8</b> 类 · 缺陷 <b>9</b> 型</span><i>|</i>
+            <span>批次 <b id="bj-meta-batch">--</b> 批 · 供应商 <b id="bj-meta-sup">--</b> 家</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="bj-head-right">
+        <div class="bj-switcher" id="bj-switcher" aria-label="部件切换"></div>
+        <div class="bj-chips">
+          <div class="bj-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="bj-chip is-key"><span>PART FAIL</span><b id="bj-chip-rate">--</b></div>
+        </div>
+        <div class="bj-clock" aria-label="实时时钟">
+          <span class="bj-clock-time" id="bj-clock-time">--:--:--</span>
+          <span class="bj-clock-date" id="bj-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="bj-band" id="bj-band"></div>
+
+    <!-- 左栏：部件旭日（可下钻） + 八大部件清单 -->
+    <div class="bj-col">
+      <section class="bj-panel" style="flex: 1;">
+        <div class="bj-panel-head">
+          <h2>故障部件旭日</h2>
+          <div class="bj-modes" id="bj-modes">
+            <button type="button" class="bj-mode is-active" data-m="part">部件 › 产品线</button>
+            <button type="button" class="bj-mode" data-m="line">产品线 › 部件</button>
+            <button type="button" class="bj-mode is-reset is-hidden" id="bj-drill-reset">‹ 全部产品线</button>
+          </div>
+        </div>
+        <div class="bj-chart" id="bj-chart-sun" role="img" aria-label="故障部件旭日图，点击部件下钻、点击产品线筛选"></div>
+      </section>
+      <section class="bj-panel" style="flex: none; height: 352px;">
+        <div class="bj-panel-head">
+          <h2>缺陷类型与主责部件</h2>
+          <span class="bj-panel-tag">年度缺陷合计 <b id="bj-def-total">--</b> 件</span>
+        </div>
+        <div class="bj-table">
+          <div class="bj-thead" id="bj-parts-head">
+            <span>部件</span><span>主责缺陷</span><span>缺陷件数</span><span>占比%</span><span>工单/万</span><span>故障率%</span>
+          </div>
+          <ul class="bj-tbody" id="bj-parts-body"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中栏：选中部件的 24 月故障率走势 + 批次追溯表 -->
+    <div class="bj-col">
+      <section class="bj-panel" style="flex: none; height: 300px;">
+        <div class="bj-panel-head">
+          <h2 id="bj-trend-title">故障率 24 月走势</h2>
+          <span class="bj-panel-tag" id="bj-trend-tag">--</span>
+        </div>
+        <div class="bj-chart" id="bj-chart-trend" role="img" aria-label="选中部件近 24 个月故障率走势"></div>
+      </section>
+      <section class="bj-panel" style="flex: 1;">
+        <div class="bj-panel-head">
+          <h2 id="bj-batch-title">批次追溯</h2>
+          <span class="bj-panel-tag" id="bj-batch-tag">--</span>
+        </div>
+        <div class="bj-table">
+          <div class="bj-thead" id="bj-batch-head">
+            <span>批次号</span><span>生产基地</span><span>生产日期</span><span>供应商</span><span>级别</span><span>涉及台数</span><span>故障台数</span><span>故障率%</span><span>处置</span>
+          </div>
+          <ul class="bj-tbody" id="bj-batch-body"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右栏：主责供应商 + 批次故障率分布（按基地） -->
+    <div class="bj-col">
+      <section class="bj-panel" style="flex: none; height: 236px;">
+        <div class="bj-panel-head">
+          <h2>主责供应商</h2>
+          <span class="bj-panel-tag" id="bj-sup-tag">--</span>
+        </div>
+        <div class="bj-table">
+          <div class="bj-thead" id="bj-sup-head">
+            <span>供应商</span><span>级别</span><span>批次</span><span>涉及台数</span><span>故障率%</span>
+          </div>
+          <ul class="bj-tbody" id="bj-sup-body"></ul>
+        </div>
+      </section>
+      <section class="bj-panel" style="flex: 1;">
+        <div class="bj-panel-head">
+          <h2>批次故障率分布</h2>
+          <span class="bj-panel-tag" id="bj-scatter-tag">--</span>
+        </div>
+        <div class="bj-chart" id="bj-chart-scatter" role="img" aria-label="批次涉及台数与故障率散点，按生产基地着色"></div>
+      </section>
+    </div>
+
+    <!-- 底部预警滚动条 -->
+    <div class="bj-foot">
+      <div class="bj-foot-tag">部件溯源</div>
+      <div class="bj-foot-view"><div class="bj-foot-track" id="bj-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("bj-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("bj-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const PARENT = "大屏样板间-厨电品质管理1920.html";
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)",
+    rose: "#e8734f"                     /* 第 8 个分类色，由 orange 压深而来 */
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const pad3 = (n) => ("00" + n).slice(-3);
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const arrow = (v) => (v >= 0 ? "▲" : "▼");
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         本页是全系列质量闭环的收口页：市场故障 → 部件 → 批次 → 生产基地 → 供应商，
+         把 P2 供应商协同 / P3 生产制造 / P4 品质管理 / P10 售后服务四页串起来。
+
+         ★ 基准盘一律取自上级页「品质管理」，本页不另编：
+           六产品线保有量 3227 万台、市场故障率 3.0011%、年售后工单 96.84 万单、
+           缺陷类型与主责部件年度缺陷件数合计 21300 件。
+         ★ 循环引用红线：进 ECharts option 的数据只放标量与数组，业务对象之间一律用
+           name / 索引关联，绝不互相持有对象引用——option 会被深拷贝，成环即栈溢出、
+           整页图表全空。旭日 data 是递归树，尤其注意节点之间不互指（见 4.9 与 §9.1）。 ===== */
+
+  /* 4.1 六大产品线：保有量(万台) / 市场故障率(%) / 生产基地归属（= 品质管理页口径） */
+  const LINES = [
+    { name: "吸油烟机",   short: "烟机", base: "杭州临平", own: 892, fail: 2.72 },
+    { name: "燃气灶具",   short: "灶具", base: "杭州临平", own: 836, fail: 2.45 },
+    { name: "洗碗机",     short: "洗碗", base: "安徽芜湖", own: 402, fail: 3.86 },
+    { name: "蒸烤一体机", short: "蒸烤", base: "安徽芜湖", own: 268, fail: 4.12 },
+    { name: "集成灶",     short: "集成", base: "广东佛山", own: 358, fail: 3.24 },
+    { name: "净水热水",   short: "净水", base: "广东佛山", own: 471, fail: 2.96 }
+  ];
+
+  /* 4.2 三大基地（产品线 → 基地是唯一归属，批次的基地由其产品线反查，不另指定） */
+  const BASES = [
+    { name: "杭州临平", color: C.cyan },
+    { name: "安徽芜湖", color: C.orange },
+    { name: "广东佛山", color: C.violet }
+  ];
+  const BASE_COLOR = {};
+  BASES.forEach((b) => { BASE_COLOR[b.name] = b.color; });
+
+  /* 4.3 故障部件构成（产品线 → 部件，权重是相对份额）——与售后服务页旭日同一张表，
+         两页叶子口径因此完全衔接（叶子合计 = 年售后工单）。 */
+  const PART_MIX = {
+    "吸油烟机":   [["风机总成", 34], ["电控板", 26], ["面板玻璃", 22], ["结构件", 18]],
+    "燃气灶具":   [["点火针", 38], ["密封圈", 26], ["面板玻璃", 20], ["结构件", 16]],
+    "洗碗机":     [["电控板", 33], ["密封圈", 29], ["线束端子", 22], ["结构件", 16]],
+    "蒸烤一体机": [["电控板", 31], ["腔体内胆", 27], ["线束端子", 24], ["面板玻璃", 18]],
+    "集成灶":     [["风机总成", 30], ["点火针", 27], ["电控板", 24], ["密封圈", 19]],
+    "净水热水":   [["密封圈", 36], ["电控板", 28], ["线束端子", 21], ["腔体内胆", 15]]
+  };
+
+  /* 4.4 八大主责部件 + 各自的主责缺陷类型与年度缺陷件数（= 品质管理页帕累托口径）。
+         code 用于批次号前缀；suffix 用于虚构供应商字号；sup 是该部件供应商的级别序列。 */
+  const PARTS = [
+    { name: "电控板",   tab: "电控板", defect: "电控失效", n: 4820, code: "EC", mat: "电子电控件", suffix: "电子", sup: [0, 1, 1, 2, 3], color: C.cyan },
+    { name: "密封圈",   tab: "密封圈", defect: "密封不良", n: 3960, code: "SL", mat: "橡塑密封件", suffix: "密封", sup: [1, 1, 2, 2],    color: C.orange },
+    { name: "线束端子", tab: "线束",   defect: "焊接虚焊", n: 3240, code: "WH", mat: "铜材",       suffix: "铜业", sup: [0, 1, 2, 3],    color: C.blue },
+    { name: "面板玻璃", tab: "面板",   defect: "面板划伤", n: 2680, code: "GP", mat: "面板玻璃",   suffix: "玻璃", sup: [1, 2, 2],       color: C.green },
+    { name: "风机总成", tab: "风机",   defect: "噪音超标", n: 2150, code: "FA", mat: "冷轧板",     suffix: "机电", sup: [0, 1, 2],       color: C.amber },
+    { name: "点火针",   tab: "点火针", defect: "点火异常", n: 1720, code: "IG", mat: "不锈钢",     suffix: "精钢", sup: [1, 1, 2],       color: C.violet },
+    { name: "腔体内胆", tab: "内胆",   defect: "涂层脱落", n: 1180, code: "LN", mat: "不锈钢",     suffix: "热工", sup: [1, 2, 3],       color: C.cyanDeep },
+    { name: "结构件",   tab: "结构件", defect: "装配错位", n: 940,  code: "SF", mat: "冷轧板",     suffix: "钢构", sup: [1, 2, 2, 3],    color: C.rose }
+  ];
+  /* 未归集到主责部件的缺陷（品质管理页帕累托的「其他」档），只进清单不进部件切换 */
+  const OTHER_DEFECT = { name: "其他", n: 610 };
+
+  /* 4.5 供应商级别（= 供应商台账页四级口径：182 家 = S12 + A45 + B98 + C27） */
+  const TIERS = [
+    { key: "S", name: "战略", badge: "is-s", color: C.cyan },
+    { key: "A", name: "优选", badge: "is-a", color: C.blue },
+    { key: "B", name: "合格", badge: "is-b", color: C.green },
+    { key: "C", name: "观察", badge: "is-c", color: C.orange }
+  ];
+  const SUP_TOTAL = 182;
+  /* 虚构字号：与供应商台账页同一套字表，14 × 14 组合，杜撰字号不指向任何真实企业 */
+  const ZH1 = ["恒", "泰", "鼎", "华", "锐", "昊", "嘉", "远", "晟", "博", "维", "宸", "泓", "祁"];
+  const ZH2 = ["锐", "岚", "铖", "驰", "砚", "屹", "澈", "岱", "沣", "擎", "稷", "弘", "铠", "琮"];
+
+  /* 4.6 全司派生量（现算，不复制数字） */
+  const D = {};
+  LINES.forEach((l) => { l.tickets = l.own * l.fail / 100; });     /* 逐线年工单（万单） */
+  D.own = sum(LINES.map((l) => l.own));                            /* 保有量 3227 万台 */
+  D.tickets = sum(LINES.map((l) => l.tickets));                    /* 年售后工单 ≈ 96.84 万单 */
+  D.fail = D.tickets / D.own * 100;                                /* 全司市场故障率 ≈ 3.0011% */
+  D.defTotal = sum(PARTS.map((p) => p.n)) + OTHER_DEFECT.n;        /* 年度缺陷件数合计 = 21300 */
+  D.partDefTotal = sum(PARTS.map((p) => p.n));                     /* 八大部件小计 = 20690 */
+
+  /* 4.7 叶子表（产品线 × 部件）：旭日两种视角都由这一张扁平表现搭，
+         元素只存索引与标量，绝不回指 LINES / PARTS 对象。 */
+  const PI_OF = {};
+  PARTS.forEach((p, i) => { PI_OF[p.name] = i; });
+  const LEAVES = [];
+  LINES.forEach((l, li) => {
+    const mix = PART_MIX[l.name];
+    const wsum = sum(mix.map((m) => m[1]));
+    mix.forEach((m) => {
+      LEAVES.push({ li: li, pi: PI_OF[m[0]], w: m[1] / wsum,
+        tickets: l.tickets * m[1] / wsum,                          /* 该线该部件年工单（万单） */
+        own: l.own * m[1] / wsum });                               /* 该线该部件归集保有量（万台） */
+    });
+  });
+
+  /* 4.8 部件级派生：工单 / 归集保有量 / 市场加权故障率（批次生成的基准） */
+  PARTS.forEach((p, pi) => {
+    const mine = LEAVES.filter((x) => x.pi === pi);
+    p.tickets = sum(mine.map((x) => x.tickets));                   /* 年工单（万单） */
+    p.own = sum(mine.map((x) => x.own));                           /* 归集保有量（万台） */
+    p.share = p.tickets / D.tickets * 100;                         /* 占全司工单比 */
+    p.defShare = p.n / D.defTotal * 100;                           /* 占年度缺陷件数比 */
+    p.rateRef = p.tickets / p.own * 100;                           /* 市场加权故障率（基准） */
+    p.lineIdx = mine.map((x) => x.li);                             /* 用到该部件的产品线索引 */
+    p.baseNames = [];
+    p.lineIdx.forEach((li) => {
+      const b = LINES[li].base;
+      if (p.baseNames.indexOf(b) < 0) p.baseNames.push(b);
+    });
+  });
+
+  /* 4.9 供应商展开（确定性，kiosk 每次打开完全一致）：
+         首字取全局序号 g = pi*5 + k 的模，次字错开一个与 (pi,k) 相关的步长。
+         同一部件内 k < 5 < 14 → 首字互不相同；跨部件后缀不同 → 29 家两两不重名。 */
+  PARTS.forEach((p, pi) => {
+    p.sups = p.sup.map((ti, k) => {
+      const g = pi * 5 + k;
+      return {
+        name: ZH1[g % ZH1.length] + ZH2[(pi * 3 + k * 5 + 1) % ZH2.length] + p.suffix,
+        tier: ti
+      };
+    });
+  });
+  D.supCnt = sum(PARTS.map((p) => p.sups.length));                 /* 涉及供应商家数 */
+
+  /* 4.10 批次生成（确定性波形，不用 Math.random）：
+         · 批次的产品线在该部件的 lineIdx 里轮转 → 生产基地由产品线反查，
+           因此「洗碗机部件的批次只能来自安徽芜湖」这类归属天然成立；
+         · 故障台数按 rateRef 的确定性抖动现算，**部件故障率再由批次求和反算**，
+           Σ故障台数 ÷ Σ涉及台数 = 该部件故障率 这条恒等式由构造保证，不做任何倒挤。 */
+  const STATUS = [
+    { t: "已闭环", c: "is-good" },
+    { t: "追溯中", c: "is-info" },
+    { t: "整改中", c: "is-mid" },
+    { t: "停用批次", c: "is-bad" }
+  ];
+  PARTS.forEach((p, pi) => {
+    const nb = 9 + (pi % 3);                                       /* 9 ~ 11 批 */
+    p.batches = [];
+    for (let j = 0; j < nb; j++) {
+      const li = p.lineIdx[j % p.lineIdx.length];
+      const sp = p.sups[j % p.sups.length];
+      let y = 2025, m = 5 + j;                                     /* 生产期 2025-05 起逐月 */
+      if (m > 12) { m -= 12; y = 2026; }
+      const day = 2 + ((j * 7 + pi * 3) % 26);
+      const units = Math.round(3400 + 1500 * Math.sin(j * 0.9 + pi * 1.7) + 700 * Math.sin(j * 2.1 + pi * 0.6));
+      const rr = p.rateRef * (1 + 0.36 * Math.sin(j * 1.31 + pi * 0.83) + 0.14 * Math.sin(j * 2.7 + pi));
+      const fails = Math.max(1, Math.round(units * rr / 100));
+      p.batches.push({
+        code: p.code + String(y).slice(2) + pad(m) + "-" + pad3(101 + j * 13 + pi * 7),
+        li: li, base: LINES[li].base, lineName: LINES[li].name,
+        date: y + "-" + pad(m) + "-" + pad(day),
+        sup: sp.name, tier: sp.tier,
+        units: units, fails: fails, rate: fails / units * 100
+      });
+    }
+    /* ★ 部件故障率 = 各批次故障台数之和 ÷ 涉及台数之和（现算，不写死） */
+    p.units = sum(p.batches.map((b) => b.units));
+    p.fails = sum(p.batches.map((b) => b.fails));
+    p.rate = p.fails / p.units * 100;
+    /* 处置状态按批次故障率相对部件均值的偏离度判定 */
+    p.batches.forEach((b) => {
+      b.status = b.rate > p.rate * 1.30 ? STATUS[3]
+               : b.rate > p.rate * 1.08 ? STATUS[2]
+               : b.rate > p.rate * 0.88 ? STATUS[1]
+               : STATUS[0];
+    });
+    /* 供应商聚合：批次按供应商归并，故障率同样是 Σ故障 ÷ Σ台数 */
+    p.supRows = p.sups.map((s) => {
+      const bs = p.batches.filter((b) => b.sup === s.name);
+      const u = sum(bs.map((b) => b.units)), f = sum(bs.map((b) => b.fails));
+      return { name: s.name, tier: s.tier, cnt: bs.length, units: u, fails: f, rate: u ? f / u * 100 : 0 };
+    }).sort((a, b) => b.rate - a.rate);
+    /* 基地聚合：同一部件的批次落在哪几个基地、各自故障率多少 */
+    p.baseRows = p.baseNames.map((bn) => {
+      const bs = p.batches.filter((b) => b.base === bn);
+      const u = sum(bs.map((b) => b.units)), f = sum(bs.map((b) => b.fails));
+      return { base: bn, cnt: bs.length, units: u, fails: f, rate: u ? f / u * 100 : 0 };
+    }).sort((a, b) => b.rate - a.rate);
+    p.supWorst = p.supRows[0];
+    p.baseWorst = p.baseRows[0];
+    p.batchWorst = p.batches.slice().sort((a, b) => b.rate - a.rate)[0];
+  });
+
+  /* 4.11 部件 24 月故障率走势：确定性波形，末月锚定到批次现算值，与 KPI 勾稽 */
+  PARTS.forEach((p, pi) => {
+    p.trend = Array.from({ length: 24 }, (_, i) => {
+      const wave = Math.sin(i * 0.54 + pi * 1.3) * 0.16 + Math.sin(i * 1.17 + pi * 0.7) * 0.07;
+      const drift = (11.5 - i) * 0.012;                            /* 早期略高，全年缓降 */
+      return Number((p.rate + wave + drift).toFixed(3));
+    });
+    p.trend[23] = Number(p.rate.toFixed(3));                       /* 末月 = 批次现算故障率 */
+    p.mom = p.trend[23] - p.trend[22];
+    p.yoy = p.trend[23] - p.trend[11];
+  });
+  D.partRateWorst = PARTS.slice().sort((a, b) => b.rate - a.rate)[0];
+  D.partTicketTop = PARTS.slice().sort((a, b) => b.tickets - a.tickets)[0];
+  D.batchTotal = sum(PARTS.map((p) => p.batches.length));
+  D.unitsTotal = sum(PARTS.map((p) => p.units));
+
+  /* 4.12 hash 别名表：部件名 / 部件短名 / 主责缺陷名 / 批次码，四种写法都能命中 */
+  const HASH_ALIAS = {};
+  PARTS.forEach((p, i) => {
+    HASH_ALIAS[p.name] = i;
+    HASH_ALIAS[p.tab] = i;
+    HASH_ALIAS[p.defect] = i;
+    HASH_ALIAS[p.code] = i;
+  });
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("bj-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("bj-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 6. 静态 DOM 全部在 echarts.init 之前填充完 =====
+     ★ 与图表同属一个 flex 容器的兄弟块若在 init 之后才由 JS 填充，会把 flex:1 的图表容器
+       压矮、图表按旧高度布局（同批物流线路详情页栽过）。本页两道保险同时上：
+       ① 三个 JS 填充块（部件清单 / 供应商 / 批次追溯）所在 panel 全部写死高度或让图表 panel
+          写死高度，图表容器的高度与兄弟内容无关；
+       ② 首帧的表格内容在 init 之前就渲染完毕。 */
+
+  /* 6.1 部件切换器（顶栏，8 枚 tab） */
+  const switcher = $("bj-switcher");
+  switcher.innerHTML = PARTS.map((p, i) => (
+    '<button type="button" class="bj-sw-tab" data-i="' + i + '" title="' + p.name + " · " + p.defect + '">' +
+      "<b>" + p.tab + "</b><span>" + fmtDec(p.rate, 2) + "%</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.children);
+
+  /* 6.2 部件清单（左下，9 行 = 8 部件 + 其他；点击即切换部件） */
+  const partsBody = $("bj-parts-body");
+  partsBody.innerHTML = PARTS.map((p, i) => (
+    '<li class="is-click" data-i="' + i + '">' +
+      '<span><b style="color:' + p.color + '">' + p.name + "</b></span>" +
+      '<span class="bj-ell">' + p.defect + "</span>" +
+      "<span>" + fmtInt(p.n) + "</span>" +
+      "<span>" + fmtDec(p.defShare, 1) + "</span>" +
+      "<span>" + fmtDec(p.tickets, 2) + "</span>" +
+      '<span style="color:' + (p.rate > D.fail ? C.orange : C.green) + '">' + fmtDec(p.rate, 2) + "</span>" +
+    "</li>"
+  )).join("") + (
+    '<li class="is-mute">' +
+      "<span>其他缺陷</span>" +
+      '<span class="bj-ell">未归集主责部件</span>' +
+      "<span>" + fmtInt(OTHER_DEFECT.n) + "</span>" +
+      "<span>" + fmtDec(OTHER_DEFECT.n / D.defTotal * 100, 1) + "</span>" +
+      "<span>—</span><span>—</span>" +
+    "</li>"
+  );
+  const partRows = Array.from(partsBody.children);
+  $("bj-def-total").textContent = fmtInt(D.defTotal);
+
+  /* 6.3 批次追溯表 / 供应商表（内容随选中部件变，函数化，init 前先跑一遍首帧） */
+  const batchBody = $("bj-batch-body");
+  const supBody = $("bj-sup-body");
+  function renderBatches(p) {
+    batchBody.innerHTML = p.batches.map((b, i) => (
+      '<li data-i="' + i + '">' +
+        "<span><b>" + b.code + "</b></span>" +
+        '<span style="color:' + BASE_COLOR[b.base] + '">' + b.base + "</span>" +
+        "<span>" + b.date + "</span>" +
+        '<span class="bj-ell">' + b.sup + "</span>" +
+        '<span class="bj-badge ' + TIERS[b.tier].badge + '">' + TIERS[b.tier].key + "</span>" +
+        "<span>" + fmtInt(b.units) + "</span>" +
+        "<span>" + fmtInt(b.fails) + "</span>" +
+        '<span style="color:' + (b.rate > p.rate ? C.orange : C.green) + '">' + fmtDec(b.rate, 2) + "</span>" +
+        '<span class="bj-badge ' + b.status.c + '">' + b.status.t + "</span>" +
+      "</li>"
+    )).join("");
+  }
+  function renderSups(p) {
+    supBody.innerHTML = p.supRows.map((s) => (
+      "<li>" +
+        '<span class="bj-ell"><b>' + s.name + "</b></span>" +
+        '<span class="bj-badge ' + TIERS[s.tier].badge + '">' + TIERS[s.tier].key + "</span>" +
+        "<span>" + s.cnt + "</span>" +
+        "<span>" + fmtInt(s.units) + "</span>" +
+        '<span style="color:' + (s.rate > p.rate ? C.orange : C.green) + '">' + fmtDec(s.rate, 2) + "</span>" +
+      "</li>"
+    )).join("");
+  }
+
+  /* 6.4 KPI 带（5 枚，随部件重绘） */
+  function kpiDefs(p) {
+    return [
+      { icon: "☎", label: "该部件故障单量", val: p.tickets, unit: "万单", dec: 2, warn: false,
+        sub: () => "覆盖 <b>" + p.lineIdx.length + "</b> 条产品线 · 主责缺陷「" + p.defect + "」" },
+      { icon: "◑", label: "占全司工单比", val: p.share, unit: "%", dec: 2, warn: false,
+        sub: () => "全司年工单 <b>" + fmtDec(D.tickets, 2) + "</b> 万单（= 保有量 × 故障率）" },
+      { icon: "⚠", label: "该部件故障率", val: p.rate, unit: "%", dec: 2, warn: p.rate > D.fail,
+        sub: () => "= 批次故障 <b>" + fmtInt(p.fails) + "</b> 台 ÷ 涉及 <b>" + fmtInt(p.units) + "</b> 台" },
+      { icon: "⛓", label: "主责供应商", val: p.sups.length, unit: "家", dec: 0, warn: false,
+        sub: () => "集团在册 <b>" + SUP_TOTAL + "</b> 家 · 最差「" + p.supWorst.name + "」" + fmtDec(p.supWorst.rate, 2) + "%" },
+      { icon: "▤", label: "涉及批次", val: p.batches.length, unit: "批", dec: 0, warn: false,
+        sub: () => "落 <b>" + p.baseNames.length + "</b> 个基地 · 峰值「" + p.batchWorst.code + "」" + fmtDec(p.batchWorst.rate, 2) + "%" }
+    ];
+  }
+  const band = $("bj-band");
+  function renderKpi(p) {
+    const defs = kpiDefs(p);
+    band.innerHTML = defs.map((k, i) => (
+      '<div class="bj-kpi' + (k.warn ? " is-warn" : "") + '">' +
+        '<div class="bj-kpi-icon">' + k.icon + "</div>" +
+        '<div class="bj-kpi-main">' +
+          '<div class="bj-kpi-label">' + k.label + "</div>" +
+          '<div class="bj-kpi-num"><span class="bj-kpi-val" id="bj-kpi-' + i + '">0</span><span class="bj-kpi-unit">' + k.unit + "</span></div>" +
+          '<div class="bj-kpi-sub">' + k.sub() + "</div>" +
+        "</div>" +
+      "</div>"
+    )).join("");
+    defs.forEach((k, i) => countUp($("bj-kpi-" + i), k.val, k.dec));
+  }
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值 */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+
+  /* 6.5 首帧：先按 hash 定位部件，把三张表 + KPI 全部渲染完，再 init 图表 */
+  function parseHash() {
+    let h = "";
+    try { h = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim(); }
+    catch (e) { h = (location.hash || "").replace(/^#/, "").trim(); }   /* 坏码兜底：不解码直接比 */
+    if (!h) return -1;
+    const k = HASH_ALIAS[h];
+    return k == null ? -1 : k;
+  }
+  const hit0 = parseHash();
+  let idx = hit0 >= 0 ? hit0 : 0;
+  renderKpi(PARTS[idx]);
+  renderBatches(PARTS[idx]);
+  renderSups(PARTS[idx]);
+
+  /* ===== 7. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+
+  const sun = makeChart("bj-chart-sun");
+  const trend = makeChart("bj-chart-trend");
+  const scatter = makeChart("bj-chart-scatter");
+
+  /* ===== 7.1 部件旭日（两种视角 + 产品线下钻） =====
+     ★ data 是递归树，节点一律现造 { name, value, itemStyle, children }，
+       只写字符串与数字，节点之间不互相持有引用——成环会让 setOption 深拷贝爆栈。 */
+  let sunMode = "part";                 /* "part": 部件 › 产品线； "line": 产品线 › 部件 */
+  let drillLine = null;                 /* 下钻到某条产品线（索引），null = 全部 */
+  function sunOption() {
+    const leaves = LEAVES.filter((x) => drillLine == null || x.li === drillLine);
+    const groups = [];                  /* 内圈节点：{ key, name, color, kids: [] } */
+    const seen = {};
+    leaves.forEach((x) => {
+      const inner = sunMode === "part" ? PARTS[x.pi] : LINES[x.li];
+      const outer = sunMode === "part" ? LINES[x.li] : PARTS[x.pi];
+      const ik = sunMode === "part" ? "P" + x.pi : "L" + x.li;
+      if (seen[ik] == null) {
+        seen[ik] = groups.length;
+        groups.push({
+          key: ik,
+          name: sunMode === "part" ? inner.name : inner.short,
+          color: sunMode === "part" ? inner.color : C.series[x.li % C.series.length],
+          on: sunMode === "part" ? x.pi === idx : false,
+          kids: []
+        });
+      }
+      const g = groups[seen[ik]];
+      g.kids.push({
+        name: sunMode === "part" ? outer.short : outer.name,
+        value: Number(x.tickets.toFixed(4)),
+        on: sunMode === "part" ? false : x.pi === idx
+      });
+    });
+    const data = groups.map((g) => ({
+      name: g.name,
+      itemStyle: {
+        color: g.color,
+        borderColor: g.on ? "#eafcfa" : "rgba(7,27,30,.85)",
+        borderWidth: g.on ? 2.4 : 2
+      },
+      label: { color: "#04191a" },
+      children: g.kids.map((k) => ({
+        name: k.name,
+        value: k.value,
+        itemStyle: {
+          color: g.color + "8c",
+          borderColor: k.on ? "#eafcfa" : "rgba(7,27,30,.7)",
+          borderWidth: k.on ? 2 : 1
+        }
+      }))
+    }));
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const share = p.value / D.tickets * 100;
+          return "<b>" + p.name + "</b><br/>年工单 <b style=\"color:" + C.cyan + "\">" +
+            fmtDec(p.value, 2) + "</b> 万单 · 占全司 " + fmtDec(share, 2) + "%" +
+            "<br/><span style=\"color:" + C.textDim + "\">点击部件下钻 · 点击产品线筛选</span>";
+        }
+      }, TIP),
+      series: [{
+        type: "sunburst", radius: ["15%", "94%"], center: ["50%", "52%"], sort: null,
+        nodeClick: false,                      /* 下钻交给自己的 click 处理，避免与选中态打架 */
+        emphasis: { focus: "ancestor" },
+        levels: [
+          {},
+          { r0: "15%", r: "56%",
+            label: { rotate: "tangential", fontSize: 12, fontWeight: 700, minAngle: 12 } },
+          { r0: "58%", r: "94%",
+            label: { rotate: 0, fontSize: 10, color: "#dff3f0", minAngle: 9 } }
+        ],
+        data: data
+      }]
+    };
+  }
+
+  /* ===== 7.2 该部件 24 月故障率走势 ===== */
+  const TREND_MONTHS = Array.from({ length: 24 }, (_, i) => {
+    const m = ((7 - (23 - i)) % 12 + 12) % 12 + 1;                 /* 倒推 24 个月，末月 = 7 月 */
+    return m + "月";
+  });
+  function trendOption(p) {
+    const lo = Math.min.apply(null, p.trend.concat([D.fail]));
+    const hi = Math.max.apply(null, p.trend.concat([D.fail]));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 14, top: 28, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis",
+        formatter: (ps) => {
+          const v = ps[0].value;
+          return "第 " + (ps[0].dataIndex + 1) + " 月　" + p.name + " 故障率 <b>" + fmtDec(v, 2) + "%</b><br/>" +
+            "<span style=\"color:" + C.textDim + "\">全司市场故障率 " + fmtDec(D.fail, 2) + "%　偏离 " +
+            signed(v - D.fail, 2) + "pp</span>";
+        }
+      }, TIP),
+      legend: { show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: [p.name + " 故障率"] },
+      xAxis: {
+        type: "category", boundaryGap: false, data: TREND_MONTHS,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 2, fontSize: 10.5 })
+      },
+      yAxis: {
+        type: "value", name: "%",
+        min: Number((lo - 0.28).toFixed(2)), max: Number((hi + 0.24).toFixed(2)),
+        nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: Object.assign({}, AXIS_LABEL, { formatter: (v) => fmtDec(v, 2) }),
+        splitLine: SPLIT_LINE, axisLine: { show: false }
+      },
+      series: [{
+        name: p.name + " 故障率", type: "line", smooth: true, symbol: "circle", symbolSize: 5,
+        data: p.trend.slice(),
+        itemStyle: { color: (q) => (q.value > D.fail ? C.orange : C.cyan) },
+        lineStyle: { width: 2.4, color: p.color },
+        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: "rgba(53,224,208,.26)" }, { offset: 1, color: "rgba(53,224,208,0)" }
+        ]) },
+        markLine: {
+          silent: true, symbol: "none",
+          data: [{ yAxis: Number(D.fail.toFixed(3)),
+            lineStyle: { color: C.orange, type: "dashed", width: 1 },
+            label: { formatter: "全司 " + fmtDec(D.fail, 2) + "%", color: C.orange, fontSize: 10, position: "insideStartTop" } }]
+        }
+      }]
+    };
+  }
+
+  /* ===== 7.3 批次故障率分布散点：x 涉及台数 / y 批次故障率 / 大小 故障台数 / 颜色 基地 ===== */
+  function scatterOption(p) {
+    const series = p.baseNames.map((bn) => ({
+      name: bn, type: "scatter",
+      /* 数据项只放标量数组：[涉及台数, 故障率, 故障台数, 批次号, 生产日期, 供应商] */
+      data: p.batches.filter((b) => b.base === bn)
+        .map((b) => [b.units, Number(b.rate.toFixed(3)), b.fails, b.code, b.date, b.sup]),
+      symbolSize: (v) => 9 + Math.sqrt(v[2]) * 0.85,
+      itemStyle: { color: BASE_COLOR[bn], borderColor: "rgba(7,27,30,.7)", borderWidth: 1, opacity: 0.92 }
+    }));
+    if (series.length) {
+      series[0].markLine = {
+        silent: true, symbol: "none",
+        data: [{ yAxis: Number(p.rate.toFixed(3)),
+          lineStyle: { color: C.amber, type: "dashed", width: 1 },
+          label: { formatter: "部件均值 " + fmtDec(p.rate, 2) + "%", color: C.amber, fontSize: 10, position: "insideEndTop" } }]
+      };
+    }
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 16, top: 34, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (q) => {
+          const v = q.data;
+          return "<b>" + v[3] + "</b><br/>" + q.seriesName + " · " + v[4] +
+            "<br/>供应商 <b>" + v[5] + "</b>" +
+            "<br/>涉及 <b>" + fmtInt(v[0]) + "</b> 台 · 故障 <b style=\"color:" + C.orange + "\">" + fmtInt(v[2]) +
+            "</b> 台<br/>批次故障率 <b>" + fmtDec(v[1], 2) + "%</b>（部件均值 " + fmtDec(p.rate, 2) + "%）";
+        }
+      }, TIP),
+      legend: { show: true, top: 0, left: 2, itemWidth: 12, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: p.baseNames.slice() },
+      xAxis: {
+        type: "value", name: "涉及台数", nameGap: 20, nameTextStyle: { color: C.textDim, fontSize: 10 },
+        scale: true, axisLabel: Object.assign({}, AXIS_LABEL, { formatter: (v) => fmtInt(v) }),
+        splitLine: SPLIT_LINE, axisLine: { show: false }
+      },
+      yAxis: {
+        type: "value", name: "故障率 %", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        scale: true, axisLabel: Object.assign({}, AXIS_LABEL, { formatter: (v) => fmtDec(v, 1) }),
+        splitLine: SPLIT_LINE, axisLine: { show: false }
+      },
+      series: series
+    };
+  }
+
+  /* ===== 8. 底部溯源播报（全部由派生量现算，不另编数字） ===== */
+  const track = $("bj-foot-track");
+  function renderFoot(p) {
+    const alerts = [
+      { lv: "高", c: C.red, t: "「" + p.name + "」故障率 " + fmtDec(p.rate, 2) + "%（批次口径），" +
+        (p.rate >= D.fail ? "高于" : "低于") + "全司 " + fmtDec(D.fail, 2) + "% 共 " + fmtDec(Math.abs(p.rate - D.fail), 2) + "pp" },
+      { lv: "高", c: C.red, t: "峰值批次「" + p.batchWorst.code + "」" + p.batchWorst.base + " · " + p.batchWorst.date +
+        " · 供应商 " + p.batchWorst.sup + "（" + TIERS[p.batchWorst.tier].name + "级），故障率 " + fmtDec(p.batchWorst.rate, 2) + "%" },
+      { lv: "中", c: C.orange, t: "基地归因：" + p.baseRows.map((b) => b.base + " " + b.cnt + " 批 / " + fmtDec(b.rate, 2) + "%").join("　") +
+        "，最差为 " + p.baseWorst.base },
+      { lv: "中", c: C.orange, t: "供应商归因：涉及 " + p.sups.length + " 家（集团在册 " + SUP_TOTAL + " 家），最差「" +
+        p.supWorst.name + "」" + TIERS[p.supWorst.tier].name + "级 " + fmtDec(p.supWorst.rate, 2) + "%，主供材料 " + p.mat },
+      { lv: "低", c: C.amber, t: "主责缺陷「" + p.defect + "」年度 " + fmtInt(p.n) + " 件，占缺陷合计 " + fmtInt(D.defTotal) +
+        " 件的 " + fmtDec(p.defShare, 1) + "%（与品质管理页帕累托同源）" },
+      { lv: "低", c: C.green, t: "闭环链路：市场故障 " + fmtDec(p.tickets, 2) + " 万单 → " + p.name + " → " +
+        p.batches.length + " 个批次 → " + p.baseNames.length + " 个基地 → " + p.sups.length + " 家供应商" }
+    ];
+    const html = alerts.map((a) => (
+      '<div class="bj-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+    )).join("");
+    track.innerHTML = html + html;                                  /* 两份首尾相接，滚动无缝 */
+    footX = 0;
+    track.style.transform = "translateX(0px)";
+  }
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 9. 切换部件：整页随选中部件重绘 + hash 同步 ===== */
+  let batchIdx = 0;
+  function applyPart(i) {
+    const n = PARTS.length;
+    idx = ((i % n) + n) % n;
+    const p = PARTS[idx];
+
+    $("bj-title").textContent = p.name + " 故障部件分析";
+    $("bj-crumb-obj").textContent = p.name + " · " + p.defect;
+    $("bj-meta-batch").textContent = p.batches.length;
+    $("bj-meta-sup").textContent = p.sups.length;
+    $("bj-chip-rate").textContent = fmtDec(p.rate, 2) + "%";
+    swTabs.forEach((t, k) => t.classList.toggle("is-active", k === idx));
+    partRows.forEach((r, k) => r.classList.toggle("is-active", k === idx));
+
+    renderKpi(p);
+    renderBatches(p);
+    renderSups(p);
+    renderFoot(p);
+
+    $("bj-trend-title").textContent = p.name + " 故障率 24 月走势";
+    $("bj-trend-tag").innerHTML = "环比 <b>" + signed(p.mom, 2) + "pp</b> · 同比 <b>" + signed(p.yoy, 2) +
+      "pp</b> · 全司 " + fmtDec(D.fail, 2) + "%";
+    $("bj-batch-title").textContent = p.name + " 批次追溯";
+    $("bj-batch-tag").innerHTML = p.batches.length + " 批 · 涉及 <b>" + fmtInt(p.units) + "</b> 台 · 故障 <b>" +
+      fmtInt(p.fails) + "</b> 台 = <b>" + fmtDec(p.rate, 2) + "%</b>";
+    $("bj-sup-tag").innerHTML = p.sups.length + " 家 · 主供材料 <b>" + p.mat + "</b>";
+    $("bj-scatter-tag").innerHTML = p.baseNames.length + " 个基地 · 点面积 ∝ 故障台数";
+
+    trend.setOption(trendOption(p), true);
+    scatter.setOption(scatterOption(p), true);
+    sun.setOption(sunOption(), true);
+
+    batchIdx = 0;
+    playBatch();
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    try { history.replaceState(null, "", "#" + encodeURIComponent(p.name)); } catch (e) { /* file:// 下可能被拦，忽略 */ }
+  }
+
+  /* 批次行轮播高亮 ↔ 散点 showTip（制造 kiosk 活性） */
+  function playBatch() {
+    const p = PARTS[idx];
+    const rows = Array.from(batchBody.children);
+    rows.forEach((r, i) => r.classList.toggle("is-active", i === batchIdx));
+    const b = p.batches[batchIdx];
+    if (b) {
+      const si = p.baseNames.indexOf(b.base);
+      const di = p.batches.filter((x) => x.base === b.base).indexOf(b);
+      if (si >= 0 && di >= 0) scatter.dispatchAction({ type: "showTip", seriesIndex: si, dataIndex: di });
+    }
+    batchIdx = (batchIdx + 1) % p.batches.length;
+  }
+  setInterval(playBatch, 2600);
+
+  /* ===== 10. 交互：旭日下钻 / 切换器 / 清单 / 键盘 / hash 传参 / kiosk 轮换 ===== */
+  const drillReset = $("bj-drill-reset");
+  const modeBtns = Array.from($("bj-modes").querySelectorAll("[data-m]"));
+  function syncDrillUi() {
+    drillReset.classList.toggle("is-hidden", drillLine == null);
+    if (drillLine != null) drillReset.textContent = "‹ 全部（当前 " + LINES[drillLine].short + "）";
+  }
+  modeBtns.forEach((b) => b.addEventListener("click", () => {
+    sunMode = b.dataset.m;
+    modeBtns.forEach((x) => x.classList.toggle("is-active", x === b));
+    sun.setOption(sunOption(), true);
+  }));
+  drillReset.addEventListener("click", () => {
+    drillLine = null; syncDrillUi(); sun.setOption(sunOption(), true); restart();
+  });
+
+  /* 旭日点击：命中部件 → 下钻选中该部件；命中产品线 → 筛选（再点一次取消） */
+  sun.on("click", (q) => {
+    const nm = q && q.name;
+    if (!nm) return;
+    const pi = PARTS.findIndex((p) => p.name === nm);
+    if (pi >= 0) { applyPart(pi); restart(); return; }
+    const li = LINES.findIndex((l) => l.short === nm || l.name === nm);
+    if (li >= 0) {
+      drillLine = drillLine === li ? null : li;
+      syncDrillUi();
+      sun.setOption(sunOption(), true);
+      restart();
+    }
+  });
+
+  swTabs.forEach((t) => t.addEventListener("click", () => { applyPart(Number(t.dataset.i)); restart(); }));
+  partRows.forEach((r) => {
+    if (!r.classList.contains("is-click")) return;
+    r.addEventListener("click", () => { applyPart(Number(r.dataset.i)); restart(); });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyPart(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyPart(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* 打开时按 hash 定位（父页下钻传参：<子页>#<部件名 或 缺陷类型名>），未命中落到第 0 个 */
+  syncDrillUi();
+  applyPart(hit0 >= 0 ? hit0 : 0);
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = parseHash();
+    if (k >= 0 && k !== idx) { applyPart(k); restart(); }
+  });
+
+  /* kiosk 常驻：每 16 秒切下一部件；鼠标停在切换器上时暂停 */
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => applyPart(idx + 1), 16000); }
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 11. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const EPS = 1e-9;
+  const near = (a, b, tol) => Math.abs(a - b) < tol;
+  const checks = [
+    ["保有量合计 = 六产品线之和 = 3227 万台", near(D.own, 3227, EPS)],
+    ["年售后工单 = Σ(保有量 × 故障率) ≈ 96.84 万单", near(D.tickets, 96.844, 1e-6)],
+    ["全司市场故障率 = 工单 ÷ 保有量 ≈ 3.0011%", near(D.fail, 3.0011, 0.001)],
+    ["缺陷件数合计 = 21300 件（八大部件 20690 + 其他 610）",
+      D.defTotal === 21300 && D.partDefTotal === 20690 && D.partDefTotal + OTHER_DEFECT.n === D.defTotal],
+    ["缺陷占比合计 = 100%", near(sum(PARTS.map((p) => p.defShare)) + OTHER_DEFECT.n / D.defTotal * 100, 100, 1e-9)],
+    ["八大部件工单之和 = 年售后工单（旭日叶子合计）", near(sum(PARTS.map((p) => p.tickets)), D.tickets, 1e-9)],
+    ["叶子表工单合计 = 年售后工单", near(sum(LEAVES.map((x) => x.tickets)), D.tickets, 1e-9)],
+    ["八大部件归集保有量之和 = 保有量合计", near(sum(PARTS.map((p) => p.own)), D.own, 1e-9)],
+    ["部件工单占比之和 = 100%", near(sum(PARTS.map((p) => p.share)), 100, 1e-9)],
+    ["★ 每个部件：Σ故障台数 ÷ Σ涉及台数 = 该部件故障率",
+      PARTS.every((p) => near(sum(p.batches.map((b) => b.fails)) / sum(p.batches.map((b) => b.units)) * 100, p.rate, EPS))],
+    ["每个部件：批次涉及台数 / 故障台数 = 分批之和",
+      PARTS.every((p) => p.units === sum(p.batches.map((b) => b.units)) && p.fails === sum(p.batches.map((b) => b.fails)))],
+    ["批次生产基地 = 其产品线的基地归属（如洗碗机部件批次只出安徽芜湖）",
+      PARTS.every((p) => p.batches.every((b) => b.base === LINES[b.li].base && p.lineIdx.indexOf(b.li) >= 0))],
+    ["供应商聚合 / 基地聚合的台数之和 = 部件台数",
+      PARTS.every((p) => sum(p.supRows.map((s) => s.units)) === p.units && sum(p.baseRows.map((r) => r.units)) === p.units)],
+    ["批次故障率末月锚定：trend[23] = 部件故障率",
+      PARTS.every((p) => near(p.trend[23], Number(p.rate.toFixed(3)), EPS))],
+    ["部件批次故障率落在合理区间 1%~8%", PARTS.every((p) => p.rate > 1 && p.rate < 8)],
+    ["涉及供应商 " + D.supCnt + " 家 ≤ 集团在册 182 家", D.supCnt <= SUP_TOTAL],
+    ["供应商字号两两不重名",
+      (() => { const s = {}; let ok = true;
+        PARTS.forEach((p) => p.sups.forEach((x) => { if (s[x.name]) ok = false; s[x.name] = 1; })); return ok; })()],
+    ["hash 传参：部件名 / 短名 / 缺陷类型名 / 批次码都能命中",
+      HASH_ALIAS["电控板"] === 0 && HASH_ALIAS["电控失效"] === 0 && HASH_ALIAS["EC"] === 0 &&
+      HASH_ALIAS["结构件"] === 7 && HASH_ALIAS["装配错位"] === 7 && HASH_ALIAS["内胆"] === 6],
+    /* ★ 循环引用体检：setOption 深拷贝时环会直接把栈打爆、整页图表全空，这里对**每个部件**
+       的三张 option（含旭日两视角与下钻态）逐一 JSON.stringify 探一次。
+       ⚠️ node 打桩测不出这个 bug（桩 setOption 是空函数不走深拷贝），必须真跑一遍序列化。 */
+    ["全部 option 无循环引用", (() => {
+      try {
+        const keepMode = sunMode, keepDrill = drillLine, keepIdx = idx;
+        PARTS.forEach((p, i) => {
+          idx = i;
+          JSON.stringify([trendOption(p), scatterOption(p)]);
+          ["part", "line"].forEach((m) => {
+            sunMode = m;
+            drillLine = null; JSON.stringify(sunOption());
+            LINES.forEach((_, li) => { drillLine = li; JSON.stringify(sunOption()); });
+          });
+        });
+        sunMode = keepMode; drillLine = keepDrill; idx = keepIdx;
+        return true;
+      } catch (e) { console.warn("[故障部件分析] option 成环：", e && e.message); return false; }
+    })()]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[故障部件分析] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

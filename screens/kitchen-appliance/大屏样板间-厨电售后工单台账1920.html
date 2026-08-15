@@ -1,0 +1,1026 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电售后工单台账</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --gd-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：工单号 / 受理时间 / 产品线 / 故障部件 / 城市 / 状态 / 时效 / SLA判定 / 满意度 */
+    --gd-tcols: 100px 118px 84px 84px 66px 74px 1fr 92px 1fr;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .gd-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 452px;
+    grid-template-rows: 84px 118px 46px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .gd-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .gd-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .gd-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .gd-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .gd-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .gd-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .gd-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .gd-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .gd-crumb em { font-style: normal; color: #cfeae7; }
+  /* 返回上级：同目录相对路径回到售后服务，暖橙描边与本页青主色区分 */
+  .gd-back {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 157, 69, 0.42);
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.16), rgba(14, 46, 50, 0.6));
+    color: #ffd9b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .gd-back:hover { color: #fff1e2; border-color: rgba(255, 157, 69, 0.9); box-shadow: 0 0 14px rgba(255, 157, 69, 0.4); }
+  .gd-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .gd-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .gd-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .gd-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .gd-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .gd-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .gd-chips { display: flex; align-items: center; gap: 9px; }
+  .gd-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .gd-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .gd-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .gd-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .gd-chip.is-key b { color: var(--mfg-cyan); }
+  .gd-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .gd-clock-time { font: 700 26px/1 var(--gd-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .gd-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .gd-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .gd-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .gd-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .gd-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .gd-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .gd-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .gd-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .gd-kpi.is-warn .gd-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .gd-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .gd-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .gd-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .gd-kpi-val { font: 700 28px/1 var(--gd-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .gd-kpi.is-warn .gd-kpi-val { color: #ffd9b0; }
+  .gd-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .gd-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gd-kpi-sub b { font-weight: 700; }
+  .gd-up { color: var(--mfg-green); }
+  .gd-down { color: var(--mfg-red); }
+
+  /* ===== 状态筛选条 ===== */
+  .gd-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 14px;
+  }
+  .gd-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #7fc0ba; }
+  .gd-fchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 5px 14px 6px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(64, 196, 190, 0.2); background: rgba(10, 38, 42, 0.55);
+    color: #bcdedb; font-size: 13px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .gd-fchip u { text-decoration: none; font: 700 13px/1 var(--gd-mono); color: inherit; }
+  .gd-fchip i { font-style: normal; font-size: 11.5px; color: rgba(127, 166, 163, 0.85); font-variant-numeric: tabular-nums; }
+  .gd-fchip:hover { border-color: rgba(53, 224, 208, 0.55); color: #eafcfa; }
+  .gd-fchip.is-on { color: #04191a; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .gd-fchip.is-on i { color: rgba(4, 25, 26, 0.68); }
+  .gd-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .gd-filters-state b { font-weight: 700; color: var(--mfg-cyan); }
+  .gd-filters-state em { font-style: normal; color: #cfe9e6; }
+  .gd-filters-state i { font-style: normal; color: rgba(127, 166, 163, 0.4); margin: 0 8px; }
+
+  /* ===== 面板 ===== */
+  .gd-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .gd-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .gd-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .gd-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .gd-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .gd-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .gd-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .gd-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .gd-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 满意度分布块由 JS 填充，且与两张图同属 .gd-col 这一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .gd-panel.is-fixed { flex: none; height: 176px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .gd-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .gd-thead, .gd-tbody li {
+    display: grid; grid-template-columns: var(--gd-tcols); align-items: center; gap: 8px;
+  }
+  .gd-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .gd-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .gd-tbody li {
+    padding: 0 8px; height: 30px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    animation: gd-rowin .34s ease both;
+  }
+  @keyframes gd-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .gd-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .gd-tbody li.is-risk { background: rgba(255, 95, 107, 0.10); box-shadow: inset 2px 0 0 var(--mfg-red); }
+  .gd-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gd-tbody li .gd-no { font: 700 11.5px/1 var(--gd-mono); color: rgba(127, 166, 163, 0.85); letter-spacing: 0.04em; }
+  .gd-tbody li .gd-time { color: #a8cfcb; font-size: 12px; }
+  .gd-tbody li .gd-city { color: #eafcfa; }
+  /* 双列条：微条 + 数值（时效 / 满意度各占一个 1fr 列） */
+  .gd-bar { display: flex; align-items: center; gap: 8px; }
+  .gd-bar-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(64, 196, 190, 0.14); overflow: hidden; }
+  .gd-bar-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .gd-bar em { flex: none; width: 46px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+  .gd-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .gd-badge.is-wait { color: #3a2405; background: var(--mfg-amber); }
+  .gd-badge.is-move { color: #041b2c; background: var(--mfg-blue); }
+  .gd-badge.is-done { color: #063a25; background: var(--mfg-green); }
+  .gd-badge.is-over { color: #3d0a10; background: var(--mfg-red); }
+  .gd-badge.is-ok { color: #04241f; background: rgba(53, 224, 208, 0.24); box-shadow: inset 0 0 0 1px rgba(53, 224, 208, 0.5); color: #8ff0e6; }
+  .gd-badge.is-miss { color: #3a2405; background: rgba(255, 157, 69, 0.22); box-shadow: inset 0 0 0 1px rgba(255, 157, 69, 0.55); color: #ffc48a; }
+  .gd-badge.is-break { color: #3d0a10; background: rgba(255, 95, 107, 0.22); box-shadow: inset 0 0 0 1px rgba(255, 95, 107, 0.6); color: #ff9aa2; }
+
+  /* ===== 右栏：满意度分布条 ===== */
+  .gd-sats { flex: none; display: flex; flex-direction: column; gap: 7px; }
+  .gd-sat-row { display: grid; grid-template-columns: 92px 1fr 84px; align-items: center; gap: 10px; font-size: 12px; color: #bcdedb; }
+  .gd-sat-row b { font-weight: 400; color: #d6efec; white-space: nowrap; }
+  .gd-sat-bar { height: 9px; border-radius: 5px; background: rgba(64, 196, 190, 0.12); overflow: hidden; }
+  .gd-sat-bar i { display: block; height: 100%; border-radius: 5px; transition: width .5s ease; }
+  .gd-sat-num { text-align: right; font-variant-numeric: tabular-nums; color: var(--mfg-text-dim); }
+  .gd-sat-num em { font-style: normal; font-weight: 700; color: #eafcfa; margin-right: 5px; }
+
+  /* ===== 底部滚动条 ===== */
+  .gd-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .gd-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .gd-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: gd-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes gd-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .gd-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .gd-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .gd-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .gd-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .gd-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .gd-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="gd-stage" id="gd-stage">
+    <!-- mockflag:begin --><div class="gd-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="gd-error" id="gd-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="gd-header">
+      <div class="gd-head-left">
+        <div class="gd-crumb">
+          <a class="gd-back" href="大屏样板间-厨电售后服务1920.html" title="返回上级专题页：售后服务">‹ 返回 售后服务</a>
+          <b>云麓厨电</b><i>›</i><span>售后服务</span><i>›</i><em>售后工单台账</em>
+        </div>
+        <div class="gd-head-title-row">
+          <div class="gd-head-title">售后工单台账</div>
+          <div class="gd-head-meta">
+            <span>全量 <b id="gd-meta-full">--</b> 万单 · 本表抽样 <b id="gd-meta-n">--</b> 单</span><i>|</i>
+            <span>抽样比 <b id="gd-meta-rate">--</b> · <b>6</b> 产品线 · <b>4</b> 状态</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="gd-head-right">
+        <div class="gd-chips">
+          <div class="gd-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="gd-chip is-key"><span id="gd-chip-key">SLA · ALL</span><b id="gd-chip-sla">--</b></div>
+        </div>
+        <div class="gd-clock" aria-label="实时时钟">
+          <span class="gd-clock-time" id="gd-clock-time">--:--:--</span>
+          <span class="gd-clock-date" id="gd-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带（随筛选重算） -->
+    <div class="gd-band" id="gd-band"></div>
+
+    <!-- 工单状态筛选条 -->
+    <div class="gd-filters">
+      <span class="gd-filters-tag">状态筛选</span>
+      <div id="gd-fchips" style="display:flex;align-items:center;gap:10px;"></div>
+      <div class="gd-filters-state" id="gd-filters-state">--</div>
+    </div>
+
+    <!-- 左：全量工单台账表 -->
+    <section class="gd-panel">
+      <div class="gd-panel-head">
+        <h2>售后工单全量表（抽样台账）</h2>
+        <span class="gd-panel-tag" id="gd-table-tag">--</span>
+      </div>
+      <div class="gd-table">
+        <div class="gd-thead">
+          <span>工单号</span><span>受理时间</span><span>产品线</span><span>故障部件</span><span>城市</span>
+          <span>状态</span><span>时效(h)</span><span>SLA 判定</span><span>满意度</span>
+        </div>
+        <ul class="gd-tbody" id="gd-tbody"></ul>
+      </div>
+    </section>
+
+    <!-- 右：辅助图 -->
+    <div class="gd-col">
+      <section class="gd-panel" style="flex: 1;">
+        <div class="gd-panel-head">
+          <h2>工单状态结构</h2>
+          <span class="gd-panel-tag">四状态合计 <b id="gd-donut-total">--</b> 单</span>
+        </div>
+        <div class="gd-chart" id="gd-chart-donut"></div>
+      </section>
+      <section class="gd-panel" style="flex: 1;">
+        <div class="gd-panel-head">
+          <h2>处理时效分布</h2>
+          <span class="gd-panel-tag" id="gd-hist-tag">--</span>
+        </div>
+        <div class="gd-chart" id="gd-chart-hist"></div>
+      </section>
+      <section class="gd-panel is-fixed">
+        <div class="gd-panel-head">
+          <h2>满意度分布</h2>
+          <span class="gd-panel-tag">当前筛选 <b id="gd-sat-total">--</b> 单</span>
+        </div>
+        <div class="gd-sats" id="gd-sats"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="gd-foot">
+      <div class="gd-foot-tag">工单研判</div>
+      <div class="gd-foot-view"><div class="gd-foot-track" id="gd-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("gd-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("gd-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const frac = (x) => x - Math.floor(x);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         ★ 与上级页「售后服务」严格同源：六产品线的保有量与市场故障率照搬品质管理页基准表，
+           年售后工单 = Σ(保有量 × 故障率 ÷ 100) = 96.84 万单，三页天然同源。
+         ★ 本页台账展示的是**抽样工单**（96.84 万单不可能逐条陈列）：
+           抽样量 N = 全量 × 1‰ 现算，抽样的状态结构 / 产品线结构 / 故障部件结构
+           一律用**最大余数法**从全量口径配额化下来，页尾自检逐项验偏差 ≤ 0.30pp。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，工单与产品线 / 状态之间一律用
+           索引（li / si）关联，绝不用对象引用回指——setOption 深拷贝，成环即整页图表全空。 ===== */
+
+  /* 4.1 六大产品线：保有量(万台) / 市场故障率(%) / 满意度(5 分制)（= 上级页与品质管理页口径） */
+  const LINES = [
+    { name: "吸油烟机",   short: "烟机", own: 892, fail: 2.72, resp: 96.8, onsite: 93.4, fix1: 88.6, sat: 4.66, cmp: 1.24 },
+    { name: "燃气灶具",   short: "灶具", own: 836, fail: 2.45, resp: 97.4, onsite: 94.2, fix1: 90.2, sat: 4.71, cmp: 1.08 },
+    { name: "洗碗机",     short: "洗碗", own: 402, fail: 3.86, resp: 94.2, onsite: 90.1, fix1: 83.4, sat: 4.48, cmp: 1.86 },
+    { name: "蒸烤一体机", short: "蒸烤", own: 268, fail: 4.12, resp: 93.1, onsite: 88.6, fix1: 81.2, sat: 4.39, cmp: 2.14 },
+    { name: "集成灶",     short: "集成", own: 358, fail: 3.24, resp: 95.6, onsite: 91.8, fix1: 85.9, sat: 4.57, cmp: 1.52 },
+    { name: "净水热水",   short: "净水", own: 471, fail: 2.96, resp: 96.2, onsite: 92.6, fix1: 87.4, sat: 4.62, cmp: 1.36 }
+  ];
+
+  /* 4.2 故障部件构成（产品线 → 部件，权重是相对份额）：沿用品质管理页 8 大主责部件口径 */
+  const PARTS = {
+    "吸油烟机":   [["风机总成", 34], ["电控板", 26], ["面板玻璃", 22], ["结构件", 18]],
+    "燃气灶具":   [["点火针", 38], ["密封圈", 26], ["面板玻璃", 20], ["结构件", 16]],
+    "洗碗机":     [["电控板", 33], ["密封圈", 29], ["线束端子", 22], ["结构件", 16]],
+    "蒸烤一体机": [["电控板", 31], ["腔体内胆", 27], ["线束端子", 24], ["面板玻璃", 18]],
+    "集成灶":     [["风机总成", 30], ["点火针", 27], ["电控板", 24], ["密封圈", 19]],
+    "净水热水":   [["密封圈", 36], ["电控板", 28], ["线束端子", 21], ["腔体内胆", 15]]
+  };
+
+  /* 4.3 上级页 SLA 阈值（累计口径，小时）：受理 2h / 派单 24h / 上门 48h / 完结 72h */
+  const SLA = { accept: 2, dispatch: 24, onsite: 48, close: 72 };
+  const SAT_TARGET = 4.50;
+
+  /* 4.4 四种工单状态（本页的切换维度）
+         · 待派单：已受理未派单，时效 = 已等待时长，破 24h 派单线即超 SLA
+         · 在途  ：已派单未完结，时效 = 已流转时长，破 48h 上门线即超 SLA
+         · 已完结：修复交付并签收，全程 ≤ 72h
+         · 已超时：全程（或在办已耗）> 72h 完结线
+         rng = [时效下限, 上限, 偏态指数]；pen = 满意度惩罚（相对本产品线基准） */
+  const STATUS = [
+    { key: "PENDING", name: "待派单", short: "待派", color: C.amber,  badge: "is-wait", sla: SLA.dispatch, slaTxt: "超派单24h", rng: [0.3, 30, 1.45], pen: 0.25 },
+    { key: "MOVING",  name: "在途",   short: "在途", color: C.blue,   badge: "is-move", sla: SLA.onsite,   slaTxt: "超上门48h", rng: [3, 60, 1.25],   pen: 0.15 },
+    { key: "CLOSED",  name: "已完结", short: "完结", color: C.green,  badge: "is-done", sla: SLA.close,    slaTxt: "超完结72h", rng: [5, 71, 1.5],    pen: 0 },
+    { key: "OVERDUE", name: "已超时", short: "超时", color: C.red,    badge: "is-over", sla: SLA.close,    slaTxt: "超完结72h", rng: [73, 168, 1.9],  pen: 0.9 }
+  ];
+
+  /* 4.5 产品线 × 状态结构（每行合计 100%）：修复难度高的线（洗碗 / 蒸烤）在途与超时占比更高。
+         全量各状态单量 = Σ(线工单 × 该行占比)，不硬编码；四状态之和必然收敛回 96.84 万单。 */
+  const MIX = [
+    [1.8, 4.9, 85.9, 7.4],
+    [1.6, 4.4, 86.9, 7.1],
+    [2.3, 6.1, 83.5, 8.1],
+    [2.6, 6.8, 82.2, 8.4],
+    [2.0, 5.4, 84.8, 7.8],
+    [1.9, 5.0, 85.6, 7.5]
+  ];
+
+  /* 4.6 服务城市池（24 城，确定性取模分配，不用随机数） */
+  const CITIES = [
+    "杭州", "成都", "武汉", "沈阳", "佛山", "西安", "天津", "昆明",
+    "南京", "青岛", "长沙", "北京", "上海", "广州", "深圳", "重庆",
+    "郑州", "合肥", "福州", "济南", "南昌", "哈尔滨", "南宁", "乌鲁木齐"
+  ];
+
+  /* 4.7 各状态的受理时间窗（期次 2026 年 7 月）：待派 / 在途集中在月末，完结 / 超时铺满全月 */
+  const MONTH = [2026, 6];                       /* JS 月份 0 基：6 = 7 月 */
+  const TIME_WIN = [
+    [30, 6, 31, 20],
+    [28, 0, 31, 18],
+    [1, 0, 29, 12],
+    [1, 0, 27, 12]
+  ];
+  const dayHour = (d, h) => new Date(MONTH[0], MONTH[1], d, h, 0, 0).getTime();
+
+  /* ===== 5. 全量口径派生（一切现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+  LINES.forEach((l) => { l.tickets = l.own * l.fail / 100; });          /* 逐线年工单，万单 */
+  D.own = sum(LINES.map((l) => l.own));                                 /* 保有量 3227 万台 */
+  D.tickets = sum(LINES.map((l) => l.tickets));                         /* 年售后工单 96.844 万单 */
+  D.fail = D.tickets / D.own * 100;                                     /* 全司市场故障率 3.0011% */
+
+  const wByTk = (key) => sum(LINES.map((l) => l[key] * l.tickets)) / D.tickets;
+  D.resp = wByTk("resp");                                               /* 24h 响应 95.86% */
+  D.onsite = wByTk("onsite");                                           /* 48h 上门 92.19% */
+  D.fix1 = wByTk("fix1");                                               /* 一次修复 86.77% */
+  D.sat = wByTk("sat");                                                 /* 满意度 4.59 分 */
+  D.cmp = wByTk("cmp");                                                 /* 投诉率 1.46% */
+
+  /* 5.1 状态 × 产品线全量矩阵（万单）：CELL[si][li]，行和 = 状态全量，列和 = 线全量 */
+  const CELL = STATUS.map((s, si) => LINES.map((l, li) => l.tickets * MIX[li][si] / 100));
+  STATUS.forEach((s, si) => { s.vol = sum(CELL[si]); s.share = 100 * s.vol / D.tickets; });
+  D.statusVol = sum(STATUS.map((s) => s.vol));                          /* 必须 = 96.844 */
+
+  /* 5.2 抽样量：按 1‰ 系统抽样现算，不写死 */
+  const SAMPLE_RATE = 1 / 1000;
+  const N = Math.round(D.tickets * 10000 * SAMPLE_RATE);                /* = 968 单 */
+
+  /* 5.3 最大余数法：把配额分解成整数，和恒等于 n（保证抽样结构 = 全量结构） */
+  function largestRemainder(quotas, n) {
+    const base = quotas.map((q) => Math.floor(q));
+    let rest = n - sum(base);
+    const order = quotas.map((q, i) => i).sort((a, b) => (quotas[b] - Math.floor(quotas[b])) - (quotas[a] - Math.floor(quotas[a])));
+    for (let k = 0; k < rest; k++) base[order[k % order.length]] += 1;
+    return base;
+  }
+  /* 先按状态配额化（状态结构最精确），再在每个状态内部按产品线配额化 */
+  const nByStatus = largestRemainder(STATUS.map((s) => N * s.vol / D.tickets), N);
+  const GRID = STATUS.map((s, si) =>
+    largestRemainder(LINES.map((l, li) => nByStatus[si] * CELL[si][li] / s.vol), nByStatus[si]));
+  STATUS.forEach((s, si) => { s.n = nByStatus[si]; });
+  const nByLine = LINES.map((l, li) => sum(STATUS.map((s, si) => GRID[si][li])));
+
+  /* 5.4 故障部件配额：每条线的抽样行数按部件权重再做一次最大余数法，
+         再用轮转（round-robin）铺开，保证同一部件不会挤在同一个状态里。 */
+  const partQueue = LINES.map((l, li) => {
+    const ws = PARTS[l.name];
+    const wsum = sum(ws.map((w) => w[1]));
+    const cnt = largestRemainder(ws.map((w) => nByLine[li] * w[1] / wsum), nByLine[li]);
+    const left = cnt.slice(), q = [];
+    while (q.length < nByLine[li]) {
+      for (let k = 0; k < ws.length; k++) { if (left[k] > 0) { q.push(ws[k][0]); left[k] -= 1; } }
+    }
+    return q;
+  });
+  const partCursor = LINES.map(() => 0);
+
+  /* ===== 6. 展开抽样工单（确定性波形，无 Math.random，kiosk 每次打开完全一致） ===== */
+  const ORDERS = [];
+  let gi = 0;
+  STATUS.forEach((s, si) => {
+    for (let li = 0; li < LINES.length; li++) {
+      for (let k = 0; k < GRID[si][li]; k++) {
+        const u = 0.62 * (0.5 + 0.5 * Math.sin(gi * 2.399 + si * 1.11 + li * 0.37)) +
+                  0.38 * (0.5 + 0.5 * Math.sin(gi * 0.777 + 1.3 + li * 0.91));
+        /* 受理时刻用黄金分割低差异序列铺满时间窗（确定性且均匀，正弦波会在两端堆积） */
+        const w = TIME_WIN[si], ut = frac(gi * 0.6180339887498949 + li * 0.137 + si * 0.371);
+        const t0 = dayHour(w[0], w[1]), t1 = dayHour(w[2], w[3]);
+        ORDERS.push({
+          si: si, li: li,                                               /* ★ 只存索引，不回指对象 */
+          hrs: s.rng[0] + (s.rng[1] - s.rng[0]) * Math.pow(u, s.rng[2]),
+          ts: t0 + (t1 - t0) * ut,
+          city: CITIES[(gi * 11 + li * 17 + si * 5) % CITIES.length],
+          part: partQueue[li][partCursor[li]++],
+          sat: LINES[li].sat + 0.34 * Math.sin(gi * 1.73 + li * 0.51) - s.pen
+        });
+        gi++;
+      }
+    }
+  });
+
+  /* 6.1 满意度标定：把抽样均值精确对到全量加权满意度（4.59 分），分布形态不变、跨页口径归一。
+         夹逼在 [3.00, 5.00] 会轻微改变均值，故迭代若干轮直到收敛。 */
+  for (let it = 0; it < 8; it++) {
+    const d = D.sat - sum(ORDERS.map((o) => o.sat)) / ORDERS.length;
+    if (Math.abs(d) < 1e-12) break;
+    ORDERS.forEach((o) => { o.sat = clamp(o.sat + d, 3.0, 5.0); });
+  }
+
+  /* 6.2 SLA 判定：按当前状态对应的那条线判，与状态互不重复
+         （已超时恒为「超完结72h」；在途破 48h、待派破 24h 同样计超 SLA） */
+  ORDERS.forEach((o) => {
+    const s = STATUS[o.si];
+    o.over = o.hrs > s.sla;
+    o.slaTxt = o.over ? s.slaTxt : "达标";
+    o.slaCls = o.over ? (o.si === 3 ? "is-break" : "is-miss") : "is-ok";
+  });
+
+  /* 6.3 台账定序：按受理时间升序，工单号顺次编到 GD26-73001 起（编号即身份，与筛选无关） */
+  const LEDGER = ORDERS.slice().sort((a, b) => a.ts - b.ts);
+  LEDGER.forEach((o, i) => { o.no = "GD26-" + (73000 + i + 1); });
+
+  /* ===== 7. 任意子集的聚合口径（全部现算） ===== */
+  function agg(list) {
+    const n = list.length;
+    const hs = list.map((o) => o.hrs);
+    return {
+      cnt: n,
+      hrs: n ? sum(hs) / n : 0,
+      hMin: n ? Math.min.apply(null, hs) : 0,
+      hMax: n ? Math.max.apply(null, hs) : 0,
+      sat: n ? sum(list.map((o) => o.sat)) / n : 0,
+      okN: list.filter((o) => !o.over).length,
+      overN: list.filter((o) => o.over).length,
+      cities: (new Set(list.map((o) => o.city))).size
+    };
+  }
+  const DA = agg(LEDGER);
+  D.slaRate = 100 * DA.okN / N;
+  D.avgHrs = DA.hrs;
+  D.overN = DA.overN;
+
+  /* 7.1 全局研判量 */
+  D.lineTop = LINES.map((l, li) => ({ li: li, name: l.name })).sort((a, b) => LINES[b.li].tickets - LINES[a.li].tickets)[0];
+  D.partAgg = {};
+  LINES.forEach((l, li) => {
+    const ws = PARTS[l.name], wsum = sum(ws.map((w) => w[1]));
+    ws.forEach((w) => { D.partAgg[w[0]] = (D.partAgg[w[0]] || 0) + l.tickets * w[1] / wsum; });
+  });
+  D.partRank = Object.keys(D.partAgg).map((k) => ({ part: k, val: D.partAgg[k] })).sort((a, b) => b.val - a.val);
+  D.partTop = D.partRank[0];
+  D.overWorst = LEDGER.slice().sort((a, b) => b.hrs - a.hrs)[0];
+  D.satWorstLine = LINES.map((l, li) => li).sort((a, b) => LINES[a].sat - LINES[b].sat)[0];
+  D.cityAgg = {};
+  LEDGER.forEach((o) => { if (o.si === 3) D.cityAgg[o.city] = (D.cityAgg[o.city] || 0) + 1; });
+  D.cityWorst = Object.keys(D.cityAgg).map((k) => ({ city: k, n: D.cityAgg[k] })).sort((a, b) => b.n - a.n)[0];
+
+  /* ===== 8. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("gd-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("gd-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("gd-meta-full").textContent = fmtDec(D.tickets, 2);
+  $("gd-meta-n").textContent = fmtInt(N);
+  $("gd-meta-rate").textContent = fmtDec(1000 * SAMPLE_RATE, 0) + "‰";
+  $("gd-donut-total").textContent = fmtInt(sum(STATUS.map((s) => s.n)));
+
+  /* ===== 9. KPI 带：5 枚，随筛选重算并翻牌缓动 ===== */
+  const KPI_DEFS = [
+    { icon: "☎", label: "工单量（全量口径）", unit: "万单", dec: 2, warn: false,
+      val: (a) => a.vol,
+      sub: (a) => "占全量 <b>" + fmtDec(100 * a.vol / D.tickets, 2) + "%</b>（" + fmtDec(D.tickets, 2) + " 万单）· 本表抽样 <b>" + fmtInt(a.cnt) + "</b> 单" },
+    { icon: "▤", label: "台账抽样单数", unit: "单", dec: 0, warn: false,
+      val: (a) => a.cnt,
+      sub: (a) => "抽样比 " + fmtDec(1000 * SAMPLE_RATE, 0) + "‰ · 占抽样 <b>" + fmtDec(100 * a.cnt / N, 2) + "%</b> · 覆盖 <b>" + a.cities + "</b> 城" },
+    { icon: "⏱", label: "平均处理时效", unit: "h", dec: 1, warn: true,
+      val: (a) => a.hrs,
+      sub: (a) => "区间 <b>" + fmtDec(a.hMin, 1) + "~" + fmtDec(a.hMax, 1) + "</b> h · 完结线 " + SLA.close + "h" },
+    { icon: "✓", label: "SLA 达标率", unit: "%", dec: 2, warn: false,
+      val: (a) => (a.cnt ? 100 * a.okN / a.cnt : 0),
+      sub: (a) => "达标 <b>" + fmtInt(a.okN) + "</b> 单 · 超 SLA <b class=\"gd-down\">" + fmtInt(a.overN) + "</b> 单" },
+    { icon: "★", label: "满意度评分", unit: "分", dec: 2, warn: false,
+      val: (a) => a.sat,
+      sub: (a) => "目标 " + fmtDec(SAT_TARGET, 2) + " 分 · 距目标 <b class=\"" + (a.sat >= SAT_TARGET ? "gd-up" : "gd-down") + "\">" +
+        signed(a.sat - SAT_TARGET, 2) + "</b> · 全量加权 " + fmtDec(D.sat, 2) + " 分" }
+  ];
+  const band = $("gd-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="gd-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="gd-kpi-icon">' + k.icon + "</div>" +
+      '<div class="gd-kpi-main">' +
+        '<div class="gd-kpi-label">' + k.label + "</div>" +
+        '<div class="gd-kpi-num"><span class="gd-kpi-val" id="gd-kpi-' + i + '">0</span><span class="gd-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="gd-kpi-sub" id="gd-kpisub-' + i + '"></div>' +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，0.9 秒收敛；每次筛选换一代 token，旧动画自动作废，
+     避免连点筛选时多条 rAF 链互相打架、数字来回跳。 */
+  const kpiGen = KPI_DEFS.map(() => 0);
+  function countUp(i, target, dec) {
+    const el = $("gd-kpi-" + i), g = ++kpiGen[i];
+    const from = parseFloat(el.textContent.replace(/,/g, "")) || 0;
+    const dur = 900, t0 = performance.now();
+    (function step(now) {
+      if (kpiGen[i] !== g) return;
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      const v = from + (target - from) * e;
+      el.textContent = dec === 0 ? fmtInt(v) : fmtDec(v, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = dec === 0 ? fmtInt(target) : fmtDec(target, dec);
+    })(t0);
+  }
+
+  /* ===== 10. 状态筛选 chip（全部 + 四状态），点击筛选并同步 location.hash ===== */
+  const FILTERS = [{ key: "ALL", label: "全部", full: "全部", color: C.cyan, cnt: N, vol: D.tickets }]
+    .concat(STATUS.map((s) => ({ key: s.key, label: s.name, full: s.name, color: s.color, cnt: s.n, vol: s.vol })));
+  const fbox = $("gd-fchips");
+  fbox.innerHTML = FILTERS.map((f, i) => (
+    '<button class="gd-fchip" type="button" data-i="' + i + '">' +
+      "<u>" + f.label + "</u><i>" + fmtInt(f.cnt) + " 单</i>" +
+    "</button>"
+  )).join("");
+  const fchips = Array.from(fbox.children);
+
+  /* 10.1 hash 传参：父页下钻跳「子页#对象名」，对象名是工单状态。
+         全称 / 简写 / 英文 key 三种写法都认，匹配不到落到「全部」。 */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k).toUpperCase()] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("全部工单", 0); alias("全量", 0);
+  STATUS.forEach((s, si) => {
+    const i = si + 1;
+    alias(s.key, i); alias(s.name, i); alias(s.short, i); alias(s.name + "工单", i); alias(s.short + "工单", i);
+  });
+  alias("待派", 1); alias("待派工单", 1); alias("待分派", 1);
+  alias("在途中", 2); alias("处理中", 2); alias("流转中", 2);
+  alias("完结", 3); alias("已完成", 3); alias("完成", 3); alias("已结案", 3);
+  alias("超时", 4); alias("已超期", 4); alias("超期", 4); alias("超SLA", 4);
+  function parseHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.trim();
+    if (!raw) return 0;
+    const hit = HASH_ALIAS[raw.toUpperCase()];
+    return hit === undefined ? 0 : hit;                       /* 匹配不到 → 全部 */
+  }
+  let hashSuppress = false;
+  function syncHash(fi) {
+    const want = "#" + encodeURIComponent(FILTERS[fi].full);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 台账表：滚动窗口分页（每页 20 行，4.5 秒翻一页；末页贴底不留空行） =====
+     ★ 表格与两张图不在同一个 flex 容器里（表在左侧 grid 单元，图在右列），
+       且右列的满意度分布块写死高度，故 JS 填充不会压矮任何图表容器。 */
+  const tbody = $("gd-tbody");
+  const WIN = 20;
+  let view = LEDGER, page = 0, pages = 1;
+
+  const fmtTs = (ts) => { const d = new Date(ts); return pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+
+  function renderTable() {
+    const n = view.length;
+    const start = n <= WIN ? 0 : Math.min(page * WIN, n - WIN);
+    const rows = view.slice(start, Math.min(start + WIN, n));
+    tbody.innerHTML = rows.map((o, k) => {
+      const s = STATUS[o.si], l = LINES[o.li];
+      const hW = clamp(o.hrs / 120 * 100, 3, 100);                     /* 0~120h 映射到条宽 */
+      const hC = o.hrs > SLA.close ? C.red : o.hrs > SLA.onsite ? C.amber : C.cyan;
+      const satW = clamp((o.sat - 3) / 2 * 100, 3, 100);               /* 3.0~5.0 分映射到条宽 */
+      const satC = o.sat >= 4.5 ? C.green : o.sat >= 4.0 ? C.amber : C.red;
+      return "<li" + (o.si === 3 ? ' class="is-risk"' : "") +
+        ' style="animation-delay:' + (k * 14) + 'ms">' +
+        '<span class="gd-no">' + o.no + "</span>" +
+        '<span class="gd-time">' + fmtTs(o.ts) + "</span>" +
+        "<span>" + l.name + "</span>" +
+        "<span>" + o.part + "</span>" +
+        '<span class="gd-city">' + o.city + "</span>" +
+        '<span class="gd-badge ' + s.badge + '">' + s.name + "</span>" +
+        '<span class="gd-bar"><span class="gd-bar-t"><u style="width:' + fmtDec(hW, 1) + "%;background:" + hC + '"></u></span><em style="color:' + hC + '">' + fmtDec(o.hrs, 1) + "</em></span>" +
+        '<span class="gd-badge ' + o.slaCls + '">' + o.slaTxt + "</span>" +
+        '<span class="gd-bar"><span class="gd-bar-t"><u style="width:' + fmtDec(satW, 1) + "%;background:" + satC + '"></u></span><em style="color:' + satC + '">' + fmtDec(o.sat, 2) + "</em></span>" +
+      "</li>";
+    }).join("");
+    const from = start + 1, to = start + rows.length;
+    $("gd-table-tag").textContent =
+      "全量 " + fmtDec(D.tickets, 2) + " 万单 · 本表抽样 " + fmtInt(N) + " 单 · 当前筛选 " + fmtInt(n) +
+      " 单 · 第 " + (page + 1) + "/" + pages + " 页（第 " + from + "–" + to + " 行）";
+    $("gd-filters-state").innerHTML =
+      "筛选结果 <b>" + fmtInt(n) + "</b> 单 / 抽样 " + fmtInt(N) + " 单<i>|</i>超 SLA <em>" +
+      view.filter((o) => o.over).length + "</em> 单<i>|</i>第 <em>" +
+      (page + 1) + "</em>/" + pages + " 页 · 每页 " + Math.min(WIN, n) + " 行";
+  }
+
+  /* ===== 12. 满意度分布（DOM 条，随筛选重算；五档之和 = 当前筛选单数） ===== */
+  const SAT_BINS = [
+    { lo: 4.8, hi: 5.01, name: "4.8~5.0 优秀", color: C.cyan },
+    { lo: 4.5, hi: 4.8,  name: "4.5~4.8 满意", color: C.green },
+    { lo: 4.0, hi: 4.5,  name: "4.0~4.5 一般", color: C.amber },
+    { lo: 3.5, hi: 4.0,  name: "3.5~4.0 不满", color: C.orange },
+    { lo: 0,   hi: 3.5,  name: "3.5 以下 差评", color: C.red }
+  ];
+  function renderSats(list) {
+    const cnts = SAT_BINS.map((b) => list.filter((o) => o.sat >= b.lo && o.sat < b.hi).length);
+    const tot = sum(cnts);
+    const mx = Math.max.apply(null, cnts.concat([1]));
+    $("gd-sat-total").textContent = fmtInt(tot);
+    $("gd-sats").innerHTML = SAT_BINS.map((b, i) => (
+      '<div class="gd-sat-row">' +
+        "<b>" + b.name + "</b>" +
+        '<div class="gd-sat-bar"><i style="width:' + fmtDec(100 * cnts[i] / mx, 1) + "%;background:" + b.color + '"></i></div>' +
+        '<div class="gd-sat-num"><em>' + fmtInt(cnts[i]) + "</em>单 " + fmtDec(tot ? 100 * cnts[i] / tot : 0, 1) + "%</div>" +
+      "</div>"
+    )).join("");
+  }
+
+  /* ★ 与图表同属 .gd-col 的满意度块先填满，再 init 图表；配合 CSS 写死高度双保险 */
+  renderSats(LEDGER);
+  renderTable();
+
+  /* ===== 13. 图表（★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 resize()） =====
+     ★ 循环引用红线：进 option 的 data 只放标量与数组，工单一律用索引 / 名称关联。 */
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const donut = echarts.init($("gd-chart-donut"));
+  const hist = echarts.init($("gd-chart-hist"));
+
+  /* 13.1 状态结构环形：四状态抽样单数恒定（合计 = N），选中状态高亮、其余压暗 */
+  function donutOption(fi) {
+    return {
+      backgroundColor: "transparent",
+      title: {
+        text: fmtInt(FILTERS[fi].cnt), left: "33%", top: "43%", textAlign: "center",
+        textStyle: { color: fi === 0 ? "#eafcfa" : FILTERS[fi].color, fontSize: 25, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" },
+        subtext: FILTERS[fi].full + " · 单", subtextStyle: { color: C.textDim, fontSize: 11 }, itemGap: 3
+      },
+      tooltip: {
+        trigger: "item", backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line,
+        textStyle: { color: C.text, fontSize: 12 },
+        formatter: (p) => {
+          const s = STATUS[p.dataIndex];
+          return "<b>" + s.name + "</b><br/>抽样 <b style=\"color:" + s.color + "\">" + fmtInt(s.n) + "</b> 单 · 占 " +
+            fmtDec(100 * s.n / N, 2) + "%<br/>全量 <b>" + fmtDec(s.vol, 2) + "</b> 万单 · 占 " +
+            fmtDec(s.share, 2) + "%<br/><span style=\"color:" + C.textDim + "\">抽样与全量偏差 " +
+            signed(100 * s.n / N - s.share, 2) + "pp · SLA 线 " + s.sla + "h</span>";
+        }
+      },
+      legend: {
+        orient: "vertical", right: 4, top: "center", itemWidth: 11, itemHeight: 8, itemGap: 12,
+        textStyle: { color: C.textDim, fontSize: 11 },
+        formatter: (name) => {
+          const s = STATUS.filter((x) => x.name === name)[0];
+          return name + "  " + fmtInt(s.n) + " 单";
+        },
+        data: STATUS.map((s) => s.name)
+      },
+      series: [{
+        type: "pie", center: ["33%", "51%"], radius: ["52%", "76%"], avoidLabelOverlap: false,
+        label: { show: false }, labelLine: { show: false },
+        itemStyle: { borderColor: "rgba(7,27,30,.9)", borderWidth: 2, borderRadius: 3 },
+        data: STATUS.map((s, si) => ({
+          name: s.name, value: s.n,
+          itemStyle: { color: s.color, opacity: (fi === 0 || fi - 1 === si) ? 1 : 0.22 }
+        }))
+      }]
+    };
+  }
+
+  /* 13.2 时效分布直方：固定 8 档（0~96h+，12h 一档，末档为 96h 以上），随筛选重算频数 */
+  const BIN_EDGES = [0, 12, 24, 36, 48, 60, 72, 96, Infinity];
+  const BIN_LABELS = ["0~12", "12~24", "24~36", "36~48", "48~60", "60~72", "72~96", "96+"];
+  const BIN_N = BIN_LABELS.length;
+  function binOf(v) {
+    for (let i = 0; i < BIN_N; i++) { if (v < BIN_EDGES[i + 1]) return i; }
+    return BIN_N - 1;
+  }
+  function binColor(i) {
+    return BIN_EDGES[i + 1] <= SLA.onsite ? C.cyan : BIN_EDGES[i + 1] <= SLA.close ? C.amber : C.orange;
+  }
+  function histOption(list) {
+    const bins = new Array(BIN_N).fill(0);
+    list.forEach((o) => { bins[binOf(o.hrs)] += 1; });
+    const tot = sum(bins);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 14, top: 20, bottom: 2, containLabel: true },
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex, n = bins[i];
+          return "处理时效 <b>" + BIN_LABELS[i] + "h</b><br/><b style=\"color:" +
+            binColor(i) + "\">" + fmtInt(n) + "</b> 单 · 占 " + fmtDec(tot ? 100 * n / tot : 0, 1) + "%<br/>" +
+            "<span style=\"color:" + C.textDim + "\">上门线 " + SLA.onsite + "h · 完结线 " + SLA.close + "h</span>";
+        }
+      },
+      xAxis: {
+        type: "category", data: BIN_LABELS,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 9.5, rotate: 26 })
+      },
+      yAxis: {
+        type: "value", name: "单", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, axisLine: { show: false },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      series: [{
+        type: "bar", barWidth: "62%", data: bins,
+        label: { show: true, position: "top", color: C.textDim, fontSize: 10, formatter: (p) => (p.value ? p.value : "") },
+        itemStyle: {
+          borderRadius: [3, 3, 0, 0],
+          color: (p) => new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: binColor(p.dataIndex) },
+            { offset: 1, color: binColor(p.dataIndex) + "44" }
+          ])
+        }
+      }]
+    };
+  }
+
+  /* ===== 14. 筛选主流程：一次调用刷新 KPI / 表 / 两图 / 满意度条 / 页头 chip ===== */
+  let fIdx = 0;
+  function applyFilter(fi, pushHash) {
+    fIdx = clamp(fi, 0, FILTERS.length - 1);
+    const f = FILTERS[fIdx];
+    view = fIdx === 0 ? LEDGER : LEDGER.filter((o) => o.si === fIdx - 1);
+    pages = Math.max(1, Math.ceil(view.length / WIN));
+    page = 0;
+
+    fchips.forEach((el, i) => {
+      const on = i === fIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? FILTERS[i].color : "";
+      el.style.borderColor = on ? FILTERS[i].color : "";
+    });
+
+    const a = agg(view);
+    a.vol = f.vol;                                                   /* 该状态的全量口径单量（万单） */
+    KPI_DEFS.forEach((k, i) => {
+      countUp(i, k.val(a), k.dec);
+      $("gd-kpisub-" + i).innerHTML = k.sub(a);
+    });
+    $("gd-chip-key").textContent = "SLA · " + f.key;
+    $("gd-chip-sla").textContent = fmtDec(a.cnt ? 100 * a.okN / a.cnt : 0, 2) + "%";
+    $("gd-hist-tag").textContent = "样本 " + fmtInt(a.cnt) + " 单 · 均值 " + fmtDec(a.hrs, 1) + "h · 超 " + SLA.close + "h " +
+      fmtInt(view.filter((o) => o.hrs > SLA.close).length) + " 单";
+
+    donut.setOption(donutOption(fIdx), true);
+    hist.setOption(histOption(view), true);
+    renderSats(view);
+    renderTable();
+    if (pushHash) syncHash(fIdx);
+  }
+
+  fchips.forEach((el) => {
+    el.addEventListener("click", () => applyFilter(Number(el.dataset.i), true));
+  });
+  /* 支持父页多次下钻：每次 hash 变化都重新定位 */
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    applyFilter(parseHash(), false);
+  });
+  /* 初始化：直接读 hash 定位（decodeURIComponent + try/catch 兜坏码），匹配不到落到「全部」 */
+  applyFilter(parseHash(), false);
+
+  /* 翻页轮播：kiosk 常驻，鼠标停在表上时暂停 */
+  let pageTimer = null;
+  function restartPaging() {
+    clearInterval(pageTimer);
+    pageTimer = setInterval(() => { page = (page + 1) % pages; renderTable(); }, 4500);
+  }
+  restartPaging();
+  tbody.addEventListener("mouseenter", () => clearInterval(pageTimer));
+  tbody.addEventListener("mouseleave", restartPaging);
+
+  /* ===== 15. 底部工单研判滚动条（文案里的数字全部由上面的派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "已超时工单抽样 " + fmtInt(STATUS[3].n) + " 单（全量 " + fmtDec(STATUS[3].vol, 2) + " 万单 · 占 " +
+      fmtDec(STATUS[3].share, 2) + "%），与 48h 上门及时率缺口 " + fmtDec(100 - D.onsite, 2) + "pp 同量级" },
+    { lv: "高", c: C.red, t: "最长滞留「" + D.overWorst.no + "」" + LINES[D.overWorst.li].name + " · " + D.overWorst.city + " · " +
+      D.overWorst.part + "，已耗 " + fmtDec(D.overWorst.hrs, 1) + "h，超 " + SLA.close + "h 完结线 " + fmtDec(D.overWorst.hrs - SLA.close, 1) + "h" },
+    { lv: "中", c: C.orange, t: "超时工单最集中城市「" + D.cityWorst.city + "」抽样 " + D.cityWorst.n + " 单；在办（待派 + 在途）抽样 " +
+      fmtInt(STATUS[0].n + STATUS[1].n) + " 单，占抽样 " + fmtDec(100 * (STATUS[0].n + STATUS[1].n) / N, 2) + "%" },
+    { lv: "中", c: C.orange, t: "满意度最低产品线「" + LINES[D.satWorstLine].name + "」" + fmtDec(LINES[D.satWorstLine].sat, 2) +
+      " 分，一次修复率 " + fmtDec(LINES[D.satWorstLine].fix1, 1) + "%，低于目标 " + fmtDec(88.0 - LINES[D.satWorstLine].fix1, 2) + "pp" },
+    { lv: "低", c: C.amber, t: "故障部件首位「" + D.partTop.part + "」全量 " + fmtDec(D.partTop.val, 2) + " 万单，占 " +
+      fmtDec(100 * D.partTop.val / D.tickets, 2) + "%；全表 SLA 达标率 " + fmtDec(D.slaRate, 2) + "%，平均时效 " + fmtDec(D.avgHrs, 1) + "h" },
+    { lv: "低", c: C.green, t: "三重校验：全量 " + fmtDec(D.tickets, 2) + " 万单 = 六产品线之和 = 四状态之和；抽样 " + fmtInt(N) +
+      " 单 = " + STATUS.map((s) => s.n).join(" + ") + "；抽样满意度 " + fmtDec(DA.sat, 2) + " 分 = 全量加权 " + fmtDec(D.sat, 2) + " 分" }
+  ];
+  const track = $("gd-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="gd-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                            /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 16. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(donutOption(0)); JSON.stringify(histOption(LEDGER)); }
+  catch (e) { optAcyclic = false; console.error("[售后工单台账] option 存在循环引用：", e.message); }
+
+  const near = (a, b, eps) => Math.abs(a - b) <= (eps == null ? 0.005 : eps);
+  /* 抽样结构 vs 全量结构的偏差（pp） */
+  const devStatus = STATUS.map((s) => Math.abs(100 * s.n / N - s.share));
+  const devLine = LINES.map((l, li) => Math.abs(100 * nByLine[li] / N - 100 * l.tickets / D.tickets));
+  const sampPart = {};
+  LEDGER.forEach((o) => { sampPart[o.part] = (sampPart[o.part] || 0) + 1; });
+  const devPart = Object.keys(D.partAgg).map((k) => Math.abs(100 * (sampPart[k] || 0) / N - 100 * D.partAgg[k] / D.tickets));
+
+  const checks = [
+    ["年售后工单 96.84 万单 = 六产品线之和（保有量 × 市场故障率）", near(D.tickets, 96.84, 0.01)],
+    ["保有量合计 3227 万台 · 全司市场故障率 3.00%", D.own === 3227 && near(D.fail, 3.0011, 0.001)],
+    ["上级页及时率同源：24h 95.86% / 48h 92.19% / 一次修复 86.77%",
+      near(D.resp, 95.86, 0.01) && near(D.onsite, 92.19, 0.01) && near(D.fix1, 86.77, 0.01)],
+    ["四状态全量单量之和 = 96.84 万单", near(D.statusVol, D.tickets, 1e-9)],
+    ["产品线 × 状态矩阵每行合计 100%", MIX.every((m) => near(sum(m), 100, 1e-9))],
+    ["抽样量 N = 全量 × 1‰ 现算 = 968 单", N === 968 && N === Math.round(D.tickets * 10000 * SAMPLE_RATE)],
+    ["四状态抽样单数之和 = N", sum(STATUS.map((s) => s.n)) === N && LEDGER.length === N],
+    ["六产品线抽样单数之和 = N", sum(nByLine) === N],
+    ["抽样状态结构 ≈ 全量状态结构（偏差 ≤ 0.30pp）", Math.max.apply(null, devStatus) <= 0.30],
+    ["抽样产品线结构 ≈ 全量结构（偏差 ≤ 0.30pp）", Math.max.apply(null, devLine) <= 0.30],
+    ["抽样故障部件结构 ≈ 全量结构（偏差 ≤ 0.30pp）", Math.max.apply(null, devPart) <= 0.30],
+    ["抽样满意度均值 = 全量加权满意度 4.59 分", near(DA.sat, D.sat, 1e-4) && near(D.sat, 4.59, 0.005)],
+    ["已超时 ⇔ 时效 > 72h（状态与时效自洽）",
+      LEDGER.every((o) => (o.si === 3) === (o.hrs > SLA.close))],
+    ["各状态时效均落在该状态定义区间内",
+      LEDGER.every((o) => o.hrs >= STATUS[o.si].rng[0] - 1e-9 && o.hrs <= STATUS[o.si].rng[1] + 1e-9)],
+    ["SLA 达标 + 超 SLA = 抽样单数", DA.okN + DA.overN === N],
+    ["工单号两两不重复且覆盖全量抽样", (new Set(LEDGER.map((o) => o.no))).size === N],
+    ["满意度五档之和 = 抽样单数",
+      sum(SAT_BINS.map((b) => LEDGER.filter((o) => o.sat >= b.lo && o.sat < b.hi).length)) === N],
+    ["各筛选结果数 = 该状态抽样数", STATUS.every((s, si) => LEDGER.filter((o) => o.si === si).length === s.n)],
+    ["hash 传参：全称 / 简写 / 英文 key 都能命中，坏码落全部",
+      HASH_ALIAS["待派单"] === 1 && HASH_ALIAS["待派"] === 1 && HASH_ALIAS["PENDING"] === 1 &&
+      HASH_ALIAS["已完结"] === 3 && HASH_ALIAS["完结"] === 3 &&
+      HASH_ALIAS["已超时"] === 4 && HASH_ALIAS["超时"] === 4 && parseHash() >= 0],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[售后工单台账] 自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
