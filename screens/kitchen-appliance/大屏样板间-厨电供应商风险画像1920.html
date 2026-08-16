@@ -1,0 +1,1617 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电供应商风险画像</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --hx-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 替代供应商清单列宽（字号 / 省 / 级别 / 采购额 / 风险分） */
+    --hx-altcols: 1fr 42px 32px 64px 46px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 =====
+         列：重点清单轨 196 / 雷达+档案 388 / 时间线+双轴 1fr(806) / 关系图+标签+替代 452
+         行：顶栏 84 / 身份条 62 / KPI 104 / 切换器 40 / 主体 1fr(640) / 底部预警 52 */
+  .hx-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 196px 388px 1fr 452px;
+    grid-template-rows: 84px 62px 104px 40px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .hx-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .hx-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识占位） ===== */
+  .hx-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .hx-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .hx-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .hx-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .hx-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .hx-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .hx-crumb em { font-style: normal; color: #cfeae7; }
+  /* 返回上级：同目录相对路径回到供应链风险图谱，暖橙描边与本页青主色区分 */
+  .hx-back {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 157, 69, 0.42);
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.16), rgba(14, 46, 50, 0.6));
+    color: #ffd9b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .hx-back:hover { color: #fff1e2; border-color: rgba(255, 157, 69, 0.9); box-shadow: 0 0 14px rgba(255, 157, 69, 0.4); }
+  .hx-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .hx-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .hx-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .hx-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .hx-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .hx-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .hx-chips { display: flex; align-items: center; gap: 9px; }
+  .hx-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .hx-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .hx-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .hx-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .hx-chip.is-key b { color: var(--mfg-cyan); }
+  .hx-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .hx-clock-time { font: 700 26px/1 var(--hx-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .hx-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 身份条（档案卡抬头：字号印章 + 级别 + 主供 + 属地 + 合作年限 + 影响面） ===== */
+  .hx-idbar {
+    grid-column: 1 / -1; min-width: 0;
+    display: flex; align-items: center; gap: 16px; padding: 0 16px 0 12px;
+    border: 1px solid rgba(53, 224, 208, 0.34); border-radius: 12px;
+    background: linear-gradient(100deg, rgba(20, 66, 68, 0.72), rgba(14, 46, 50, 0.5) 46%, rgba(14, 46, 50, 0.5));
+    box-shadow: inset 0 0 22px rgba(53, 224, 208, 0.07);
+  }
+  .hx-seal {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 21px; font-weight: 700; color: #04191a; letter-spacing: 0;
+    box-shadow: 0 0 16px -2px rgba(0, 0, 0, 0.5);
+  }
+  .hx-id-name { flex: none; display: flex; flex-direction: column; gap: 3px; min-width: 148px; }
+  .hx-id-name b { font-size: 20px; font-weight: 700; letter-spacing: 0.1em; color: #eafcfa; }
+  .hx-id-name span { font-size: 11px; letter-spacing: 0.14em; color: rgba(127, 166, 163, 0.9); font-variant-numeric: tabular-nums; }
+  .hx-id-fields { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0; }
+  .hx-id-f {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;
+    padding: 0 14px; border-left: 1px solid rgba(64, 196, 190, 0.18);
+  }
+  .hx-id-f span { font-size: 10.5px; letter-spacing: 0.14em; color: #5f8a87; white-space: nowrap; }
+  .hx-id-f b {
+    font-size: 14px; font-weight: 700; letter-spacing: 0.03em; color: #cfe9e6;
+    font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hx-id-impact {
+    flex: none; max-width: 430px; padding: 6px 12px 7px; border-radius: 9px;
+    border: 1px dashed rgba(255, 157, 69, 0.42); background: rgba(58, 32, 12, 0.35);
+    font-size: 12px; line-height: 1.5; color: #ffd9b0; font-variant-numeric: tabular-nums;
+  }
+  .hx-id-impact b { font-weight: 700; color: #ffbd80; }
+  .hx-id-impact i { font-style: normal; color: rgba(255, 217, 176, 0.62); }
+
+  /* 级别徽章（S 战略 / A 优选 / B 合格 / C 观察） */
+  .hx-tier {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px 3px; border-radius: 5px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #04191a; white-space: nowrap;
+  }
+  .hx-tier.is-s { background: var(--mfg-cyan); }
+  .hx-tier.is-a { background: var(--mfg-blue); }
+  .hx-tier.is-b { background: var(--mfg-green); }
+  .hx-tier.is-c { background: var(--mfg-orange); }
+
+  /* ===== KPI 带（5 枚，随切换重算） ===== */
+  .hx-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .hx-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .hx-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .hx-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .hx-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .hx-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .hx-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .hx-kpi.is-warn .hx-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .hx-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .hx-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .hx-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .hx-kpi-val { font: 700 28px/1 var(--hx-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .hx-kpi.is-warn .hx-kpi-val { color: #ffd9b0; }
+  .hx-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .hx-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hx-kpi-sub b { font-weight: 700; }
+  .hx-up { color: var(--mfg-green); }
+  .hx-down { color: var(--mfg-red); }
+
+  /* ===== 供应商切换器（重点画像 12 家） ===== */
+  .hx-swbar {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 14px;
+  }
+  .hx-swbar-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #7fc0ba; }
+  .hx-switcher { flex: 1; min-width: 0; display: flex; align-items: stretch; gap: 7px; }
+  .hx-sw {
+    flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: center; gap: 6px;
+    padding: 5px 6px 6px; border-radius: 8px; cursor: pointer; user-select: none; font-family: inherit;
+    border: 1px solid rgba(64, 196, 190, 0.22); background: rgba(10, 38, 42, 0.55);
+    color: #bcdedb; white-space: nowrap; overflow: hidden;
+    transition: color .18s, border-color .18s, background .18s, box-shadow .18s;
+  }
+  .hx-sw b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.03em; }
+  .hx-sw i { font-style: normal; font-size: 10.5px; color: rgba(127, 166, 163, 0.9); font-variant-numeric: tabular-nums; }
+  .hx-sw:hover { color: #eafcfa; border-color: rgba(53, 224, 208, 0.6); }
+  .hx-sw.is-on { color: #04191a; border-color: transparent; box-shadow: 0 0 15px rgba(0, 0, 0, 0.3); }
+  .hx-sw.is-on i { color: rgba(4, 25, 26, 0.72); }
+  .hx-swbar-state { flex: none; font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .hx-swbar-state b { font-weight: 700; color: var(--mfg-cyan); }
+  .hx-swbar-state i { font-style: normal; color: rgba(127, 166, 163, 0.4); margin: 0 7px; }
+
+  /* ===== 面板骨架 ===== */
+  .hx-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .hx-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .hx-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .hx-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .hx-panel-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; white-space: nowrap; }
+  .hx-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .hx-panel-tag { font-size: 11.5px; letter-spacing: 0.05em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+  .hx-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .hx-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 左轨：重点供应商清单（点击切换对象） ===== */
+  .hx-rail { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; overflow: hidden; display: flex; flex-direction: column; gap: 2px; }
+  .hx-rail-item {
+    flex: 1; min-height: 0; display: grid;
+    grid-template-columns: 20px 1fr 26px; grid-template-rows: auto auto;
+    align-items: center; align-content: center; gap: 3px 6px; padding: 3px 7px; border-radius: 7px; cursor: pointer;
+    border: 1px solid transparent; background: rgba(24, 72, 74, 0.2);
+    transition: background .2s, border-color .2s;
+  }
+  .hx-rail-item:hover { background: rgba(53, 224, 208, 0.12); border-color: rgba(53, 224, 208, 0.35); }
+  .hx-rail-item.is-on { background: rgba(53, 224, 208, 0.18); border-color: rgba(53, 224, 208, 0.7); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.12); }
+  .hx-rail-no { font: 700 10px/1 var(--hx-mono); color: rgba(127, 166, 163, 0.7); font-variant-numeric: tabular-nums; }
+  .hx-rail-name { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #d6efec; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hx-rail-tier { justify-self: end; width: 16px; height: 16px; border-radius: 4px; font: 700 10px/16px var(--hx-mono); text-align: center; color: #04191a; }
+  .hx-rail-bar { grid-column: 1 / 3; height: 4px; border-radius: 2px; background: rgba(64, 196, 190, 0.18); overflow: hidden; }
+  .hx-rail-bar u { display: block; height: 100%; border-radius: 2px; }
+  .hx-rail-risk { font: 700 11px/1 var(--hx-mono); text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ===== 基础档案卡（固定高度：与雷达同属 flex 容器，JS 重填不得改布局） ===== */
+  .hx-dossier {
+    flex: 1; min-height: 0; overflow: hidden;
+    display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 30px; gap: 5px 8px; align-content: start;
+  }
+  .hx-dos-f {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+    padding: 0 8px; height: 30px; border-radius: 5px; background: rgba(24, 72, 74, 0.28);
+    font-variant-numeric: tabular-nums;
+  }
+  .hx-dos-f span { font-size: 11px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; }
+  .hx-dos-f b { font-size: 12.5px; font-weight: 700; color: #d6efec; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hx-dos-cert {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; overflow: hidden;
+    padding: 0 8px; height: 30px; border-radius: 5px; background: rgba(24, 72, 74, 0.28);
+  }
+  .hx-dos-cert > span { flex: none; font-size: 11px; color: rgba(127, 166, 163, 0.9); }
+  .hx-dos-cert u {
+    flex: none; text-decoration: none; padding: 2px 7px 3px; border-radius: 4px; white-space: nowrap;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+    color: #8ff0e6; border: 1px solid rgba(53, 224, 208, 0.4); background: rgba(53, 224, 208, 0.1);
+  }
+
+  /* ===== 合作时间线（固定高度 + 定长 8 条，重填绝不改布局） ===== */
+  .hx-tl { position: relative; flex: 1; min-height: 0; overflow: hidden; margin: 2px 0 0; padding: 0 0 0 0; list-style: none; }
+  .hx-tl::before {
+    content: ""; position: absolute; left: 81px; top: 8px; bottom: 8px; width: 2px; border-radius: 1px;
+    background: linear-gradient(180deg, rgba(53, 224, 208, 0.06), rgba(53, 224, 208, 0.5) 20%, rgba(255, 157, 69, 0.5) 84%, rgba(255, 157, 69, 0.06));
+  }
+  .hx-tl-item {
+    position: relative; display: grid; grid-template-columns: 62px 24px 1fr; align-items: center; gap: 0 8px;
+    height: 36px; border-radius: 6px; padding-right: 8px;
+    transition: background .25s;
+  }
+  .hx-tl-item:nth-child(odd) { background: rgba(24, 72, 74, 0.22); }
+  .hx-tl-item.is-cursor { background: rgba(53, 224, 208, 0.16); box-shadow: inset 0 0 0 1px rgba(53, 224, 208, 0.4); }
+  .hx-tl-date { font: 700 11.5px/1 var(--hx-mono); text-align: right; color: #9fd0cb; font-variant-numeric: tabular-nums; }
+  .hx-tl-dot { justify-self: center; width: 10px; height: 10px; border-radius: 50%; border: 2px solid rgba(7, 27, 30, 0.9); }
+  .hx-tl-body { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .hx-tl-body em { font-style: normal; font-size: 12.5px; color: #cbe6e3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hx-tl-body em b { font-weight: 700; color: #eafcfa; }
+  .hx-ev {
+    flex: none; padding: 2px 8px 3px; border-radius: 4px; white-space: nowrap;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; color: #04191a;
+  }
+  .hx-ev.is-ship  { background: var(--mfg-cyan); }
+  .hx-ev.is-audit { background: var(--mfg-blue); }
+  .hx-ev.is-qa    { background: var(--mfg-red); }
+  .hx-ev.is-price { background: var(--mfg-amber); }
+  .hx-ev.is-alert { background: var(--mfg-orange); }
+  .hx-ev.is-cert  { background: var(--mfg-violet); }
+  .hx-ev.is-fix   { background: var(--mfg-green); }
+
+  /* ===== 风险标签墙（固定高度） ===== */
+  .hx-tags { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; }
+  .hx-tag {
+    display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 9px 4px; border-radius: 999px;
+    font-size: 11.5px; letter-spacing: 0.04em; white-space: nowrap; border: 1px solid;
+  }
+  .hx-tag i { font-style: normal; font-size: 10.5px; font-variant-numeric: tabular-nums; opacity: 0.78; }
+  .hx-tag.is-hi   { color: #ffc3c8; border-color: rgba(255, 95, 107, 0.6);  background: rgba(96, 26, 38, 0.42); }
+  .hx-tag.is-mid  { color: #ffd9b0; border-color: rgba(255, 157, 69, 0.55); background: rgba(74, 44, 16, 0.4); }
+  .hx-tag.is-low  { color: #b8e8bf; border-color: rgba(126, 224, 138, 0.5); background: rgba(18, 62, 40, 0.38); }
+  .hx-tag.is-info { color: #a8cfe8; border-color: rgba(79, 168, 232, 0.45); background: rgba(16, 46, 70, 0.4); }
+
+  /* ===== CSS grid 模拟表格（替代供应商清单） ===== */
+  .hx-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .hx-thead, .hx-tbody li {
+    display: grid; grid-template-columns: var(--hx-altcols); align-items: center; gap: 6px;
+  }
+  .hx-thead {
+    flex: none; padding: 4px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.06em; color: #7fc0ba;
+  }
+  .hx-thead span:not(:first-child), .hx-tbody li span:not(:first-child) { text-align: right; }
+  .hx-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .hx-tbody li {
+    padding: 0 8px; height: 26px; border-radius: 5px;
+    font-size: 12px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .hx-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .hx-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .hx-tbody li.is-link { cursor: pointer; }
+  .hx-tbody li.is-link:hover { background: rgba(53, 224, 208, 0.2); box-shadow: inset 0 0 0 1px rgba(53, 224, 208, 0.5); }
+  .hx-tbody li b { font-weight: 700; color: #eafcfa; }
+  .hx-tbody li.is-empty { display: flex; align-items: center; justify-content: center; color: #ffb3b9; font-size: 11.5px; background: rgba(96, 26, 38, 0.28); }
+  .hx-badge {
+    justify-self: end; padding: 1px 6px 2px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; color: #04191a;
+  }
+  .hx-badge.is-good { background: var(--mfg-green); }
+  .hx-badge.is-mid { background: var(--mfg-amber); }
+  .hx-badge.is-bad { background: var(--mfg-red); }
+
+  /* ===== 底部风险提示滚动条 ===== */
+  .hx-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .hx-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .hx-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: hx-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes hx-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .hx-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .hx-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .hx-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .hx-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .hx-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .hx-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="hx-stage" id="hx-stage">
+    <!-- mockflag:begin --><div class="hx-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="hx-error" id="hx-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识占位） -->
+    <header class="hx-header">
+      <div class="hx-head-left">
+        <div class="hx-crumb">
+          <a class="hx-back" href="大屏样板间-厨电供应链风险图谱1920.html" title="返回上级专题页：供应链风险图谱（Esc）">‹ 返回 供应链风险图谱</a>
+          <b>云麓厨电</b><i>›</i><span>供应链风险图谱</span><i>›</i><em id="hx-crumb-obj">--</em>
+        </div>
+        <div class="hx-head-title-row">
+          <div class="hx-head-title" id="hx-title">供应商风险画像</div>
+          <div class="hx-head-meta">
+            <span>重点画像 <b id="hx-meta-focus">--</b> 家 / 在册 <b id="hx-meta-total">--</b> 家</span><i>|</i>
+            <span><b>6</b> 维风险 · <b>4</b> 层影响链</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="hx-head-right">
+        <div class="hx-chips">
+          <div class="hx-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="hx-chip is-key"><span>RISK SCORE</span><b id="hx-chip-risk">--</b></div>
+        </div>
+        <div class="hx-clock" aria-label="实时时钟">
+          <span class="hx-clock-time" id="hx-clock-time">--:--:--</span>
+          <span class="hx-clock-date" id="hx-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 身份条 -->
+    <div class="hx-idbar" id="hx-idbar"></div>
+
+    <!-- KPI 带（随供应商切换重算） -->
+    <div class="hx-band" id="hx-band"></div>
+
+    <!-- 供应商切换器 -->
+    <div class="hx-swbar">
+      <span class="hx-swbar-tag">供应商切换</span>
+      <div class="hx-switcher" id="hx-switcher" aria-label="重点供应商切换"></div>
+      <div class="hx-swbar-state" id="hx-sw-state">--</div>
+    </div>
+
+    <!-- 左轨：重点供应商清单 -->
+    <div class="hx-col">
+      <section class="hx-panel" style="flex: 1;">
+        <div class="hx-panel-head">
+          <h2>重点画像</h2>
+          <span class="hx-panel-tag">风险降序</span>
+        </div>
+        <ul class="hx-rail" id="hx-rail"></ul>
+      </section>
+    </div>
+
+    <!-- 第二栏：六维风险雷达 + 基础档案卡 -->
+    <div class="hx-col">
+      <section class="hx-panel" style="flex: 1;">
+        <div class="hx-panel-head">
+          <h2>六维风险雷达</h2>
+          <span class="hx-panel-tag">越外越险 · 满分 <b>100</b></span>
+        </div>
+        <div class="hx-chart" id="hx-chart-radar"></div>
+      </section>
+      <section class="hx-panel" style="flex: none; height: 232px;">
+        <div class="hx-panel-head">
+          <h2>基础档案</h2>
+          <span class="hx-panel-tag" id="hx-dos-tag">--</span>
+        </div>
+        <div class="hx-dossier" id="hx-dossier"></div>
+      </section>
+    </div>
+
+    <!-- 第三栏：合作时间线 + 月度供货量与合格率 -->
+    <div class="hx-col">
+      <section class="hx-panel" style="flex: none; height: 340px;">
+        <div class="hx-panel-head">
+          <h2>合作时间线</h2>
+          <span class="hx-panel-tag" id="hx-tl-tag">--</span>
+        </div>
+        <ul class="hx-tl" id="hx-tl"></ul>
+      </section>
+      <section class="hx-panel" style="flex: 1;">
+        <div class="hx-panel-head">
+          <h2>月度供货额与来料合格率</h2>
+          <span class="hx-panel-tag" id="hx-mon-tag">--</span>
+        </div>
+        <div class="hx-chart" id="hx-chart-month"></div>
+      </section>
+    </div>
+
+    <!-- 第四栏：关系子图 + 风险标签墙 + 替代供应商清单 -->
+    <div class="hx-col">
+      <section class="hx-panel" style="flex: 1;">
+        <div class="hx-panel-head">
+          <h2>影响链关系子图</h2>
+          <span class="hx-panel-tag" id="hx-graph-tag">--</span>
+        </div>
+        <div class="hx-chart" id="hx-chart-graph"></div>
+      </section>
+      <section class="hx-panel" style="flex: none; height: 104px;">
+        <div class="hx-panel-head">
+          <h2>风险标签墙</h2>
+          <span class="hx-panel-tag" id="hx-tag-tag">--</span>
+        </div>
+        <div class="hx-tags" id="hx-tags"></div>
+      </section>
+      <section class="hx-panel" style="flex: none; height: 190px;">
+        <div class="hx-panel-head">
+          <h2>替代供应商</h2>
+          <span class="hx-panel-tag" id="hx-alt-tag">--</span>
+        </div>
+        <div class="hx-table">
+          <div class="hx-thead">
+            <span>字号</span><span>属地</span><span>级别</span><span>采购额</span><span>风险分</span>
+          </div>
+          <ul class="hx-tbody" id="hx-alt-body"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部风险提示滚动条 -->
+    <div class="hx-foot">
+      <div class="hx-foot-tag">画像提示</div>
+      <div class="hx-foot-view"><div class="hx-foot-track" id="hx-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("hx-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("hx-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const PARENT = "大屏样板间-厨电供应链风险图谱1920.html";
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad2 = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  /* =====================================================================
+     4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+
+     ★★ 与上级页「供应链风险图谱」严格同源 ★★
+        4.1 ~ 4.9 与第 5 ~ 7 节的建模代码是上级页数据层的**逐行复刻**：
+        级别定义、省 × 级别矩阵、材料模式、虚构字号表、确定性波形、合格率标定、
+        关键件归属、七分项风险权重全部照搬，182 家逐条生成结果与上级页一一对应
+        （同名、同省、同级别、同采购额、同风险分）。本页在此之上只新增
+        「重点画像选取 / 基础档案 / 合作时间线 / 月度序列 / 影响链子图」五组派生字段。
+
+     ★ 循环引用防线（上级页同款）：业务对象之间只用 name / 索引关联，绝不互相持有；
+       进 option 的数据只放标量与数组；页尾对**每一家**的每个 option 都跑 JSON.stringify。
+
+     合计一律由分项求和，比率一律现算，页面上不出现任何硬编码的合计值。
+     ===================================================================== */
+
+  /* 4.1 级别定义（otd/qual/amt/pay/fin 是级别中心值，个体由确定性波形展开，不用 Math.random） */
+  const TIERS = [
+    { key: "S", name: "战略", full: "战略供应商", color: C.cyan,   otd: 97.6, otdA: 1.0, qual: 99.46, qualA: 0.16, amt: 12000, amtA: 0.30, pay: 90, payA: 9, fin: 88, finA: 6 },
+    { key: "A", name: "优选", full: "优选供应商", color: C.blue,   otd: 96.2, otdA: 1.7, qual: 99.22, qualA: 0.26, amt:  5200, amtA: 0.34, pay: 75, payA: 9, fin: 80, finA: 8 },
+    { key: "B", name: "合格", full: "合格供应商", color: C.green,  otd: 93.6, otdA: 3.0, qual: 98.92, qualA: 0.42, amt:  1800, amtA: 0.38, pay: 60, payA: 9, fin: 70, finA: 10 },
+    { key: "C", name: "观察", full: "观察供应商", color: C.orange, otd: 88.4, otdA: 3.4, qual: 98.19, qualA: 0.62, amt:   700, amtA: 0.40, pay: 45, payA: 8, fin: 58, finA: 12 }
+  ];
+
+  /* 4.2 省 × 级别矩阵：n = [S, A, B, C]。全表求和 = 182 家，列求和 = 12 / 45 / 98 / 27 */
+  const PROVS = [
+    { name: "浙江", n: [2, 9, 16, 4] },
+    { name: "广东", n: [3, 8, 14, 4] },
+    { name: "江苏", n: [2, 6, 12, 3] },
+    { name: "安徽", n: [1, 5, 10, 3] },
+    { name: "山东", n: [1, 4,  8, 3] },
+    { name: "福建", n: [1, 2,  5, 2] },
+    { name: "上海", n: [1, 3,  4, 1] },
+    { name: "河北", n: [0, 2,  4, 2] },
+    { name: "河南", n: [0, 1,  5, 1] },
+    { name: "湖北", n: [0, 1,  3, 1] },
+    { name: "四川", n: [0, 1,  3, 1] },
+    { name: "重庆", n: [0, 1,  2, 1] },
+    { name: "湖南", n: [0, 1,  2, 1] },
+    { name: "辽宁", n: [0, 1,  2, 0] },
+    { name: "天津", n: [1, 0,  2, 0] },
+    { name: "江西", n: [0, 0,  2, 0] },
+    { name: "陕西", n: [0, 0,  2, 0] },
+    { name: "广西", n: [0, 0,  1, 0] },
+    { name: "山西", n: [0, 0,  1, 0] }
+  ];
+
+  /* 4.3 五大原材料 + 主供材料排布模式（182 家展开后各材料家数固定为 37/37/18/36/54） */
+  const MATERIALS = [
+    { name: "冷轧板",     suffix: "钢构", color: C.blue },
+    { name: "不锈钢",     suffix: "精钢", color: C.cyan },
+    { name: "铜材",       suffix: "铜业", color: C.amber },
+    { name: "面板玻璃",   suffix: "玻璃", color: C.violet },
+    { name: "电子电控件", suffix: "电子", color: C.green }
+  ];
+  const MAT_PATTERN = [0, 1, 2, 3, 4, 0, 1, 4, 3, 4];
+
+  /* 4.4 虚构字号：14 × 13 = 182 个两字组合，与供应商数一一对应，保证不重名。
+         全部为杜撰字号，不指向任何真实企业。 */
+  const ZH1 = ["恒", "泰", "鼎", "华", "锐", "昊", "嘉", "远", "晟", "博", "维", "宸", "泓", "祁"];
+  const ZH2 = ["锐", "岚", "铖", "驰", "砚", "屹", "澈", "岱", "沣", "擎", "稷", "弘", "铠", "琮"];
+
+  /* 4.5 来料合格率的跨页锚：品质管理页六产品线（产量, 来料合格率），按产量加权 = 全司来料合格率 */
+  const LINES = [
+    { name: "吸油烟机",   short: "烟机", out: 236, iqc: 99.24, base: 0 },
+    { name: "燃气灶具",   short: "灶具", out: 218, iqc: 99.36, base: 0 },
+    { name: "洗碗机",     short: "洗碗", out: 132, iqc: 98.86, base: 1 },
+    { name: "蒸烤一体机", short: "蒸烤", out:  96, iqc: 98.72, base: 1 },
+    { name: "集成灶",     short: "集成", out: 108, iqc: 99.02, base: 2 },
+    { name: "净水热水",   short: "净水", out: 112, iqc: 99.42, base: 2 }
+  ];
+  const OUT_TOTAL = sum(LINES.map((l) => l.out));                          /* 902 万台 */
+  const IQC_GROUP = sum(LINES.map((l) => l.iqc * l.out)) / OUT_TOTAL;      /* 99.1541% */
+  const GROUP_REV = 112.6;                                                 /* 年营收（内销口径），亿元 */
+
+  /* 三大基地：产量由所属产品线求和得到，绝不另写一份 */
+  const BASES = [
+    { name: "杭州临平", short: "临平", color: C.cyan },
+    { name: "安徽芜湖", short: "芜湖", color: C.blue },
+    { name: "广东佛山", short: "佛山", color: C.violet }
+  ];
+  BASES.forEach((b, bi) => {
+    b.lines = LINES.map((l, li) => (l.base === bi ? li : -1)).filter((x) => x >= 0);
+    b.out = sum(b.lines.map((li) => LINES[li].out));                       /* 454 / 228 / 220 */
+  });
+
+  /* 集团年度目标 + 供应商准入基准线（与上级页同值） */
+  const OTD_TARGET = 96.0;
+  const OTD_LINE = 93.0, QUAL_LINE = 98.80;
+  const RISK_HI = 50, RISK_MID = 38;
+
+  /* ===== 5. 由矩阵展开 182 家供应商（确定性，kiosk 每次打开完全一致） ===== */
+  const SUPPLIERS = [];
+  let gi = 0;
+  PROVS.forEach((p) => {
+    p.total = sum(p.n);
+    TIERS.forEach((t, ti) => {
+      for (let k = 0; k < p.n[ti]; k++) {
+        const i = gi++;
+        const mi = MAT_PATTERN[i % MAT_PATTERN.length];
+        const w1 = Math.sin(i * 1.37 + ti * 2.1), w2 = Math.sin(i * 0.53 + 0.7);
+        const w3 = Math.sin(i * 0.91 + ti * 1.3), w4 = Math.sin(i * 2.17 + 1.1);
+        SUPPLIERS.push({
+          idx: i,
+          name: ZH1[i % ZH1.length] + ZH2[Math.floor(i / ZH1.length) % ZH2.length] + MATERIALS[mi].suffix,
+          prov: p.name,
+          tier: t.key, tierIdx: ti,
+          mat: mi,
+          otd: clamp(t.otd + w1 * t.otdA * 0.72 + w2 * t.otdA * 0.28, 80, 99.6),
+          qual: t.qual + w3 * t.qualA * 0.7 + w4 * t.qualA * 0.3,
+          amt: Math.round(t.amt * (1 + t.amtA * Math.sin(i * 0.77 + ti))),   /* 年采购额，万元 */
+          pay: Math.round(t.pay + Math.sin(i * 1.09 + ti * 0.83) * t.payA),  /* 账期，天 */
+          fin: clamp(t.fin + t.finA * Math.sin(i * 1.61 + ti * 0.9), 30, 99) /* 财务健康分 */
+        });
+      }
+    });
+  });
+
+  /* 5.1 来料合格率标定（与上级页同一步）：把个体波形的采购额加权均值精确对到 IQC_GROUP */
+  const AMT_TOTAL = sum(SUPPLIERS.map((s) => s.amt));                       /* ≈ 57.20 亿元 */
+  const QUAL_CAL = IQC_GROUP - sum(SUPPLIERS.map((s) => s.qual * s.amt)) / AMT_TOTAL;
+  SUPPLIERS.forEach((s) => { s.qual = s.qual + QUAL_CAL; });
+
+  /* 名字索引：全页凡是「拿到一个名字要回查业务对象」都走这几张表，
+     业务对象之间因此**只用名字互指**，从不互相持有对象（循环引用的根治办法）。 */
+  const SUP_BY_NAME = {};
+  SUPPLIERS.forEach((s) => { SUP_BY_NAME[s.name] = s; });
+  const LINE_BY_NAME = {};
+  LINES.forEach((l) => { LINE_BY_NAME[l.name] = l; });
+
+  /* ===== 6. 关键件层（与上级页同源）：供方家数 = 1 的关键件即单一来源 ===== */
+  const PARTS = [
+    { name: "机身钣金件",   mat: 0, n: 21, bases: [0, 1, 2] },
+    { name: "腔体内胆",     mat: 0, n: 16, bases: [1, 2] },
+    { name: "灶具面板总成", mat: 1, n: 20, bases: [0, 2] },
+    { name: "拉丝装饰条",   mat: 1, n:  1, bases: [0, 2] },
+    { name: "内胆不锈钢件", mat: 1, n: 16, bases: [1] },
+    { name: "燃烧器铜件",   mat: 2, n: 11, bases: [0, 2] },
+    { name: "阀体铜组件",   mat: 2, n:  1, bases: [0, 2] },
+    { name: "换热铜管",     mat: 2, n:  6, bases: [2] },
+    { name: "钢化面板玻璃", mat: 3, n: 22, bases: [0, 1, 2] },
+    { name: "微晶面板",     mat: 3, n:  1, bases: [2] },
+    { name: "触控视窗玻璃", mat: 3, n: 13, bases: [1, 2] },
+    { name: "主控板",       mat: 4, n: 18, bases: [0, 1, 2] },
+    { name: "高压点火器",   mat: 4, n:  1, bases: [0] },
+    { name: "变频驱动模块", mat: 4, n: 12, bases: [0, 1] },
+    { name: "智能网关模组", mat: 4, n:  1, bases: [1, 2] },
+    { name: "触控面板 IC",  mat: 4, n: 10, bases: [1, 2] },
+    { name: "传感器组件",   mat: 4, n:  8, bases: [0, 1, 2] },
+    { name: "直流无刷电机", mat: 4, n:  4, bases: [0, 1] }
+  ];
+  const PART_BY_NAME = {};
+  PARTS.forEach((p) => { PART_BY_NAME[p.name] = p; p.sup = []; });
+  MATERIALS.forEach((m, mi) => {
+    const pool = SUPPLIERS.filter((s) => s.mat === mi).sort((a, b) => a.idx - b.idx);
+    let k = 0;
+    PARTS.filter((p) => p.mat === mi).forEach((p) => {
+      for (let j = 0; j < p.n; j++) {
+        const s = pool[k++];
+        s.part = p.name;                    /* ★ 只存字符串，两侧都不持有对方对象 */
+        p.sup.push(s.name);
+      }
+    });
+    m.cnt = pool.length;
+    m.amt = sum(pool.map((s) => s.amt));
+  });
+  PARTS.forEach((p) => {
+    p.amt = sum(p.sup.map((n) => SUP_BY_NAME[n].amt));
+    p.single = p.n === 1;
+    p.lines = [];
+    p.bases.forEach((bi) => BASES[bi].lines.forEach((li) => { if (p.lines.indexOf(li) < 0) p.lines.push(li); }));
+    p.out = sum(p.lines.map((li) => LINES[li].out));                        /* 受影响年产量，万台 */
+  });
+
+  /* ===== 7. 风险度量（与上级页同一套公式与权重，七分项归一到 0~100「越大越险」再加权） ===== */
+  const PROV_MAX = Math.max.apply(null, PROVS.map((p) => p.total));         /* 浙江 31 家 */
+  const PROV_CNT = {};
+  PROVS.forEach((p) => { PROV_CNT[p.name] = p.total; });
+  const W = { otd: 0.22, qual: 0.16, conc: 0.15, geo: 0.12, alt: 0.17, fin: 0.13, pay: 0.05 };
+  SUPPLIERS.forEach((s) => {
+    const p = PART_BY_NAME[s.part];
+    s.partN = p.n;
+    s.alt = p.n - 1;                                                        /* 替代供应商数 */
+    s.conc = s.amt / p.amt * 100;                                           /* 采购集中度 */
+    s.geo = PROV_CNT[s.prov] / PROV_MAX * 100;                              /* 地域集中风险 */
+    s.rOtd = clamp((99.6 - s.otd) / (99.6 - 84) * 100, 0, 100);
+    s.rQual = clamp((99.8 - s.qual) / (99.8 - 98.0) * 100, 0, 100);
+    s.rConc = clamp(s.conc, 0, 100);
+    s.rGeo = s.geo;
+    s.rAlt = 100 / p.n;                                                     /* 单点依赖：单源 = 100 */
+    s.rFin = 100 - s.fin;
+    s.rPay = clamp((75 - s.pay) / 45 * 100, 0, 100);
+    s.risk = W.otd * s.rOtd + W.qual * s.rQual + W.conc * s.rConc +
+             W.geo * s.rGeo + W.alt * s.rAlt + W.fin * s.rFin + W.pay * s.rPay;
+    s.verdict = s.risk >= RISK_HI ? { t: "高危", c: "is-bad" }
+              : s.risk >= RISK_MID ? { t: "关注", c: "is-mid" }
+              : { t: "正常", c: "is-good" };
+  });
+
+  /* ===== 8. 全司派生量（全部现算） ===== */
+  const D = {};
+  D.total = SUPPLIERS.length;                                               /* 182 */
+  D.amt = AMT_TOTAL;
+  D.otd = sum(SUPPLIERS.map((s) => s.otd * s.amt)) / D.amt;                 /* ≈ 95.61% */
+  D.qual = sum(SUPPLIERS.map((s) => s.qual * s.amt)) / D.amt;               /* ≈ 99.1541% */
+  D.riskIdx = sum(SUPPLIERS.map((s) => s.risk * s.amt)) / D.amt;            /* 采购额加权风险指数 */
+  D.matSum = sum(MATERIALS.map((m) => m.cnt));
+  D.provSum = sum(PROVS.map((p) => p.total));
+  D.partSum = sum(PARTS.map((p) => p.n));
+  D.singles = PARTS.filter((p) => p.single);
+  D.singleN = D.singles.length;                                             /* 5 项 */
+  D.hiN = SUPPLIERS.filter((s) => s.risk >= RISK_HI).length;
+  TIERS.forEach((t) => { t.cnt = SUPPLIERS.filter((s) => s.tier === t.key).length; });
+  D.tierSum = sum(TIERS.map((t) => t.cnt));
+  /* 风险分项的采购额加权均值 —— 雷达的「集团均值」参照系 */
+  const RDIMS = [
+    { key: "rOtd",  name: "准时",   raw: "otd",  unit: "%" },
+    { key: "rQual", name: "质量",   raw: "qual", unit: "%" },
+    { key: "rFin",  name: "财务",   raw: "fin",  unit: "分" },
+    { key: "rConc", name: "集中度", raw: "conc", unit: "%" },
+    { key: "rGeo",  name: "地域",   raw: "geo",  unit: "指数" },
+    { key: "rAlt",  name: "替代性", raw: "alt",  unit: "家" }
+  ];
+  RDIMS.forEach((d) => { d.avg = sum(SUPPLIERS.map((s) => s[d.key] * s.amt)) / D.amt; });
+  /* 准入线在六维上的映射（本页新增，全部由上面的准入常量现算，不硬编码）：
+     准时 / 质量 直接由 OTD_LINE、QUAL_LINE 代入同一归一化公式；
+     财务取 B 级中心值 70 分；集中度 45%；地域 70 指数；替代性要求关键件至少 3 家在册供方。 */
+  const LINE_MIN_ALT = 3, LINE_CONC = 45, LINE_GEO = 70, LINE_FIN = 70;
+  const RLINE = {
+    rOtd: clamp((99.6 - OTD_LINE) / (99.6 - 84) * 100, 0, 100),
+    rQual: clamp((99.8 - QUAL_LINE) / (99.8 - 98.0) * 100, 0, 100),
+    rFin: 100 - LINE_FIN,
+    rConc: LINE_CONC,
+    rGeo: LINE_GEO,
+    rAlt: 100 / LINE_MIN_ALT
+  };
+
+  /* =====================================================================
+     9. 重点画像对象（本页新增）：从 182 家里挑 12 家做 360 画像。
+        选取规则完全由数据决定、不手点名单：
+          ① 全部单一来源供方（5 家，断供单点）
+          ② 战略 S 按采购额降序前 4（采购额压舱石）
+          ③ 非单源的高风险供应商按风险降序前 3（观察名单）
+        三组去重后按风险分降序排列 —— 首屏默认落在风险最高的一家。
+     ===================================================================== */
+  const pick = {};
+  const FOCUS = [];
+  const take = (s) => { if (s && !pick[s.name]) { pick[s.name] = 1; FOCUS.push(s); } };
+  D.singles.forEach((p) => take(SUP_BY_NAME[p.sup[0]]));
+  SUPPLIERS.filter((s) => s.tier === "S").sort((a, b) => b.amt - a.amt).slice(0, 4).forEach(take);
+  SUPPLIERS.filter((s) => s.risk >= RISK_HI && s.partN > 1).sort((a, b) => b.risk - a.risk).slice(0, 3).forEach(take);
+  FOCUS.sort((a, b) => b.risk - a.risk);
+  D.focusN = FOCUS.length;
+  D.focusAmt = sum(FOCUS.map((s) => s.amt));
+  D.focusShare = D.focusAmt / D.amt * 100;
+  /* 全司风险排名（1 = 最高）：只用于 KPI 副标，排名由排序位次现算 */
+  const RANK = {};
+  SUPPLIERS.slice().sort((a, b) => b.risk - a.risk).forEach((s, i) => { RANK[s.name] = i + 1; });
+
+  /* ===== 10. 月历轴：近 24 个月，末月 = 2026-07 ===== */
+  const ANCHOR_Y = 2026, ANCHOR_M = 7, MON_N = 24;
+  function ymOf(k) {                                   /* k = 0..23，k = 23 为末月 */
+    const t = ANCHOR_Y * 12 + (ANCHOR_M - 1) - (MON_N - 1 - k);
+    return { y: Math.floor(t / 12), m: t % 12 + 1 };
+  }
+  const MON_FULL = Array.from({ length: MON_N }, (_, k) => { const d = ymOf(k); return d.y + "-" + pad2(d.m); });
+  const MON_SHORT = Array.from({ length: MON_N }, (_, k) => { const d = ymOf(k); return (d.m === 1 ? d.y % 100 + "年" : d.m + "月"); });
+
+  /* =====================================================================
+     11. 每家重点供应商的画像派生（档案 / 月度序列 / 事件 / 标签 / 替代 / 影响链）
+          —— 全部只用标量与字符串，方便安全地进 option。
+     ===================================================================== */
+  const CERT_BY_TIER = [
+    ["ISO 9001", "IATF 16949", "ISO 14001", "ISO 45001"],
+    ["ISO 9001", "ISO 14001", "ISO 45001"],
+    ["ISO 9001", "ISO 14001"],
+    ["ISO 9001"]
+  ];
+  const CERT_BY_MAT = ["GB/T 冷轧认证", "GB/T 不锈钢认证", "RoHS 合规", "CQC 玻璃认证", "IECQ QC080000"];
+
+  FOCUS.forEach((s) => {
+    const p = PART_BY_NAME[s.part];
+
+    /* 11.1 基础档案（确定性派生，随级别与采购额单调） */
+    s.coop = clamp(Math.round(6 + (3 - s.tierIdx) * 2.4 + 3.6 * Math.sin(s.idx * 0.83 + 1.9)), 2, 18);
+    s.since = ANCHOR_Y - s.coop;
+    s.reg = Math.round((s.amt * 0.46 + 900) / 50) * 50;                       /* 注册资本，万元 */
+    s.staff = Math.round(s.amt / 22 + 90);                                    /* 员工规模，人 */
+    s.capa = Math.max(4, Math.round(s.amt / 42));                             /* 年产能，万件 */
+    s.capaShare = clamp(Math.round(26 + 44 * (0.5 + 0.5 * Math.sin(s.idx * 1.21 + 0.4)) + (3 - s.tierIdx) * 4), 12, 92);
+    s.settle = s.pay >= 85 ? "月结 90 天" : s.pay >= 70 ? "月结 75 天" : s.pay >= 55 ? "月结 60 天" : "月结 45 天";
+    /* 证书顺序：级别基础证 → 材料专项证 → 级别其余证（档案卡只列前 3 张，其余折成「+N」） */
+    s.certs = [CERT_BY_TIER[s.tierIdx][0], CERT_BY_MAT[s.mat]].concat(CERT_BY_TIER[s.tierIdx].slice(1));
+
+    /* 11.2 月度供货额与来料合格率（★ 两条勾稽：近 12 月供货额之和 = 年采购额；
+             近 12 月采购额加权合格率 = 年来料合格率）。波形确定性，不用 Math.random。 */
+    const rawA = Array.from({ length: MON_N }, (_, k) =>
+      1 + 0.24 * Math.sin(k * 0.62 + s.idx * 0.41) + 0.11 * Math.sin(k * 1.37 + s.idx));
+    const recent = rawA.slice(12), prev = rawA.slice(0, 12);
+    const kRecent = s.amt / sum(recent);
+    s.yoy = 0.9 + 0.16 * (0.5 + 0.5 * Math.sin(s.idx * 0.97 + 2.3));          /* 上一年度基数比 */
+    const kPrev = s.amt * s.yoy / sum(prev);
+    /* ★ 不做四舍五入：一取整，12 个月之和就对不回年采购额，勾稽自检会挂。
+       末月吃掉浮点残差，保证 Σ(近 12 月) 恒等于 s.amt；显示层再按需保留小数。 */
+    s.monAmt = rawA.map((v, k) => v * (k < 12 ? kPrev : kRecent));
+    s.monAmt[MON_N - 1] = s.amt - sum(s.monAmt.slice(12, MON_N - 1));
+    s.amtRecent = sum(s.monAmt.slice(12));
+    s.amtPrev = sum(s.monAmt.slice(0, 12));
+    s.amtYoy = (s.amtRecent - s.amtPrev) / s.amtPrev * 100;
+
+    const rawQ = Array.from({ length: MON_N }, (_, k) =>
+      s.qual + 0.30 * Math.sin(k * 0.78 + s.idx * 0.63) + 0.13 * Math.sin(k * 1.61 + s.idx * 0.2));
+    const wRecent = s.monAmt.slice(12);
+    const qCal = s.qual - sum(rawQ.slice(12).map((q, k) => q * wRecent[k])) / s.amtRecent;
+    s.monQual = rawQ.map((q) => q + qCal);                                    /* 同理不取整 */
+    s.qualRecent = sum(s.monQual.slice(12).map((q, k) => q * wRecent[k])) / s.amtRecent;
+    s.qualBelowN = s.monQual.slice(12).filter((q) => q < QUAL_LINE).length;
+    s.monMin = Math.min.apply(null, s.monQual);
+    s.monMax = Math.max.apply(null, s.monQual);
+
+    /* 11.3 合作时间线：从画像事实里长出来的 8 条事件（定长 → 面板高度恒定） */
+    const ev = [];
+    const push = (k, type, cls, text) => { if (k >= 0 && k < MON_N) ev.push({ k: k, type: type, cls: cls, text: text }); };
+    push(23, "月度评级", "is-audit", "本期综合风险 <b>" + fmtDec(s.risk, 1) + "</b> 分，判定「" + s.verdict.t + "」，全司排名 <b>" + RANK[s.name] + "/" + D.total + "</b>");
+    if (p.single) push(22, "断供预警", "is-alert", "「" + p.name + "」在册供方仅本家，断供将波及 <b>" + p.lines.length + "</b> 条产品线 / <b>" + p.out + "</b> 万台");
+    else if (s.risk >= RISK_HI) push(22, "断供预警", "is-alert", "风险分超高危线 <b>" + RISK_HI + "</b>，已纳入季度观察名单并要求提交改善计划");
+    push(21, "现场审核", "is-audit", "年度体系审核得分 <b>" + fmtDec(s.fin, 0) + "</b>，" + (s.fin >= 80 ? "结论通过" : s.fin >= 65 ? "限期整改 2 项" : "降级观察"));
+    push(19, "认证复审", "is-cert", s.certs[s.certs.length - 1] + " 复审通过，在册证书 <b>" + s.certs.length + "</b> 张");
+    push(17, "价格调整", "is-price", MATERIALS[s.mat].name + "行情联动，供货单价" + (s.idx % 2 === 0 ? "上调 <b>" : "下调 <b>") + fmtDec(1.4 + (s.idx % 7) * 0.35, 1) + "%</b>");
+    if (s.otd < OTD_LINE) push(14, "质量事件", "is-qa", "准时率 <b>" + fmtDec(s.otd, 2) + "%</b> 低于准入线 " + fmtDec(OTD_LINE, 1) + "%，连续 2 批次延误");
+    else push(14, "批量交付", "is-ship", "累计交付达 <b>" + fmtInt(s.capa * s.capaShare / 100) + "</b> 万件，准时率 <b>" + fmtDec(s.otd, 2) + "%</b>");
+    if (s.qual < QUAL_LINE) push(11, "质量事件", "is-qa", "来料合格率 <b>" + fmtDec(s.qual, 2) + "%</b> 低于准入线 " + fmtDec(QUAL_LINE, 2) + "%，触发批退");
+    else push(11, "批量交付", "is-ship", "「" + p.name + "」季度供货额 <b>" + fmtInt(s.amt / 4) + "</b> 万元，验收合格");
+    push(8, "改善关闭", "is-fix", "上轮整改项全部关闭，合格率回升至 <b>" + fmtDec(s.monQual[8], 2) + "%</b>");
+    push(5, "现场审核", "is-audit", "二方审核抽查 " + MATERIALS[s.mat].name + "来料，判定" + (s.rQual > 55 ? "有条件通过" : "通过"));
+    push(2, "批量交付", "is-ship", "进入本期供应体系，账期 <b>" + s.pay + "</b> 天（" + s.settle + "）");
+    push(0, "合作起点", "is-cert", "自 <b>" + s.since + "</b> 年进入合格供方名录，累计合作 <b>" + s.coop + "</b> 年");
+    ev.sort((a, b) => b.k - a.k);
+    s.events = ev.slice(0, 8);                                                /* 恒 8 条 */
+
+    /* 11.4 风险标签墙（按分项相对准入线着色，最多 6 枚） */
+    const tags = [];
+    if (p.single) tags.push({ t: "单一来源", v: "在册 1 家", lv: "is-hi" });
+    if (s.rOtd > RLINE.rOtd) tags.push({ t: "交付不稳", v: fmtDec(s.otd, 2) + "%", lv: "is-hi" });
+    if (s.rQual > RLINE.rQual) tags.push({ t: "来料波动", v: fmtDec(s.qual, 2) + "%", lv: "is-hi" });
+    if (s.rConc > RLINE.rConc) tags.push({ t: "采购集中", v: fmtDec(s.conc, 1) + "%", lv: "is-mid" });
+    if (s.rGeo > RLINE.rGeo) tags.push({ t: "地域集中", v: s.prov + " " + PROV_CNT[s.prov] + " 家", lv: "is-mid" });
+    if (s.rFin > RLINE.rFin) tags.push({ t: "财务承压", v: fmtDec(s.fin, 0) + " 分", lv: "is-mid" });
+    if (s.pay < 60) tags.push({ t: "账期偏短", v: s.pay + " 天", lv: "is-mid" });
+    if (s.pay >= 85) tags.push({ t: "账期偏长", v: s.pay + " 天", lv: "is-info" });
+    if (s.tierIdx <= 1) tags.push({ t: TIERS[s.tierIdx].full, v: "采购额前列", lv: "is-info" });
+    if (s.alt >= LINE_MIN_ALT) tags.push({ t: "替代充足", v: s.alt + " 家", lv: "is-low" });
+    if (s.otd >= OTD_TARGET) tags.push({ t: "准时达标", v: "≥ " + fmtDec(OTD_TARGET, 1) + "%", lv: "is-low" });
+    s.tags = tags.slice(0, 6);
+
+    /* 11.5 替代供应商：同关键件的其他在册供方（风险升序）；单源时给同材料的候选切换名单 */
+    s.altList = p.sup.filter((n) => n !== s.name).map((n) => SUP_BY_NAME[n])
+      .sort((a, b) => a.risk - b.risk).slice(0, 4).map((x) => x.name);
+    s.altCand = [];
+    if (p.single) {
+      s.altCand = SUPPLIERS.filter((x) => x.mat === s.mat && x.name !== s.name && x.risk < RISK_MID)
+        .sort((a, b) => a.risk - b.risk).slice(0, 3).map((x) => x.name);
+    }
+
+    /* 11.6 影响链读数（基地 / 产品线 / 产量 / 折合营收，全部现算） */
+    s.impBases = p.bases.map((bi) => BASES[bi].name);
+    s.impLines = p.lines.map((li) => LINES[li].name);
+    s.impOut = p.out;
+    s.impShare = p.out / OUT_TOTAL * 100;
+    s.impRev = GROUP_REV * p.out / OUT_TOTAL;
+  });
+  D.focusSingleN = FOCUS.filter((s) => s.partN === 1).length;
+  D.focusHiN = FOCUS.filter((s) => s.risk >= RISK_HI).length;
+
+  /* ===== 12. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("hx-clock-time").textContent = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+    $("hx-clock-date").textContent = d.getFullYear() + "年" + pad2(d.getMonth() + 1) + "月" + pad2(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* =====================================================================
+     13. DOM 填充（★ 必须全部早于 echarts.init）
+         与图表同属一个 flex 容器的兄弟块 —— 基础档案卡（雷达同栏）、合作时间线
+         （双轴同栏）、风险标签墙 / 替代清单（关系子图同栏）—— 若在 init 之后才填
+         内容，会把 flex:1 的图表容器压矮、图表按旧高度布局。所以：
+           ① 这几块的**高度全部在 CSS 里写死**（232 / 340 / 104 / 190），
+              内部一律 min-height:0 + overflow:hidden，切换供应商只改文本不改布局；
+           ② 本节把它们（含 KPI 带、身份条、切换器、左轨、底部条）一次性填完，
+              第 15 节才开始 echarts.init。
+     ===================================================================== */
+
+  /* 13.1 顶栏统计位 */
+  $("hx-meta-focus").textContent = D.focusN;
+  $("hx-meta-total").textContent = D.total;
+
+  /* 13.2 左轨：重点供应商清单 */
+  const riskColor = (r) => (r >= RISK_HI ? C.red : r >= RISK_MID ? C.amber : C.green);
+  const RISK_MAXV = Math.max.apply(null, FOCUS.map((s) => s.risk));
+  $("hx-rail").innerHTML = FOCUS.map((s, i) => (
+    '<li class="hx-rail-item" data-i="' + i + '" title="' + esc(s.name + " · " + TIERS[s.tierIdx].full + " · " + s.prov + " · 主供 " + s.part) + '">' +
+      '<span class="hx-rail-no">' + pad2(i + 1) + "</span>" +
+      '<span class="hx-rail-name">' + esc(s.name) + "</span>" +
+      '<span class="hx-rail-tier" style="background:' + TIERS[s.tierIdx].color + '">' + s.tier + "</span>" +
+      '<span class="hx-rail-bar"><u style="width:' + fmtDec(s.risk / RISK_MAXV * 100, 1) + "%;background:" + riskColor(s.risk) + '"></u></span>' +
+      '<span class="hx-rail-risk" style="color:' + riskColor(s.risk) + '">' + fmtDec(s.risk, 1) + "</span>" +
+    "</li>"
+  )).join("");
+  const railRows = Array.prototype.slice.call($("hx-rail").children);
+
+  /* 13.3 切换器 */
+  $("hx-switcher").innerHTML = FOCUS.map((s, i) => (
+    '<button class="hx-sw" type="button" data-i="' + i + '" title="' + esc(s.name + " · 风险 " + fmtDec(s.risk, 1) + " 分") + '">' +
+      "<b>" + esc(s.name) + "</b><i>" + fmtDec(s.risk, 0) + "</i>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.prototype.slice.call($("hx-switcher").children);
+
+  /* 13.4 身份条 / KPI 带 / 档案卡 / 时间线 / 标签墙 / 替代清单 / 底部条：先建骨架，再由 apply() 填值 */
+  const KPI_DEFS = [
+    { icon: "¥", label: "年采购额", unit: "万元", dec: 0, warn: false,
+      val: (s) => s.amt,
+      sub: (s) => "占全司 <b>" + fmtDec(s.amt / D.amt * 100, 2) + "%</b> · 占该关键件 <b>" + fmtDec(s.conc, 1) + "%</b>" },
+    { icon: "⏱", label: "准时交付率", unit: "%", dec: 2, warn: false,
+      val: (s) => s.otd,
+      sub: (s) => "准入线 " + fmtDec(OTD_LINE, 1) + "% · <b class=\"" + (s.otd >= OTD_LINE ? "hx-up" : "hx-down") + "\">" + signed(s.otd - OTD_LINE, 2) + "pp</b>" },
+    { icon: "◈", label: "来料合格率", unit: "%", dec: 2, warn: false,
+      val: (s) => s.qual,
+      sub: (s) => "准入线 " + fmtDec(QUAL_LINE, 2) + "% · <b class=\"" + (s.qual >= QUAL_LINE ? "hx-up" : "hx-down") + "\">" + signed(s.qual - QUAL_LINE, 2) + "pp</b>" },
+    { icon: "⚠", label: "综合风险分", unit: "分", dec: 1, warn: true,
+      val: (s) => s.risk,
+      sub: (s) => "全司加权 " + fmtDec(D.riskIdx, 1) + " · 排名 <b>" + RANK[s.name] + "/" + D.total + "</b>" },
+    { icon: "⇄", label: "替代供应商", unit: "家", dec: 0, warn: false,
+      val: (s) => s.alt,
+      sub: (s) => "「" + s.part + "」在册 <b>" + s.partN + "</b> 家 · 准入要求 ≥ " + LINE_MIN_ALT + " 家" }
+  ];
+  $("hx-band").innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="hx-kpi" id="hx-kpi-box-' + i + '">' +
+      '<div class="hx-kpi-icon">' + k.icon + "</div>" +
+      '<div class="hx-kpi-main">' +
+        '<div class="hx-kpi-label">' + k.label + "</div>" +
+        '<div class="hx-kpi-num"><span class="hx-kpi-val" id="hx-kpi-' + i + '">0</span><span class="hx-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="hx-kpi-sub" id="hx-kpi-sub-' + i + '">--</div>' +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  $("hx-idbar").innerHTML =
+    '<div class="hx-seal" id="hx-seal">—</div>' +
+    '<div class="hx-id-name"><b id="hx-id-name">--</b><span id="hx-id-code">--</span></div>' +
+    '<div class="hx-id-fields">' +
+      '<div class="hx-id-f"><span>供应商级别</span><b id="hx-id-tier">--</b></div>' +
+      '<div class="hx-id-f"><span>主供原材料</span><b id="hx-id-mat">--</b></div>' +
+      '<div class="hx-id-f"><span>主供关键件</span><b id="hx-id-part">--</b></div>' +
+      '<div class="hx-id-f"><span>注册属地</span><b id="hx-id-prov">--</b></div>' +
+      '<div class="hx-id-f"><span>合作年限</span><b id="hx-id-coop">--</b></div>' +
+    "</div>" +
+    '<div class="hx-id-impact" id="hx-id-impact">--</div>';
+
+  const DOS_DEFS = [
+    { k: "注册资本", f: (s) => fmtInt(s.reg) + " 万元" },
+    { k: "成立 / 合作", f: (s) => s.since + " 年 · " + s.coop + " 年" },
+    { k: "员工规模", f: (s) => fmtInt(s.staff) + " 人" },
+    { k: "年产能", f: (s) => fmtInt(s.capa) + " 万件" },
+    { k: "供本司占比", f: (s) => s.capaShare + "%" },
+    { k: "账期", f: (s) => s.pay + " 天" },
+    { k: "结算方式", f: (s) => s.settle },
+    { k: "财务健康", f: (s) => fmtDec(s.fin, 0) + " 分" }
+  ];
+  $("hx-dossier").innerHTML =
+    DOS_DEFS.map((d, i) => '<div class="hx-dos-f"><span>' + d.k + '</span><b id="hx-dos-' + i + '">--</b></div>').join("") +
+    '<div class="hx-dos-cert" id="hx-dos-cert"><span>体系认证</span></div>';
+
+  $("hx-tl").innerHTML = Array.from({ length: 8 }, (_, i) => (
+    '<li class="hx-tl-item" data-i="' + i + '">' +
+      '<span class="hx-tl-date" id="hx-tl-d-' + i + '">--</span>' +
+      '<span class="hx-tl-dot" id="hx-tl-o-' + i + '"></span>' +
+      '<div class="hx-tl-body"><b class="hx-ev" id="hx-tl-b-' + i + '">--</b><em id="hx-tl-t-' + i + '">--</em></div>' +
+    "</li>"
+  )).join("");
+  const tlRows = Array.prototype.slice.call($("hx-tl").children);
+
+  $("hx-tags").innerHTML = "";
+  $("hx-alt-body").innerHTML = "";
+  $("hx-foot-track").innerHTML = "";
+
+  /* =====================================================================
+     14. 关系子图的手工布局（★ layout:"none"，坐标全部由容器尺寸现算）
+         四层：供应商（含同件替代供方）→ 关键件 → 制造基地 → 产品线。
+         containment 三重保证：
+           ① 坐标空间 GW × GH 直接取自容器 clientWidth/clientHeight 减去边距，
+              各层 x 取 GW 的固定比例、y 由 spreadY() 在 [PADY, GH-PADY] 内均分；
+           ② spreadY 的 gap = min(maxGap, (GH-2*PADY)/(n-1))，节点数再多也不会溢出；
+           ③ 额外放两枚 symbolSize:0 的**透明锚点**在 (0,0) 与 (GW,GH)：
+              layout:"none" 下 ECharts 会把全部节点的包围盒拉伸贴合 series 的
+              left/top/right/bottom 矩形，锚点把包围盒钉死成 [0,GW]×[0,GH]，
+              于是「坐标在空间内」⇔「像素在矩形内」，与节点分布无关。
+              （上级页当年用 force 算坐标，包围盒随机漂移才出现底部被静默裁掉。）
+     ===================================================================== */
+  const GX_FRAC = [0.10, 0.38, 0.655, 0.915];
+  const PADY = 22, MAX_GAP = 58;
+  function spreadY(n, H) {
+    if (n <= 0) return [];
+    if (n === 1) return [H / 2];
+    const gap = Math.min(MAX_GAP, (H - 2 * PADY) / (n - 1));
+    const y0 = H / 2 - gap * (n - 1) / 2;
+    return Array.from({ length: n }, (_, i) => y0 + i * gap);
+  }
+  const GCATS = [
+    { name: "供应商", color: C.blue },
+    { name: "关键件", color: C.violet },
+    { name: "制造基地", color: C.cyan },
+    { name: "产品线", color: C.orange }
+  ];
+
+  /* 构图：返回 {nodes, links, note, W, H}，note 是 name → tooltip 文案（纯字符串表） */
+  function buildGraph(s, W, H) {
+    const p = PART_BY_NAME[s.part];
+    const nodes = [], links = [], note = {};
+    /* 锚点：不可见、不参与 tooltip，只用来钉死包围盒 */
+    nodes.push({ name: "__a0", x: 0, y: 0, symbolSize: 0, silent: true, itemStyle: { opacity: 0 }, label: { show: false }, category: 0 });
+    nodes.push({ name: "__a1", x: W, y: H, symbolSize: 0, silent: true, itemStyle: { opacity: 0 }, label: { show: false }, category: 0 });
+
+    /* 层 1：本家 + 最多 4 家同件替代供方（单源时只有本家） */
+    const alts = s.altList.map((n) => SUP_BY_NAME[n]);
+    const col1 = alts.slice();
+    col1.splice(Math.floor(col1.length / 2), 0, s);                       /* 本家居中 */
+    const y1 = spreadY(col1.length, H);
+    col1.forEach((x, i) => {
+      const me = x.name === s.name;
+      nodes.push({
+        name: x.name, category: 0, x: GX_FRAC[0] * W, y: y1[i],
+        symbolSize: me ? 24 : 12,
+        itemStyle: {
+          color: me ? riskColor(x.risk) : "rgba(79,168,232,.5)",
+          borderWidth: me ? 2 : 0, borderColor: "#eafcfa",
+          shadowBlur: me ? 16 : 0, shadowColor: "rgba(255,95,107,.7)"
+        },
+        label: { show: true, position: "bottom", distance: 5, fontSize: me ? 11 : 9.5,
+          fontWeight: me ? 700 : 400, color: me ? "#eafcfa" : "rgba(168,207,232,.75)" }
+      });
+      note[x.name] = (me ? "【本期画像】" : "【同件替代供方】") + TIERS[x.tierIdx].full +
+        " · " + x.prov + "<br/>年采购额 " + fmtInt(x.amt) + " 万元 · 风险 " + fmtDec(x.risk, 1) + " 分";
+      links.push({ source: x.name, target: p.name, me: me ? 1 : 0 });
+    });
+
+    /* 层 2：关键件（1 项） */
+    nodes.push({
+      name: p.name, category: 1, x: GX_FRAC[1] * W, y: H / 2, symbolSize: 30,
+      itemStyle: { color: p.single ? C.red : C.violet, borderWidth: p.single ? 2 : 0, borderColor: "#ffd0d4" },
+      label: { show: true, position: "bottom", distance: 6, fontSize: 11, fontWeight: 700,
+        color: p.single ? "#ffb3b9" : "#d5c6ff" }
+    });
+    note[p.name] = "关键件 · " + MATERIALS[p.mat].name + "<br/>在册供方 " + p.n + " 家" +
+      (p.single ? "（单一来源）" : "") + "<br/>年采购额 " + fmtDec(p.amt / 10000, 2) + " 亿元";
+
+    /* 层 3：制造基地 */
+    const y3 = spreadY(p.bases.length, H);
+    p.bases.forEach((bi, i) => {
+      const b = BASES[bi];
+      nodes.push({
+        name: b.name, category: 2, x: GX_FRAC[2] * W, y: y3[i], symbolSize: 22,
+        itemStyle: { color: b.color, shadowBlur: 12, shadowColor: "rgba(53,224,208,.45)" },
+        label: { show: true, position: "bottom", distance: 5, fontSize: 10.5, fontWeight: 700, color: "#cfe9e6" }
+      });
+      note[b.name] = "制造基地 · 年产量 " + fmtDec(b.out, 0) + " 万台<br/>" +
+        b.lines.map((li) => LINES[li].name).join(" / ");
+      links.push({ source: p.name, target: b.name, me: 0 });
+      b.lines.forEach((li) => links.push({ source: b.name, target: LINES[li].name, me: 0 }));
+    });
+
+    /* 层 4：产品线 */
+    const y4 = spreadY(p.lines.length, H);
+    p.lines.forEach((li, i) => {
+      const l = LINES[li];
+      nodes.push({
+        name: l.name, category: 3, x: GX_FRAC[3] * W, y: y4[i],
+        symbolSize: 10 + 14 * Math.sqrt(l.out / 236),
+        itemStyle: { color: C.orange },
+        label: { show: true, position: "bottom", distance: 5, fontSize: 10, color: "#ffd9b0" }
+      });
+      note[l.name] = "产品线 · 年产量 " + l.out + " 万台<br/>占全司 " + fmtDec(l.out / OUT_TOTAL * 100, 1) + "%";
+    });
+    return { nodes: nodes, links: links, note: note, W: W, H: H };
+  }
+
+  /* ===== 15. 图表实例 =====
+     ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const radar = makeChart("hx-chart-radar");
+  const month = makeChart("hx-chart-month");
+  const graph = makeChart("hx-chart-graph");
+  const TIP = {
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line,
+    textStyle: { color: C.text, fontSize: 12 }, confine: true
+  };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 10.5 };
+
+  /* 15.1 六维风险雷达：本期 / 集团加权均值 / 准入线 */
+  function radarOption(s) {
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({ trigger: "item" }, TIP, {
+        formatter: (pm) => {
+          const v = pm.value || [];
+          const own = pm.name === "本期";
+          return "<b>" + esc(pm.name) + "</b><span style=\"color:" + C.textDim + "\">　（分值越大风险越高）</span><br/>" +
+            RDIMS.map((d, i) => d.name + "　<b style=\"color:" + C.cyan + "\">" + fmtDec(v[i], 1) + "</b>" +
+              (own ? "<span style=\"color:" + C.textDim + "\">　实测 " + fmtDec(s[d.raw], d.raw === "alt" ? 0 : 2) + " " + d.unit + "</span>" : "")
+            ).join("<br/>");
+        }
+      }),
+      legend: {
+        show: true, top: 0, right: 0, itemWidth: 13, itemHeight: 7, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 },
+        data: ["本期", "集团均值", "准入线"]
+      },
+      radar: {
+        center: ["50%", "54%"], radius: "66%", splitNumber: 4, shape: "polygon",
+        /* ★ 轴名里直接拼上本期分值，不用 axisName.formatter ——
+           formatter 的第二个入参在各版本里字段不一，拼字符串最稳。 */
+        axisName: { color: "#9fd0cb", fontSize: 10.5, lineHeight: 13 },
+        nameGap: 6,
+        indicator: RDIMS.map((d) => ({ name: d.name + "\n" + fmtDec(s[d.key], 0), max: 100 })),
+        axisLine: { lineStyle: { color: "rgba(64,196,190,.22)" } },
+        splitLine: { lineStyle: { color: "rgba(64,196,190,.16)" } },
+        splitArea: { areaStyle: { color: ["rgba(53,224,208,.03)", "rgba(53,224,208,.06)"] } }
+      },
+      series: [{
+        type: "radar", symbolSize: 4,
+        data: [
+          { name: "本期", value: RDIMS.map((d) => Number(fmtDec(s[d.key], 1))),
+            lineStyle: { color: riskColor(s.risk), width: 2.4 },
+            itemStyle: { color: riskColor(s.risk) },
+            areaStyle: { color: s.risk >= RISK_HI ? "rgba(255,95,107,.24)" : s.risk >= RISK_MID ? "rgba(255,201,77,.22)" : "rgba(53,224,208,.22)" } },
+          { name: "集团均值", value: RDIMS.map((d) => Number(fmtDec(d.avg, 1))),
+            lineStyle: { color: C.blue, width: 1.6, type: "dashed" },
+            itemStyle: { color: C.blue }, areaStyle: { color: "rgba(79,168,232,.08)" } },
+          { name: "准入线", value: RDIMS.map((d) => Number(fmtDec(RLINE[d.key], 1))),
+            lineStyle: { color: C.amber, width: 1.4, type: "dotted" },
+            itemStyle: { color: C.amber }, areaStyle: { opacity: 0 } }
+        ]
+      }]
+    };
+  }
+
+  /* 15.2 月度供货额（柱）与来料合格率（线）双轴 */
+  function monthOption(s) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 8, top: 30, bottom: 2, containLabel: true },
+      tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" } }, TIP, {
+        formatter: (ps) => {
+          const k = ps[0].dataIndex;
+          return "<b>" + MON_FULL[k] + "</b><br/>供货额 <b style=\"color:" + C.cyan + "\">" +
+            fmtInt(s.monAmt[k]) + "</b> 万元<br/>合格率 <b style=\"color:" + C.orange + "\">" +
+            fmtDec(s.monQual[k], 2) + "%</b>" + (s.monQual[k] < QUAL_LINE ? "　<span style=\"color:" + C.red + "\">低于准入线</span>" : "") +
+            "<br/><span style=\"color:" + C.textDim + "\">" + (k < 12 ? "上一年度" : "近 12 个月") + "</span>";
+        }
+      }),
+      legend: { show: true, top: 0, right: 2, itemWidth: 13, itemHeight: 7,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["月度供货额", "来料合格率"] },
+      xAxis: {
+        type: "category", data: MON_SHORT,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 2, fontSize: 10 })
+      },
+      yAxis: [
+        { type: "value", name: "万元", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: AXIS_LABEL, splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+        { type: "value", name: "%", scale: true,
+          min: Number(fmtDec(Math.min(s.monMin, QUAL_LINE) - 0.12, 2)),
+          max: Number(fmtDec(Math.max(s.monMax, QUAL_LINE) + 0.12, 2)),
+          nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { formatter: (v) => fmtDec(v, 2) }),
+          splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "月度供货额", type: "bar", barWidth: "58%",
+          data: s.monAmt.map((v) => Number(fmtDec(v, 1))),
+          itemStyle: {
+            borderRadius: [3, 3, 0, 0],
+            color: (pm) => (pm.dataIndex >= 12
+              ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: C.cyan }, { offset: 1, color: C.cyanDeep }])
+              : "rgba(79,168,232,.34)")
+          } },
+        { name: "来料合格率", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 4, z: 5,
+          data: s.monQual.map((v) => Number(fmtDec(v, 2))),
+          lineStyle: { color: C.orange, width: 2 },
+          itemStyle: { color: (pm) => (pm.value < QUAL_LINE ? C.red : C.orange) },
+          markLine: {
+            silent: true, symbol: "none",
+            data: [{ yAxis: Number(fmtDec(QUAL_LINE, 2)) }],
+            lineStyle: { color: C.amber, type: "dashed", width: 1 },
+            label: { formatter: "准入线 " + fmtDec(QUAL_LINE, 2) + "%", color: C.amber, fontSize: 10, position: "insideStartTop" }
+          } }
+      ]
+    };
+  }
+
+  /* 15.3 影响链关系子图（graph + layout:"none" + 手工四层坐标） */
+  function graphOption(s) {
+    const el = $("hx-chart-graph");
+    /* ★ 坐标空间必须与 series 的 left/right/top/bottom 留白后的矩形**同尺寸同宽高比**：
+       layout:"none" 下 ECharts 按包围盒的宽高比等比贴合该矩形，尺寸一致 ⇒ 缩放系数 = 1，
+       手写坐标即像素坐标，既不留黑边也不会被裁。26 = left 13 + right 13；42 = top 30 + bottom 12。 */
+    const GW = Math.max(240, (el.clientWidth || 420) - 26);
+    const GH = Math.max(150, (el.clientHeight || 260) - 42);
+    const g = buildGraph(s, GW, GH);
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({ trigger: "item" }, TIP, {
+        formatter: (pm) => {
+          if (pm.dataType !== "node") return "";
+          if (pm.name.indexOf("__a") === 0) return "";
+          return "<b>" + esc(pm.name) + "</b><br/>" + (g.note[pm.name] || "");
+        }
+      }),
+      legend: {
+        show: true, top: 0, left: 0, itemWidth: 9, itemHeight: 9, itemGap: 11,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: GCATS.map((c) => c.name)
+      },
+      series: [{
+        type: "graph", layout: "none", roam: false,
+        left: 13, right: 13, top: 30, bottom: 12,
+        categories: GCATS.map((c) => ({ name: c.name, itemStyle: { color: c.color } })),
+        labelLayout: { hideOverlap: true },
+        edgeSymbol: ["none", "arrow"], edgeSymbolSize: [0, 6],
+        emphasis: { focus: "adjacency", scale: 1.08, lineStyle: { width: 2.6, color: C.cyan, opacity: 1 } },
+        data: g.nodes,
+        links: g.links.map((l) => ({
+          source: l.source, target: l.target,
+          lineStyle: l.me
+            ? { color: riskColor(s.risk), width: 2.2, opacity: 0.95, curveness: 0.08 }
+            : { color: "rgba(64,196,190,.34)", width: 1, opacity: 0.6, curveness: 0.08 }
+        })),
+        animationDuration: 520, animationEasing: "cubicOut"
+      }]
+    };
+  }
+
+  /* ===== 16. 翻牌缓动（纯文本更新，不改变布局高度） ===== */
+  function countUp(el, target, dec) {
+    const dur = 900, t0 = performance.now();
+    if (el.__raf) cancelAnimationFrame(el.__raf);
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = dec === 0 ? fmtInt(target * e) : fmtDec(target * e, dec);
+      if (p < 1) el.__raf = requestAnimationFrame(step);
+      else el.textContent = dec === 0 ? fmtInt(target) : fmtDec(target, dec);
+    })(t0);
+  }
+
+  /* ===== 17. 应用某一家供应商（所有块只改文本，不改布局） ===== */
+  let idx = 0, tlCursor = -1;
+
+  function renderId(s) {
+    const t = TIERS[s.tierIdx];
+    const seal = $("hx-seal");
+    seal.textContent = s.name.charAt(0);
+    seal.style.background = "linear-gradient(150deg, " + t.color + ", " + riskColor(s.risk) + ")";
+    $("hx-id-name").textContent = s.name;
+    $("hx-id-code").textContent = "SUP-" + pad2(Math.floor(s.idx / 100)) + pad2(s.idx % 100) + " · 画像 " + pad2(idx + 1) + "/" + D.focusN;
+    $("hx-id-tier").innerHTML = '<span class="hx-tier is-' + s.tier.toLowerCase() + '">' + s.tier + " " + t.name + "</span>";
+    $("hx-id-mat").textContent = MATERIALS[s.mat].name;
+    $("hx-id-part").innerHTML = esc(s.part) + (s.partN === 1
+      ? ' <span class="hx-tier is-c">单一来源</span>'
+      : ' <i style="font-style:normal;color:#5f8a87">（在册 ' + s.partN + " 家）</i>");
+    $("hx-id-prov").textContent = s.prov + " · 同省 " + PROV_CNT[s.prov] + " 家";
+    $("hx-id-coop").textContent = s.coop + " 年（" + s.since + " 年起）";
+    $("hx-id-impact").innerHTML = "断供影响面：<b>" + s.impBases.length + "</b> 个基地 <i>·</i> <b>" +
+      s.impLines.length + "</b> 条产品线 <i>·</i> <b>" + fmtInt(s.impOut) + "</b> 万台年产量（占 <b>" +
+      fmtDec(s.impShare, 1) + "%</b>）<i>·</i> 折合营收 <b>" + fmtDec(s.impRev, 1) + "</b> 亿元";
+    $("hx-crumb-obj").textContent = s.name;
+    $("hx-title").textContent = s.name + " 风险画像";
+    $("hx-chip-risk").textContent = fmtDec(s.risk, 1) + " 分";
+  }
+
+  function renderKpi(s) {
+    KPI_DEFS.forEach((k, i) => {
+      const v = k.val(s);
+      const warn = i === 3 ? s.risk >= RISK_MID
+                 : i === 1 ? s.otd < OTD_LINE
+                 : i === 2 ? s.qual < QUAL_LINE
+                 : i === 4 ? s.alt < LINE_MIN_ALT : false;
+      $("hx-kpi-box-" + i).classList.toggle("is-warn", warn);
+      $("hx-kpi-sub-" + i).innerHTML = k.sub(s);
+      countUp($("hx-kpi-" + i), v, k.dec);
+    });
+  }
+
+  function renderDossier(s) {
+    DOS_DEFS.forEach((d, i) => { $("hx-dos-" + i).textContent = d.f(s); });
+    $("hx-dos-cert").innerHTML = "<span>体系认证</span>" +
+      s.certs.slice(0, 3).map((c) => "<u>" + esc(c) + "</u>").join("") +
+      (s.certs.length > 3 ? "<u>+" + (s.certs.length - 3) + "</u>" : "");
+    $("hx-dos-tag").innerHTML = "共 <b>" + s.certs.length + "</b> 张在册证书";
+  }
+
+  const EV_COLOR = { "is-ship": C.cyan, "is-audit": C.blue, "is-qa": C.red, "is-price": C.amber,
+    "is-alert": C.orange, "is-cert": C.violet, "is-fix": C.green };
+  function renderTimeline(s) {
+    s.events.forEach((e, i) => {
+      $("hx-tl-d-" + i).textContent = MON_FULL[e.k];
+      $("hx-tl-o-" + i).style.background = EV_COLOR[e.cls] || C.cyan;
+      const b = $("hx-tl-b-" + i);
+      b.className = "hx-ev " + e.cls;
+      b.textContent = e.type;
+      $("hx-tl-t-" + i).innerHTML = e.text;
+    });
+    const kinds = {};
+    s.events.forEach((e) => { kinds[e.type] = 1; });
+    $("hx-tl-tag").innerHTML = "近 <b>24</b> 个月 · <b>" + s.events.length + "</b> 条 · " +
+      Object.keys(kinds).length + " 类事件";
+    tlCursor = -1;
+  }
+
+  function renderTags(s) {
+    $("hx-tags").innerHTML = s.tags.map((t) => (
+      '<span class="hx-tag ' + t.lv + '">' + esc(t.t) + "<i>" + esc(t.v) + "</i></span>"
+    )).join("");
+    const hi = s.tags.filter((t) => t.lv === "is-hi").length;
+    $("hx-tag-tag").innerHTML = "共 <b>" + s.tags.length + "</b> 枚 · 高危 <b>" + hi + "</b> 枚";
+  }
+
+  const tierBadge = (x) => '<span class="hx-badge" style="background:' + TIERS[x.tierIdx].color + '">' + x.tier + "</span>";
+  function renderAlt(s) {
+    const list = s.altList.length ? s.altList : s.altCand;
+    const isCand = !s.altList.length;
+    $("hx-alt-tag").innerHTML = isCand
+      ? "无在册替代 · 同材料候选 <b>" + s.altCand.length + "</b> 家"
+      : "在册 <b>" + s.alt + "</b> 家 · 列示前 " + list.length;
+    if (!list.length) {
+      $("hx-alt-body").innerHTML = '<li class="is-empty">单一来源：该关键件与同材料均无可切换供方</li>';
+      return;
+    }
+    $("hx-alt-body").innerHTML = list.map((n) => {
+      const x = SUP_BY_NAME[n];
+      const inFocus = pick[x.name] ? " is-link" : "";
+      return '<li data-name="' + esc(x.name) + '" class="' + inFocus.trim() + '"' +
+        (inFocus ? ' title="点击切到该供应商画像"' : ' title="' + esc(x.name + " · 未在重点画像名单") + '"') + ">" +
+        "<span><b>" + esc(x.name) + "</b></span>" +
+        "<span>" + x.prov + "</span>" +
+        "<span>" + tierBadge(x) + "</span>" +
+        "<span>" + fmtInt(x.amt) + "</span>" +
+        '<span style="color:' + riskColor(x.risk) + '">' + fmtDec(x.risk, 1) + "</span>" +
+        "</li>";
+    }).join("") + (isCand ? '<li class="is-empty" style="background:rgba(74,44,16,.3);color:#ffd9b0">以上为同材料候选，切换前需完成认证</li>' : "");
+  }
+
+  function renderFoot(s) {
+    const p = PART_BY_NAME[s.part];
+    const items = [
+      { lv: s.risk >= RISK_HI ? "高" : s.risk >= RISK_MID ? "中" : "低", c: riskColor(s.risk),
+        t: s.name + " 综合风险 " + fmtDec(s.risk, 1) + " 分（判定「" + s.verdict.t + "」），全司 " + D.total + " 家中排名第 " + RANK[s.name] },
+      { lv: p.single ? "高" : "中", c: p.single ? C.red : C.orange,
+        t: "主供「" + p.name + "」在册 " + p.n + " 家" + (p.single ? "（单一来源）" : "") +
+          "，断供波及 " + s.impLines.length + " 条产品线 / " + s.impOut + " 万台 / 折合营收 " + fmtDec(s.impRev, 1) + " 亿元" },
+      { lv: s.otd >= OTD_LINE ? "低" : "高", c: s.otd >= OTD_LINE ? C.green : C.red,
+        t: "准时交付率 " + fmtDec(s.otd, 2) + "%（准入线 " + fmtDec(OTD_LINE, 1) + "%，集团加权 " + fmtDec(D.otd, 2) + "%）" },
+      { lv: s.qual >= QUAL_LINE ? "低" : "高", c: s.qual >= QUAL_LINE ? C.green : C.red,
+        t: "来料合格率 " + fmtDec(s.qual, 2) + "%（准入线 " + fmtDec(QUAL_LINE, 2) + "%，集团加权 " + fmtDec(D.qual, 4) + "%），近 12 月有 " + s.qualBelowN + " 个月低于准入线" },
+      { lv: "中", c: C.amber,
+        t: "近 12 个月供货额 " + fmtInt(s.amtRecent) + " 万元 = 年采购额，同比 " + signed(s.amtYoy, 1) + "%，占该关键件 " + fmtDec(s.conc, 1) + "%" },
+      { lv: "低", c: C.blue,
+        t: "重点画像 " + D.focusN + " 家合计采购额 " + fmtDec(D.focusAmt / 10000, 2) + " 亿元，占全司 " + fmtDec(D.focusShare, 1) + "%（全司 " + fmtDec(D.amt / 10000, 2) + " 亿元）" }
+    ];
+    const html = items.map((a) => (
+      '<div class="hx-foot-item"><i style="color:' + a.c + '">[' + a.lv + "]</i><em>" + esc(a.t) + "</em></div>"
+    )).join("");
+    $("hx-foot-track").innerHTML = html + html;                          /* 两份首尾相接，滚动无缝 */
+  }
+
+  function apply(k, pushHash) {
+    idx = ((k % D.focusN) + D.focusN) % D.focusN;
+    const s = FOCUS[idx];
+
+    /* DOM 块（高度均已由 CSS 固定，重填不影响图表容器） */
+    renderId(s);
+    renderKpi(s);
+    renderDossier(s);
+    renderTimeline(s);
+    renderTags(s);
+    renderAlt(s);
+    renderFoot(s);
+
+    swTabs.forEach((el, i) => {
+      const on = i === idx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? TIERS[FOCUS[i].tierIdx].color : "";
+      el.style.borderColor = on ? "transparent" : "";
+    });
+    railRows.forEach((el, i) => el.classList.toggle("is-on", i === idx));
+    $("hx-sw-state").innerHTML = "当前 <b>" + esc(s.name) + "</b><i>|</i>" + TIERS[s.tierIdx].full +
+      " · " + s.prov + "<i>|</i>采购额 " + fmtInt(s.amt) + " 万元<i>|</i>风险 " + fmtDec(s.risk, 1) + " 分";
+    $("hx-mon-tag").innerHTML = "近 12 月合计 <b>" + fmtInt(s.amtRecent) + "</b> 万元 · 同比 " + signed(s.amtYoy, 1) + "%";
+    $("hx-graph-tag").innerHTML = "<b>" + (s.altList.length + 1) + "</b>供方 → <b>1</b>件 → <b>" +
+      s.impBases.length + "</b>基地 → <b>" + s.impLines.length + "</b>线";
+
+    /* 三图：节点/序列长度随对象变 → notMerge 全量重设 */
+    radar.setOption(radarOption(s), true);
+    month.setOption(monthOption(s), true);
+    graph.setOption(graphOption(s), true);
+
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    if (pushHash) {
+      try { history.replaceState(null, "", "#" + encodeURIComponent(s.name)); }
+      catch (e) { /* file:// 下部分浏览器禁止 replaceState，忽略即可 */ }
+    }
+  }
+
+  /* ===== 18. hash 传参：对象名 = 供应商字号 ===== */
+  function hashIdx() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    if (!raw) return -1;
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配 */ }
+    raw = raw.trim();
+    if (!raw) return -1;
+    let k = FOCUS.map((s) => s.name).indexOf(raw);
+    if (k < 0) k = FOCUS.map((s) => s.name).findIndex((n) => n.indexOf(raw) >= 0 || raw.indexOf(n) >= 0);
+    return k;
+  }
+  const startIdx = hashIdx();
+  apply(startIdx >= 0 ? startIdx : 0, true);       /* 匹配不到落默认第一个（风险最高的一家） */
+
+  /* ===== 19. 交互：切换器 / 左轨清单 / 替代清单 / 键盘 ← → / Esc 回上级 / hashchange ===== */
+  swTabs.forEach((el) => el.addEventListener("click", () => { apply(Number(el.dataset.i), true); restart(); }));
+  railRows.forEach((el) => el.addEventListener("click", () => { apply(Number(el.dataset.i), true); restart(); }));
+  $("hx-alt-body").addEventListener("click", (e) => {
+    const li = e.target.closest ? e.target.closest("li[data-name]") : null;
+    if (!li) return;
+    const k = FOCUS.map((s) => s.name).indexOf(li.dataset.name);
+    if (k >= 0) { apply(k, true); restart(); }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { apply(idx - 1, true); restart(); }
+    else if (e.key === "ArrowRight") { apply(idx + 1, true); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+  /* 父页可多次下钻同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = hashIdx();
+    if (k >= 0 && k !== idx) { apply(k, false); restart(); }
+  });
+
+  /* kiosk 常驻轮换；鼠标停在左轨上时暂停，便于人工查看 */
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => apply(idx + 1, true), 15000); }
+  restart();
+  $("hx-rail").addEventListener("mouseenter", () => clearInterval(timer));
+  $("hx-rail").addEventListener("mouseleave", restart);
+
+  /* ===== 20. 活性：时间线游标巡航 + 雷达/柱状高亮 + 底部滚动 ===== */
+  setInterval(() => {
+    tlCursor = (tlCursor + 1) % tlRows.length;
+    tlRows.forEach((r, i) => r.classList.toggle("is-cursor", i === tlCursor));
+  }, 2100);
+
+  let monCur = 12;
+  setInterval(() => {
+    month.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: monCur });
+    monCur = monCur + 1 >= MON_N ? 12 : monCur + 1;
+  }, 2600);
+
+  setInterval(() => {
+    radar.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    radar.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: 0 });
+  }, 4200);
+
+  let footX = 0;
+  const track = $("hx-foot-track");
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* =====================================================================
+     21. 开发期自检：勾稽关系 + option 环检测（不影响页面渲染）
+         ★ 环检测必须对**每一家**的**每一个** option 跑 JSON.stringify ——
+           setOption 的深拷贝遇环即 RangeError、整页图表全空，而 node 打桩测不出。
+     ===================================================================== */
+  let optAcyclic = true;
+  try { FOCUS.forEach((s) => { JSON.stringify(radarOption(s)); JSON.stringify(monthOption(s)); JSON.stringify(graphOption(s)); }); }
+  catch (e) { optAcyclic = false; console.error("[供应商风险画像] option 存在循环引用：", e.message); }
+
+  /* 子图坐标越界自检：全部节点必须落在 [0, GW] × [0, GH] 的手工坐标空间内 */
+  const gEl = $("hx-chart-graph");
+  const GW_T = Math.max(240, (gEl.clientWidth || 420) - 26);
+  const GH_T = Math.max(150, (gEl.clientHeight || 260) - 42);
+  const gAll = FOCUS.map((s) => buildGraph(s, GW_T, GH_T));
+  const inBox = gAll.every((g) => g.nodes.every((n) => n.x >= 0 && n.x <= GW_T && n.y >= 0 && n.y <= GH_T));
+  const linkOk = gAll.every((g) => {
+    const set = {}; g.nodes.forEach((n) => { set[n.name] = 1; });
+    return g.links.every((l) => typeof l.source === "string" && typeof l.target === "string" &&
+      set[l.source] === 1 && set[l.target] === 1);
+  });
+
+  const eq = (a, b, tol) => Math.abs(a - b) < (tol == null ? 1e-6 : tol);
+  const checks = [
+    ["供应商总数 = 省 × 级别矩阵全表之和 = 182", D.total === 182 && D.provSum === 182],
+    ["级别维度合计回到 182（12/45/98/27）", D.tierSum === 182 && TIERS.map((t) => t.cnt).join("/") === "12/45/98/27"],
+    ["材料维度合计回到 182（37/37/18/36/54）", D.matSum === 182 && MATERIALS.map((m) => m.cnt).join("/") === "37/37/18/36/54"],
+    ["关键件供方数合计 = 182 且每家恰好归属一项", D.partSum === 182 &&
+      SUPPLIERS.every((s) => !!PART_BY_NAME[s.part]) && sum(PARTS.map((p) => p.sup.length)) === 182],
+    ["供应商名唯一（14 × 13 虚构字号组合）", (new Set(SUPPLIERS.map((s) => s.name))).size === 182],
+    ["年采购额合计 57.20 亿元（与上级页同源）", eq(D.amt / 10000, 57.20, 0.005)],
+    ["加权来料合格率 = 99.1541%（与品质管理页同源）", eq(D.qual, IQC_GROUP, 1e-9) && eq(D.qual, 99.1541, 0.0005)],
+    ["加权准时交付率 ≈ 95.61%（目标 " + fmtDec(OTD_TARGET, 1) + "%）", eq(D.otd, 95.61, 0.01)],
+    ["产品线产量合计 = 902 万台 · 三大基地 454/228/220", OUT_TOTAL === 902 &&
+      BASES.map((b) => b.out).join("/") === "454/228/220" && sum(BASES.map((b) => b.out)) === 902],
+    ["风险权重之和 = 1（七分项，与上级页同权重）", eq(sum(Object.keys(W).map((k) => W[k])), 1, 1e-9)],
+    ["每家风险分 = 七分项加权之和", SUPPLIERS.every((s) => eq(s.risk,
+      W.otd * s.rOtd + W.qual * s.rQual + W.conc * s.rConc + W.geo * s.rGeo + W.alt * s.rAlt + W.fin * s.rFin + W.pay * s.rPay, 1e-9))],
+    ["单一来源关键件 = 供方数为 1 的关键件（5 项）", D.singleN === 5 && D.singles.every((p) => p.sup.length === 1)],
+    ["重点画像家数在 10 ~ 16 之间", D.focusN >= 10 && D.focusN <= 16],
+    ["重点画像采购额之和 ≤ 全司 57.20 亿元", D.focusAmt <= D.amt && D.focusAmt / 10000 <= 57.20],
+    ["重点画像覆盖全部单一来源供方", D.focusSingleN === D.singleN],
+    ["每家：替代供应商数 = 关键件在册供方数 − 1", FOCUS.every((s) => s.alt === s.partN - 1 &&
+      s.alt === PART_BY_NAME[s.part].sup.length - 1)],
+    ["每家：近 12 个月供货额之和 = 年采购额", FOCUS.every((s) => eq(s.amtRecent, s.amt, 1e-6))],
+    ["每家：近 12 个月加权合格率 = 年来料合格率", FOCUS.every((s) => eq(s.qualRecent, s.qual, 1e-9))],
+    ["每家：时间线恰好 8 条且月序落在近 24 个月内", FOCUS.every((s) => s.events.length === 8 &&
+      s.events.every((e) => e.k >= 0 && e.k < MON_N))],
+    ["每家：影响产量 = 受影响产品线之和 ≤ 902 万台", FOCUS.every((s) => {
+      const p = PART_BY_NAME[s.part];
+      return eq(s.impOut, sum(p.lines.map((li) => LINES[li].out)), 1e-9) && s.impOut <= OUT_TOTAL;
+    })],
+    ["每家：影响基地 = 关键件供货基地，产品线 = 基地产品线并集", FOCUS.every((s) => {
+      const p = PART_BY_NAME[s.part];
+      const u = {}; p.bases.forEach((bi) => BASES[bi].lines.forEach((li) => { u[li] = 1; }));
+      return s.impBases.length === p.bases.length && s.impLines.length === Object.keys(u).length;
+    })],
+    ["雷达三条曲线维度一致（6 维，满分 100）", RDIMS.length === 6 &&
+      Object.keys(RLINE).length === 6 && RDIMS.every((d) => RLINE[d.key] >= 0 && RLINE[d.key] <= 100)],
+    /* ★ 下面三条是「循环引用 / 坐标越界」两个坑的结构性防线 */
+    ["子图 links 的 source/target 全为字符串且指向已存在节点", linkOk],
+    ["子图节点坐标全部落在手工坐标空间 [0,W]×[0,H] 内", inBox],
+    ["三图 option 均无循环引用（逐家 JSON.stringify）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[供应商风险画像] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

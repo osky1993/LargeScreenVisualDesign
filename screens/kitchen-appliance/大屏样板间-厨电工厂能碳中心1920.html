@@ -1,0 +1,1270 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电工厂能碳中心</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --nt-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：碳排放核算（范围 / 核算项目 / 排放量 / 占比 / 同比 / 判定） */
+    --nt-tcols: 40px 1fr 74px 52px 56px 44px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .nt-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(126, 224, 138, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    /* 第 4 行是通栏的「主题河流 + 碳排核算」带：themeRiver 天生要宽、要矮 */
+    grid-template-rows: 84px 132px 1fr 268px 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .nt-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .nt-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .nt-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .nt-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(126, 224, 138, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(126, 224, 138, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .nt-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .nt-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .nt-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .nt-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .nt-crumb em { font-style: normal; color: #cfeae7; }
+  .nt-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .nt-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .nt-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .nt-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .nt-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .nt-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .nt-chips { display: flex; align-items: center; gap: 9px; }
+  .nt-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .nt-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .nt-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .nt-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .nt-chip.is-key b { color: var(--mfg-cyan); }
+  .nt-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .nt-clock-time { font: 700 26px/1 var(--nt-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .nt-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .nt-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .nt-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .nt-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .nt-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .nt-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .nt-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .nt-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .nt-kpi.is-warn .nt-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .nt-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .nt-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .nt-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .nt-kpi-val { font: 700 30px/1 var(--nt-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .nt-kpi.is-warn .nt-kpi-val { color: #ffd9b0; }
+  .nt-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .nt-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nt-kpi-sub b { font-weight: 700; }
+  .nt-up { color: var(--mfg-green); }
+  .nt-down { color: var(--mfg-red); }
+
+  /* ===== 栏与面板 ===== */
+  .nt-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .nt-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .nt-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .nt-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .nt-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .nt-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .nt-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .nt-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .nt-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 第 4 行通栏：24h 主题河流（宽） + 碳排放核算表 ===== */
+  .nt-band2 { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 620px; gap: 14px; min-height: 0; }
+
+  /* ===== 三基地能碳看板（左栏下，flex:none —— 必须在 init 之前填满） ===== */
+  .nt-bases { flex: none; display: flex; flex-direction: column; gap: 6px; }
+  .nt-base-row {
+    position: relative; display: grid; grid-template-columns: 26px 1fr 74px 66px; align-items: center; gap: 9px;
+    padding: 6px 9px 7px; border-radius: 9px;
+    border: 1px solid rgba(64, 196, 190, 0.16); background: rgba(10, 38, 42, 0.5);
+    transition: border-color .25s, background .25s;
+  }
+  .nt-base-row.is-active { border-color: rgba(53, 224, 208, 0.6); background: rgba(18, 68, 68, 0.55); box-shadow: inset 0 0 16px rgba(53, 224, 208, 0.12); }
+  .nt-base-dot {
+    width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font: 700 12px/1 var(--nt-mono); color: #04191a;
+  }
+  .nt-base-name { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .nt-base-name b { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #d6efec; }
+  .nt-base-bar { height: 5px; border-radius: 3px; background: rgba(64, 196, 190, 0.16); overflow: hidden; }
+  .nt-base-bar u { display: block; height: 100%; border-radius: 3px; }
+  .nt-base-num { text-align: right; font-size: 11px; color: var(--mfg-text-dim); font-variant-numeric: tabular-nums; }
+  .nt-base-num b { display: block; font: 700 13px/1.4 var(--nt-mono); color: #bfe4e0; }
+  .nt-base-num.is-key b { color: var(--mfg-green); }
+
+  /* ===== CSS grid 模拟表格（碳排放核算） ===== */
+  .nt-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .nt-thead, .nt-tbody li {
+    display: grid; grid-template-columns: var(--nt-tcols); align-items: center; gap: 6px;
+  }
+  .nt-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .nt-thead span:not(:first-child):not(:nth-child(2)), .nt-tbody li span:not(:first-child):not(:nth-child(2)) { text-align: right; }
+  .nt-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  /* 行高 23px：第 4 行通栏高 268px，扣掉面板内边距/标题/表头后净高约 186px，
+     恰好容下 8 行核算项（范围一 2 + 范围二 2 + 范围三 4），不出现半行。 */
+  .nt-tbody li {
+    padding: 0 8px; height: 23px; border-radius: 5px;
+    font-size: 11.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .nt-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .nt-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .nt-tbody li b { font-weight: 700; color: #eafcfa; }
+  .nt-scope {
+    justify-self: start; padding: 1px 6px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; color: #04191a;
+  }
+  .nt-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .nt-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .nt-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .nt-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+  .nt-badge.is-off { color: #04222c; background: var(--mfg-cyan); }
+
+  /* ===== liquidFill 缺失时的 CSS 液面降级卡（挂在图表容器自身，不做 flex 兄弟） ===== */
+  .nt-lqfall { display: flex; align-items: center; justify-content: space-around; width: 100%; height: 100%; gap: 8px; }
+  .nt-lqcard { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
+  .nt-lqcard > i { font-style: normal; font-size: 11px; letter-spacing: 0.06em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .nt-lqball {
+    position: relative; width: 104px; height: 104px; border-radius: 50%; overflow: hidden;
+    background: rgba(10, 38, 42, 0.72); border: 2px solid rgba(53, 224, 208, 0.45);
+    box-shadow: inset 0 0 18px rgba(53, 224, 208, 0.14);
+  }
+  .nt-lqfill { position: absolute; left: -50%; width: 200%; bottom: 0; }
+  /* ★ background: inherit —— 波峰的底色跟随 .nt-lqfill 上由 JS 内联写入的指标色 */
+  .nt-lqfill::before, .nt-lqfill::after {
+    content: ""; position: absolute; left: 50%; top: 0; width: 200%; padding-bottom: 200%;
+    background: inherit;
+    border-radius: 44%; transform: translate(-50%, -76%); opacity: .82;
+    animation: nt-wave 7s linear infinite;
+  }
+  .nt-lqfill::after { border-radius: 47%; opacity: .42; animation-duration: 11s; animation-direction: reverse; }
+  @keyframes nt-wave { from { transform: translate(-50%, -76%) rotate(0deg); } to { transform: translate(-50%, -76%) rotate(360deg); } }
+  .nt-lqpct {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font: 700 21px/1 var(--nt-mono); color: #eafcfa; text-shadow: 0 0 10px rgba(4, 16, 18, 0.9);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== 底部能碳预警滚动条 ===== */
+  .nt-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .nt-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-green);
+  }
+  .nt-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-green);
+    box-shadow: 0 0 10px var(--mfg-green); animation: nt-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes nt-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .nt-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .nt-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .nt-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .nt-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .nt-foot-item b { font-weight: 700; }
+  .nt-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .nt-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="nt-stage" id="nt-stage">
+    <!-- mockflag:begin --><div class="nt-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="nt-error" id="nt-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空：模拟数据标识由 tools/inject_mock_flag.py 注入） -->
+    <header class="nt-header">
+      <div class="nt-head-left">
+        <div class="nt-crumb"><b>云麓厨电</b><i>›</i><em>工厂能碳中心</em></div>
+        <div class="nt-head-title-row">
+          <div class="nt-head-title">工厂能碳中心</div>
+          <div class="nt-head-meta">
+            <span>四类能源 · <b>3</b> 大基地 · <b>5</b> 大工序</span><i>|</i>
+            <span>年产量 <b id="nt-meta-out">--</b> 万台 · <b>18</b> 条产线</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="nt-head-right">
+        <div class="nt-chips">
+          <div class="nt-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="nt-chip is-key"><span>GREEN POWER</span><b id="nt-chip-green">--</b></div>
+        </div>
+        <div class="nt-clock" aria-label="实时时钟">
+          <span class="nt-clock-time" id="nt-clock-time">--:--:--</span>
+          <span class="nt-clock-date" id="nt-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="nt-band" id="nt-band"></div>
+
+    <!-- 左栏：水球液面组 + 三基地能碳看板 -->
+    <div class="nt-col">
+      <section class="nt-panel" style="flex: none; height: 252px;">
+        <div class="nt-panel-head">
+          <h2>绿色能源液面</h2>
+          <span class="nt-panel-tag">储能 <b id="nt-ess-state">--</b> · 容量 <b id="nt-ess-cap">--</b> MWh</span>
+        </div>
+        <div class="nt-chart" id="nt-chart-liquid" role="img" aria-label="绿电占比、储能荷电状态、水重复利用率三枚水球，液面波动幅度与周期各不相同"></div>
+      </section>
+      <section class="nt-panel" style="flex: 1;">
+        <div class="nt-panel-head">
+          <h2>三基地能碳看板</h2>
+          <span class="nt-panel-tag">综合能耗 · 单耗 · 绿电率</span>
+        </div>
+        <div class="nt-bases" id="nt-bases"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：厂区综合能流桑基 -->
+    <section class="nt-panel">
+      <div class="nt-panel-head">
+        <h2>厂区综合能流图</h2>
+        <span class="nt-panel-tag">四源 → 三基地 → 五工序 · 三层守恒 <b id="nt-sankey-total">--</b> tce</span>
+      </div>
+      <div class="nt-chart" id="nt-chart-sankey" role="img" aria-label="外购电力、屋顶光伏、天然气、市政新水流向三大基地再流向五大工序的能流桑基图，逐层能量守恒"></div>
+    </section>
+
+    <!-- 右栏：单位产品能耗分布 -->
+    <section class="nt-panel">
+      <div class="nt-panel-head">
+        <h2>单位产品能耗分布</h2>
+        <span class="nt-panel-tag">六产品线 · <b id="nt-box-n">--</b> 个班次样本</span>
+      </div>
+      <div class="nt-chart" id="nt-chart-box" role="img" aria-label="六条产品线单位产品电耗的箱线图，箱体中位数等于该产品线单耗基准，离群班次以散点叠加"></div>
+    </section>
+
+    <!-- 第 4 行通栏：24h 用能结构演化（主题河流） + 碳排放核算表 -->
+    <div class="nt-band2">
+      <section class="nt-panel">
+        <div class="nt-panel-head">
+          <h2>24 小时用能结构演化</h2>
+          <span class="nt-panel-tag" id="nt-river-tag">五类供能 · 光伏峰值 <b id="nt-pv-peak">--</b> 时</span>
+        </div>
+        <div class="nt-chart" id="nt-chart-river" role="img" aria-label="一天二十四小时五类供能的主题河流，屋顶光伏随日照六时起、正午峰、十八时落"></div>
+      </section>
+      <section class="nt-panel">
+        <div class="nt-panel-head">
+          <h2>碳排放核算</h2>
+          <span class="nt-panel-tag">范围三按上游口径 · 合计 <b id="nt-co2-total">--</b> 万 tCO₂e</span>
+        </div>
+        <div class="nt-table">
+          <div class="nt-thead">
+            <span>范围</span><span>核算项目</span><span>排放 t</span><span>占比</span><span>同比</span><span>判定</span>
+          </div>
+          <ul class="nt-tbody" id="nt-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部能碳动态滚动条 -->
+    <div class="nt-foot">
+      <div class="nt-foot-tag">能碳动态</div>
+      <div class="nt-foot-view"><div class="nt-foot-track" id="nt-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts-liquidfill@3.1.0/dist/echarts-liquidfill.min.js" onerror="window.__ntLiquidError = true"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("nt-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("nt-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const arrow = (v) => (v >= 0 ? "▲" : "▼");
+  const sortAsc = (a) => a.slice().sort((x, y) => x - y);
+  const thou = (n, dec) => {
+    const s = fmtDec(n, dec == null ? 0 : dec).split(".");
+    s[0] = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return s.join(".");
+  };
+
+  /* ===========================================================================
+     4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+        口径与全系列基准盘一致：年产量 902 万台 = 六产品线之和 = 三基地之和；
+        18 条产线；年营收 112.6 亿元（内销口径）。
+        本页新增的是「能源 + 碳排」两层，**全部由产量与单位能耗派生**，
+        合计一律由分项求和，比率一律现算，页面上不出现任何硬编码的合计值。
+     =========================================================================== */
+
+  /* 4.1 三大生产基地（配色与设备/生产页同源） */
+  const BASES = [
+    { key: "hz", name: "杭州临平", node: "杭州临平基地", color: C.cyan,   grid: "华东电网", ef: 0.5617 },
+    { key: "wh", name: "安徽芜湖", node: "安徽芜湖基地", color: C.blue,   grid: "华东电网", ef: 0.5691 },
+    { key: "fs", name: "广东佛山", node: "广东佛山基地", color: C.violet, grid: "南方电网", ef: 0.5271 }
+  ];
+  const BI = { hz: 0, wh: 1, fs: 2 };
+
+  /* 4.2 六大产品线：产量（万台）+ 单位产品电耗（kWh/台，家电组装类 8~25 区间）+ 所属基地/产线数 */
+  const LINES = [
+    { name: "吸油烟机",   short: "烟机", base: "hz", out: 236, unit: 11.2, plines: 4 },
+    { name: "燃气灶具",   short: "灶具", base: "hz", out: 218, unit:  8.6, plines: 4 },
+    { name: "洗碗机",     short: "洗碗", base: "wh", out: 132, unit: 18.4, plines: 3 },
+    { name: "蒸烤一体机", short: "蒸烤", base: "wh", out:  96, unit: 21.6, plines: 2 },
+    { name: "集成灶",     short: "集成", base: "fs", out: 108, unit: 16.2, plines: 2 },
+    { name: "净水热水",   short: "净水", base: "fs", out: 112, unit: 13.5, plines: 3 }
+  ];
+
+  /* 4.3 四类能源投入（物理量，按基地分配 —— 桑基第一层的「源 × 基地」矩阵就建在它上面）
+         · 屋顶光伏 / 绿电交易：万 kWh，两者之和 ÷ 总用电 = 绿电占比（现算）
+         · 天然气：万 m³，用于喷涂烘干工序
+         · 市政新水：万 t；回用水单列，两者算水重复利用率 */
+  const PV_MKWH    = { hz: 786, wh: 612, fs: 444 };    /* 屋顶光伏自发自用 */
+  const GTRADE_MKWH = { hz: 962, wh: 748, fs: 505 };   /* 绿电交易（计入外购电，零碳） */
+  const GAS_MM3    = { hz: 118, wh:  76, fs:  52 };    /* 天然气 万 m³ */
+  const WATER_MT   = { hz: 152, wh:  98, fs:  66 };    /* 市政新水 万 t */
+  const REUSE_MT   = { hz: 1284, wh: 872, fs: 528 };   /* 循环回用水 万 t */
+
+  /* 4.4 折标煤系数（GB/T 2589 口径）与排放因子 */
+  const TCE = { elec: 1.229, gas: 12.143, water: 0.857 };  /* tce / 万kWh · tce / 万m³ · tce / 万t */
+  const EF_GAS = 2.1622;                                   /* kgCO₂ / m³ 天然气 */
+  const GAS_KWH_M3 = 10.8;                                 /* 天然气低位热值折电当量 kWh / m³ */
+  const REVENUE_YI = 112.6;                                /* 年营收 112.6 亿元（内销口径，绝不能改） */
+  const PLINE_TOTAL = 18;
+
+  /* ===== 4.5 逐层派生：产量 → 用电 → 综合能耗 ===== */
+  const D = {};
+  D.out = sum(LINES.map((l) => l.out));                                  /* 902 万台 */
+  D.plines = sum(LINES.map((l) => l.plines));                            /* 18 条 */
+  LINES.forEach((l) => { l.elec = l.out * l.unit; });                    /* 万kWh = 万台 × kWh/台 */
+  D.elec = sum(LINES.map((l) => l.elec));                                /* 年总用电 万kWh */
+  D.unitElec = D.elec / D.out;                                           /* 加权单位产品电耗 */
+
+  BASES.forEach((b) => {
+    const ls = LINES.filter((l) => l.base === b.key);
+    b.out = sum(ls.map((l) => l.out));                                   /* 基地产量 = 所属产品线之和 */
+    b.plines = sum(ls.map((l) => l.plines));
+    b.elec = sum(ls.map((l) => l.elec));                                 /* 基地用电 = 所属产品线之和 */
+    b.pv = PV_MKWH[b.key];
+    b.gtrade = GTRADE_MKWH[b.key];
+    b.buy = b.elec - b.pv;                                               /* 外购电 = 用电 − 光伏自发 */
+    b.gridBuy = b.buy - b.gtrade;                                        /* 常规网电 = 外购电 − 绿电交易 */
+    b.green = b.pv + b.gtrade;
+    b.greenRate = b.green / b.elec * 100;
+    b.gas = GAS_MM3[b.key];
+    b.water = WATER_MT[b.key];
+    b.reuse = REUSE_MT[b.key];
+    b.unitElec = b.elec / b.out;
+    /* 范围一（天然气燃烧）+ 范围二（常规网电）—— 基地口径碳排 */
+    b.co2Gas = b.gas * 1e4 * EF_GAS / 1000;                              /* 万m³ → m³ → kg → t */
+    b.co2Elec = b.gridBuy * 10 * b.ef;                                   /* 万kWh = 10 MWh */
+    b.co2 = b.co2Gas + b.co2Elec;
+  });
+
+  D.pv = sum(BASES.map((b) => b.pv));
+  D.gtrade = sum(BASES.map((b) => b.gtrade));
+  D.buy = sum(BASES.map((b) => b.buy));
+  D.gridBuy = sum(BASES.map((b) => b.gridBuy));
+  D.green = D.pv + D.gtrade;
+  D.greenRate = D.green / D.elec * 100;                                  /* ★ 绿电占比（水球 1） */
+  D.gas = sum(BASES.map((b) => b.gas));
+  D.water = sum(BASES.map((b) => b.water));
+  D.reuse = sum(BASES.map((b) => b.reuse));
+  D.waterReuseRate = D.reuse / (D.reuse + D.water) * 100;                /* ★ 水重复利用率（水球 3） */
+  D.baseOut = sum(BASES.map((b) => b.out));                              /* 应等于 D.out */
+
+  /* 综合能耗（tce）：四类能源分别折标后求和 */
+  BASES.forEach((b) => {
+    b.tce = {
+      buy:   b.buy * TCE.elec,
+      pv:    b.pv * TCE.elec,
+      gas:   b.gas * TCE.gas,
+      water: b.water * TCE.water
+    };
+    b.tceTotal = b.tce.buy + b.tce.pv + b.tce.gas + b.tce.water;
+  });
+  D.tce = sum(BASES.map((b) => b.tceTotal));
+  D.tceWan = D.tce / 1e4;                                                /* 万 tce */
+  D.unitTce = D.tce * 1000 / (D.out * 1e4);                              /* kgce / 台 */
+
+  /* ===== 4.6 桑基三层守恒 =====
+         第一层「源 × 基地」矩阵：基地节点值 = 矩阵列和；源节点值 = 矩阵行和。
+         第二层「基地 × 工序」矩阵：直接由基地节点值 × 工序占比生成，
+         每个基地的占比数组严格和为 1 —— 于是「基地之和 = 工序之和」是**结构性**成立的，
+         不靠事后凑数。 */
+  const SRC = [
+    { node: "外购电力", color: C.blue,   unit: "万 kWh", key: "buy",
+      qty: (b) => b.buy,   coef: TCE.elec,  note: "含绿电交易" },
+    { node: "屋顶光伏", color: C.amber,  unit: "万 kWh", key: "pv",
+      qty: (b) => b.pv,    coef: TCE.elec,  note: "自发自用 · 零碳" },
+    { node: "天然气",   color: C.orange, unit: "万 m³",  key: "gas",
+      qty: (b) => b.gas,   coef: TCE.gas,   note: "喷涂烘干热源" },
+    { node: "市政新水", color: C.cyan,   unit: "万 t",   key: "water",
+      qty: (b) => b.water, coef: TCE.water, note: "折标 0.857 tce/万t" }
+  ];
+  const PROCS = [
+    { node: "冲压",     color: C.series[0] },
+    { node: "焊接",     color: C.series[2] },
+    { node: "注塑",     color: C.series[5] },
+    { node: "喷涂烘干", color: C.series[1] },
+    { node: "装配测试", color: C.series[3] }
+  ];
+  /* 各基地五工序能耗占比（每行严格和为 1；喷涂烘干含天然气热源故最高） */
+  const PROC_SHARE = {
+    hz: [0.18, 0.14, 0.10, 0.34, 0.24],
+    wh: [0.12, 0.13, 0.26, 0.28, 0.21],
+    fs: [0.15, 0.12, 0.22, 0.29, 0.22]
+  };
+
+  /* M1[s][b]：源 s 供给基地 b 的能量（tce）—— 行和 = 源节点值，列和 = 基地节点值 */
+  const M1 = SRC.map((s) => BASES.map((b) => s.qty(b) * s.coef));
+  const SRC_TOTAL = M1.map((row) => sum(row));
+  const BASE_TOTAL = BASES.map((b, bi) => sum(M1.map((row) => row[bi])));
+  /* M2[b][p]：基地 b 分摊到工序 p 的能量（tce）—— 行和 ≡ BASE_TOTAL[b]（占比和为 1） */
+  const M2 = BASES.map((b, bi) => PROC_SHARE[b.key].map((r) => BASE_TOTAL[bi] * r));
+  const PROC_TOTAL = PROCS.map((p, pi) => sum(M2.map((row) => row[pi])));
+
+  D.srcSum = sum(SRC_TOTAL);
+  D.baseSum = sum(BASE_TOTAL);
+  D.procSum = sum(PROC_TOTAL);
+
+  /* 节点值查表（纯标量对象，供 label / tooltip 反查 —— 绝不放进 option，杜绝循环引用） */
+  const NODE_VAL = {};
+  SRC.forEach((s, i) => { NODE_VAL[s.node] = SRC_TOTAL[i]; });
+  BASES.forEach((b, i) => { NODE_VAL[b.node] = BASE_TOTAL[i]; });
+  PROCS.forEach((p, i) => { NODE_VAL[p.node] = PROC_TOTAL[i]; });
+  const NODE_NOTE = {};
+  SRC.forEach((s, i) => {
+    NODE_NOTE[s.node] = thou(sum(BASES.map((b) => s.qty(b))), 0) + " " + s.unit + " · " + s.note;
+  });
+  BASES.forEach((b, i) => {
+    NODE_NOTE[b.node] = "产量 " + thou(b.out, 0) + " 万台 · " + b.plines + " 条产线 · 绿电率 " + fmtDec(b.greenRate, 1) + "%";
+  });
+  PROCS.forEach((p, i) => {
+    NODE_NOTE[p.node] = "占厂区综合能耗 " + fmtDec(PROC_TOTAL[i] / D.procSum * 100, 1) + "%";
+  });
+  D.procTop = PROCS.map((p, i) => ({ name: p.node, v: PROC_TOTAL[i] })).sort((a, b) => b.v - a.v)[0];
+
+  /* 基地口径的两个派生强度指标（看板与桑基共用） */
+  BASES.forEach((b, bi) => {
+    b.tceBase = BASE_TOTAL[bi];                                          /* = 桑基基地节点值 */
+    b.unitTce = b.tceBase * 1000 / (b.out * 1e4);                        /* kgce / 台 */
+  });
+  D.greenBest = BASES.slice().sort((a, b) => b.greenRate - a.greenRate)[0];
+  D.unitWorst = BASES.slice().sort((a, b) => b.unitTce - a.unitTce)[0];
+
+  /* ===========================================================================
+     4.7 ★ 24 小时供能结构（themeRiver 数据源）
+     —— 五条带：外购电力 / 屋顶光伏 / 储能放电 / 天然气(折电当量) / 余热回收。
+     ⚠ 为什么不把「压缩空气」单列成一条带：空压站是**二次能源载体**，它的电耗
+       已经计在「外购电力 / 屋顶光伏」里，再单列一条就是重复计量，河流面积会虚高。
+       压缩空气的口径改到工序侧（喷涂烘干 / 装配测试）与 tooltip 里说明。
+     ★ 逐时电量平衡是**结构性**的：外购电 = 电负荷 + 储能充电 − 光伏自发 − 储能放电，
+       所以「日供电合计 ≡ 日电负荷 + 日充电量」恒等，不靠事后凑。
+     =========================================================================== */
+  const HRS = 24;
+  const ESS_CAP = 32;                         /* 储能装机 MWh（磷酸铁锂） */
+  const ESS_RTE = 0.90;                       /* 充放电综合效率 */
+  const HEAT_RATE = 0.12;                     /* 烘干尾气余热回收率（折电当量） */
+  const ESS_DIS = { 9: 2.4, 10: 2.4, 11: 2.4, 18: 3.0, 19: 3.0, 20: 3.0, 21: 3.0 };  /* 峰段放电 MWh */
+  const hrArr = (fn) => { const a = []; for (let h = 0; h < HRS; h++) a.push(fn(h)); return a; };
+  const scaleTo = (arr, total) => { const s = sum(arr); return arr.map((v) => (s > 0 ? v / s * total : 0)); };
+  const bell = (x, mu, sg) => Math.exp(-Math.pow((x - mu) / sg, 2));
+
+  /* 日尺度基准（MWh/日）—— 一律由年度量 ÷ 365 现算 */
+  const DAY = {};
+  DAY.elec = D.elec * 10 / 365;                              /* 万kWh → MWh → 日 */
+  DAY.gas  = D.gas * GAS_KWH_M3 * 1e4 / 1000 / 365;          /* 万m³ → m³ → kWh → MWh → 日 */
+  DAY.pv   = D.pv * 10 / 365;
+
+  /* 电负荷形态：两班倒（早班 8–16、晚班 16–24），午休与交接班各有一个凹口 */
+  const LOAD_SHAPE = hrArr((h) =>
+    0.55 + 0.34 * bell(h, 10.5, 3.2) + 0.30 * bell(h, 19.5, 3.0)
+         - 0.10 * bell(h, 12.5, 1.1) - 0.08 * bell(h, 16.5, 1.0));
+  /* ★ 光伏日照曲线：6 时起、正午峰、18 时落 —— 半个正弦拱取 1.25 次幂，正午更尖、晨昏更缓 */
+  /* ⚠ 窗口写成开区间 (6, 18)：Math.sin(Math.PI) 不是精确 0 而是 1.2e-16，
+     若写成闭区间，18 时会留下一个肉眼看不见、自检却抓得到的极小非零出力。 */
+  const PV_SHAPE = hrArr((h) => (h > 6 && h < 18 ? Math.pow(Math.sin(Math.PI * (h - 6) / 12), 1.25) : 0));
+
+  const RV = {};
+  RV.load   = scaleTo(LOAD_SHAPE, DAY.elec);
+  RV.pv     = scaleTo(PV_SHAPE, DAY.pv);
+  RV.gas    = scaleTo(hrArr((h) => 0.35 + 0.65 * LOAD_SHAPE[h]), DAY.gas);   /* 烘干线跟随产线节拍 */
+  RV.heat   = RV.gas.map((v) => v * HEAT_RATE);                              /* 余热按气耗等比回收 */
+  RV.essDis = hrArr((h) => ESS_DIS[h] || 0);
+  DAY.essDis = sum(RV.essDis);
+  DAY.essChg = DAY.essDis / ESS_RTE;
+  RV.essChg = scaleTo(hrArr((h) => (h <= 5 ? 1 : 0)), DAY.essChg);           /* 谷电时段充电 */
+  RV.buy    = hrArr((h) => RV.load[h] + RV.essChg[h] - RV.pv[h] - RV.essDis[h]);
+  DAY.buy   = sum(RV.buy);
+  DAY.heat  = sum(RV.heat);
+  DAY.supply = DAY.buy + DAY.pv + DAY.essDis + DAY.gas + DAY.heat;
+  D.pvPeakH = RV.pv.indexOf(Math.max.apply(null, RV.pv));                    /* 光伏峰值时刻 */
+  D.pvPeak  = Math.max.apply(null, RV.pv);
+  D.pvDayShare = DAY.pv / (DAY.buy + DAY.pv + DAY.essDis) * 100;
+  D.loadPeakH = RV.load.indexOf(Math.max.apply(null, RV.load));
+  D.buyPeak = Math.max.apply(null, RV.buy);
+  D.buyValley = Math.min.apply(null, RV.buy);
+
+  /* 储能荷电轨迹：SOC[h] 为整点时刻电量（MWh）。充放量守恒 ⇒ SOC[24] ≡ SOC[0]，kiosk 常驻不漂移 */
+  const SOC = [];
+  (function () {
+    let s = 0.30 * ESS_CAP;
+    for (let h = 0; h < HRS; h++) { SOC.push(s); s = s + RV.essChg[h] * ESS_RTE - RV.essDis[h]; }
+    SOC.push(s);
+  })();
+  D.socMin = Math.min.apply(null, SOC);
+  D.socMax = Math.max.apply(null, SOC);
+  /* 当前 SOC：按「时 + 分」在整点轨迹上线性插值（随时钟走，非随机） */
+  function socNow(d) {
+    const t = d || new Date();
+    const h = t.getHours(), f = (t.getMinutes() * 60 + t.getSeconds()) / 3600;
+    return SOC[h] + (SOC[h + 1] - SOC[h]) * f;
+  }
+  function essState(d) {
+    const h = (d || new Date()).getHours();
+    if (RV.essChg[h] > 0) return "充电中";
+    if (RV.essDis[h] > 0) return "放电中";
+    return "待机";
+  }
+
+  const RIVER_CATS = [
+    { name: "外购电力", color: C.blue,   arr: RV.buy,    note: "含绿电交易，谷电时段兼给储能充电" },
+    { name: "屋顶光伏", color: C.amber,  arr: RV.pv,     note: "自发自用 · 零碳 · 6 时起 12 时峰 18 时落" },
+    { name: "储能放电", color: C.violet, arr: RV.essDis, note: ESS_CAP + " MWh 磷酸铁锂 · 峰段放电削峰" },
+    { name: "天然气",   color: C.orange, arr: RV.gas,    note: "喷涂烘干热源 · 按低位热值折电当量" },
+    { name: "余热回收", color: C.green,  arr: RV.heat,   note: "烘干尾气换热 · 回收率 " + fmtDec(HEAT_RATE * 100, 0) + "%" }
+  ];
+  const hourTotal = (h) => sum(RIVER_CATS.map((c) => c.arr[h]));
+
+  /* ===========================================================================
+     4.8 ★ 单位产品能耗分布（boxplot）
+     每条产品线取 plines × 26 个班次样本，确定性三角波叠加生成，再整体平移，
+     使各组**中位数严格等于该产品线的单耗基准 l.unit** —— 与桑基/KPI 同源，
+     箱体位置不是画出来的巧合，是锚定出来的。高位离群班次两枚，用 scatter 叠加。
+     =========================================================================== */
+  function quantile(s, q) {
+    const n = s.length;
+    if (!n) return NaN;
+    const pos = (n - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
+    return lo === hi ? s[lo] : s[lo] + (s[hi] - s[lo]) * (pos - lo);
+  }
+  /* 五数概括：须线取 1.5×IQR 栅栏内最远的真实样本，栅栏外的判为离群 */
+  function boxStats(vals) {
+    const s = sortAsc(vals), n = s.length;
+    const q1 = quantile(s, 0.25), med = quantile(s, 0.5), q3 = quantile(s, 0.75);
+    const iqr = q3 - q1, loF = q1 - 1.5 * iqr, hiF = q3 + 1.5 * iqr;
+    let wl = q1, wh = q3;
+    for (let i = 0; i < n; i++) { if (s[i] >= loF) { wl = s[i]; break; } }
+    for (let i = n - 1; i >= 0; i--) { if (s[i] <= hiF) { wh = s[i]; break; } }
+    return { n: n, q1: q1, med: med, q3: q3, iqr: iqr, wl: wl, wh: wh,
+             min: s[0], max: s[n - 1], outliers: s.filter((v) => v < loF || v > hiF) };
+  }
+  const SHIFT_PER_LINE = 26;
+  const GROUPS = LINES.map((l, li) => {
+    const n = l.plines * SHIFT_PER_LINE, a = l.unit * 0.062, raw = [];
+    for (let k = 0; k < n; k++) {
+      raw.push(l.unit
+        + a * 1.00 * Math.sin(k * 0.68 + li * 2.1)
+        + a * 0.56 * Math.sin(k * 1.79 + li * 1.3)
+        + a * 0.27 * Math.sin(k * 3.61 + li));
+    }
+    /* 定向注入两个高位离群班次（确定性，非随机）：能耗异常偏高才是要盯的方向 */
+    raw.push(l.unit * (1.235 + li * 0.006), l.unit * (1.185 + li * 0.004));
+    const shift = l.unit - quantile(sortAsc(raw), 0.5);          /* 平移使中位数 = 单耗基准 */
+    const vals = raw.map((v) => Number(fmtDec(v + shift, 2)));
+    const b = boxStats(vals);
+    return { li: li, name: l.name, short: l.short, base: l.base, unit: l.unit,
+             out: l.out, plines: l.plines, stat: b, color: C.series[li % C.series.length] };
+  });
+  D.boxN = sum(GROUPS.map((g) => g.stat.n));
+  D.boxOut = sum(GROUPS.map((g) => g.stat.outliers.length));
+  D.boxSpread = GROUPS.slice().sort((a, b) => b.stat.iqr - a.stat.iqr)[0];
+  D.unitTop = GROUPS.slice().sort((a, b) => b.unit - a.unit)[0];
+  D.unitLow = GROUPS.slice().sort((a, b) => a.unit - b.unit)[0];
+
+  /* ===========================================================================
+     4.9 碳排放核算：范围一 / 范围二 / 范围三
+     每一项都由「活动量 × 排放因子」现算，合计由分项求和，页面不出现硬编码合计。
+     =========================================================================== */
+  const FLEET_T   = 862;      /* 自有叉车与厂内车辆燃油 tCO₂ */
+  const REFRIG_T  = 214;      /* 制冷剂逸散（GWP 折算）tCO₂ */
+  const STEAM_MT  = 1.05;     /* 外购蒸汽 万 t */
+  const EF_STEAM  = 0.31;     /* tCO₂ / t 蒸汽 */
+  const EF_MAT    = 9.6;      /* 采购原材料隐含碳 kgCO₂e / 台 */
+  const EF_IN     = 1.1;      /* 入厂物流 kgCO₂e / 台（按产量） */
+  const EF_OUT    = 1.6;      /* 出厂配送 kgCO₂e / 台（按销量） */
+  const EF_STAFF  = 0.42;     /* 员工通勤与差旅 tCO₂e / 人·年 */
+  const EF_WASTE  = 0.35;     /* 废弃物与污水处理 kgCO₂e / 台 */
+  const HEADCOUNT = 8600;     /* 在册员工（与生产制造总览同源口径） */
+  const SALES_WAN = 866;      /* 年销量 万台 */
+
+  const SCOPE_META = {
+    1: { tag: "范围一", color: C.orange },
+    2: { tag: "范围二", color: C.cyan },
+    3: { tag: "范围三", color: C.violet }
+  };
+  const CO2_ROWS = [
+    { s: 1, name: "天然气燃烧（喷涂烘干）", v: D.gas * 1e4 * EF_GAS / 1000, yoy: -6.4,
+      note: thou(D.gas, 0) + " 万m³ × " + EF_GAS + " kgCO₂/m³" },
+    { s: 1, name: "自有车辆燃油与制冷剂逸散", v: FLEET_T + REFRIG_T, yoy: -2.1,
+      note: "叉车与厂内车辆 " + thou(FLEET_T, 0) + " t + 制冷剂 " + thou(REFRIG_T, 0) + " t" },
+    { s: 2, name: "外购电力（扣除绿电交易）", v: sum(BASES.map((b) => b.co2Elec)), yoy: -9.8,
+      note: "常规网电 " + thou(D.gridBuy, 0) + " 万kWh × 分区域电网因子" },
+    { s: 2, name: "外购蒸汽与热力", v: STEAM_MT * 1e4 * EF_STEAM, yoy: -1.4,
+      note: thou(STEAM_MT * 1e4, 0) + " t 蒸汽 × " + EF_STEAM + " tCO₂/t" },
+    { s: 3, name: "采购原材料隐含碳（钢铝塑玻）", v: EF_MAT * D.out * 1e4 / 1000, yoy: 1.6,
+      note: EF_MAT + " kgCO₂e/台 × " + thou(D.out, 0) + " 万台" },
+    { s: 3, name: "入厂与出厂物流", v: (EF_IN * D.out + EF_OUT * SALES_WAN) * 1e4 / 1000, yoy: -3.2,
+      note: "入厂按产量 " + EF_IN + " · 出厂按销量 " + EF_OUT + " kgCO₂e/台" },
+    { s: 3, name: "员工通勤与差旅", v: HEADCOUNT * EF_STAFF, yoy: 4.3,
+      note: thou(HEADCOUNT, 0) + " 人 × " + EF_STAFF + " tCO₂e/人·年" },
+    { s: 3, name: "废弃物与污水处理", v: EF_WASTE * D.out * 1e4 / 1000, yoy: -5.1,
+      note: EF_WASTE + " kgCO₂e/台 × " + thou(D.out, 0) + " 万台" }
+  ];
+  D.co2 = sum(CO2_ROWS.map((r) => r.v));                                 /* 合计 = 分项之和 */
+  D.co2Wan = D.co2 / 1e4;
+  D.co2Prev = sum(CO2_ROWS.map((r) => r.v / (1 + r.yoy / 100)));         /* 上年 = 分项反推之和 */
+  D.co2Yoy = (D.co2 / D.co2Prev - 1) * 100;
+  CO2_ROWS.forEach((r) => {
+    r.share = r.v / D.co2 * 100;
+    r.verdict = r.yoy <= -5 ? { t: "优", c: "is-good" }
+              : r.yoy <= 0  ? { t: "达标", c: "is-off" }
+              : r.yoy <= 3  ? { t: "关注", c: "is-mid" }
+              : { t: "超标", c: "is-bad" };
+  });
+  D.scope = [1, 2, 3].map((s) => sum(CO2_ROWS.filter((r) => r.s === s).map((r) => r.v)));
+  D.co2Unit = D.co2 / (D.out * 1e4);                                     /* tCO₂e / 台 */
+  D.co2UnitKg = D.co2Unit * 1000;                                        /* kgCO₂e / 台 */
+  D.co2Rev = D.co2 / (REVENUE_YI * 1e4);                                 /* tCO₂e / 万元营收 */
+  /* 绿电（光伏自发 + 绿电交易）等效减碳：按各基地实际电网因子加权 */
+  D.efAvg = sum(BASES.map((b) => b.ef * b.elec)) / D.elec;
+  D.cutCo2 = sum(BASES.map((b) => b.green * 10 * b.ef));
+  D.cutCo2Wan = D.cutCo2 / 1e4;
+  D.tcePerRev = D.tce * 1000 / (REVENUE_YI * 1e4);                       /* kgce / 万元营收 */
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("nt-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("nt-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===========================================================================
+     6. ★ 先把所有 DOM 填满，再 echarts.init
+     —— 与图表同属一个 flex/grid 容器的兄弟块若在 init 之后才填内容，会把 flex:1 的
+        图表容器压矮，而图表已按旧高度布好版（本专题物流线路详情页栽过这一跤）。
+     =========================================================================== */
+  $("nt-meta-out").textContent = thou(D.out, 0);
+  $("nt-chip-green").textContent = fmtDec(D.greenRate, 1) + "%";
+  $("nt-ess-state").textContent = essState();
+  $("nt-ess-cap").textContent = String(ESS_CAP);
+  $("nt-sankey-total").textContent = thou(D.srcSum, 0);
+  $("nt-box-n").textContent = thou(D.boxN, 0);
+  $("nt-pv-peak").textContent = pad(D.pvPeakH) + ":00";
+  $("nt-co2-total").textContent = fmtDec(D.co2Wan, 2);
+
+  /* 6.1 KPI 带：5 枚，数值翻牌缓动 */
+  const KPI_DEFS = [
+    { icon: "◈", label: "年综合能耗", val: D.tceWan, unit: "万 tce", dec: 3, warn: false,
+      sub: () => "电 + 气 + 水折标之和 · 单耗 <b>" + fmtDec(D.unitTce, 2) + "</b> kgce/台" },
+    { icon: "⚡", label: "单位产品电耗", val: D.unitElec, unit: "kWh/台", dec: 2, warn: false,
+      sub: () => "六产品线加权 · 区间 <b>" + fmtDec(D.unitLow.unit, 1) + "~" + fmtDec(D.unitTop.unit, 1) + "</b> kWh" },
+    { icon: "☁", label: "年碳排放总量", val: D.co2Wan, unit: "万 tCO₂e", dec: 2, warn: true,
+      sub: () => "范围三占 <b>" + fmtDec(D.scope[2] / D.co2 * 100, 1) + "%</b> · 同比 <b class=\"" + (D.co2Yoy >= 0 ? "nt-down" : "nt-up") + "\">" + signed(D.co2Yoy, 1) + "%</b>" },
+    { icon: "☀", label: "绿电消纳量", val: D.green, unit: "万 kWh", dec: 0, warn: false,
+      sub: () => "光伏 <b>" + thou(D.pv, 0) + "</b> + 绿证 <b>" + thou(D.gtrade, 0) + "</b> · 减碳 <b class=\"nt-up\">" + fmtDec(D.cutCo2Wan, 2) + "</b> 万 t" },
+    { icon: "¥", label: "万元产值能耗", val: D.tcePerRev, unit: "kgce/万元", dec: 1, warn: false,
+      sub: () => "营收 <b>" + fmtDec(REVENUE_YI, 1) + "</b> 亿元 · 碳强度 <b>" + fmtDec(D.co2Rev * 1000, 1) + "</b> kg/万元" }
+  ];
+  $("nt-band").innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="nt-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="nt-kpi-icon">' + k.icon + "</div>" +
+      '<div class="nt-kpi-main">' +
+        '<div class="nt-kpi-label">' + k.label + "</div>" +
+        '<div class="nt-kpi-num"><span class="nt-kpi-val" id="nt-kpi-' + i + '">0</span><span class="nt-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="nt-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛（截图核对勾稽时请等收敛后再看） */
+  function countUp(el, target, dec) {
+    if (!el) return;
+    const dur = 1100, t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = dec === 0 ? thou(target * e, 0) : fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = dec === 0 ? thou(target, 0) : fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("nt-kpi-" + i), k.val, k.dec));
+
+  /* 6.2 三基地能碳看板 */
+  const greenMax = Math.max.apply(null, BASES.map((b) => b.greenRate));
+  const basesBox = $("nt-bases");
+  basesBox.innerHTML = BASES.map((b, i) => (
+    '<div class="nt-base-row" data-i="' + i + '">' +
+      '<div class="nt-base-dot" style="background:' + b.color + '">' + (i + 1) + "</div>" +
+      '<div class="nt-base-name">' +
+        "<b>" + b.name + " · " + b.grid + " <span style=\"color:" + b.color + "\">绿电 " + fmtDec(b.greenRate, 1) + "%</span></b>" +
+        '<div class="nt-base-bar"><u style="width:' + fmtDec(b.greenRate / greenMax * 100, 1) + '%;background:' + b.color + '"></u></div>' +
+      "</div>" +
+      '<div class="nt-base-num">综合能耗<b>' + thou(b.tceBase, 0) + "</b></div>" +
+      '<div class="nt-base-num is-key">单耗<b>' + fmtDec(b.unitTce, 2) + "</b></div>" +
+    "</div>"
+  )).join("");
+  const baseRows = Array.prototype.slice.call(basesBox.children || []);
+
+  /* 6.3 碳排放核算表（CSS grid 模拟，8 行） */
+  $("nt-tbody").innerHTML = CO2_ROWS.map((r, i) => (
+    "<li data-i=\"" + i + "\" title=\"" + r.note + "\">" +
+      '<span class="nt-scope" style="background:' + SCOPE_META[r.s].color + '">' + SCOPE_META[r.s].tag + "</span>" +
+      "<span>" + r.name + "</span>" +
+      "<span><b>" + thou(r.v, 0) + "</b></span>" +
+      "<span>" + fmtDec(r.share, 1) + "%</span>" +
+      "<span style=\"color:" + (r.yoy <= 0 ? C.green : C.orange) + "\">" + signed(r.yoy, 1) + "%</span>" +
+      '<span class="nt-badge ' + r.verdict.c + '">' + r.verdict.t + "</span>" +
+    "</li>"
+  )).join("");
+  const co2Rows = Array.prototype.slice.call($("nt-tbody").children || []);
+
+  /* 6.4 底部能碳动态滚动条（文案全部由派生量现算，不另编数字） */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "范围三占总碳排 " + fmtDec(D.scope[2] / D.co2 * 100, 1) + "%，首位「采购原材料隐含碳」" + thou(CO2_ROWS[4].v, 0) + " t，同比 " + signed(CO2_ROWS[4].yoy, 1) + "%" },
+    { lv: "高", c: C.red, t: D.unitTop.name + " 单位产品电耗 " + fmtDec(D.unitTop.unit, 1) + " kWh/台，为六线最高，高于加权均值 " + fmtDec(D.unitTop.unit - D.unitElec, 1) + " kWh" },
+    { lv: "中", c: C.orange, t: "全厂离群班次 " + D.boxOut + " 个（超 1.5×IQR 栅栏），波动最大产品线为 " + D.boxSpread.name + "，IQR " + fmtDec(D.boxSpread.stat.iqr, 2) + " kWh" },
+    { lv: "中", c: C.orange, t: D.procTop.name + " 为能耗最高工序，占厂区综合能耗 " + fmtDec(D.procTop.v / D.procSum * 100, 1) + "%，含天然气热源 " + thou(D.gas, 0) + " 万m³" },
+    { lv: "低", c: C.amber, t: "储能 " + ESS_CAP + " MWh，谷段充 " + fmtDec(DAY.essChg, 1) + " MWh、峰段放 " + fmtDec(DAY.essDis, 1) + " MWh，日削峰 " + fmtDec(D.buyPeak - D.buyValley, 1) + " MWh" },
+    { lv: "低", c: C.green, t: "绿电占比 " + fmtDec(D.greenRate, 1) + "%（" + D.greenBest.name + " 最高 " + fmtDec(D.greenBest.greenRate, 1) + "%），年等效减碳 " + fmtDec(D.cutCo2Wan, 2) + " 万 tCO₂e" },
+    { lv: "低", c: C.green, t: "水重复利用率 " + fmtDec(D.waterReuseRate, 1) + "%，回用水 " + thou(D.reuse, 0) + " 万 t、市政新水 " + thou(D.water, 0) + " 万 t" }
+  ];
+  const track = $("nt-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="nt-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                      /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===========================================================================
+     7. 图表
+     ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后一律不调 chart.resize()
+     ★ 进 option 的数据只放标量与数组：桑基 links 只写节点 name 字符串，
+       节点对象之间不互相回指 —— 否则 setOption 深拷贝成环 → RangeError 整页空白。
+     =========================================================================== */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = (extra) => Object.assign({
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  }, extra || {});
+
+  /* ---------------------------------------------------------------------------
+     7.1 ★ 厂区综合能流图（sankey · 本页第一张主角图）
+         四源 → 三基地 → 五工序，值统一折标煤 tce。
+         三层守恒是**结构性**的：
+           · 第一层「源 × 基地」矩阵 M1：行和 = 源节点值，列和 = 基地节点值；
+           · 第二层「基地 × 工序」矩阵 M2 = 基地节点值 × 工序占比（每行占比严格和为 1），
+             故 Σ工序 ≡ Σ基地 ≡ Σ源，不靠事后配平。
+  --------------------------------------------------------------------------- */
+  const sankey = makeChart("nt-chart-sankey");
+  const skNodes = []
+    .concat(SRC.map((s, i) => ({
+      name: s.node, value: SRC_TOTAL[i], depth: 0,
+      itemStyle: { color: s.color, borderWidth: 0 },
+      label: { position: "left", formatter: "{n|" + s.node + "}\n{v|" + thou(SRC_TOTAL[i], 0) + " tce}" }
+    })))
+    .concat(BASES.map((b, i) => ({
+      name: b.node, value: BASE_TOTAL[i], depth: 1,
+      itemStyle: { color: b.color, borderWidth: 0 },
+      label: { position: "right", formatter: "{b|" + b.name + "}" }
+    })))
+    .concat(PROCS.map((p, i) => ({
+      name: p.node, value: PROC_TOTAL[i], depth: 2,
+      itemStyle: { color: p.color, borderWidth: 0 },
+      label: { position: "right", formatter: "{n|" + p.node + "}\n{v|" + fmtDec(PROC_TOTAL[i] / D.procSum * 100, 1) + "%}" }
+    })));
+  const skLinks = [];
+  SRC.forEach((s, si) => BASES.forEach((b, bi) => {
+    skLinks.push({ source: s.node, target: b.node, value: M1[si][bi] });   /* ← 只放 name 字符串 */
+  }));
+  BASES.forEach((b, bi) => PROCS.forEach((p, pi) => {
+    skLinks.push({ source: b.node, target: p.node, value: M2[bi][pi] });
+  }));
+  sankey.setOption({
+    backgroundColor: "transparent",
+    tooltip: TIP({
+      trigger: "item", confine: true,
+      formatter: (p) => {
+        if (p.dataType === "edge") {
+          const v = p.data.value;
+          return "<b>" + p.data.source + "</b> → <b>" + p.data.target + "</b><br/>" +
+            "能流 <b style=\"color:" + C.cyan + "\">" + thou(v, 0) + "</b> tce · 占全厂 " +
+            fmtDec(v / D.srcSum * 100, 2) + "%";
+        }
+        const v = NODE_VAL[p.name] || 0;
+        return "<b style=\"color:" + C.cyan + "\">" + p.name + "</b><br/>折标 <b>" + thou(v, 0) +
+          "</b> tce · 占全厂 " + fmtDec(v / D.srcSum * 100, 1) + "%<br/>" +
+          "<span style=\"color:" + C.textDim + "\">" + (NODE_NOTE[p.name] || "") + "</span>";
+      }
+    }),
+    series: [{
+      type: "sankey", layout: "none", nodeAlign: "justify", draggable: false,
+      left: 76, right: 104, top: 22, bottom: 18,
+      nodeWidth: 16, nodeGap: 12,
+      data: skNodes, links: skLinks,
+      label: {
+        show: true, color: "#dff3f0", fontSize: 12,
+        textShadowColor: "rgba(4,16,18,.9)", textShadowBlur: 6,
+        rich: {
+          n: { fontSize: 12.5, fontWeight: 700, color: "#eafcfa", lineHeight: 16 },
+          v: { fontSize: 10.5, color: C.textDim, lineHeight: 14 },
+          b: { fontSize: 12.5, fontWeight: 700, color: "#eafcfa", lineHeight: 16 }
+        }
+      },
+      lineStyle: { color: "gradient", opacity: 0.42, curveness: 0.52 },
+      itemStyle: { borderWidth: 0 },
+      emphasis: { focus: "adjacency", lineStyle: { opacity: 0.68 } },
+      animationDuration: 900, animationEasing: "cubicOut"
+    }]
+  });
+
+  /* ---------------------------------------------------------------------------
+     7.2 ★ 绿色能源液面（liquidFill · 本页第二张主角图）
+         三枚水球：绿电占比 / 储能 SOC / 水重复利用率。
+         波幅、波长、周期、相位、流向逐球错开，三枚球的液面不会同步“打拍子”。
+         ★ 资源守卫：liquidFill 是插件，缺失（离线 / CDN 被拦）时**不让整页白屏**、
+           也不让这一格空着 —— 先屏外探测能否 setOption 出 liquidFill，
+           失败就把这一格降级成纯 CSS 液面卡（同样有波纹动画与数值），其余图表照常。
+  --------------------------------------------------------------------------- */
+  function liquidReady() {
+    if (window.__ntLiquidError) return false;
+    const holder = document.createElement("div");
+    holder.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:120px;height:90px;";
+    document.body.appendChild(holder);
+    let probe = null, ok = false;
+    try {
+      probe = echarts.init(holder);
+      probe.setOption({ series: [{ type: "liquidFill", data: [0.5] }] });
+      ok = true;
+    } catch (err) { ok = false; }
+    if (probe) probe.dispose();
+    holder.remove();
+    return ok;
+  }
+  const LQ_OK = liquidReady();
+  const LQ = [
+    { key: "green", name: "绿电占比", color: C.green, dim: "#d8ffe2",
+      center: ["17%", "50%"], amp: "5%",   len: "78%", period: 5200, dir: "right", phase: 0,
+      val: () => D.greenRate / 100 },
+    { key: "soc", name: "储能 SOC", color: C.violet, dim: "#e7dcff",
+      center: ["50%", "50%"], amp: "3.2%", len: "62%", period: 3800, dir: "left",  phase: 70,
+      val: () => socNow() / ESS_CAP },
+    { key: "water", name: "水重复利用率", color: C.cyan, dim: "#d3fbf6",
+      center: ["83%", "50%"], amp: "6.5%", len: "94%", period: 6600, dir: "right", phase: 150,
+      val: () => D.waterReuseRate / 100 }
+  ];
+  const liquid = LQ_OK ? makeChart("nt-chart-liquid") : null;
+  function liquidOption() {
+    return {
+      backgroundColor: "transparent",
+      series: LQ.map((q) => {
+        const v = Math.max(0.02, Math.min(0.995, q.val()));
+        return {
+          type: "liquidFill", name: q.name,
+          center: q.center, radius: "60%",
+          data: [
+            { value: v, itemStyle: { color: q.color, opacity: 0.72 } },
+            { value: Math.max(0.02, v - 0.055), itemStyle: { color: q.color, opacity: 0.34 } }
+          ],
+          amplitude: q.amp, waveLength: q.len, period: q.period, direction: q.dir, phase: q.phase,
+          backgroundStyle: { color: "rgba(8,32,36,.72)", borderWidth: 0 },
+          outline: {
+            show: true, borderDistance: 4,
+            itemStyle: { color: "none", borderColor: q.color, borderWidth: 1.6, shadowBlur: 10, shadowColor: q.color }
+          },
+          itemStyle: { shadowBlur: 0 },
+          label: {
+            show: true, position: "inside", insideColor: "#04191a",
+            formatter: "{v|" + fmtDec(v * 100, 1) + "}{u|%}\n{n|" + q.name + "}",
+            rich: {
+              v: { fontSize: 23, fontWeight: 700, color: q.dim, lineHeight: 26 },
+              u: { fontSize: 12, fontWeight: 700, color: q.dim, padding: [0, 0, 4, 2] },
+              n: { fontSize: 11, color: "#a8cfcb", lineHeight: 20 }
+            }
+          }
+        };
+      })
+    };
+  }
+  function liquidFallback() {
+    $("nt-chart-liquid").innerHTML =
+      '<div class="nt-lqfall">' + LQ.map((q) => {
+        const v = Math.max(0.02, Math.min(0.995, q.val()));
+        return '<div class="nt-lqcard">' +
+            '<div class="nt-lqball" style="border-color:' + q.color + '">' +
+              '<div class="nt-lqfill" style="height:' + fmtDec(v * 100, 1) + "%;background:" + q.color + ';opacity:.62"></div>' +
+              '<div class="nt-lqpct">' + fmtDec(v * 100, 1) + "%</div>" +
+            "</div><i>" + q.name + "</i>" +
+          "</div>";
+      }).join("") + "</div>";
+  }
+  function renderLiquid() {
+    if (liquid) liquid.setOption(liquidOption(), { notMerge: true, lazyUpdate: false });
+    else liquidFallback();
+    $("nt-ess-state").textContent = essState();
+  }
+  renderLiquid();
+  if (!LQ_OK) {
+    /* 降级不算致命错误，但要让运维知道插件没到位 */
+    console.warn("[工厂能碳中心] echarts-liquidfill 插件不可用，绿色能源液面已降级为 CSS 液面卡");
+  }
+  /* 储能 SOC 随时钟走：每 15 秒重算一次（确定性轨迹，不用随机数） */
+  setInterval(renderLiquid, 15000);
+
+  /* ---------------------------------------------------------------------------
+     7.3 ★ 24 小时用能结构演化（themeRiver · 本页第三张主角图）
+         data 行是 [时间, 数值, 类目] 三元组，纯标量。
+         ★ singleAxis.left 给到 78：themeRiver 的层标签画在每条带的**左端外侧**，
+           左边距不够会被画布静默裁掉，只剩半个字（研发与新品孵化页的教训）。
+  --------------------------------------------------------------------------- */
+  const river = makeChart("nt-chart-river");
+  const riverTime = (h) => "2026-07-31T" + pad(h) + ":00:00";
+  const RIVER_ROWS = [];
+  RIVER_CATS.forEach((c) => { c.arr.forEach((v, h) => { RIVER_ROWS.push([riverTime(h), Number(fmtDec(v, 3)), c.name]); }); });
+  river.setOption({
+    backgroundColor: "transparent",
+    color: RIVER_CATS.map((c) => c.color),
+    tooltip: TIP({
+      trigger: "axis", confine: true,
+      axisPointer: { type: "line", lineStyle: { color: "rgba(53,224,208,.45)", width: 1 } },
+      formatter: (ps) => {
+        if (!ps || !ps.length) return "";
+        const row = ps[0].value;
+        const t = new Date(Array.isArray(row) ? row[0] : ps[0].name);
+        if (isNaN(t.getTime())) return "";
+        const h = Math.max(0, Math.min(HRS - 1, t.getHours()));
+        const tot = hourTotal(h);
+        let s = "<b>" + pad(h) + ":00 — " + pad((h + 1) % 24) + ":00</b>　供能合计 <b style=\"color:" + C.cyan + "\">" +
+          fmtDec(tot, 2) + "</b> MWh<br/>";
+        RIVER_CATS.forEach((c) => {
+          s += "<span style=\"color:" + c.color + "\">■</span> " + c.name + "　<b>" + fmtDec(c.arr[h], 2) +
+            "</b> MWh · " + fmtDec(c.arr[h] / tot * 100, 1) + "%<br/>";
+        });
+        s += "<span style=\"color:" + C.textDim + "\">电负荷 " + fmtDec(RV.load[h], 2) + " MWh" +
+          (RV.essChg[h] > 0 ? " + 储能充电 " + fmtDec(RV.essChg[h], 2) + " MWh" : "") +
+          " · 储能 SOC " + fmtDec(SOC[h] / ESS_CAP * 100, 0) + "%</span>";
+        return s;
+      }
+    }),
+    legend: {
+      top: 0, right: 2, icon: "roundRect", itemWidth: 13, itemHeight: 7, itemGap: 14,
+      data: RIVER_CATS.map((c) => c.name),
+      textStyle: { color: C.textDim, fontSize: 11 }, inactiveColor: "#3d6f6c"
+    },
+    singleAxis: {
+      type: "time", left: 78, right: 26, top: 30, bottom: 22,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, {
+        fontSize: 10.5, hideOverlap: true,
+        formatter: (v) => { const d = new Date(v); return pad(d.getHours()) + ":00"; }
+      })
+    },
+    series: [{
+      type: "themeRiver",
+      data: RIVER_ROWS,
+      boundaryGap: ["8%", "8%"],
+      label: { show: true, color: "#eafcfa", fontSize: 10, fontWeight: 700, position: "left" },
+      itemStyle: { opacity: 0.92, shadowBlur: 8, shadowColor: "rgba(4,16,18,.5)" },
+      emphasis: { itemStyle: { shadowBlur: 18, shadowColor: "rgba(53,224,208,.45)" } },
+      animationDuration: 900, animationEasing: "cubicOut"
+    }]
+  });
+
+  /* ---------------------------------------------------------------------------
+     7.4 ★ 单位产品能耗分布（boxplot · 本页第四张主角图）
+         五数概括由 §4.8 手算（不用 dataset transform，须线口径与离群判定完全可控），
+         离群班次用 scatter 叠加；markLine 标出六线加权均值。
+  --------------------------------------------------------------------------- */
+  const box = makeChart("nt-chart-box");
+  const boxOutPts = [];
+  GROUPS.forEach((g, gi) => { g.stat.outliers.forEach((v) => boxOutPts.push({ value: [gi, v], gi: gi })); });
+  const boxData = GROUPS.map((g) => ({
+    value: [g.stat.wl, g.stat.q1, g.stat.med, g.stat.q3, g.stat.wh],
+    itemStyle: { color: "rgba(53,224,208,.14)", borderColor: g.color, borderWidth: 1.5 }
+  }));
+  box.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 4, right: 12, top: 28, bottom: 4, containLabel: true },
+    tooltip: TIP({
+      trigger: "item", confine: true,
+      formatter: (p) => {
+        if (p.seriesType === "scatter") {
+          const g = GROUPS[p.data.gi];
+          return "<b>" + g.name + " · 离群班次</b><br/>单耗 <b style=\"color:" + C.red + "\">" +
+            fmtDec(p.value[1], 2) + "</b> kWh/台<br/><span style=\"color:" + C.textDim +
+            "\">超出 1.5×IQR 栅栏，高于基准 " + fmtDec((p.value[1] / g.unit - 1) * 100, 1) + "%</span>";
+        }
+        const g = GROUPS[p.dataIndex], b = g.stat, v = p.value;
+        return "<b>" + g.name + "</b>（n=" + b.n + " 班次 · " + g.plines + " 条产线）<br/>" +
+          "须上 <b>" + fmtDec(v[5], 2) + "</b> · Q3 <b>" + fmtDec(v[4], 2) + "</b><br/>" +
+          "中位数 <b style=\"color:" + g.color + "\">" + fmtDec(v[3], 2) + "</b> kWh/台（= 单耗基准 " + fmtDec(g.unit, 1) + "）<br/>" +
+          "Q1 <b>" + fmtDec(v[2], 2) + "</b> · 须下 <b>" + fmtDec(v[1], 2) + "</b><br/>" +
+          "<span style=\"color:" + C.textDim + "\">IQR " + fmtDec(b.iqr, 2) + " · 离群 " + b.outliers.length +
+          " 班 · 年产 " + thou(g.out, 0) + " 万台 · 年电耗 " + thou(g.out * g.unit, 0) + " 万kWh</span>";
+      }
+    }),
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 12,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["单耗分布", "离群班次"]
+    },
+    xAxis: {
+      type: "category", data: GROUPS.map((g) => g.short + "\nn=" + g.stat.n), boundaryGap: true,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10.5, lineHeight: 13 })
+    },
+    yAxis: {
+      type: "value", name: "kWh/台", min: 6, max: 28, interval: 4,
+      nameTextStyle: { color: C.textDim, fontSize: 10 },
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    series: [
+      {
+        name: "单耗分布", type: "boxplot", boxWidth: [12, 32], data: boxData,
+        markLine: {
+          silent: true, symbol: "none",
+          data: [{ yAxis: Number(fmtDec(D.unitElec, 2)) }],
+          lineStyle: { color: "rgba(255,201,77,.55)", type: "dashed", width: 1 },
+          label: { formatter: "六线加权均值 " + fmtDec(D.unitElec, 2), color: C.amber, fontSize: 10, position: "insideEndTop" }
+        }
+      },
+      { name: "离群班次", type: "scatter", data: boxOutPts, symbolSize: 6, itemStyle: { color: C.red, opacity: 0.85 } }
+    ]
+  });
+
+  /* ===== 8. 活性轮播：基地看板 ↔ 桑基 联动；核算表 / 箱线 各自巡航 ===== */
+  let baseIdx = 0;
+  function playBase() {
+    baseRows.forEach((r, i) => r.classList.toggle("is-active", i === baseIdx));
+    if (sankey) {
+      sankey.dispatchAction({ type: "downplay", seriesIndex: 0 });
+      sankey.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: SRC.length + baseIdx });
+    }
+    baseIdx = (baseIdx + 1) % BASES.length;
+  }
+  playBase();
+  setInterval(playBase, 3400);
+
+  let rowIdx = 0;
+  setInterval(() => {
+    co2Rows.forEach((r, i) => r.classList.toggle("is-active", i === rowIdx));
+    rowIdx = (rowIdx + 1) % (co2Rows.length || 1);
+  }, 2400);
+
+  let boxIdx = 0;
+  setInterval(() => {
+    if (!box) return;
+    box.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    box.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: boxIdx });
+    boxIdx = (boxIdx + 1) % GROUPS.length;
+  }, 2600);
+
+  /* ===== 9. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const near = (a, b, eps) => Math.abs(a - b) < (eps == null ? 1e-6 : eps);
+  const checks = [
+    ["年产量 902 万台 = 六产品线之和 = 三基地之和",
+      near(D.out, 902, 1e-9) && near(D.baseOut, D.out, 1e-9)],
+    ["产线合计 18 条", D.plines === PLINE_TOTAL],
+    ["年总用电 = 六产品线（产量 × 单耗）之和",
+      near(D.elec, sum(LINES.map((l) => l.out * l.unit)), 1e-6)],
+    ["外购电 = 用电 − 光伏自发（逐基地）",
+      BASES.every((b) => near(b.buy, b.elec - b.pv, 1e-9))],
+    ["绿电占比 = (光伏 + 绿证) ÷ 总用电",
+      near(D.greenRate, (D.pv + D.gtrade) / D.elec * 100, 1e-9)],
+    ["★ 桑基三层守恒：Σ源 = Σ基地 = Σ工序",
+      near(D.srcSum, D.baseSum, 1e-6) && near(D.baseSum, D.procSum, 1e-6)],
+    ["桑基 27 条连线值之和 = 两层各自的总量",
+      near(sum(skLinks.slice(0, SRC.length * BASES.length).map((l) => l.value)), D.srcSum, 1e-6) &&
+      near(sum(skLinks.slice(SRC.length * BASES.length).map((l) => l.value)), D.procSum, 1e-6)],
+    ["各基地工序占比之和 = 1",
+      BASES.every((b) => near(sum(PROC_SHARE[b.key]), 1, 1e-9))],
+    ["综合能耗 = 四类能源折标之和", near(D.tce, sum(BASES.map((b) => b.tceTotal)), 1e-6)],
+    ["★ 逐时电量平衡：外购电 + 光伏 + 储能放电 = 电负荷 + 储能充电",
+      RV.buy.every((v, h) => near(v + RV.pv[h] + RV.essDis[h], RV.load[h] + RV.essChg[h], 1e-9))],
+    ["逐时外购电恒为正（不出现倒送电网）", RV.buy.every((v) => v > 0)],
+    ["日光伏发电量 = 年光伏 ÷ 365", near(sum(RV.pv), D.pv * 10 / 365, 1e-6)],
+    /* 半正弦拱的两个端点（6 时与 18 时）取值恰为 0，故「有出力」的时段是 (6, 18) 开区间 */
+    ["★ 光伏 6 时起、正午峰、18 时落",
+      D.pvPeakH === 12 && RV.pv[7] > 0 && RV.pv[17] > 0 &&
+      RV.pv.every((v, h) => (h > 6 && h < 18 ? v > 0 : v === 0))],
+    ["储能 SOC 日闭环（SOC[24] = SOC[0]）且始终在 10%~95%",
+      near(SOC[24], SOC[0], 1e-9) && D.socMin >= 0.10 * ESS_CAP && D.socMax <= 0.95 * ESS_CAP],
+    ["余热回收 = 天然气折电当量 × 回收率", near(DAY.heat, DAY.gas * HEAT_RATE, 1e-9)],
+    ["★ 箱线图中位数 = 各产品线单耗基准",
+      GROUPS.every((g) => near(g.stat.med, g.unit, 5e-3))],
+    ["五数概括单调：须下 ≤ Q1 ≤ 中位 ≤ Q3 ≤ 须上",
+      GROUPS.every((g) => g.stat.wl <= g.stat.q1 && g.stat.q1 <= g.stat.med &&
+                          g.stat.med <= g.stat.q3 && g.stat.q3 <= g.stat.wh)],
+    ["碳排合计 = 八个核算项之和 = 范围一 + 二 + 三",
+      near(D.co2, sum(CO2_ROWS.map((r) => r.v)), 1e-6) && near(D.co2, sum(D.scope), 1e-6)],
+    ["核算项占比合计 = 100%", near(sum(CO2_ROWS.map((r) => r.share)), 100, 1e-6)],
+    ["年营收 112.6 亿元口径未被改写", near(REVENUE_YI, 112.6, 1e-9)]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[工厂能碳中心] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
