@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电基地数字孪生</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --jt-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .jt-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 440px 1fr 440px;
+    grid-template-rows: 84px 112px 1fr;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .jt-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .jt-error.is-visible { display: block; }
+
+  /* ===== 顶栏：面包屑（含返回上级） + 基地切换器 + 芯片 + 时钟 ===== */
+  .jt-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .jt-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .jt-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .jt-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .jt-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .jt-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .jt-crumb em { font-style: normal; color: #cfeae7; }
+  .jt-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px 3px; border-radius: 7px;
+    color: #a9d9d4; text-decoration: none; letter-spacing: 0.06em;
+    border: 1px solid rgba(64, 196, 190, 0.3); background: rgba(14, 52, 56, 0.55);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .jt-crumb-up:hover { color: #eafcfa; border-color: rgba(53, 224, 208, 0.85); box-shadow: 0 0 14px rgba(53, 224, 208, 0.32); }
+  .jt-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .jt-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .jt-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .jt-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .jt-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .jt-head-right { display: flex; align-items: center; gap: 18px; flex: none; }
+  .jt-switcher { display: flex; align-items: stretch; gap: 8px; }
+  .jt-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-width: 96px; padding: 6px 12px; border-radius: 9px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9d9d4;
+    border: 1px solid rgba(64, 196, 190, 0.28); background: rgba(12, 44, 48, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .jt-sw-tab b { font-size: 14.5px; font-weight: 700; letter-spacing: 0.08em; }
+  .jt-sw-tab span { font-size: 10.5px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.9); font-variant-numeric: tabular-nums; }
+  .jt-sw-tab:hover { color: #eafcfa; border-color: rgba(53, 224, 208, 0.6); }
+  .jt-sw-tab.is-active {
+    color: #04191a; border-color: transparent;
+    background: linear-gradient(160deg, var(--mfg-cyan), var(--mfg-cyan-deep));
+    box-shadow: 0 0 16px rgba(53, 224, 208, 0.42);
+  }
+  .jt-sw-tab.is-active span { color: rgba(4, 25, 26, 0.72); }
+  .jt-sw-tab.is-soon {
+    cursor: default; color: rgba(169, 140, 245, 0.9);
+    border-style: dashed; border-color: rgba(169, 140, 245, 0.4); background: rgba(30, 26, 56, 0.42);
+  }
+  .jt-sw-tab.is-soon span { color: rgba(169, 140, 245, 0.62); }
+
+  .jt-chips { display: flex; align-items: center; gap: 9px; }
+  .jt-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 112px; padding: 7px 14px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .jt-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .jt-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  a.jt-chip { text-decoration: none; cursor: pointer; transition: border-color .18s, box-shadow .18s; }
+  a.jt-chip:hover { border-color: rgba(53, 224, 208, 0.7); box-shadow: 0 0 14px rgba(53, 224, 208, 0.3); }
+  a.jt-chip b { color: var(--mfg-cyan); }
+  .jt-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 18px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .jt-clock-time { font: 700 26px/1 var(--jt-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .jt-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带（6 枚，随基地切换重算） ===== */
+  .jt-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .jt-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 12px; padding: 0 14px 0 16px;
+  }
+  .jt-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .jt-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .jt-kpi-icon {
+    flex: none; width: 42px; height: 42px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 19px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35);
+  }
+  .jt-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .jt-kpi-label { font-size: 11.5px; letter-spacing: 0.08em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .jt-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .jt-kpi-val { font: 700 25px/1 var(--jt-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .jt-kpi.is-warn .jt-kpi-val { color: #ffd9b0; }
+  .jt-kpi-unit { font-size: 12px; color: var(--mfg-text-dim); }
+  .jt-kpi-sub { font-size: 10.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .jt-kpi-sub b { font-weight: 700; }
+
+  /* ===== 三栏主体 ===== */
+  .jt-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .jt-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .jt-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .jt-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .jt-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .jt-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .jt-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .jt-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .jt-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 中央等距厂区舞台 ===== */
+  .jt-isowrap { flex: 1; min-height: 0; min-width: 0; position: relative; }
+  .jt-isowrap svg { width: 100%; height: 100%; display: block; }
+  .jt-iso-fence { fill: none; stroke: rgba(64, 196, 190, 0.20); stroke-width: 1.4; stroke-dasharray: 10 6; }
+  .jt-iso-grid { stroke: rgba(53, 224, 208, 0.06); stroke-width: 1; }
+  .jt-iso-edge { fill: none; stroke-linecap: round; }
+  .jt-iso-rev { fill: none; stroke: var(--mfg-orange); stroke-linecap: round; opacity: 0.78; }
+  .jt-iso-cap-bg { fill: #f2f8f7; }
+  .jt-iso-cap-tx { font-size: 11px; font-weight: 600; fill: #0b2b2e; }
+  .jt-iso-lead { stroke: rgba(216, 242, 239, 0.35); stroke-width: 1; stroke-dasharray: 2 3; }
+  .jt-iso-val { font: 700 10.5px var(--jt-mono); fill: #8ff0e6; }
+  .jt-iso-sub { font-size: 9.5px; fill: rgba(127, 166, 163, 0.95); }
+  .jt-iso-lg { font-size: 10.5px; fill: var(--mfg-text-dim); }
+  .jt-iso-gate { font-size: 10px; fill: var(--mfg-text-dim); letter-spacing: 0.2em; }
+  .jt-lamp { animation: jt-lamp 2.2s ease-in-out infinite; }
+  @keyframes jt-lamp { 50% { opacity: 0.45; } }
+  .jt-down-pulse { animation: jt-down 1.1s ease-in-out infinite; }
+  @keyframes jt-down { 50% { opacity: 0.3; } }
+
+  /* ===== 右栏：状态清单 + 事件 ===== */
+  .jt-lines { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .jt-lines li {
+    display: grid; grid-template-columns: 14px 66px 1fr 62px; align-items: center; gap: 8px; flex: 1; min-height: 0;
+    padding: 2px 10px; border-radius: 8px;
+    border: 1px solid rgba(64, 196, 190, 0.14); background: rgba(10, 38, 42, 0.5);
+    font-size: 12px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+  }
+  .jt-lines li i { font-style: normal; font: 700 11px var(--jt-mono); color: #5f8a87; }
+  .jt-lines li em { font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .jt-dot { width: 9px; height: 9px; border-radius: 50%; }
+  .jt-badge {
+    text-align: center; padding: 2px 0; border-radius: 6px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em;
+  }
+  .jt-badge.is-run { color: #bff3c6; background: rgba(126, 224, 138, 0.14); border: 1px solid rgba(126, 224, 138, 0.4); }
+  .jt-badge.is-idle { color: #ffe9b8; background: rgba(255, 201, 77, 0.13); border: 1px solid rgba(255, 201, 77, 0.4); }
+  .jt-badge.is-fix { color: #bcd9f6; background: rgba(79, 168, 232, 0.14); border: 1px solid rgba(79, 168, 232, 0.42); }
+  .jt-badge.is-down { color: #ffc9ce; background: rgba(255, 95, 107, 0.16); border: 1px solid rgba(255, 95, 107, 0.45); }
+
+  .jt-events { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; overflow: hidden; }
+  .jt-events li {
+    display: flex; align-items: center; gap: 10px; flex: 1; min-height: 0;
+    padding: 3px 10px; border-radius: 8px;
+    border: 1px solid rgba(64, 196, 190, 0.14); background: rgba(10, 38, 42, 0.5);
+    font-size: 12px; color: #cbe6e3; line-height: 1.4;
+  }
+  .jt-events li i { font-style: normal; font: 700 11px var(--jt-mono); color: #5f8a87; flex: none; }
+  .jt-events li b { font-weight: 700; color: #eafcfa; }
+  .jt-etag { flex: none; min-width: 40px; text-align: center; padding: 2px 8px; border-radius: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; }
+  .jt-etag.is-warn { color: #ffd9b0; background: rgba(255, 157, 69, 0.16); border: 1px solid rgba(255, 157, 69, 0.4); }
+  .jt-etag.is-crit { color: #ffc9ce; background: rgba(255, 95, 107, 0.16); border: 1px solid rgba(255, 95, 107, 0.45); }
+  .jt-etag.is-info { color: #a9f0e8; background: rgba(53, 224, 208, 0.13); border: 1px solid rgba(53, 224, 208, 0.35); }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .jt-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="jt-stage" id="jt-stage">
+    <!-- mockflag:begin --><div class="jt-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="jt-error" id="jt-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="jt-header">
+      <div class="jt-head-left">
+        <div class="jt-crumb">
+          <b>云麓厨电</b><i>›</i>
+          <a class="jt-crumb-up" href="大屏样板间-厨电生产制造总览1920.html" title="返回上级专题页（Esc）">‹ 返回 生产制造总览</a><i>›</i>
+          <em id="jt-crumb-obj">--</em>
+        </div>
+        <div class="jt-head-title-row">
+          <div class="jt-head-title" id="jt-title">-- 数字孪生</div>
+          <div class="jt-head-meta">
+            <span>厂区 <b id="jt-meta-area">--</b></span><i>|</i>
+            <span>产线 <b id="jt-meta-lines">--</b> 条 · 工序 <b>8</b> 段</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="jt-head-right">
+        <div class="jt-switcher" id="jt-switcher" aria-label="基地切换"></div>
+        <div class="jt-chips">
+          <a class="jt-chip" id="jt-chip-sis" href="大屏样板间-厨电基地生产详情1920.html" title="切到指标视角：基地生产详情"><span>姊妹页 · 指标视角</span><b>基地生产详情 ›</b></a>
+        </div>
+        <div class="jt-clock" aria-label="实时时钟">
+          <span class="jt-clock-time" id="jt-clock-time">--:--:--</span>
+          <span class="jt-clock-date" id="jt-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <section class="jt-band" id="jt-band" aria-label="基地核心指标"></section>
+
+    <!-- 左栏 -->
+    <div class="jt-col">
+      <section class="jt-panel" style="flex: 1;">
+        <div class="jt-panel-head">
+          <h2>工序日通过量</h2>
+          <span class="jt-panel-tag" id="jt-tag-flow">--</span>
+        </div>
+        <div class="jt-chart" id="jt-chart-flow"></div>
+      </section>
+      <section class="jt-panel" style="flex: 1.06;">
+        <div class="jt-panel-head">
+          <h2>24h 产出节奏</h2>
+          <span class="jt-panel-tag" id="jt-tag-day">--</span>
+        </div>
+        <div class="jt-chart" id="jt-chart-day"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：等距厂区 -->
+    <section class="jt-panel">
+      <div class="jt-panel-head">
+        <h2 id="jt-iso-title">厂区数字孪生 · 工艺流</h2>
+        <span class="jt-panel-tag" id="jt-tag-iso">--</span>
+      </div>
+      <div class="jt-isowrap">
+        <svg id="jt-iso" viewBox="0 0 924 704" preserveAspectRatio="xMidYMid meet" role="img" aria-label="基地厂区等距数字孪生：原料入厂到出货月台的工艺流，装配车间挂产线状态灯，返修回流为橙色虚线"></svg>
+      </div>
+    </section>
+
+    <!-- 右栏 -->
+    <div class="jt-col">
+      <section class="jt-panel" style="flex: 1.22;">
+        <div class="jt-panel-head">
+          <h2>产线状态灯板</h2>
+          <span class="jt-panel-tag" id="jt-tag-line">--</span>
+        </div>
+        <ul class="jt-lines" id="jt-lines"></ul>
+      </section>
+      <section class="jt-panel" style="flex: 0.86;">
+        <div class="jt-panel-head">
+          <h2>OEE 三因子</h2>
+          <span class="jt-panel-tag" id="jt-tag-oee">--</span>
+        </div>
+        <div class="jt-chart" id="jt-chart-oee"></div>
+      </section>
+      <section class="jt-panel" style="flex: 0.92;">
+        <div class="jt-panel-head">
+          <h2>今日厂区事件</h2>
+          <span class="jt-panel-tag" id="jt-tag-evt">--</span>
+        </div>
+        <ul class="jt-events" id="jt-events"></ul>
+      </section>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("jt-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtQty = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+
+  /* ===== 2. 系列公共色板 ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const lighten = (hex, t) => hexMix(hex, t, 255);
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层 =====
+     产品线产量 / FPY 与「基地生产详情」页逐字段同值（那页是产线口径的权威源）；
+     产线清单（编号 / 车间 / 状态）同页同源。基地产量 = 产品线之和：454 / 228 / 220 = 902。
+     日产 = 年产量 ÷ 302 个有效生产日（两班制）；工序段流量由日产叠加确定性损耗率派生。 */
+  const WORK_DAYS = 302;
+  const LINES = [
+    { name: "吸油烟机",   base: "hz", out: 236, fpy: 96.8 },
+    { name: "燃气灶具",   base: "hz", out: 218, fpy: 97.2 },
+    { name: "洗碗机",     base: "wh", out: 132, fpy: 95.2 },
+    { name: "蒸烤一体机", base: "wh", out:  96, fpy: 94.4 },
+    { name: "集成灶",     base: "fs", out: 108, fpy: 96.1 },
+    { name: "净水热水",   base: "fs", out: 112, fpy: 97.6 }
+  ];
+  const BASES = [
+    { key: "hz", name: "杭州临平", area: "1 080 亩", role: "总部主基地", a: 92.5, p: 94.8, q: 98.5,
+      wsA: "A 区 · 烟机装配", wsB: "B 区 · 灶具装配", liA: 0, liB: 1, solar: true },
+    { key: "wh", name: "安徽芜湖", area: "760 亩", role: "洗护制造基地", a: 88.2, p: 92.4, q: 97.9,
+      wsA: "A 区 · 洗碗机装配", wsB: "B 区 · 蒸烤装配", liA: 2, liB: 3, solar: true },
+    { key: "fs", name: "广东佛山", area: "820 亩", role: "集成与水机基地", a: 90.4, p: 93.6, q: 98.3,
+      wsA: "A 区 · 集成灶装配", wsB: "B 区 · 净水热水装配", liA: 4, liB: 5, solar: false }
+  ];
+  const INCUBATOR = { name: "成都基地", note: "在建 · 规划 120 万台 · 2027 投产", progress: 62 };
+  const ST = {
+    run:  { t: "运行", cls: "is-run",  c: C.green },
+    idle: { t: "待机", cls: "is-idle", c: C.amber },
+    fix:  { t: "检修", cls: "is-fix",  c: C.blue },
+    down: { t: "故障", cls: "is-down", c: C.red }
+  };
+  const PLINES = [
+    { base: "hz", code: "L1-01", ws: "A", name: "烟机装配一线", st: "run" },
+    { base: "hz", code: "L1-02", ws: "A", name: "烟机装配二线", st: "run" },
+    { base: "hz", code: "L1-03", ws: "A", name: "烟机装配三线", st: "idle" },
+    { base: "hz", code: "L1-04", ws: "A", name: "烟机总装四线", st: "run" },
+    { base: "hz", code: "L2-01", ws: "B", name: "灶具装配一线", st: "run" },
+    { base: "hz", code: "L2-02", ws: "B", name: "灶具装配二线", st: "run" },
+    { base: "hz", code: "L2-03", ws: "B", name: "灶具装配三线", st: "fix" },
+    { base: "hz", code: "L2-04", ws: "B", name: "灶具总装四线", st: "run" },
+    { base: "wh", code: "W1-01", ws: "A", name: "洗碗装配一线", st: "run" },
+    { base: "wh", code: "W1-02", ws: "A", name: "洗碗装配二线", st: "run" },
+    { base: "wh", code: "W1-03", ws: "A", name: "洗碗总装三线", st: "down" },
+    { base: "wh", code: "W2-01", ws: "B", name: "蒸烤装配一线", st: "run" },
+    { base: "wh", code: "W2-02", ws: "B", name: "蒸烤总装二线", st: "fix" },
+    { base: "fs", code: "F1-01", ws: "A", name: "集成灶一线",   st: "run" },
+    { base: "fs", code: "F1-02", ws: "A", name: "集成灶二线",   st: "run" },
+    { base: "fs", code: "F2-01", ws: "B", name: "净水机一线",   st: "run" },
+    { base: "fs", code: "F2-02", ws: "B", name: "热水机二线",   st: "idle" },
+    { base: "fs", code: "F2-03", ws: "B", name: "水机总装三线", st: "run" }
+  ];
+  /* 工序段损耗系数（相对成品日产的投入倍数，确定性给定）：
+     投料 1.045 → 冲压 1.032 → 焊接 1.020 → 涂装 1.010 → 装配 1.000 → 检测 1.000 → 合格 = FPY */
+  const STAGE_K = [1.045, 1.032, 1.020, 1.010, 1.000, 1.000];
+  const STAGE_NAMES = ["原料投料", "冲压下料", "钣金焊接", "表面处理", "总装装配", "整机检测", "合格入库"];
+
+  /* 派生：基地级数字全部现算 */
+  BASES.forEach((b) => {
+    b.lA = LINES[b.liA]; b.lB = LINES[b.liB];
+    b.out = b.lA.out + b.lB.out;
+    b.fpy = (b.lA.fpy * b.lA.out + b.lB.fpy * b.lB.out) / b.out;
+    b.oee = b.a * b.p * b.q / 1e4;
+    b.daily = b.out * 1e4 / WORK_DAYS;                       /* 台/日 */
+    b.stages = STAGE_K.map((k) => b.daily * k);              /* 各工序日通过量 台/日 */
+    b.stages.push(b.daily * b.fpy / 100);                    /* 合格入库 */
+    b.rework = b.daily * (1 - b.fpy / 100);                  /* 返修 台/日 */
+    b.wip = b.daily * 0.9;                                   /* 在制 ≈ 0.9 个生产日 */
+    b.pls = PLINES.filter((p) => p.base === b.key);
+    b.lineCnt = b.pls.length;
+  });
+
+  /* ===== 4. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("jt-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("jt-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. 切换器 ===== */
+  const switcher = $("jt-switcher");
+  switcher.innerHTML = BASES.map((b, i) => (
+    '<button class="jt-sw-tab" type="button" data-i="' + i + '" title="切换到' + b.name + '基地（← → 方向键）">' +
+      "<b>" + b.name + "</b><span>" + fmtDec(b.out, 0) + " 万台 · " + b.lineCnt + " 线</span>" +
+    "</button>"
+  )).join("") +
+  '<div class="jt-sw-tab is-soon" title="' + INCUBATOR.note + '"><b>' + INCUBATOR.name + "</b><span>在建 " + INCUBATOR.progress + "%</span></div>";
+  const swTabs = Array.from(switcher.querySelectorAll(".jt-sw-tab[data-i]"));
+
+  /* ===== 6. KPI 带（随基地切换重算 + 翻牌缓动） ===== */
+  function countUp(el, target, dec) {
+    const t0 = performance.now(), dur = 1200;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmtDec(target * (1 - Math.pow(1 - p, 3)), dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+  function renderKpi(b) {
+    const defs = [
+      { icon: "🏭", label: "年产量", v: b.out, dec: 0, unit: "万台", sub: b.lA.name + " " + b.lA.out + " · " + b.lB.name + " " + b.lB.out },
+      { icon: "📅", label: "日均产出", v: b.daily / 1e4, dec: 2, unit: "万台/日", sub: "按 " + WORK_DAYS + " 个生产日 · 两班制" },
+      { icon: "⚙", label: "OEE 综合效率", v: b.oee, dec: 2, unit: "%", warn: b.oee < 85, sub: "A " + fmtDec(b.a, 1) + " × P " + fmtDec(b.p, 1) + " × Q " + fmtDec(b.q, 1) },
+      { icon: "✓", label: "制程直通率 FPY", v: b.fpy, dec: 2, unit: "%", sub: "产量加权 · 目标 95.0%" },
+      { icon: "🔩", label: "在制 WIP", v: b.wip / 1e4, dec: 2, unit: "万台", sub: "≈ 0.9 个生产日在制" },
+      { icon: "🔁", label: "日返修量", v: b.rework, dec: 0, unit: "台/日", warn: true, sub: "= 日产 × (1 − FPY)，回流 B 区复装" }
+    ];
+    $("jt-band").innerHTML = defs.map((k, i) => (
+      '<div class="jt-kpi' + (k.warn ? " is-warn" : "") + '">' +
+        '<div class="jt-kpi-icon">' + k.icon + "</div>" +
+        '<div class="jt-kpi-main">' +
+          '<div class="jt-kpi-label">' + k.label + "</div>" +
+          '<div class="jt-kpi-num"><span class="jt-kpi-val" id="jt-kpi-' + i + '">0</span><span class="jt-kpi-unit">' + k.unit + "</span></div>" +
+          '<div class="jt-kpi-sub">' + k.sub + "</div>" +
+        "</div>" +
+      "</div>"
+    )).join("");
+    defs.forEach((k, i) => countUp($("jt-kpi-" + i), k.v, k.dec));
+  }
+
+  /* ===== 7. 等距厂区（纯 SVG，不依赖 echarts，资源守卫之前渲染） ===== */
+  const NP = {
+    raw:   { x: 122, y: 148, a: 36, b: 18, h: 22 },
+    press: { x: 318, y: 112, a: 40, b: 20, h: 26 },
+    weld:  { x: 506, y: 100, a: 40, b: 20, h: 26 },
+    paint: { x: 682, y: 138, a: 40, b: 20, h: 26 },
+    asmA:  { x: 700, y: 320, a: 48, b: 24, h: 32 },
+    asmB:  { x: 462, y: 352, a: 48, b: 24, h: 32 },
+    qc:    { x: 268, y: 380, a: 34, b: 17, h: 22 },
+    pack:  { x: 146, y: 462, a: 34, b: 17, h: 22 },
+    rack:  { x: 320, y: 548, a: 40, b: 20, h: 46 },
+    dock:  { x: 560, y: 588, a: 40, b: 20, h: 16 },
+    rework:{ x: 118, y: 596, a: 26, b: 13, h: 16 },
+    energy:{ x: 852, y: 470, a: 28, b: 14, h: 20 },
+    office:{ x: 852, y: 136, a: 28, b: 14, h: 36 }
+  };
+  function isoCube(cx, cy, a, b, h, col, extra) {
+    const top = lighten(col, 0.16), lf = darken(col, 0.38), rt = darken(col, 0.56);
+    return '<polygon points="' + cx + "," + (cy - b) + " " + (cx + a) + "," + cy + " " + cx + "," + (cy + b) + " " + (cx - a) + "," + cy + '" fill="' + top + '"/>' +
+      '<polygon points="' + (cx - a) + "," + cy + " " + cx + "," + (cy + b) + " " + cx + "," + (cy + b + h) + " " + (cx - a) + "," + (cy + h) + '" fill="' + lf + '"/>' +
+      '<polygon points="' + cx + "," + (cy + b) + " " + (cx + a) + "," + cy + " " + (cx + a) + "," + (cy + h) + " " + cx + "," + (cy + b + h) + '" fill="' + rt + '"/>' + (extra || "");
+  }
+  /* 屋顶光伏：顶面内嵌蓝色栅格菱形 */
+  function solarRoof(n) {
+    const a = n.a * 0.62, b = n.b * 0.62;
+    let g = '<polygon points="' + n.x + "," + (n.y - b) + " " + (n.x + a) + "," + n.y + " " + n.x + "," + (n.y + b) + " " + (n.x - a) + "," + n.y + '" fill="rgba(79,168,232,0.5)" stroke="rgba(255,255,255,0.35)" stroke-width="0.8"/>';
+    for (let k = 1; k <= 2; k += 1) {
+      const t = k / 3;
+      g += '<line x1="' + (n.x - a + a * t) + '" y1="' + (n.y - b * t) + '" x2="' + (n.x + a * t) + '" y2="' + (n.y + b - b * t) + '" stroke="rgba(255,255,255,0.3)" stroke-width="0.7"/>';
+    }
+    return g;
+  }
+  /* 立体库：右立面横向货架棱线 */
+  function rackFace(n) {
+    let g = "";
+    for (let k = 1; k <= 3; k += 1) {
+      const dy = n.h * k / 4;
+      g += '<line x1="' + n.x + '" y1="' + (n.y + n.b + dy) + '" x2="' + (n.x + n.a) + '" y2="' + (n.y + dy) + '" stroke="rgba(255,255,255,0.22)" stroke-width="0.9"/>';
+    }
+    return g;
+  }
+  /* 装配车间：左立面产线状态灯一排 */
+  function lampRow(n, pls) {
+    return pls.map((p, i) => {
+      const t = (i + 0.5) / pls.length;
+      const lx = n.x - n.a + n.a * t, ly = n.y + n.b * t + n.h * 0.55;
+      const cls = p.st === "down" ? "jt-down-pulse" : "jt-lamp";
+      return '<circle class="' + cls + '" cx="' + lx + '" cy="' + ly + '" r="3.2" fill="' + ST[p.st].c + '"/>';
+    }).join("");
+  }
+  function capsule(x, y, glyph, name) {
+    const w = 26 + name.length * 11.5 + 14;
+    return '<rect class="jt-iso-cap-bg" x="' + (x - w / 2) + '" y="' + (y - 11) + '" width="' + w + '" height="22" rx="11"/>' +
+      '<text class="jt-iso-cap-tx" x="' + (x - w / 2 + 8) + '" y="' + (y + 4) + '">' + glyph + '</text>' +
+      '<text class="jt-iso-cap-tx" x="' + (x - w / 2 + 25) + '" y="' + (y + 4) + '">' + name + "</text>";
+  }
+  const outPt = (n) => [n.x + n.a + 3, n.y + (n.b + n.h) * 0.5];
+  const inPt = (n) => [n.x - n.a - 3, n.y + (n.b + n.h) * 0.5];
+  const botPt = (n) => [n.x, n.y + n.b + n.h + 4];
+  const topPt = (n) => [n.x, n.y - n.b - 4];
+  function edgePath(p1, p2) {
+    const dx = (p2[0] - p1[0]) * 0.45;
+    return "M" + p1[0] + "," + p1[1] + " C" + (p1[0] + dx) + "," + p1[1] + " " + (p2[0] - dx) + "," + p2[1] + " " + p2[0] + "," + p2[1];
+  }
+
+  function buildIso(b) {
+    const S = [];
+    /* 厂区围栏 + 大门 */
+    S.push('<polygon class="jt-iso-fence" points="462,16 908,238 462,668 16,336"/>');
+    S.push('<text class="jt-iso-gate" x="700" y="672" text-anchor="middle">GATE · 成品出厂</text>');
+    [[40, 300, 470, 80], [90, 430, 620, 160], [200, 620, 760, 340], [420, 40, 900, 280]].forEach((l) =>
+      S.push('<line class="jt-iso-grid" x1="' + l[0] + '" y1="' + l[1] + '" x2="' + l[2] + '" y2="' + l[3] + '"/>'));
+
+    const daily = b.daily;
+    /* —— 流（画在建筑下层）—— */
+    const flows = [
+      [outPt(NP.raw), inPt(NP.press), b.stages[0]],
+      [outPt(NP.press), inPt(NP.weld), b.stages[1]],
+      [outPt(NP.weld), inPt(NP.paint), b.stages[2]],
+      [botPt(NP.paint), topPt(NP.asmA), b.stages[3] * b.lA.out / b.out],
+      [[NP.paint.x - 20, NP.paint.y + NP.paint.b + NP.paint.h], topPt(NP.asmB), b.stages[3] * b.lB.out / b.out],
+      [inPt(NP.asmA), [NP.qc.x + NP.qc.a + 3, NP.qc.y + 2], daily * b.lA.out / b.out],
+      [inPt(NP.asmB), [NP.qc.x + NP.qc.a + 3, NP.qc.y + 14], daily * b.lB.out / b.out],
+      [inPt(NP.qc), inPt(NP.pack), b.stages[6]],
+      [botPt(NP.pack), [NP.rack.x - NP.rack.a - 3, NP.rack.y + 20], b.stages[6]],
+      [outPt(NP.rack), inPt(NP.dock), b.stages[6]]
+    ];
+    const particles = [];
+    flows.forEach((f) => {
+      const d = edgePath(f[0], f[1]);
+      const w = 1.2 + Math.min(3.2, f[2] / 6000);
+      S.push('<path class="jt-iso-edge" d="' + d + '" stroke="' + C.cyan + '" stroke-width="' + fmtDec(w, 2) + '" opacity="0.5"/>');
+      const len = Math.hypot(f[1][0] - f[0][0], f[1][1] - f[0][1]);
+      particles.push('<circle r="2.5" fill="#5ff0e0"><animateMotion dur="' + fmtDec(1.3 + len / 240, 2) + 's" repeatCount="indefinite" path="' + d + '"/></circle>');
+    });
+    /* 出厂箭头（月台 → 大门外，接华东仓干线） */
+    const dOut = outPt(NP.dock);
+    S.push('<path class="jt-iso-edge" d="M' + dOut[0] + "," + dOut[1] + " L" + (dOut[0] + 66) + "," + (dOut[1] + 12) + '" stroke="' + C.cyanDeep + '" stroke-width="2.6" opacity="0.8" marker-end="url(#jt-arr)"/>');
+    S.push('<text class="jt-iso-sub" x="' + (dOut[0] + 40) + '" y="' + (dOut[1] - 6) + '">发往区域仓</text>');
+    /* 返修逆向：检测 → 返修站 → B 区（橙色虚线） */
+    const rev1 = edgePath(botPt(NP.qc), [NP.rework.x + NP.rework.a + 3, NP.rework.y + 4]);
+    const rev2 = "M" + NP.rework.x + "," + (NP.rework.y - NP.rework.b - 4) + " C110,470 240,430 " + (NP.asmB.x - NP.asmB.a - 4) + "," + (NP.asmB.y + NP.asmB.h + 6);
+    [rev1, rev2].forEach((d) => S.push('<path class="jt-iso-rev" d="' + d + '" stroke-width="1.5" stroke-dasharray="6 5"><animate attributeName="stroke-dashoffset" from="0" to="-22" dur="1.25s" repeatCount="indefinite"/></path>'));
+    particles.push('<circle r="2.4" fill="' + C.orange + '"><animateMotion dur="3.4s" repeatCount="indefinite" path="' + rev1 + '"/></circle>');
+    particles.push('<circle r="2.4" fill="' + C.orange + '"><animateMotion dur="3.8s" repeatCount="indefinite" path="' + rev2 + '"/></circle>');
+
+    /* —— 建筑 —— */
+    function bld(key, col, glyph, name, val, sub, extra) {
+      const n = NP[key];
+      let g = '<g class="jt-iso-node">';
+      g += isoCube(n.x, n.y, n.a, n.b, n.h, col, extra || "");
+      const capY = n.y - n.b - 32;
+      g += '<line class="jt-iso-lead" x1="' + n.x + '" y1="' + (capY + 12) + '" x2="' + n.x + '" y2="' + (n.y - n.b - 3) + '"/>';
+      g += capsule(n.x, capY, glyph, name);
+      const vy = n.y + n.b + n.h + 15;
+      if (val) g += '<text class="jt-iso-val" x="' + n.x + '" y="' + vy + '" text-anchor="middle">' + val + "</text>";
+      if (sub) g += '<text class="jt-iso-sub" x="' + n.x + '" y="' + (vy + 13) + '" text-anchor="middle">' + sub + "</text>";
+      return g + "</g>";
+    }
+    const q = (v) => fmtQty(v) + " 台/日";
+    S.push(bld("raw", C.amber, "🧱", "原料库", q(b.stages[0]), "冷轧板 · 玻璃 · 电控"));
+    S.push(bld("press", C.cyan, "⚒", "冲压车间", q(b.stages[1]), null));
+    S.push(bld("weld", C.cyan, "🔥", "钣金焊接", q(b.stages[2]), null));
+    S.push(bld("paint", C.cyan, "🎨", "表面处理", q(b.stages[3]), "喷涂 · 阳极氧化",
+      '<polygon points="' + NP.paint.x + "," + (NP.paint.y + NP.paint.b + NP.paint.h * 0.55) + " " + (NP.paint.x + NP.paint.a) + "," + (NP.paint.y + NP.paint.h * 0.55) + " " + (NP.paint.x + NP.paint.a) + "," + (NP.paint.y + NP.paint.h * 0.72) + " " + NP.paint.x + "," + (NP.paint.y + NP.paint.b + NP.paint.h * 0.72) + '" fill="' + C.orange + '" opacity="0.85"/>'));
+    S.push(bld("asmA", C.cyan, "⚙", b.wsA, b.lA.name + " · " + b.pls.filter((p) => p.ws === "A").length + " 线",
+      "FPY " + fmtDec(b.lA.fpy, 1) + "%", (b.solar ? solarRoof(NP.asmA) : "") + lampRow(NP.asmA, b.pls.filter((p) => p.ws === "A"))));
+    S.push(bld("asmB", C.cyan, "⚙", b.wsB, b.lB.name + " · " + b.pls.filter((p) => p.ws === "B").length + " 线",
+      "FPY " + fmtDec(b.lB.fpy, 1) + "%", lampRow(NP.asmB, b.pls.filter((p) => p.ws === "B"))));
+    S.push(bld("qc", C.blue, "🔍", "整机检测", q(daily), "全检 + 抽检"));
+    S.push(bld("pack", C.blue, "📦", "包装线", q(b.stages[6]), null));
+    S.push(bld("rack", C.blue, "🏬", "成品立库", null, "库容 3.5 万台", rackFace(NP.rack)));
+    S.push(bld("dock", C.cyanDeep, "🚚", "出货月台", q(b.stages[6]), "整车直发"));
+    S.push(bld("rework", C.orange, "🔧", "返修站", fmtQty(b.rework) + " 台/日", "复装回流 B 区"));
+    S.push(bld("energy", C.violet, "⚡", "能源站", null, b.solar ? "配电 · 空压 · 光伏并网" : "配电 · 空压"));
+    S.push(bld("office", C.violet, "🏢", "办公研发楼", null, b.role));
+
+    S.push(particles.join(""));
+    /* 图例 */
+    S.push('<g transform="translate(14,690)">' +
+      '<line x1="0" y1="0" x2="28" y2="0" stroke="' + C.cyan + '" stroke-width="2.4" opacity="0.7"/>' +
+      '<text class="jt-iso-lg" x="35" y="4">工艺正向流 · 线宽∝台/日</text>' +
+      '<line x1="196" y1="0" x2="224" y2="0" stroke="' + C.orange + '" stroke-width="1.5" stroke-dasharray="6 5"/>' +
+      '<text class="jt-iso-lg" x="231" y="4">检测不良返修回流</text>' +
+      '<circle cx="352" cy="0" r="3.4" fill="' + C.green + '"/><circle cx="366" cy="0" r="3.4" fill="' + C.amber + '"/>' +
+      '<circle cx="380" cy="0" r="3.4" fill="' + C.blue + '"/><circle cx="394" cy="0" r="3.4" fill="' + C.red + '"/>' +
+      '<text class="jt-iso-lg" x="403" y="4">产线灯：运行 / 待机 / 检修 / 故障</text>' +
+      "</g>");
+    const defs = '<defs><marker id="jt-arr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1L8 5L1 9Z" fill="' + C.cyanDeep + '"/></marker></defs>';
+    $("jt-iso").innerHTML = defs + S.join("");
+  }
+
+  /* ===== 8. 右栏：灯板清单 + 事件（不依赖 echarts） ===== */
+  function renderLines(b) {
+    $("jt-lines").innerHTML = b.pls.map((p) => (
+      "<li>" +
+        '<span class="jt-dot" style="background:' + ST[p.st].c + ';box-shadow:0 0 8px ' + ST[p.st].c + '"></span>' +
+        "<i>" + p.code + "</i><em>" + p.name + "</em>" +
+        '<span class="jt-badge ' + ST[p.st].cls + '">' + ST[p.st].t + "</span>" +
+      "</li>"
+    )).join("");
+    const cnt = { run: 0, idle: 0, fix: 0, down: 0 };
+    b.pls.forEach((p) => (cnt[p.st] += 1));
+    $("jt-tag-line").innerHTML = "运行 <b>" + cnt.run + "</b> · 待机 " + cnt.idle + " · 检修 " + cnt.fix + " · 故障 " + cnt.down;
+  }
+  const EVENTS = {
+    hz: [
+      ["is-crit", "故障", "L2-03 灶具三线伺服驱动报警停线，维修组已到场，预计 <b>40 分钟</b>恢复"],
+      ["is-warn", "换型", "L1-03 烟机三线切换新型号治具，待机 <b>25 分钟</b>"],
+      ["is-info", "物流", "今日第 <b>18</b> 车整车直发华东仓，齐套率 100%"],
+      ["is-info", "能碳", "屋顶光伏当日发电 <b>2.8 万 kWh</b>，并网正常"]
+    ],
+    wh: [
+      ["is-crit", "故障", "W1-03 洗碗总装三线拧紧枪扭矩漂移停线，备件在途 <b>2h</b>"],
+      ["is-warn", "检修", "W2-02 蒸烤总装二线计划性保养，预计 <b>4h</b> 完成"],
+      ["is-info", "物流", "发往华北仓干线 <b>3</b> 车已出厂，在途正常"],
+      ["is-info", "质量", "洗碗机 FPY 周环比 <b>+0.3pp</b>，密封圈批次问题闭环"]
+    ],
+    fs: [
+      ["is-warn", "待机", "F2-02 热水机二线待料待机，电控板齐套预计 <b>1.5h</b>"],
+      ["is-info", "出口", "集成灶出口柜 <b>2</b> 柜完成装箱，发往华南仓中转"],
+      ["is-info", "质量", "净水热水 FPY <b>97.6%</b>，全厂最高"],
+      ["is-info", "设备", "F1 冲压线模具寿命剩余 <b>12%</b>，已排换模计划"]
+    ]
+  };
+  function renderEvents(b) {
+    $("jt-events").innerHTML = EVENTS[b.key].map((e) => (
+      '<li><span class="jt-etag ' + e[0] + '">' + e[1] + "</span><span>" + e[2] + "</span></li>"
+    )).join("");
+    $("jt-tag-evt").innerHTML = "<b>" + EVENTS[b.key].length + "</b> 条 · 今日";
+  }
+
+  /* ===== 9. 资源守卫（等距厂区 / 灯板 / 事件已在上方渲染，不依赖 echarts） ===== */
+  const errorNode = $("jt-error");
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) errorNode.classList.add("is-visible");
+
+  let flowChart = null, dayChart = null, oeeChart = null;
+  if (hasEcharts) {
+    flowChart = echarts.init($("jt-chart-flow"));
+    dayChart = echarts.init($("jt-chart-day"));
+    oeeChart = echarts.init($("jt-chart-oee"));
+  }
+  const axisLabel = { color: C.textDim, fontSize: 10.5 };
+
+  /* 左上：工序日通过量（横向条，随损耗逐段收敛） */
+  function flowOption(b) {
+    const vals = b.stages.map((v) => Number((v / 1e4).toFixed(3)));
+    return {
+      grid: { left: 8, right: 52, top: 4, bottom: 4, containLabel: true },
+      xAxis: { type: "value", show: false },
+      yAxis: {
+        type: "category", inverse: true, data: STAGE_NAMES,
+        axisLabel: { color: C.text, fontSize: 11.5 }, axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 12, data: vals,
+        itemStyle: {
+          borderRadius: 7,
+          color: (p) => (p.dataIndex === STAGE_NAMES.length - 1 ? C.green
+            : new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: C.cyanDeep }, { offset: 1, color: C.cyan }]))
+        },
+        showBackground: true, backgroundStyle: { color: "rgba(64,196,190,0.08)", borderRadius: 7 },
+        label: { show: true, position: "right", fontSize: 10.5, fontWeight: 700, color: "#cfe9e6", formatter: (p) => fmtDec(p.value, 2) + " 万" }
+      }]
+    };
+  }
+  /* 左下：24h 产出节奏（两班制双峰，面积和 = 日产） */
+  function dayOption(b) {
+    const HOURS = Array.from({ length: 24 }, (_, i) => i + ":00");
+    const shape = [0, 0, 0, 0, 0, 0, 0.2, 0.75, 1, 1, 0.95, 0.85, 0.35, 0.9, 1, 1, 0.95, 0.6, 0.15, 0.7, 0.9, 0.85, 0.5, 0.1];
+    const k = b.daily / sum(shape);
+    const data = shape.map((v) => Math.round(v * k));
+    return {
+      grid: { left: 8, right: 12, top: 22, bottom: 4, containLabel: true },
+      xAxis: { type: "category", data: HOURS, axisLabel: Object.assign({ interval: 3 }, axisLabel), axisLine: { lineStyle: { color: C.grid } }, axisTick: { show: false } },
+      yAxis: { type: "value", name: "台/时", nameTextStyle: { color: C.textDim, fontSize: 10 }, axisLabel: axisLabel, splitLine: { lineStyle: { color: C.grid } } },
+      series: [{
+        type: "line", data: data, smooth: true, symbol: "none",
+        lineStyle: { color: C.cyan, width: 2 },
+        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: "rgba(53,224,208,0.4)" }, { offset: 1, color: "rgba(53,224,208,0.02)" }]) },
+        markArea: {
+          silent: true, itemStyle: { color: "rgba(255,157,69,0.06)" },
+          label: { color: C.textDim, fontSize: 9.5 },
+          data: [[{ name: "早班", xAxis: "7:00" }, { xAxis: "12:00" }], [{ name: "晚班", xAxis: "13:00" }, { xAxis: "18:00" }]]
+        }
+      }]
+    };
+  }
+  /* 右中：OEE 三因子横向条 */
+  function oeeOption(b) {
+    const items = [["时间开动率 A", b.a], ["性能开动率 P", b.p], ["良品率 Q", b.q]];
+    return {
+      grid: { left: 8, right: 56, top: 4, bottom: 4, containLabel: true },
+      xAxis: { type: "value", min: 70, max: 100, show: false },
+      yAxis: { type: "category", inverse: true, data: items.map((x) => x[0]), axisLabel: { color: C.text, fontSize: 11.5 }, axisLine: { show: false }, axisTick: { show: false } },
+      series: [{
+        type: "bar", barWidth: 13,
+        data: items.map((x, i) => ({ value: x[1], itemStyle: { color: [C.cyan, C.blue, C.green][i], borderRadius: 7 } })),
+        showBackground: true, backgroundStyle: { color: "rgba(64,196,190,0.08)", borderRadius: 7 },
+        label: { show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#cfe9e6", formatter: (p) => fmtDec(p.value, 1) + "%" }
+      }]
+    };
+  }
+
+  /* ===== 10. 切换：整页随基地重绘 + hash 同步 ===== */
+  const PARENT = "大屏样板间-厨电生产制造总览1920.html";
+  let idx = 0;
+  function applyBase(i) {
+    const n = BASES.length;
+    idx = ((i % n) + n) % n;
+    const b = BASES[idx];
+    $("jt-title").textContent = b.name + " 数字孪生";
+    $("jt-crumb-obj").textContent = b.name + "基地 · " + b.role;
+    $("jt-meta-area").textContent = b.area;
+    $("jt-meta-lines").textContent = b.lineCnt;
+    $("jt-iso-title").textContent = "厂区数字孪生 · " + b.name;
+    $("jt-tag-iso").innerHTML = "日产 <b>" + fmtDec(b.daily / 1e4, 2) + "</b> 万台 · 返修 " + fmtQty(b.rework) + " 台";
+    $("jt-tag-flow").innerHTML = "投料 → 合格 · 直通 <b>" + fmtDec(b.fpy, 2) + "%</b>";
+    $("jt-tag-day").innerHTML = "日产 <b>" + fmtDec(b.daily / 1e4, 2) + "</b> 万台 · 两班制";
+    $("jt-tag-oee").innerHTML = "OEE <b>" + fmtDec(b.oee, 2) + "%</b> · 较目标 " + signed(b.oee - 85, 2) + "pp";
+    $("jt-chip-sis").href = "大屏样板间-厨电基地生产详情1920.html#" + encodeURIComponent(b.name);
+    swTabs.forEach((t, k) => t.classList.toggle("is-active", k === idx));
+
+    renderKpi(b);
+    buildIso(b);
+    renderLines(b);
+    renderEvents(b);
+    if (hasEcharts) {
+      flowChart.setOption(flowOption(b));
+      dayChart.setOption(dayOption(b));
+      oeeChart.setOption(oeeOption(b));
+    }
+    history.replaceState(null, "", "#" + encodeURIComponent(b.name));
+  }
+
+  /* ===== 11. 交互：切换器 / 键盘 / hash / kiosk 轮换 ===== */
+  swTabs.forEach((t) => t.addEventListener("click", () => { applyBase(Number(t.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyBase(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyBase(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+  function hashIdx() {
+    const h = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+    if (!h) return -1;
+    return BASES.findIndex((b) => b.name === h || b.key === h || b.name.indexOf(h) >= 0);
+  }
+  const hit = hashIdx();
+  applyBase(hit >= 0 ? hit : 0);
+  window.addEventListener("hashchange", () => {
+    const k = hashIdx();
+    if (k >= 0 && k !== idx) { applyBase(k); restart(); }
+  });
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => applyBase(idx + 1), 18000); }
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+})();
+</script>
+</body>
+</html>

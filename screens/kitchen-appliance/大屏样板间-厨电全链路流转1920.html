@@ -325,7 +325,7 @@ ORIG-->
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/></svg>
           </button>
           <div class="ql-cmeta">
-            <span class="ql-cidx"><b id="ql-c-cur">--</b><i>/ 18</i></span>
+            <span class="ql-cidx"><b id="ql-c-cur">--</b><i>/ 19</i></span>
             <span class="ql-cbar" aria-hidden="true"><u id="ql-c-bar"></u></span>
           </div>
           <button class="ql-cbtn" id="ql-c-next" type="button" aria-label="下一页" title="下一页（→ 方向键）">
@@ -403,7 +403,7 @@ ORIG-->
       </section>
       <section class="ql-panel" style="flex: 1.12;">
         <div class="ql-panel-head">
-          <h2>七仓吞吐与周转</h2>
+          <h2>七仓吞吐与存销比</h2>
           <span class="ql-panel-tag">库存合计 <b id="ql-tag-inv">--</b> 万台</span>
         </div>
         <div class="ql-chart" id="ql-chart-rdc"></div>
@@ -509,26 +509,28 @@ ORIG-->
   const darken = (hex, t) => hexMix(hex, t, 0);
 
   /* ===== 3. 数据层：单一数据源，全部视图由此派生 =====
-     勾稽到系列基准盘：产量 902 = 三基地之和 = 七仓吞吐之和
-                       = 内销 866（门店 372 + 电商 452 + 工程 42）+ 出口自产 36。
+     勾稽到系列基准盘：产量 902 = 三基地之和（454 + 228 + 220，= 基地生产详情页产品线之和）
+                       = 七仓吞吐之和 = 内销 866（门店 372 + 电商 452 + 工程 42）+ 出口自产 36。
+     基地 → 仓 21 条干线矩阵**逐格取自物流运输页的 RDCS.inb**（那页是干线运量的权威源）；
+     七仓库存逐仓取自仓储库存页的 42 格矩阵行和（31.0/17.5/15.0/10.0/10.0/13.0/21.5）。
      出口口径与 P16 一致：出口发运 132.0 = 自产结余 36 + ODM 委外 96（ODM 不经自有仓网，不入图）。
      逆向：售后工单 96.84 万单（= 保有量 3227 × 故障率 3.0011%）= 上门修复 84.44
            + 返厂检修 8.6 + 退换新机 3.8；返厂 + 退换 = 12.4 万单构成逆向物流，
            与 P4 市场故障率、P10 工单量同源。 */
   const D = {
     bases: [
-      { id: "hz", name: "杭州临平", out: 424, hq: true },
-      { id: "wh", name: "安徽芜湖", out: 271 },
-      { id: "fs", name: "广东佛山", out: 207 }
+      { id: "hz", name: "杭州临平", out: 454, hq: true },
+      { id: "wh", name: "安徽芜湖", out: 228 },
+      { id: "fs", name: "广东佛山", out: 220 }
     ],
     rdcs: [
-      { id: "hd", name: "华东仓", thru: 224, inv: 30.2 },
-      { id: "hb", name: "华北仓", thru: 133, inv: 17.8 },
-      { id: "hz2", name: "华中仓", thru: 121, inv: 15.6 },
-      { id: "xb", name: "西北仓", thru: 84, inv: 10.7 },
-      { id: "db", name: "东北仓", thru: 80, inv: 9.2 },
-      { id: "xn", name: "西南仓", thru: 102, inv: 13.1 },
-      { id: "hn", name: "华南仓", thru: 158, inv: 21.4 }
+      { id: "hd", name: "华东仓", thru: 246, inv: 31.0 },
+      { id: "hb", name: "华北仓", thru: 160, inv: 17.5 },
+      { id: "hz2", name: "华中仓", thru: 146, inv: 15.0 },
+      { id: "xb", name: "西北仓", thru: 76, inv: 10.0 },
+      { id: "db", name: "东北仓", thru: 48, inv: 10.0 },
+      { id: "xn", name: "西南仓", thru: 98, inv: 13.0 },
+      { id: "hn", name: "华南仓", thru: 128, inv: 21.5 }
     ],
     exits: [
       { id: "st", name: "线下门店", out: 372, sub: "3 240 家门店" },
@@ -536,26 +538,26 @@ ORIG-->
       { id: "pj", name: "工程渠道", out: 42, sub: "精装楼盘" },
       { id: "ex", name: "海外出口", out: 36, sub: "自产结余" }
     ],
-    /* 基地 → 仓：13 条干线（行和 = 基地产量，列和 = 仓吞吐） */
+    /* 基地 → 仓：3 × 7 = 21 条干线（逐格 = 物流运输页 RDCS.inb；行和 = 基地产量，列和 = 仓吞吐） */
     b2r: [
-      ["hz", "hd", 168], ["hz", "hb", 92], ["hz", "hz2", 76], ["hz", "xb", 48], ["hz", "db", 40],
-      ["wh", "hd", 56], ["wh", "hb", 41], ["wh", "hz2", 45], ["wh", "xn", 53], ["wh", "db", 40], ["wh", "xb", 36],
-      ["fs", "hn", 158], ["fs", "xn", 49]
+      ["hz", "hd", 150], ["hz", "hb", 78], ["hz", "hz2", 68], ["hz", "xb", 42], ["hz", "db", 26], ["hz", "xn", 46], ["hz", "hn", 44],
+      ["wh", "hd", 62], ["wh", "hb", 48], ["wh", "hz2", 40], ["wh", "xb", 22], ["wh", "db", 12], ["wh", "xn", 22], ["wh", "hn", 22],
+      ["fs", "hd", 34], ["fs", "hb", 34], ["fs", "hz2", 38], ["fs", "xb", 12], ["fs", "db", 10], ["fs", "xn", 30], ["fs", "hn", 62]
     ],
     /* 仓 → 出口：18 条（行和 = 仓吞吐，列和 = 出口量；出口走华东/华南港口，工程集中在华东/华中） */
     r2x: [
-      ["hd", "st", 81], ["hd", "ec", 99], ["hd", "pj", 24], ["hd", "ex", 20],
-      ["hb", "st", 60], ["hb", "ec", 73],
-      ["hz2", "st", 47], ["hz2", "ec", 56], ["hz2", "pj", 18],
-      ["xb", "st", 38], ["xb", "ec", 46],
-      ["db", "st", 36], ["db", "ec", 44],
-      ["xn", "st", 46], ["xn", "ec", 56],
-      ["hn", "st", 64], ["hn", "ec", 78], ["hn", "ex", 16]
+      ["hd", "st", 90], ["hd", "ec", 110], ["hd", "pj", 24], ["hd", "ex", 22],
+      ["hb", "st", 72], ["hb", "ec", 88],
+      ["hz2", "st", 58], ["hz2", "ec", 70], ["hz2", "pj", 18],
+      ["xb", "st", 34], ["xb", "ec", 42],
+      ["db", "st", 22], ["db", "ec", 26],
+      ["xn", "st", 44], ["xn", "ec", 54],
+      ["hn", "st", 52], ["hn", "ec", 62], ["hn", "ex", 14]
     ],
     odm: 96,                                        /* ODM 委外出口，不经自有仓网 */
     users: { install: 3227, member: 1860 },          /* 保有量（万台，与品质/售后页同源）/ 注册会员（万，与会员页同源） */
     rev: { onsite: 84.44, plant: 8.6, swap: 3.8 },   /* 万单，合计 96.84 = 保有量 × 故障率 3.0011%（与售后页同源） */
-    transit: 13.6,                                   /* 当前在途（万台，存量） */
+    transit: 12.6,                                   /* 当前在途（万台，存量，= 物流运输页 INTRANSIT 末月） */
     otd: 94.2, trunkOtd: 97.26, deliverOk: 99.1,     /* 时效：全链 / 干线（与物流运输页同源）/ 末端妥投 */
     yoyProd: 7.8, yoySale: 8.4
   };
@@ -569,7 +571,7 @@ ORIG-->
   const tickets = D.rev.onsite + D.rev.plant + D.rev.swap;              /* 96.8 */
   const revBack = D.rev.plant + D.rev.swap;                             /* 12.4 逆向物流 */
   const backRate = revBack / domTotal * 100;                            /* 返厂率 ≈ 1.43% */
-  const turnDays = invTotal / (domTotal / 365);                         /* 周转天数 ≈ 49.7 */
+  const turnDays = invTotal / (domTotal / 365);                         /* 期末存销比 ≈ 49.7 天（驾驶舱 44.0 为年均口径） */
 
   /* ===== 4. 头部与时钟 ===== */
   const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
@@ -587,7 +589,7 @@ ORIG-->
     { v: prodTotal, dec: 0, sub: "三基地合计 · 同比 <b class='ql-up'>▲ +" + fmtDec(D.yoyProd, 1) + "%</b>" },
     { v: domTotal, dec: 0, sub: "门店 372 · 电商 452 · 工程 42" },
     { v: expTotal, dec: 1, sub: "自产 " + expSelf + " + ODM 委外 " + D.odm + " 万台" },
-    { v: invTotal, dec: 1, sub: "周转 <b>" + fmtDec(turnDays, 1) + "</b> 天 · 目标 40 天" },
+    { v: invTotal, dec: 1, sub: "期末存销比 <b>" + fmtDec(turnDays, 1) + "</b> 天 · 七仓合计" },
     { v: D.otd, dec: 1, sub: "干线 " + fmtDec(D.trunkOtd, 2) + "% · 末端妥投 " + fmtDec(D.deliverOk, 1) + "%" },
     { v: backRate, dec: 2, sub: "返厂 " + fmtDec(D.rev.plant, 1) + " + 退换 " + fmtDec(D.rev.swap, 1) + " 万单" }
   ];
@@ -866,7 +868,7 @@ ORIG-->
     legend: {
       top: 0, right: 0, itemWidth: 12, itemHeight: 8,
       textStyle: { color: C.textDim, fontSize: 10.5 },
-      data: ["年吞吐", "周转天数"]
+      data: ["年吞吐", "存销比天数"]
     },
     xAxis: { type: "category", data: rdcNames, axisLabel: axisLabel, axisLine: { lineStyle: { color: C.grid } }, axisTick: { show: false } },
     yAxis: [
@@ -882,13 +884,13 @@ ORIG-->
         }
       },
       {
-        name: "周转天数", type: "line", yAxisIndex: 1, data: turnByRdc, smooth: true,
+        name: "存销比天数", type: "line", yAxisIndex: 1, data: turnByRdc, smooth: true,
         symbol: "circle", symbolSize: 6,
         lineStyle: { color: C.orange, width: 2 }, itemStyle: { color: C.orange },
         markLine: {
           symbol: "none", silent: true,
           lineStyle: { color: C.amber, type: "dashed", opacity: 0.7 },
-          label: { color: C.amber, fontSize: 10, formatter: "目标 40 天" },
+          label: { color: C.amber, fontSize: 10, formatter: "参考 40 天" },
           data: [{ yAxis: 40 }]
         }
       }
@@ -1030,6 +1032,10 @@ ORIG-->
     {
         "f": "大屏样板间-厨电用户会员运营1920.html",
         "t": "会员资产与复购表现"
+    },
+    {
+        "f": "大屏样板间-厨电智能物联运营1920.html",
+        "t": "在网设备、消息流与 OTA 拓扑"
     },
     {
         "f": "大屏样板间-厨电经营健康指数1920.html",
