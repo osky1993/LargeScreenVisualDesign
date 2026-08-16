@@ -1,0 +1,1499 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电单国家市场详情</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --gj-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 准入认证清单列宽（认证+市场 / 已获·应认 / 完成度 / 有效期至 / 状态） */
+    --gj-ccols: 1fr 74px 50px 62px 46px;
+    /* 邻国对比行列宽（序号 / 国名 / 条 / 金额 / 区域内占比） */
+    --gj-nbcols: 16px 74px 1fr 44px 40px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 =====
+         列：区域定位+结构 452 / 走势+竞争 1fr(952) / 认证+物流+本地化 452
+         行：顶栏 84 / 身份条 62 / KPI 108 / 国家切换器 40 / 主体 1fr(642) / 底部提示 46 */
+  .gj-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 62px 108px 40px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .gj-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .gj-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识占位） ===== */
+  .gj-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .gj-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .gj-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .gj-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .gj-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .gj-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .gj-crumb em { font-style: normal; color: #cfeae7; }
+  /* 返回上级：同目录相对路径回到「海外出口与全球布局」，暖橙描边与本页青主色区分 */
+  .gj-back {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 157, 69, 0.42);
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.16), rgba(14, 46, 50, 0.6));
+    color: #ffd9b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .gj-back:hover { color: #fff1e2; border-color: rgba(255, 157, 69, 0.9); box-shadow: 0 0 14px rgba(255, 157, 69, 0.4); }
+  .gj-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .gj-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .gj-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .gj-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .gj-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .gj-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .gj-chips { display: flex; align-items: center; gap: 9px; }
+  .gj-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .gj-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .gj-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .gj-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .gj-chip.is-key b { color: var(--mfg-cyan); }
+  .gj-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .gj-clock-time { font: 700 26px/1 var(--gj-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .gj-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 国别身份条（区域徽章 + 中英文名 + 所属区域 / 进入年份 / 主销线 / 承运港 / 排名） ===== */
+  .gj-idbar {
+    grid-column: 1 / -1; min-width: 0;
+    display: flex; align-items: center; gap: 16px; padding: 0 16px 0 12px;
+    border: 1px solid rgba(53, 224, 208, 0.34); border-radius: 12px;
+    background: linear-gradient(100deg, rgba(20, 66, 68, 0.72), rgba(14, 46, 50, 0.5) 46%, rgba(14, 46, 50, 0.5));
+    box-shadow: inset 0 0 22px rgba(53, 224, 208, 0.07);
+  }
+  /* 区域徽章（取代国旗图片：全页零外部资源，颜色 = 该国所属区域色） */
+  .gj-seal {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    color: #04191a; box-shadow: 0 0 16px -2px rgba(0, 0, 0, 0.5);
+  }
+  .gj-seal b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; }
+  .gj-seal i { font-style: normal; font-size: 8.5px; letter-spacing: 0.08em; opacity: 0.72; }
+  .gj-id-name { flex: none; display: flex; flex-direction: column; gap: 3px; min-width: 156px; }
+  .gj-id-name b { font-size: 20px; font-weight: 700; letter-spacing: 0.1em; color: #eafcfa; }
+  .gj-id-name span { font-size: 11px; letter-spacing: 0.14em; color: rgba(127, 166, 163, 0.9); font-variant-numeric: tabular-nums; }
+  .gj-id-fields { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0; }
+  .gj-id-f {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;
+    padding: 0 14px; border-left: 1px solid rgba(64, 196, 190, 0.18);
+  }
+  .gj-id-f span { font-size: 10.5px; letter-spacing: 0.14em; color: #5f8a87; white-space: nowrap; }
+  .gj-id-f b {
+    font-size: 14px; font-weight: 700; letter-spacing: 0.03em; color: #cfe9e6;
+    font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .gj-id-note {
+    flex: none; max-width: 448px; padding: 6px 12px 7px; border-radius: 9px;
+    border: 1px dashed rgba(255, 157, 69, 0.42); background: rgba(58, 32, 12, 0.35);
+    font-size: 12px; line-height: 1.5; color: #ffd9b0; font-variant-numeric: tabular-nums;
+  }
+  .gj-id-note b { font-weight: 700; color: #ffbd80; }
+  .gj-id-note i { font-style: normal; color: rgba(255, 217, 176, 0.62); }
+
+  /* ===== KPI 带（5 枚，随国家切换重算） ===== */
+  .gj-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .gj-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .gj-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .gj-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .gj-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .gj-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .gj-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .gj-kpi.is-warn .gj-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .gj-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .gj-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .gj-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .gj-kpi-val { font: 700 28px/1 var(--gj-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .gj-kpi.is-warn .gj-kpi-val { color: #ffd9b0; }
+  .gj-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .gj-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gj-kpi-sub b { font-weight: 700; }
+  .gj-up { color: var(--mfg-green); }
+  .gj-down { color: var(--mfg-red); }
+
+  /* ===== 国家切换器（重点出口国 13 个） ===== */
+  .gj-swbar {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 14px;
+  }
+  .gj-swbar-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #7fc0ba; }
+  .gj-switcher { flex: 1; min-width: 0; display: flex; align-items: stretch; gap: 6px; }
+  .gj-sw {
+    flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: center; gap: 5px;
+    padding: 5px 4px 6px; border-radius: 8px; cursor: pointer; user-select: none; font-family: inherit;
+    border: 1px solid rgba(64, 196, 190, 0.22); background: rgba(10, 38, 42, 0.55);
+    color: #bcdedb; white-space: nowrap; overflow: hidden;
+    transition: color .18s, border-color .18s, background .18s, box-shadow .18s;
+  }
+  .gj-sw b { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; }
+  .gj-sw i { font-style: normal; font-size: 10px; color: rgba(127, 166, 163, 0.9); font-variant-numeric: tabular-nums; }
+  .gj-sw:hover { color: #eafcfa; border-color: rgba(53, 224, 208, 0.6); }
+  .gj-sw.is-on { color: #04191a; border-color: transparent; box-shadow: 0 0 15px rgba(0, 0, 0, 0.3); }
+  .gj-sw.is-on i { color: rgba(4, 25, 26, 0.72); }
+  .gj-swbar-state { flex: none; font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .gj-swbar-state b { font-weight: 700; color: var(--mfg-cyan); }
+  .gj-swbar-state i { font-style: normal; color: rgba(127, 166, 163, 0.4); margin: 0 7px; }
+
+  /* ===== 面板骨架 ===== */
+  .gj-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .gj-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .gj-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .gj-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .gj-panel-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; white-space: nowrap; }
+  .gj-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .gj-panel-tag { font-size: 11.5px; letter-spacing: 0.05em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+  .gj-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .gj-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 区域定位条 + 同区邻国对比（取代世界地图；固定高度，JS 重填不改布局） ===== */
+  .gj-locate { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 8px; }
+  .gj-regstrip { flex: none; display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+  .gj-reg {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    height: 34px; border-radius: 7px; cursor: default;
+    border: 1px solid rgba(64, 196, 190, 0.2); background: rgba(10, 38, 42, 0.5);
+    transition: border-color .22s, background .22s;
+  }
+  .gj-reg span { font-size: 10.5px; letter-spacing: 0.02em; color: #9fc4c0; white-space: nowrap; }
+  .gj-reg b { font: 700 11px/1 var(--gj-mono); color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .gj-reg.is-on { border-color: transparent; }
+  .gj-reg.is-on span, .gj-reg.is-on b { color: #04191a; }
+  .gj-nblist { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 1px; }
+  .gj-nb {
+    display: grid; grid-template-columns: var(--gj-nbcols); align-items: center; gap: 6px;
+    height: 18px; padding: 0 5px; border-radius: 4px; cursor: pointer;
+    font-size: 11px; color: #b6d8d4; font-variant-numeric: tabular-nums;
+    transition: background .2s;
+  }
+  .gj-nb:hover { background: rgba(53, 224, 208, 0.12); }
+  .gj-nb.is-on { background: rgba(53, 224, 208, 0.18); box-shadow: inset 0 0 0 1px rgba(53, 224, 208, 0.55); }
+  .gj-nb.is-on em { color: #eafcfa; }
+  .gj-nb.is-off { cursor: default; opacity: 0.72; }
+  .gj-nb.is-off:hover { background: transparent; }
+  .gj-nb u { font: 700 9.5px/1 var(--gj-mono); text-decoration: none; color: rgba(127, 166, 163, 0.7); }
+  .gj-nb em { font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gj-nb .gj-nbar { height: 6px; border-radius: 3px; background: rgba(64, 196, 190, 0.16); overflow: hidden; }
+  .gj-nb .gj-nbar > s { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .gj-nb .gj-namt { text-align: right; color: #d6efec; }
+  .gj-nb .gj-nshr { text-align: right; color: rgba(127, 166, 163, 0.85); }
+
+  /* ===== 渠道结构（固定高度：堆叠条 + 四行图例，纯 DOM） ===== */
+  .gj-chan { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 9px; }
+  .gj-chanbar { flex: none; display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid rgba(64, 196, 190, 0.22); }
+  .gj-chanbar > u {
+    display: flex; align-items: center; justify-content: center; text-decoration: none;
+    font: 700 11px/1 var(--gj-mono); color: #04191a; white-space: nowrap; overflow: hidden;
+    transition: flex-grow .5s ease;
+  }
+  .gj-chanlist { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 26px; gap: 4px 8px; align-content: start; }
+  .gj-chanf {
+    display: flex; align-items: center; gap: 7px; padding: 0 8px; height: 26px; border-radius: 5px;
+    background: rgba(24, 72, 74, 0.28); font-variant-numeric: tabular-nums;
+  }
+  .gj-chanf > s { flex: none; width: 8px; height: 8px; border-radius: 2px; text-decoration: none; }
+  .gj-chanf span { flex: 1; min-width: 0; font-size: 11.5px; color: rgba(127, 166, 163, 0.95); white-space: nowrap; }
+  .gj-chanf b { font-size: 12px; font-weight: 700; color: #d6efec; white-space: nowrap; }
+  .gj-chanf i { font-style: normal; font-size: 10.5px; color: rgba(127, 166, 163, 0.8); }
+
+  /* ===== CSS grid 模拟表格（准入认证清单） ===== */
+  .gj-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .gj-thead, .gj-tbody li {
+    display: grid; grid-template-columns: var(--gj-ccols); align-items: center; gap: 6px;
+  }
+  .gj-thead {
+    flex: none; padding: 4px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.06em; color: #7fc0ba;
+  }
+  .gj-thead span:not(:first-child), .gj-tbody li span:not(:first-child) { text-align: right; }
+  .gj-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .gj-tbody li {
+    padding: 0 8px; height: 32px; border-radius: 5px;
+    font-size: 12px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .gj-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .gj-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .gj-tbody li b { font-weight: 700; color: #eafcfa; }
+  .gj-tbody li .gj-cname { text-align: left; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  .gj-tbody li .gj-cname i { font-style: normal; font-size: 10.5px; color: rgba(127, 166, 163, 0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gj-tfoot {
+    flex: none; margin-top: 4px; padding: 4px 8px; border-radius: 5px;
+    background: rgba(20, 66, 68, 0.5); border: 1px dashed rgba(64, 196, 190, 0.28);
+    font-size: 11.5px; color: #b6d8d4; font-variant-numeric: tabular-nums;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; white-space: nowrap;
+  }
+  .gj-tfoot b { font-weight: 700; color: var(--mfg-cyan); }
+  .gj-badge {
+    justify-self: end; padding: 1px 6px 2px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; color: #04191a;
+  }
+  .gj-badge.is-good { background: var(--mfg-green); }
+  .gj-badge.is-mid { background: var(--mfg-amber); }
+  .gj-badge.is-bad { background: var(--mfg-red); }
+  .gj-badge.is-info { background: var(--mfg-blue); }
+
+  /* ===== 物流时效（固定高度：路由行 + 三段条 + 门到门合计） ===== */
+  .gj-logi { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
+  .gj-route {
+    flex: none; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px;
+    border-radius: 7px; background: rgba(24, 72, 74, 0.32); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 12px; color: #cbe6e3; white-space: nowrap; overflow: hidden;
+  }
+  .gj-route b { font-weight: 700; color: #eafcfa; }
+  .gj-route i { font-style: normal; color: var(--mfg-orange); font-size: 13px; }
+  .gj-route .gj-wh {
+    margin-left: auto; flex: none; padding: 1px 7px 2px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; color: #04191a; background: var(--mfg-cyan);
+  }
+  .gj-route .gj-wh.is-none { color: #9fc4c0; background: transparent; border: 1px dashed rgba(127, 166, 163, 0.5); }
+  .gj-leg {
+    flex: none; display: grid; grid-template-columns: 68px 1fr 60px; align-items: center; gap: 8px; height: 24px;
+    font-size: 11.5px; color: rgba(127, 166, 163, 0.95); font-variant-numeric: tabular-nums;
+  }
+  .gj-leg .gj-legbar { height: 9px; border-radius: 4px; background: rgba(64, 196, 190, 0.14); overflow: hidden; }
+  .gj-leg .gj-legbar > s { display: block; height: 100%; border-radius: 4px; text-decoration: none; transition: width .5s ease; }
+  .gj-leg em { font-style: normal; text-align: right; color: #d6efec; font-weight: 700; }
+  .gj-legtot {
+    flex: none; margin-top: 2px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 3px 9px; border-radius: 5px; background: rgba(20, 66, 68, 0.5);
+    border: 1px dashed rgba(64, 196, 190, 0.28);
+    font-size: 11.5px; color: #b6d8d4; white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .gj-legtot b { font-weight: 700; color: var(--mfg-cyan); }
+
+  /* ===== 本地化事项（固定高度：2 列字段网格 + 一行备注） ===== */
+  .gj-local { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
+  .gj-locgrid { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 29px; gap: 6px 8px; align-content: start; }
+  .gj-locf {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+    padding: 0 8px; height: 29px; border-radius: 5px; background: rgba(24, 72, 74, 0.28);
+    font-variant-numeric: tabular-nums;
+  }
+  .gj-locf span { flex: none; font-size: 11px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; }
+  .gj-locf b { font-size: 12.5px; font-weight: 700; color: #d6efec; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gj-locnote {
+    flex: none; padding: 3px 9px 4px; border-radius: 5px; font-size: 11px; line-height: 1.3;
+    color: #ffd9b0; background: rgba(58, 32, 12, 0.32); border: 1px dashed rgba(255, 157, 69, 0.38);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .gj-locnote b { font-weight: 700; color: #ffbd80; }
+
+  /* ===== 底部提示滚动条 ===== */
+  .gj-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .gj-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .gj-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: gj-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes gj-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .gj-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .gj-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .gj-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .gj-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .gj-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .gj-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="gj-stage" id="gj-stage">
+    <!-- mockflag:begin --><div class="gj-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="gj-error" id="gj-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识占位） -->
+    <header class="gj-header">
+      <div class="gj-head-left">
+        <div class="gj-crumb">
+          <a class="gj-back" href="大屏样板间-厨电海外出口与全球布局1920.html" title="返回上级专题页：海外出口与全球布局（Esc）">‹ 返回 海外出口与全球布局</a>
+          <b>云麓厨电</b><i>›</i><span>海外出口与全球布局</span><i>›</i><em id="gj-crumb-obj">--</em>
+        </div>
+        <div class="gj-head-title-row">
+          <div class="gj-head-title">单国家市场详情</div>
+          <div class="gj-head-meta">
+            <span>重点出口国 <b id="gj-meta-focus">--</b> / 覆盖 <b id="gj-meta-total">--</b> 国</span><i>|</i>
+            <span><b>6</b> 大区域 · <b>6</b> 条产品线</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="gj-head-right">
+        <div class="gj-chips">
+          <div class="gj-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="gj-chip is-key"><span>EXPORT / YEAR</span><b id="gj-chip-exp">--</b></div>
+        </div>
+        <div class="gj-clock" aria-label="实时时钟">
+          <span class="gj-clock-time" id="gj-clock-time">--:--:--</span>
+          <span class="gj-clock-date" id="gj-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 国别身份条 -->
+    <div class="gj-idbar" id="gj-idbar"></div>
+
+    <!-- KPI 带（随国家切换重算） -->
+    <div class="gj-band" id="gj-band"></div>
+
+    <!-- 国家切换器 -->
+    <div class="gj-swbar">
+      <span class="gj-swbar-tag">国家切换</span>
+      <div class="gj-switcher" id="gj-switcher" aria-label="重点出口国切换"></div>
+      <div class="gj-swbar-state" id="gj-sw-state">--</div>
+    </div>
+
+    <!-- 左栏：区域定位 + 产品线结构 + 渠道结构 -->
+    <div class="gj-col">
+      <section class="gj-panel" style="flex: none; height: 210px;">
+        <div class="gj-panel-head">
+          <h2>区域定位与邻国对比</h2>
+          <span class="gj-panel-tag" id="gj-loc-tag">--</span>
+        </div>
+        <div class="gj-locate">
+          <div class="gj-regstrip" id="gj-regstrip"></div>
+          <div class="gj-nblist" id="gj-nblist"></div>
+        </div>
+      </section>
+      <section class="gj-panel" style="flex: 1;">
+        <div class="gj-panel-head">
+          <h2>产品线出口额构成</h2>
+          <span class="gj-panel-tag" id="gj-line-tag">--</span>
+        </div>
+        <div class="gj-chart" id="gj-chart-line"></div>
+      </section>
+      <section class="gj-panel" style="flex: none; height: 152px;">
+        <div class="gj-panel-head">
+          <h2>渠道结构</h2>
+          <span class="gj-panel-tag" id="gj-chan-tag">--</span>
+        </div>
+        <div class="gj-chan">
+          <div class="gj-chanbar" id="gj-chanbar"></div>
+          <div class="gj-chanlist" id="gj-chanlist"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中栏：24 月出口额走势 + 价格带竞争定位 -->
+    <div class="gj-col">
+      <section class="gj-panel" style="flex: 1.04;">
+        <div class="gj-panel-head">
+          <h2>出口额 24 个月走势与同比</h2>
+          <span class="gj-panel-tag" id="gj-mon-tag">--</span>
+        </div>
+        <div class="gj-chart" id="gj-chart-month"></div>
+      </section>
+      <section class="gj-panel" style="flex: 1;">
+        <div class="gj-panel-head">
+          <h2>价格带与竞争定位</h2>
+          <span class="gj-panel-tag" id="gj-comp-tag">--</span>
+        </div>
+        <div class="gj-chart" id="gj-chart-comp"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：准入认证 + 物流时效 + 本地化事项 -->
+    <div class="gj-col">
+      <section class="gj-panel" style="flex: none; height: 244px;">
+        <div class="gj-panel-head">
+          <h2>准入认证清单</h2>
+          <span class="gj-panel-tag" id="gj-cert-tag">--</span>
+        </div>
+        <div class="gj-table">
+          <div class="gj-thead">
+            <span>认证 / 适用市场</span><span>已获 / 应认</span><span>完成度</span><span>有效期至</span><span>状态</span>
+          </div>
+          <ul class="gj-tbody" id="gj-cert-body"></ul>
+          <div class="gj-tfoot" id="gj-cert-foot">--</div>
+        </div>
+      </section>
+      <section class="gj-panel" style="flex: none; height: 190px;">
+        <div class="gj-panel-head">
+          <h2>物流时效</h2>
+          <span class="gj-panel-tag" id="gj-logi-tag">--</span>
+        </div>
+        <div class="gj-logi">
+          <div class="gj-route" id="gj-route"></div>
+          <div id="gj-legs"></div>
+          <div class="gj-legtot" id="gj-legtot">--</div>
+        </div>
+      </section>
+      <section class="gj-panel" style="flex: 1;">
+        <div class="gj-panel-head">
+          <h2>本地化事项</h2>
+          <span class="gj-panel-tag" id="gj-local-tag">--</span>
+        </div>
+        <div class="gj-local">
+          <div class="gj-locgrid" id="gj-locgrid"></div>
+          <div class="gj-locnote" id="gj-locnote">--</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部提示滚动条 -->
+    <div class="gj-foot">
+      <div class="gj-foot-tag">市场提示</div>
+      <div class="gj-foot-view"><div class="gj-foot-track" id="gj-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("gj-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("gj-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  const PARENT = "大屏样板间-厨电海外出口与全球布局1920.html";
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const arrow = (v) => (v >= 0 ? "▲" : "▼");
+  const esc = (s) => String(s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+
+  /* =====================================================================
+     4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+
+     ★★ 口径分离（与上级页一字不差，别改坏）：
+        全系列收敛的「年营收 112.6 亿」是**内销口径**，出口是内销之外的独立口径：
+            集团总营收 = 内销 112.6 亿 + 出口 26.30 亿 = 138.90 亿
+        本页凡出现 112.6，含义一律仍是内销。年产量 902 万台 / 内销年销量 866 万台只读不改。
+
+     ★ 4.1~4.4 全部**逐字复制自上级页**「海外出口与全球布局」，是本页与上级页的同源锚：
+        六产品线 × 六区域出口额矩阵 / 六大区域出口量与同比 / 三大出海港口 / 27 国名单。
+        本页只做「取子集 + 往下拆」，不修改任何一个上级数字。
+     ===================================================================== */
+
+  const DOMESTIC_REV = 112.6;      /* 内销年营收（亿元）—— 全系列基准，本页只引用 */
+  const CAP_OUTPUT = 902;          /* 三大基地年产量（万台）—— 只引用 */
+  const CAP_DOMESTIC_SALES = 866;  /* 内销年销量（万台）—— 只引用 */
+
+  /* 4.1 六产品线 × 六区域出口额矩阵（亿元）——与上级页同源，列和 = 区域出口额，总和 = 年出口额 */
+  const LINE_NAMES = ["吸油烟机", "燃气灶具", "洗碗机", "蒸烤一体机", "集成灶", "净水热水"];
+  const REGION_NAMES = ["东南亚", "中东", "欧洲", "北美", "拉美", "非洲及大洋洲"];
+  const REGION_SHORT = ["东南亚", "中东", "欧洲", "北美", "拉美", "非洲大洋"];
+  const MATRIX = [
+    /*            东南亚  中东  欧洲  北美  拉美  非洲及大洋洲 */
+    /* 吸油烟机 */ [1.42, 0.86, 1.24, 0.72, 0.48, 0.32],
+    /* 燃气灶具 */ [1.18, 0.94, 0.66, 0.38, 0.52, 0.44],
+    /* 洗碗机   */ [0.62, 0.48, 1.86, 1.42, 0.34, 0.14],
+    /* 蒸烤一体 */ [0.54, 0.36, 1.32, 1.08, 0.26, 0.10],
+    /* 集成灶   */ [1.06, 0.52, 0.88, 0.46, 0.38, 0.18],
+    /* 净水热水 */ [1.64, 1.32, 0.74, 0.42, 0.56, 0.46]
+  ];
+
+  /* 4.2 六大区域出口量（万台）与同比（%）——与上级页同源；出口额由矩阵列和现算 */
+  const REGION_META = [
+    { name: "东南亚",       qty: 38.6, yoy: 22.4, color: C.cyan },
+    { name: "中东",         qty: 24.2, yoy: 26.8, color: C.orange },
+    { name: "欧洲",         qty: 26.4, yoy: 12.6, color: C.blue },
+    { name: "北美",         qty: 15.8, yoy:  8.4, color: C.green },
+    { name: "拉美",         qty: 14.6, yoy: 19.2, color: C.amber },
+    { name: "非洲及大洋洲", qty: 12.4, yoy: 31.5, color: C.violet }
+  ];
+
+  /* 4.3 三大出海港口（对应三大基地）——与上级页同源 */
+  const PORTS = [
+    { name: "宁波舟山港", base: "杭州临平基地" },
+    { name: "上海洋山港", base: "安徽芜湖基地" },
+    { name: "深圳盐田港", base: "广东佛山基地" }
+  ];
+
+  /* 4.4 27 个出口市场（cn 中文名 / en 英文名 / r 区域索引 / p 承运港口索引 / amt 亿元）
+         —— 与上级页同源，各区之和 = 区域出口额（自检 2 逐区校验）。 */
+  const COUNTRIES = [
+    /* 东南亚 —— 深圳盐田港 */
+    { cn: "越南",       en: "Vietnam",              r: 0, p: 2, amt: 1.62 },
+    { cn: "泰国",       en: "Thailand",             r: 0, p: 2, amt: 1.38 },
+    { cn: "马来西亚",   en: "Malaysia",             r: 0, p: 2, amt: 1.24 },
+    { cn: "印度尼西亚", en: "Indonesia",            r: 0, p: 2, amt: 1.06 },
+    { cn: "菲律宾",     en: "Philippines",          r: 0, p: 2, amt: 0.66 },
+    { cn: "新加坡",     en: "Singapore",            r: 0, p: 2, amt: 0.50 },
+    /* 中东 —— 深圳盐田港 */
+    { cn: "沙特阿拉伯", en: "Saudi Arabia",         r: 1, p: 2, amt: 1.62 },
+    { cn: "阿联酋",     en: "United Arab Emirates", r: 1, p: 2, amt: 1.34 },
+    { cn: "土耳其",     en: "Turkey",               r: 1, p: 2, amt: 1.02 },
+    { cn: "卡塔尔",     en: "Qatar",                r: 1, p: 2, amt: 0.50 },
+    /* 欧洲 —— 宁波舟山港 */
+    { cn: "德国",       en: "Germany",              r: 2, p: 0, amt: 1.72 },
+    { cn: "法国",       en: "France",               r: 2, p: 0, amt: 1.24 },
+    { cn: "意大利",     en: "Italy",                r: 2, p: 0, amt: 1.08 },
+    { cn: "西班牙",     en: "Spain",                r: 2, p: 0, amt: 0.92 },
+    { cn: "俄罗斯",     en: "Russia",               r: 2, p: 0, amt: 0.88 },
+    { cn: "波兰",       en: "Poland",               r: 2, p: 0, amt: 0.86 },
+    /* 北美 —— 上海洋山港 */
+    { cn: "美国",       en: "United States",        r: 3, p: 1, amt: 3.26 },
+    { cn: "加拿大",     en: "Canada",               r: 3, p: 1, amt: 0.78 },
+    { cn: "墨西哥",     en: "Mexico",               r: 3, p: 1, amt: 0.44 },
+    /* 拉美 —— 上海洋山港 */
+    { cn: "巴西",       en: "Brazil",               r: 4, p: 1, amt: 1.16 },
+    { cn: "智利",       en: "Chile",                r: 4, p: 1, amt: 0.62 },
+    { cn: "秘鲁",       en: "Peru",                 r: 4, p: 1, amt: 0.42 },
+    { cn: "哥伦比亚",   en: "Colombia",             r: 4, p: 1, amt: 0.34 },
+    /* 非洲及大洋洲 —— 深圳盐田港 */
+    { cn: "南非",       en: "South Africa",         r: 5, p: 2, amt: 0.54 },
+    { cn: "埃及",       en: "Egypt",                r: 5, p: 2, amt: 0.46 },
+    { cn: "尼日利亚",   en: "Nigeria",              r: 5, p: 2, amt: 0.36 },
+    { cn: "澳大利亚",   en: "Australia",            r: 5, p: 2, amt: 0.28 }
+  ];
+
+  /* 4.5 准入认证目录。
+         前 8 行 code/market/need/pass/wip **逐字来自上级页 CERTS**（src "同源"）；
+         后 10 行是本页作为二级详情往下拆出的国别补充项（src "明细"）。
+         need = pass + wip 逐行成立（自检 5 校验）。 */
+  const CERT_CATALOG = [
+    { code: "CE",       market: "欧盟 27 国",     need: 96,  pass: 92,  wip: 4, src: "同源" },
+    { code: "UL/ETL",   market: "美国 · 加拿大",  need: 68,  pass: 61,  wip: 7, src: "同源" },
+    { code: "CB",       market: "IECEE 互认",     need: 84,  pass: 79,  wip: 5, src: "同源" },
+    { code: "SASO",     market: "沙特阿拉伯",     need: 42,  pass: 36,  wip: 6, src: "同源" },
+    { code: "G-Mark",   market: "海湾六国",       need: 38,  pass: 35,  wip: 3, src: "同源" },
+    { code: "SIRIM",    market: "马来西亚",       need: 34,  pass: 32,  wip: 2, src: "同源" },
+    { code: "SNI",      market: "印度尼西亚",     need: 28,  pass: 22,  wip: 6, src: "同源" },
+    { code: "INMETRO",  market: "巴西",           need: 26,  pass: 20,  wip: 6, src: "同源" },
+    { code: "QCVN",     market: "越南强制",       need: 32,  pass: 28,  wip: 4, src: "明细" },
+    { code: "TISI",     market: "泰国工标",       need: 30,  pass: 27,  wip: 3, src: "明细" },
+    { code: "TSE",      market: "土耳其标准",     need: 24,  pass: 21,  wip: 3, src: "明细" },
+    { code: "NRCS",     market: "南非强制",       need: 22,  pass: 17,  wip: 5, src: "明细" },
+    { code: "SABS",     market: "南非质量",       need: 18,  pass: 15,  wip: 3, src: "明细" },
+    { code: "RoHS",     market: "全球环保指令",   need: 108, pass: 104, wip: 4, src: "明细" },
+    { code: "ErP",      market: "欧盟能效标签",   need: 64,  pass: 60,  wip: 4, src: "明细" },
+    { code: "DOE",      market: "美国能效",       need: 46,  pass: 41,  wip: 5, src: "明细" },
+    { code: "MEPS",     market: "马来 · 澳洲能效", need: 26, pass: 24,  wip: 2, src: "明细" },
+    { code: "ENERGY",   market: "目的国能效标识", need: 58,  pass: 50,  wip: 8, src: "明细" }
+  ];
+
+  /* 4.6 八座海外仓的**所在国**（与上级页 WAREHOUSES 同源，本页只取国别与仓名） */
+  const WAREHOUSE_BY_CN = {
+    "马来西亚": "巴生海外仓",
+    "泰国": "林查班海外仓",
+    "阿联酋": "杰贝阿里海外仓",
+    "德国": "汉堡海外仓",
+    "波兰": "格但斯克海外仓",
+    "美国": "洛杉矶 + 萨凡纳海外仓",
+    "巴西": "桑托斯海外仓"
+  };
+
+  /* 4.7 出口额月度权重（与上级页同源，确定性，不用 Math.random）。
+         权重只定形状，最后按该国年出口额等比缩放，故「近 12 月之和 = 该国年出口额」恒成立。 */
+  const MONTH_W = [1.62, 1.71, 1.86, 1.94, 2.08, 2.16, 2.34, 2.42, 2.28, 2.46, 2.62, 2.71];
+
+  /* 4.8 重点出口国的**国别档案**（本页新增的二级明细，不改任何上级数字）。
+         cn 与 4.4 的 27 国名单对齐；amt 不在此重复，一律从 COUNTRIES 取。
+         asp 出口均价（元/台）· market 该国厨电市场规模（亿元）· yoy 出口额同比（%）
+         since 进入年份 · sea 海运天 · clear 清关天 · last 末端配送天
+         volt 电压频率 · plug 插头制式 · lang 界面与说明书语言 · svc 授权售后网点（个）
+         dport 目的港 · certs 该国适用认证（对应 4.5 的 code） */
+  const FOCUS_META = [
+    { cn: "美国",       since: 2012, asp: 2860, market: 420, yoy:  8.4, sea: 16, clear: 3.5, last: 4.0,
+      volt: "120V / 60Hz", plug: "A / B 型", lang: "英语 + 西班牙语", svc: 118, dport: "洛杉矶港",
+      certs: ["CB", "UL/ETL", "DOE", "RoHS"] },
+    { cn: "德国",       since: 2011, asp: 2680, market: 186, yoy: 11.4, sea: 32, clear: 2.0, last: 2.0,
+      volt: "230V / 50Hz", plug: "F 型 Schuko", lang: "德语 + 英语", svc: 52, dport: "汉堡港",
+      certs: ["CB", "CE", "ErP", "RoHS"] },
+    { cn: "沙特阿拉伯", since: 2016, asp: 1880, market:  62, yoy: 28.4, sea: 18, clear: 5.0, last: 4.0,
+      volt: "220V / 60Hz", plug: "G / A 型", lang: "阿拉伯语 + 英语", svc: 46, dport: "吉达港",
+      certs: ["CB", "SASO", "G-Mark", "RoHS"] },
+    { cn: "越南",       since: 2013, asp: 1620, market:  48, yoy: 24.6, sea:  5, clear: 2.5, last: 3.5,
+      volt: "220V / 50Hz", plug: "A / C 型", lang: "越南语 + 英语", svc: 86, dport: "胡志明港",
+      certs: ["CB", "QCVN", "ENERGY", "RoHS"] },
+    { cn: "泰国",       since: 2014, asp: 1710, market:  56, yoy: 21.2, sea:  6, clear: 3.0, last: 3.0,
+      volt: "220V / 50Hz", plug: "A / B / C 型", lang: "泰语 + 英语", svc: 72, dport: "林查班港",
+      certs: ["CB", "TISI", "ENERGY", "RoHS"] },
+    { cn: "阿联酋",     since: 2015, asp: 1960, market:  38, yoy: 25.6, sea: 17, clear: 3.0, last: 2.5,
+      volt: "220V / 50Hz", plug: "G 型", lang: "阿拉伯语 + 英语", svc: 34, dport: "杰贝阿里港",
+      certs: ["CB", "G-Mark", "ENERGY", "RoHS"] },
+    { cn: "马来西亚",   since: 2012, asp: 1780, market:  42, yoy: 23.8, sea:  6, clear: 2.0, last: 2.5,
+      volt: "240V / 50Hz", plug: "G 型", lang: "马来语 + 英语 + 中文", svc: 64, dport: "巴生港",
+      certs: ["CB", "SIRIM", "MEPS", "RoHS"] },
+    { cn: "法国",       since: 2013, asp: 2540, market: 152, yoy: 13.8, sea: 33, clear: 2.5, last: 2.5,
+      volt: "230V / 50Hz", plug: "E 型", lang: "法语", svc: 41, dport: "勒阿弗尔港",
+      certs: ["CB", "CE", "ErP", "RoHS"] },
+    { cn: "巴西",       since: 2016, asp: 1780, market:  96, yoy: 19.2, sea: 38, clear: 8.0, last: 5.5,
+      volt: "127V / 220V 双压", plug: "N 型（巴标）", lang: "葡萄牙语", svc: 44, dport: "桑托斯港",
+      certs: ["CB", "INMETRO", "ENERGY", "RoHS"] },
+    { cn: "意大利",     since: 2014, asp: 2460, market: 128, yoy: 12.2, sea: 30, clear: 3.0, last: 2.5,
+      volt: "230V / 50Hz", plug: "L / F 型", lang: "意大利语", svc: 36, dport: "热那亚港",
+      certs: ["CB", "CE", "ErP", "RoHS"] },
+    { cn: "印度尼西亚", since: 2015, asp: 1540, market:  68, yoy: 19.6, sea:  7, clear: 4.0, last: 4.5,
+      volt: "220V / 50Hz", plug: "C / F 型", lang: "印尼语", svc: 58, dport: "丹戎不碌港",
+      certs: ["CB", "SNI", "ENERGY", "RoHS"] },
+    { cn: "土耳其",     since: 2017, asp: 1720, market:  74, yoy: 24.2, sea: 24, clear: 4.5, last: 3.5,
+      volt: "230V / 50Hz", plug: "C / F 型", lang: "土耳其语", svc: 38, dport: "伊斯坦布尔港",
+      certs: ["CB", "CE", "TSE", "RoHS"] },
+    { cn: "南非",       since: 2018, asp: 1360, market:  34, yoy: 33.6, sea: 26, clear: 6.0, last: 5.0,
+      volt: "230V / 50Hz", plug: "M / D 型", lang: "英语 + 南非荷兰语", svc: 22, dport: "德班港",
+      certs: ["CB", "NRCS", "SABS", "RoHS"] }
+  ];
+
+  /* 4.9 渠道基准权重（按区域，只定形状，最后归一化 × 该国出口额） */
+  const CHANNELS = [
+    { name: "经销分销", color: C.cyan },
+    { name: "KA 连锁",  color: C.blue },
+    { name: "本地电商", color: C.violet },
+    { name: "工程集采", color: C.amber }
+  ];
+  const CH_BASE = [
+    [0.46, 0.18, 0.26, 0.10],   /* 东南亚 */
+    [0.52, 0.22, 0.14, 0.12],   /* 中东 */
+    [0.30, 0.34, 0.28, 0.08],   /* 欧洲 */
+    [0.24, 0.38, 0.32, 0.06],   /* 北美 */
+    [0.48, 0.20, 0.22, 0.10],   /* 拉美 */
+    [0.56, 0.16, 0.18, 0.10]    /* 非洲及大洋洲 */
+  ];
+
+  /* 4.10 竞争对手档位（价格系数 pf 相对本品均价、份额基数 sb），名称按国别套模板 */
+  const RIVAL_TPL = [
+    { key: "欧美高端 A", pf: 1.68, sb:  8.6, color: C.violet },
+    { key: "日韩合资 B", pf: 1.32, sb:  6.4, color: C.blue },
+    { key: "本土龙头 C", pf: 0.82, sb: 14.2, color: C.orange },
+    { key: "中国同业 D", pf: 0.94, sb:  5.2, color: C.green },
+    { key: "本地白牌 E", pf: 0.58, sb:  9.4, color: C.amber }
+  ];
+
+  /* =====================================================================
+     5. 派生量：全部现算，页面上不出现任何硬编码的合计值
+     ===================================================================== */
+  const D = {};
+
+  /* 产品线出口额 = 矩阵行和；区域出口额 = 矩阵列和 */
+  const LINES = LINE_NAMES.map((name, i) => ({
+    name: name, idx: i, amt: sum(MATRIX[i]), color: C.series[i % C.series.length]
+  }));
+  const REGIONS = REGION_META.map((m, j) => ({
+    name: m.name, short: REGION_SHORT[j], idx: j, qty: m.qty, yoy: m.yoy, color: m.color,
+    amt: sum(MATRIX.map((row) => row[j]))
+  }));
+
+  D.expAmt = sum(REGIONS.map((r) => r.amt));            /* 年出口额（亿元） = 矩阵总和 = 26.30 */
+  D.expQty = sum(REGIONS.map((r) => r.qty));            /* 年出口量（万台） = 132.0 */
+  D.groupRev = DOMESTIC_REV + D.expAmt;                 /* 集团总营收 = 内销 + 出口 = 138.90 */
+  D.expShare = D.expAmt / D.groupRev * 100;             /* 出口占集团总营收 ≈ 18.93% */
+  D.cntN = COUNTRIES.length;                            /* 覆盖 27 国 */
+  REGIONS.forEach((r) => { r.share = r.amt / D.expAmt * 100; });
+
+  /* 27 国：全球排名 / 区域内排名 / 占集团出口比 —— 只放标量，不做对象回指 */
+  const byAmtDesc = (a, b) => b.amt - a.amt;
+  const rankAll = COUNTRIES.slice().sort(byAmtDesc).map((c) => c.cn);
+  COUNTRIES.forEach((c) => {
+    c.share = c.amt / D.expAmt * 100;
+    c.rankAll = rankAll.indexOf(c.cn) + 1;
+  });
+  REGIONS.forEach((r, j) => {
+    const inReg = COUNTRIES.filter((c) => c.r === j).sort(byAmtDesc);
+    r.members = inReg.map((c) => c.cn);                 /* ★ 只存名字数组，不存对象 */
+    r.regAmt = sum(inReg.map((c) => c.amt));
+    inReg.forEach((c, k) => { c.rankReg = k + 1; c.regN = inReg.length; c.regShare = c.amt / r.amt * 100; });
+  });
+  const cnIndex = {};
+  COUNTRIES.forEach((c, i) => { cnIndex[c.cn] = i; });
+  const enIndex = {};
+  COUNTRIES.forEach((c, i) => { enIndex[c.en] = i; });
+
+  /* 认证目录：完成度现算 + 按 code 建索引（值是索引数字，不是对象） */
+  const certIdx = {};
+  CERT_CATALOG.forEach((ct, i) => {
+    ct.rate = ct.pass / ct.need * 100;
+    certIdx[ct.code] = i;
+  });
+
+  /* ---- 重点出口国 FOCUS：把 4.8 的档案接到 4.4 的 27 国名单上 ---- */
+  const FOCUS = FOCUS_META.map((m, ci) => {
+    const base = COUNTRIES[cnIndex[m.cn]];
+    const f = {
+      ci: ci, cn: base.cn, en: base.en, r: base.r, p: base.p, amt: base.amt,
+      share: base.share, rankAll: base.rankAll, rankReg: base.rankReg, regN: base.regN, regShare: base.regShare,
+      since: m.since, asp: m.asp, market: m.market, yoy: m.yoy,
+      sea: m.sea, clear: m.clear, last: m.last,
+      volt: m.volt, plug: m.plug, lang: m.lang, svc: m.svc, dport: m.dport,
+      certs: m.certs.slice(),
+      port: PORTS[base.p].name, portBase: PORTS[base.p].base,
+      regName: REGIONS[base.r].name, regShort: REGIONS[base.r].short,
+      regColor: REGIONS[base.r].color, regYoy: REGIONS[base.r].yoy
+    };
+
+    /* 出口量（万台） = 出口额 ÷ 出口均价；门到门时效 = 三段之和 */
+    f.qty = f.amt * 1e8 / f.asp / 1e4;
+    f.lead = f.sea + f.clear + f.last;
+    /* 当地市占率 = 该国出口额 ÷ 该国厨电市场规模 */
+    f.msRate = f.amt / f.market * 100;
+    f.years = 2026 - f.since;
+    f.wh = WAREHOUSE_BY_CN[f.cn] || "";
+
+    /* 产品线结构：以该国所属区域的产品线构成为底，叠一层确定性国别偏好，归一化 × 该国出口额
+       —— 六项之和 = 该国出口额（自检 3 逐国校验） */
+    const lw = LINE_NAMES.map((_, i) => MATRIX[i][f.r] * (1 + 0.42 * Math.sin(ci * 1.11 + i * 1.9)));
+    const lwT = sum(lw);
+    f.lineAmt = lw.map((w) => w / lwT * f.amt);
+    f.lineShare = f.lineAmt.map((v) => v / f.amt * 100);
+    let li = 0;
+    f.lineAmt.forEach((v, i) => { if (v > f.lineAmt[li]) li = i; });
+    f.topLine = LINE_NAMES[li];
+    f.topLineShare = f.lineShare[li];
+
+    /* 渠道结构：区域基准 + 国别偏好，归一化 × 该国出口额（自检 4 逐国校验） */
+    const cw = CH_BASE[f.r].map((w, k) => w * (1 + 0.30 * Math.sin(ci * 0.87 + k * 2.3)));
+    const cwT = sum(cw);
+    f.chanAmt = cw.map((w) => w / cwT * f.amt);
+    f.chanShare = f.chanAmt.map((v) => v / f.amt * 100);
+    let chi = 0;
+    f.chanAmt.forEach((v, k) => { if (v > f.chanAmt[chi]) chi = k; });
+    f.topChan = CHANNELS[chi].name;
+    f.topChanShare = f.chanShare[chi];
+
+    /* 24 月出口额（万元）：后 12 月按 MONTH_W 缩放到年出口额；
+       前 12 月同样缩放到 年出口额 ÷ (1+同比)，故整段回推出的同比恒等于 f.yoy（自检 6） */
+    const wT = sum(MONTH_W);
+    const prevW = MONTH_W.map((w, i) => w * (1 + 0.08 * Math.sin(i * 0.9 + 1.4)));
+    const pT = sum(prevW);
+    const curTot = f.amt * 1e4;                       /* 亿元 → 万元 */
+    const prevTot = curTot / (1 + f.yoy / 100);
+    f.mCur = MONTH_W.map((w) => w / wT * curTot);
+    f.mPrev = prevW.map((w) => w / pT * prevTot);
+    f.mAll = f.mPrev.concat(f.mCur);
+    f.mYoy = f.mCur.map((v, i) => (v - f.mPrev[i]) / f.mPrev[i] * 100);
+    f.recent12 = sum(f.mCur);
+    f.prev12 = sum(f.mPrev);
+    f.yoyCalc = (f.recent12 - f.prev12) / f.prev12 * 100;
+    f.mPeak = Math.max.apply(null, f.mCur);
+
+    /* 认证：该国适用项的应认证 / 已获 / 在途与完成度（现算，不写死） */
+    f.ctNeed = sum(f.certs.map((code) => CERT_CATALOG[certIdx[code]].need));
+    f.ctPass = sum(f.certs.map((code) => CERT_CATALOG[certIdx[code]].pass));
+    f.ctWip = sum(f.certs.map((code) => CERT_CATALOG[certIdx[code]].wip));
+    f.ctRate = f.ctPass / f.ctNeed * 100;
+    /* 有效期：确定性生成（kiosk 常驻须每次一致），并现算距基准日 2026-07-31 的剩余月数 */
+    f.certRows = f.certs.map((code, k) => {
+      const ct = CERT_CATALOG[certIdx[code]];
+      const addM = 5 + ((ci * 7 + k * 5) % 26);        /* 距基准日 5 ~ 30 个月 */
+      const tot = 7 + addM;                            /* 基准月 = 2026-07 */
+      const yy = 2026 + Math.floor((tot - 1) / 12);
+      const mm = ((tot - 1) % 12) + 1;
+      const st = addM <= 8 ? { t: "临期", c: "is-mid" }
+               : ct.rate < 88 ? { t: "换证中", c: "is-bad" }
+               : ct.rate < 94 ? { t: "推进", c: "is-info" }
+               : { t: "有效", c: "is-good" };
+      return {
+        code: ct.code, market: ct.market, src: ct.src,
+        need: ct.need, pass: ct.pass, wip: ct.wip, rate: ct.rate,
+        due: yy + "-" + pad(mm), left: addM, badge: st.t, badgeCls: st.c
+      };
+    });
+    let cw2 = 0;
+    f.certRows.forEach((row, k) => { if (row.rate < f.certRows[cw2].rate) cw2 = k; });
+    f.ctWorst = f.certRows[cw2].code;
+    f.ctWorstRate = f.certRows[cw2].rate;
+
+    /* 竞争定位：本品 + 五档竞品（价格 = 本品均价 × 档位系数 × 确定性扰动） */
+    f.rivals = RIVAL_TPL.map((t, k) => ({
+      name: t.key === "本土龙头 C" ? (f.cn + "本土 C") : t.key,
+      color: t.color,
+      price: Math.round(f.asp * t.pf * (1 + 0.06 * Math.sin(ci * 1.3 + k * 2.1))),
+      share: t.sb * (1 + 0.18 * Math.sin(ci * 0.9 + k * 1.7))
+    }));
+    f.localLeader = f.rivals[2];
+    f.priceGap = (f.asp - f.localLeader.price) / f.localLeader.price * 100;
+    f.bandLo = Math.round(f.asp * 0.80);
+    f.bandHi = Math.round(f.asp * 1.36);
+    return f;
+  });
+
+  /* 重点国合计：必须 ≤ 集团年出口额（自检 1） */
+  D.fcN = FOCUS.length;
+  D.fcAmt = sum(FOCUS.map((f) => f.amt));
+  D.fcQty = sum(FOCUS.map((f) => f.qty));
+  D.fcShare = D.fcAmt / D.expAmt * 100;
+  D.fcLead = sum(FOCUS.map((f) => f.lead * f.amt)) / D.fcAmt;      /* 按出口额加权的门到门时效 */
+  D.fcCtRate = sum(FOCUS.map((f) => f.ctPass)) / sum(FOCUS.map((f) => f.ctNeed)) * 100;
+  D.leadMax = Math.max.apply(null, FOCUS.map((f) => f.lead));
+
+  /* ===== 6. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("gj-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("gj-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("gj-meta-focus").textContent = D.fcN;
+  $("gj-meta-total").textContent = D.cntN;
+
+  /* ===== 7. 24 个月标签（2024-08 ~ 2026-07，末月对齐期次 2026 年 7 月） ===== */
+  const MON_N = 24;
+  const MON_LABELS = Array.from({ length: MON_N }, (_, i) => {
+    const t = 8 + i;
+    const yy = 2024 + Math.floor((t - 1) / 12);
+    const mm = ((t - 1) % 12) + 1;
+    return String(yy).slice(2) + "/" + pad(mm);
+  });
+
+  /* ===== 8. 国家切换器（静态骨架先建好，随后只切 class，不改结构） ===== */
+  $("gj-switcher").innerHTML = FOCUS.map((f, i) => (
+    '<button class="gj-sw" type="button" data-i="' + i + '" title="' + esc(f.cn + " " + f.en) + '">' +
+      "<b>" + esc(f.cn) + "</b><i>" + fmtDec(f.amt, 2) + "</i>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.prototype.slice.call($("gj-switcher").children);
+
+  /* 区域定位条：6 个区域徽章（结构固定，只切 class 与配色） */
+  $("gj-regstrip").innerHTML = REGIONS.map((r, j) => (
+    '<div class="gj-reg" data-j="' + j + '"><span>' + esc(r.short) + "</span><b>" + fmtDec(r.amt, 2) + "</b></div>"
+  )).join("");
+  const regTabs = Array.prototype.slice.call($("gj-regstrip").children);
+
+  /* ===== 9. KPI 带：结构一次建好，切换时只改数值与副标题 ===== */
+  const KPI_DEFS = [
+    { icon: "￥", label: "该国年出口额", unit: "亿元", dec: 2 },
+    { icon: "▣", label: "该国年出口量", unit: "万台", dec: 2 },
+    { icon: "↗", label: "出口额同比",   unit: "%",    dec: 1 },
+    { icon: "◎", label: "当地市占率",   unit: "%",    dec: 2 },
+    { icon: "✓", label: "认证完成度",   unit: "%",    dec: 1 }
+  ];
+  $("gj-band").innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="gj-kpi" id="gj-kpi-box-' + i + '">' +
+      '<div class="gj-kpi-icon">' + k.icon + "</div>" +
+      '<div class="gj-kpi-main">' +
+        '<div class="gj-kpi-label">' + k.label + "</div>" +
+        '<div class="gj-kpi-num"><span class="gj-kpi-val" id="gj-kpi-' + i + '">0</span><span class="gj-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="gj-kpi-sub" id="gj-kpi-sub-' + i + '">--</div>' +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，0.9 秒收敛到目标值（★ 截图验证勾稽须等收敛后再判） */
+  const kpiTimers = [];
+  function countUp(i, target, dec) {
+    const el = $("gj-kpi-" + i);
+    const dur = 900, t0 = performance.now(), from = parseFloat(el.textContent) || 0;
+    if (kpiTimers[i]) cancelAnimationFrame(kpiTimers[i]);
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(from + (target - from) * e, dec);
+      if (p < 1) kpiTimers[i] = requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+
+  /* =====================================================================
+     10. DOM 渲染（★ 所有与图表同属 flex 容器的兄弟块要么固定高度、
+         要么在 echarts.init 之前先填一遍：本页三处 JS 填充块
+         「区域定位/邻国对比 206px」「渠道结构 152px」以及右栏三块
+         都写死了高度，加上 init 前先跑一次 renderDom，双保险。）
+     ===================================================================== */
+  const NBAR_W = 1;   /* 邻国条按区域内最大值归一 */
+
+  function renderDom(f) {
+    /* 10.1 面包屑 + 顶部 chip */
+    $("gj-crumb-obj").textContent = f.cn;
+    $("gj-chip-exp").textContent = fmtDec(f.amt, 2) + " 亿";
+
+    /* 10.2 身份条 */
+    $("gj-idbar").innerHTML =
+      '<div class="gj-seal" style="background:' + f.regColor + '"><b>' + esc(f.regShort.slice(0, 2)) + "</b><i>" + esc(String(f.rankAll).padStart(2, "0")) + "</i></div>" +
+      '<div class="gj-id-name"><b>' + esc(f.cn) + "</b><span>" + esc(f.en.toUpperCase()) + "</span></div>" +
+      '<div class="gj-id-fields">' +
+        '<div class="gj-id-f"><span>所属区域</span><b>' + esc(f.regName) + " · 区内第 " + f.rankReg + "/" + f.regN + "</b></div>" +
+        '<div class="gj-id-f"><span>进入年份</span><b>' + f.since + " 年 · 已运营 " + f.years + " 年</b></div>" +
+        '<div class="gj-id-f"><span>主销产品线</span><b>' + esc(f.topLine) + " · 占 " + fmtDec(f.topLineShare, 1) + "%</b></div>" +
+        '<div class="gj-id-f"><span>承运港口</span><b>' + esc(f.port) + " → " + esc(f.dport) + "</b></div>" +
+        '<div class="gj-id-f"><span>出口均价</span><b>' + fmtInt(f.asp) + " 元/台</b></div>" +
+      "</div>" +
+      '<div class="gj-id-note">占集团年出口额 <b>' + fmtDec(f.share, 2) + "%</b><i> · </i>27 国排名 <b>第 " + f.rankAll +
+        "</b><i> · </i>门到门 <b>" + fmtDec(f.lead, 1) + "</b> 天<i> · </i>授权网点 <b>" + f.svc + "</b> 个</div>";
+
+    /* 10.3 KPI 数值与副标题 */
+    const dYoy = f.yoy - f.regYoy;
+    const subs = [
+      "占集团出口 <b>" + fmtDec(f.share, 2) + "</b>% · 全球第 <b>" + f.rankAll + "</b>/" + D.cntN,
+      "出口均价 <b>" + fmtInt(f.asp) + "</b> 元/台 · " + esc(f.regName) + "区 " + fmtDec(REGIONS[f.r].qty, 1) + " 万台",
+      esc(f.regName) + "区 " + fmtDec(f.regYoy, 1) + "% · 差 <b class=\"" + (dYoy >= 0 ? "gj-up" : "gj-down") + "\">" + arrow(dYoy) + fmtDec(Math.abs(dYoy), 1) + "pp</b>",
+      "该国厨电市场 <b>" + fmtDec(f.market, 0) + "</b> 亿元 · 区内第 <b>" + f.rankReg + "</b>/" + f.regN,
+      "已获 <b>" + f.ctPass + "</b>/应认 <b>" + f.ctNeed + "</b> 机型 · 在途 <b>" + f.ctWip + "</b>"
+    ];
+    const vals = [f.amt, f.qty, f.yoy, f.msRate, f.ctRate];
+    const warns = [false, false, f.yoy < f.regYoy, false, f.ctRate < 93];
+    KPI_DEFS.forEach((k, i) => {
+      $("gj-kpi-sub-" + i).innerHTML = subs[i];
+      $("gj-kpi-box-" + i).classList.toggle("is-warn", warns[i]);
+      countUp(i, vals[i], k.dec);
+    });
+
+    /* 10.4 切换器与区域条高亮 */
+    swTabs.forEach((el, i) => {
+      const on = i === f.ci;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? FOCUS[i].regColor : "";
+    });
+    regTabs.forEach((el, j) => {
+      const on = j === f.r;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? REGIONS[j].color : "";
+    });
+    $("gj-sw-state").innerHTML = "当前 <b>" + esc(f.cn) + "</b><i>|</i>" + esc(f.regName) +
+      "<i>|</i>出口 " + fmtDec(f.amt, 2) + " 亿元<i>|</i>同比 " + signed(f.yoy, 1) + "%";
+
+    /* 10.5 区域定位 / 邻国对比（同区全部国家，本国高亮；重点国可点击直达） */
+    const reg = REGIONS[f.r];
+    $("gj-loc-tag").innerHTML = esc(reg.name) + " <b>" + fmtDec(reg.amt, 2) + "</b> 亿 · 占集团出口 " + fmtDec(reg.share, 1) + "%";
+    const maxAmt = Math.max.apply(null, reg.members.map((n) => COUNTRIES[cnIndex[n]].amt));
+    const focusNames = FOCUS.map((x) => x.cn);
+    $("gj-nblist").innerHTML = reg.members.map((n, k) => {
+      const c = COUNTRIES[cnIndex[n]];
+      const on = n === f.cn;
+      const inFocus = focusNames.indexOf(n) >= 0;
+      const w = c.amt / maxAmt * 100 * NBAR_W;
+      return '<div class="gj-nb ' + (on ? "is-on" : (inFocus ? "" : "is-off")) + '" data-cn="' + esc(n) + '"' +
+        ' title="' + esc(n + " · " + fmtDec(c.amt, 2) + " 亿元 · 区内第 " + (k + 1)) + '">' +
+        "<u>" + pad(k + 1) + "</u><em>" + esc(n) + "</em>" +
+        '<span class="gj-nbar"><s style="width:' + fmtDec(w, 1) + "%;background:" +
+          (on ? reg.color : "rgba(64,196,190,.42)") + '"></s></span>' +
+        '<span class="gj-namt">' + fmtDec(c.amt, 2) + "</span>" +
+        '<span class="gj-nshr">' + fmtDec(c.regShare, 1) + "%</span>" +
+      "</div>";
+    }).join("");
+
+    /* 10.6 渠道结构（堆叠条 + 四行图例） */
+    $("gj-chan-tag").innerHTML = "首位 <b>" + esc(f.topChan) + "</b> · 占 " + fmtDec(f.topChanShare, 1) + "%";
+    $("gj-chanbar").innerHTML = CHANNELS.map((ch, k) => (
+      '<u style="flex:' + fmtDec(f.chanShare[k], 3) + ";background:" + ch.color + '">' +
+        (f.chanShare[k] >= 12 ? fmtDec(f.chanShare[k], 1) + "%" : "") +
+      "</u>"
+    )).join("");
+    $("gj-chanlist").innerHTML = CHANNELS.map((ch, k) => (
+      '<div class="gj-chanf"><s style="background:' + ch.color + '"></s>' +
+        "<span>" + esc(ch.name) + "</span>" +
+        "<b>" + fmtDec(f.chanAmt[k], 2) + "</b><i>亿 · " + fmtDec(f.chanShare[k], 1) + "%</i>" +
+      "</div>"
+    )).join("");
+
+    /* 10.7 准入认证清单 */
+    $("gj-cert-tag").innerHTML = "适用 <b>" + f.certs.length + "</b> 项 · 完成度 " + fmtDec(f.ctRate, 1) + "%";
+    $("gj-cert-body").innerHTML = f.certRows.map((row) => (
+      "<li>" +
+        '<span class="gj-cname"><b>' + esc(row.code) + "</b><i>" + esc(row.market) + (row.src === "同源" ? "" : " ·明细") + "</i></span>" +
+        "<span>" + row.pass + " / " + row.need + "</span>" +
+        '<span style="color:' + (row.rate >= 94 ? C.green : row.rate >= 88 ? C.amber : C.red) + '">' + fmtDec(row.rate, 1) + "</span>" +
+        "<span>" + esc(row.due) + "</span>" +
+        '<span class="gj-badge ' + row.badgeCls + '">' + row.badge + "</span>" +
+      "</li>"
+    )).join("");
+    $("gj-cert-foot").innerHTML =
+      "<span>应认证 <b>" + f.ctNeed + "</b> 机型 · 已获 <b>" + f.ctPass + "</b> · 在途 <b>" + f.ctWip + "</b></span>" +
+      "<span>短板 <b>" + esc(f.ctWorst) + "</b> " + fmtDec(f.ctWorstRate, 1) + "%</span>";
+
+    /* 10.8 物流时效 */
+    $("gj-logi-tag").innerHTML = "门到门 <b>" + fmtDec(f.lead, 1) + "</b> 天 · 13 国均 " + fmtDec(D.fcLead, 1) + " 天";
+    $("gj-route").innerHTML =
+      "<b>" + esc(f.port) + "</b><i>→</i><b>" + esc(f.dport) + "</b>" +
+      '<span style="color:rgba(127,166,163,.85);font-size:11px">' + esc(f.portBase) + "发运</span>" +
+      (f.wh
+        ? '<span class="gj-wh">' + esc(f.wh) + "</span>"
+        : '<span class="gj-wh is-none">无海外仓 · 直发</span>');
+    const legs = [
+      { n: "海运在途", v: f.sea,   c: C.cyan },
+      { n: "目的港清关", v: f.clear, c: C.orange },
+      { n: "末端配送", v: f.last,  c: C.blue }
+    ];
+    $("gj-legs").innerHTML = legs.map((g) => (
+      '<div class="gj-leg"><span>' + g.n + "</span>" +
+        '<span class="gj-legbar"><s style="width:' + fmtDec(g.v / D.leadMax * 100, 1) + "%;background:" + g.c + '"></s></span>' +
+        "<em>" + fmtDec(g.v, 1) + " 天</em>" +
+      "</div>"
+    )).join("");
+    const dLead = f.lead - D.fcLead;
+    $("gj-legtot").innerHTML =
+      "<span>门到门合计 <b>" + fmtDec(f.lead, 1) + "</b> 天 = " + fmtDec(f.sea, 1) + " + " + fmtDec(f.clear, 1) + " + " + fmtDec(f.last, 1) + "</span>" +
+      '<span class="' + (dLead <= 0 ? "gj-up" : "gj-down") + '">较均值 ' + signed(dLead, 1) + " 天</span>";
+
+    /* 10.9 本地化事项 */
+    $("gj-local-tag").innerHTML = esc(f.lang.split(" + ")[0]) + " · " + esc(f.plug);
+    const locF = [
+      { k: "电压 / 频率", v: f.volt },
+      { k: "插头制式", v: f.plug },
+      { k: "界面与说明书", v: f.lang },
+      { k: "授权售后网点", v: f.svc + " 个" },
+      { k: "海外仓", v: f.wh || "无 · 国内直发" },
+      { k: "整机保修", v: (f.r === 2 || f.r === 3 ? 24 : 12) + " 个月" }
+    ];
+    $("gj-locgrid").innerHTML = locF.map((x) => (
+      '<div class="gj-locf" title="' + esc(x.k + "：" + x.v) + '"><span>' + esc(x.k) + "</span><b>" + esc(x.v) + "</b></div>"
+    )).join("");
+    $("gj-locnote").innerHTML = "本地化包：" + esc(f.plug) + "插头 + " + esc(f.volt) +
+      "适配 + " + esc(f.lang) + "说明书，覆盖 <b>" + fmtDec(f.topLineShare, 1) + "%</b> 出口额的主销线「" +
+      esc(f.topLine) + "」优先改型";
+
+    /* 10.10 面板头 tag（图表侧） */
+    $("gj-line-tag").innerHTML = "首位 <b>" + esc(f.topLine) + "</b> · 六线合计 " + fmtDec(sum(f.lineAmt), 2) + " 亿";
+    $("gj-mon-tag").innerHTML = "近 12 月合计 <b>" + fmtDec(f.recent12 / 1e4, 2) + "</b> 亿元 · 同比 " + signed(f.yoyCalc, 1) + "%";
+    $("gj-comp-tag").innerHTML = "主流价格带 <b>" + fmtInt(f.bandLo) + " ~ " + fmtInt(f.bandHi) + "</b> 元 · 本品 " + fmtInt(f.asp);
+  }
+
+  /* ===== 11. 图表 option 工厂（★ 只放标量与数组，绝不把业务对象塞进 series.data） ===== */
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP_BASE = {
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  };
+
+  /* 11.1 产品线出口额构成（横向条形，降序，值 = 亿元，标签带占比） */
+  function lineOption(f) {
+    const order = LINE_NAMES.map((n, i) => i).sort((a, b) => f.lineAmt[a] - f.lineAmt[b]);  /* 升序：y 轴自下而上 */
+    const names = order.map((i) => LINE_NAMES[i]);
+    const vals = order.map((i) => Number(fmtDec(f.lineAmt[i], 3)));
+    const shares = order.map((i) => Number(fmtDec(f.lineShare[i], 1)));
+    const colors = order.map((i) => C.series[i % C.series.length]);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 62, top: 6, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex;
+          return "<b>" + names[k] + "</b><br/>出口额 <b style=\"color:" + colors[k] + "\">" +
+            fmtDec(vals[k], 2) + "</b> 亿元<br/>占该国 <b>" + fmtDec(shares[k], 1) + "%</b>";
+        }
+      }, TIP_BASE),
+      xAxis: { type: "value", axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }, axisTick: { show: false } },
+      yAxis: {
+        type: "category", data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 11.5 })
+      },
+      series: [{
+        type: "bar", barWidth: "58%", data: vals,
+        itemStyle: {
+          borderRadius: [0, 4, 4, 0],
+          color: (p) => new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: colors[p.dataIndex] + "66" }, { offset: 1, color: colors[p.dataIndex] }
+          ])
+        },
+        label: {
+          show: true, position: "right", color: "#cfe9e6", fontSize: 11, fontWeight: 700,
+          formatter: (p) => fmtDec(p.value, 2) + "亿 " + fmtDec(shares[p.dataIndex], 1) + "%"
+        }
+      }]
+    };
+  }
+
+  /* 11.2 出口额 24 月走势（柱）+ 同比（线，仅后 12 月有值） */
+  function monthOption(f) {
+    const bars = f.mAll.map((v) => Number(fmtDec(v, 1)));
+    const yoyLine = new Array(12).fill(null).concat(f.mYoy.map((v) => Number(fmtDec(v, 1))));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 10, top: 30, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex;
+          let s = "<b>" + MON_LABELS[k] + "</b><br/>出口额 <b style=\"color:" + C.cyan + "\">" + fmtInt(bars[k]) + "</b> 万元";
+          if (k >= 12) {
+            const y = yoyLine[k];
+            s += "<br/>同比 <b style=\"color:" + (y >= 0 ? C.green : C.red) + "\">" + signed(y, 1) + "%</b>" +
+                 "<br/><span style=\"color:" + C.textDim + "\">去年同月 " + fmtInt(bars[k - 12]) + " 万元</span>";
+          } else {
+            s += "<br/><span style=\"color:" + C.textDim + "\">上一年度基期</span>";
+          }
+          return s;
+        }
+      }, TIP_BASE),
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: ["月出口额", "同比"]
+      },
+      xAxis: {
+        type: "category", data: MON_LABELS,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 2, fontSize: 10.5 })
+      },
+      yAxis: [
+        { type: "value", name: "万元", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false } },
+        { type: "value", name: "同比 %", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { formatter: "{value}" }),
+          splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "月出口额", type: "bar", barWidth: "56%", data: bars,
+          itemStyle: {
+            borderRadius: [3, 3, 0, 0],
+            color: (p) => (p.dataIndex < 12
+              ? "rgba(79,168,232,.34)"
+              : new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: C.cyan }, { offset: 1, color: C.cyanDeep }
+                ]))
+          },
+          markLine: {
+            silent: true, symbol: "none",
+            data: [{ xAxis: 11.5 }],
+            lineStyle: { color: "rgba(255,157,69,.55)", type: "dashed", width: 1 },
+            label: { formatter: "本年度", color: C.orange, fontSize: 10, position: "insideEndTop" }
+          } },
+        { name: "同比", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 5, connectNulls: false,
+          data: yoyLine,
+          lineStyle: { color: C.orange, width: 2 }, itemStyle: { color: C.orange } }
+      ]
+    };
+  }
+
+  /* 11.3 价格带与竞争定位（散点：x 均价 元/台，y 份额 %；本品高亮 + 价格带底色） */
+  function compOption(f) {
+    const rivalData = f.rivals.map((rv) => [rv.price, Number(fmtDec(rv.share, 2)), rv.name]);
+    const rivalColors = f.rivals.map((rv) => rv.color);
+    const selfData = [[f.asp, Number(fmtDec(f.msRate, 2)), "云麓 " + f.cn]];
+    const xs = rivalData.map((d) => d[0]).concat([f.asp]);
+    const ys = rivalData.map((d) => d[1]).concat([f.msRate]);
+    const xMin = Math.floor(Math.min.apply(null, xs) * 0.86 / 100) * 100;
+    const xMax = Math.ceil(Math.max.apply(null, xs) * 1.10 / 100) * 100;
+    const yMax = Math.ceil(Math.max.apply(null, ys) * 1.28);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 8, right: 24, top: 28, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => "<b>" + p.data[2] + "</b><br/>均价 <b style=\"color:" + C.cyan + "\">" +
+          fmtInt(p.data[0]) + "</b> 元/台<br/>当地份额 <b>" + fmtDec(p.data[1], 2) + "%</b>"
+      }, TIP_BASE),
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 12, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: ["竞品", "云麓厨电"]
+      },
+      xAxis: {
+        type: "value", name: "均价 元/台", min: xMin, max: xMax, scale: true,
+        nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "value", name: "当地份额 %", min: 0, max: yMax,
+        nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+      },
+      series: [
+        { name: "竞品", type: "scatter", symbolSize: 15, data: rivalData,
+          itemStyle: { color: (p) => rivalColors[p.dataIndex], opacity: 0.86 },
+          label: {
+            show: true, position: "top", distance: 5, color: "#9fc4c0", fontSize: 10,
+            formatter: (p) => p.data[2]
+          },
+          markArea: {
+            silent: true,
+            itemStyle: { color: "rgba(53,224,208,.08)", borderColor: "rgba(53,224,208,.3)", borderWidth: 1, borderType: "dashed" },
+            label: { show: true, position: "insideTop", color: C.textDim, fontSize: 10, formatter: "主流价格带" },
+            data: [[{ xAxis: f.bandLo }, { xAxis: f.bandHi }]]
+          } },
+        { name: "云麓厨电", type: "effectScatter", symbolSize: 21, data: selfData, z: 6,
+          rippleEffect: { scale: 3.2, brushType: "stroke" },
+          itemStyle: { color: C.cyan, shadowBlur: 12, shadowColor: "rgba(53,224,208,.7)" },
+          label: {
+            show: true, position: "right", distance: 8, color: "#eafcfa", fontSize: 11, fontWeight: 700,
+            formatter: (p) => p.data[2]
+          } }
+      ]
+    };
+  }
+
+  /* =====================================================================
+     12. 首屏：先把 DOM 填满（含所有与图表同容器的兄弟块），再 init 图表
+         ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize()
+     ===================================================================== */
+  function hashIdx() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    if (!raw) return -1;
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配 */ }
+    raw = raw.trim();
+    if (!raw) return -1;
+    /* 对象名 = 国家中文名；同时兼容英文名与大小写 */
+    let k = FOCUS.map((f) => f.cn).indexOf(raw);
+    if (k < 0) k = FOCUS.map((f) => f.en.toLowerCase()).indexOf(raw.toLowerCase());
+    if (k < 0) k = FOCUS.findIndex((f) => f.cn.indexOf(raw) >= 0 || raw.indexOf(f.cn) >= 0);
+    if (k < 0) k = FOCUS.findIndex((f) => f.en.toLowerCase().indexOf(raw.toLowerCase()) >= 0);
+    return k;
+  }
+  const startIdx = hashIdx();
+  let idx = startIdx >= 0 ? startIdx : 0;      /* 匹配不到落默认第一个（出口额最大的美国） */
+  renderDom(FOCUS[idx]);                       /* ← init 之前先填一遍 DOM */
+
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const chLine = makeChart("gj-chart-line");
+  const chMon = makeChart("gj-chart-month");
+  const chComp = makeChart("gj-chart-comp");
+
+  function apply(i, pushHash) {
+    idx = (i + FOCUS.length) % FOCUS.length;
+    const f = FOCUS[idx];
+    renderDom(f);
+    /* 三图的类目数固定，但数据全换，用 notMerge 全量重设最稳 */
+    chLine.setOption(lineOption(f), true);
+    chMon.setOption(monthOption(f), true);
+    chComp.setOption(compOption(f), true);
+    /* hash 同步：便于分享与上级页回跳（replaceState 不触发 hashchange，不会自激） */
+    if (pushHash) {
+      try { history.replaceState(null, "", "#" + encodeURIComponent(f.cn)); }
+      catch (e) { /* file:// 下部分浏览器禁止 replaceState，忽略即可 */ }
+    }
+  }
+  apply(idx, true);
+
+  /* ===== 13. 交互：顶部切换器 / 左栏邻国清单 / 键盘 ← → / Esc 回上级 / hashchange ===== */
+  swTabs.forEach((el) => el.addEventListener("click", () => { apply(Number(el.dataset.i), true); restart(); }));
+  $("gj-nblist").addEventListener("click", (e) => {
+    const row = e.target.closest ? e.target.closest(".gj-nb") : null;
+    if (!row || !row.dataset.cn) return;
+    const k = FOCUS.map((f) => f.cn).indexOf(row.dataset.cn);
+    if (k >= 0) { apply(k, true); restart(); }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { apply(idx - 1, true); restart(); }
+    else if (e.key === "ArrowRight") { apply(idx + 1, true); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+  /* 上级页可多次下钻同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = hashIdx();
+    if (k >= 0 && k !== idx) { apply(k, false); restart(); }
+  });
+
+  /* kiosk 常驻轮换；鼠标停在切换器上时暂停，便于人工查看 */
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => apply(idx + 1, true), 15000); }
+  restart();
+  $("gj-switcher").addEventListener("mouseenter", () => clearInterval(timer));
+  $("gj-switcher").addEventListener("mouseleave", restart);
+
+  /* ===== 14. 活性：产品线条巡航 + 月度提示巡航 + 底部滚动 ===== */
+  let lineCur = 0;
+  setInterval(() => {
+    chLine.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    chLine.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: lineCur });
+    lineCur = (lineCur + 1) % LINE_NAMES.length;
+  }, 2400);
+
+  let monCur = 12;
+  setInterval(() => {
+    chMon.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: monCur });
+    monCur = monCur + 1 >= MON_N ? 12 : monCur + 1;
+  }, 2600);
+
+  setInterval(() => {
+    chComp.dispatchAction({ type: "downplay", seriesIndex: 1 });
+    chComp.dispatchAction({ type: "highlight", seriesIndex: 1, dataIndex: 0 });
+  }, 4200);
+
+  /* ===== 15. 底部市场提示（全部由派生量现算，不另编数字） ===== */
+  function footHtml() {
+    const f = FOCUS[idx];
+    const dYoy = f.yoy - f.regYoy;
+    const dLead = f.lead - D.fcLead;
+    const items = [
+      { lv: "口径", c: C.cyan, t: "集团总营收 " + fmtDec(D.groupRev, 2) + " 亿元 = 内销 " + fmtDec(DOMESTIC_REV, 1) +
+        " 亿 + 出口 " + fmtDec(D.expAmt, 2) + " 亿；重点 " + D.fcN + " 国合计 " + fmtDec(D.fcAmt, 2) +
+        " 亿，占集团出口 " + fmtDec(D.fcShare, 1) + "%" },
+      { lv: "规模", c: C.blue, t: f.cn + " 年出口 " + fmtDec(f.amt, 2) + " 亿元 / " + fmtDec(f.qty, 2) +
+        " 万台，均价 " + fmtInt(f.asp) + " 元/台，27 国排名第 " + f.rankAll + "、" + f.regName + "区第 " + f.rankReg + "/" + f.regN },
+      { lv: dYoy >= 0 ? "增长" : "承压", c: dYoy >= 0 ? C.green : C.orange,
+        t: f.cn + " 同比 " + signed(f.yoy, 1) + "%，" + f.regName + "区 " + fmtDec(f.regYoy, 1) + "%，差 " + signed(dYoy, 1) + "pp" },
+      { lv: f.ctRate < 93 ? "高" : "中", c: f.ctRate < 93 ? C.red : C.amber,
+        t: "准入认证完成度 " + fmtDec(f.ctRate, 1) + "%（已获 " + f.ctPass + " / 应认 " + f.ctNeed +
+          "），短板 " + f.ctWorst + " " + fmtDec(f.ctWorstRate, 1) + "%，在途 " + f.ctWip + " 机型" },
+      { lv: dLead > 0 ? "中" : "低", c: dLead > 0 ? C.orange : C.green,
+        t: "门到门 " + fmtDec(f.lead, 1) + " 天 = 海运 " + fmtDec(f.sea, 1) + " + 清关 " + fmtDec(f.clear, 1) +
+          " + 末端 " + fmtDec(f.last, 1) + "，较 " + D.fcN + " 国加权均值 " + signed(dLead, 1) + " 天" },
+      { lv: "结构", c: C.violet, t: "主销「" + f.topLine + "」占 " + fmtDec(f.topLineShare, 1) +
+        "%，渠道以「" + f.topChan + "」为主占 " + fmtDec(f.topChanShare, 1) +
+        "%，当地市占率 " + fmtDec(f.msRate, 2) + "%（市场 " + fmtDec(f.market, 0) + " 亿元）" },
+      { lv: "竞争", c: C.amber, t: "本品均价较" + f.localLeader.name + " " + signed(f.priceGap, 1) +
+        "%，主流价格带 " + fmtInt(f.bandLo) + " ~ " + fmtInt(f.bandHi) + " 元" }
+    ];
+    return items.map((a) => (
+      '<div class="gj-foot-item"><i style="color:' + a.c + '">[' + a.lv + "]</i><em>" + esc(a.t) + "</em></div>"
+    )).join("");
+  }
+  const track = $("gj-foot-track");
+  function paintFoot() { const h = footHtml(); track.innerHTML = h + h; }   /* 两份首尾相接，滚动无缝 */
+  paintFoot();
+  setInterval(paintFoot, 15000);
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* =====================================================================
+     16. 开发期自检：勾稽关系 + option 环检测（不影响页面渲染）
+         ★ 环检测必须对**每一国**的**每一个** option 跑 JSON.stringify ——
+           setOption 会深拷贝整个 option，遇环即 RangeError、整页图表全空，
+           而 node 打桩测不出（桩的 setOption 是空函数，不走深拷贝）。
+     ===================================================================== */
+  const eq = (a, b, tol) => Math.abs(a - b) < (tol == null ? 1e-9 : tol);
+  const checks = [
+    ["年出口额 = 矩阵总和 = 26.30 亿元（上级页同源）", eq(D.expAmt, 26.30, 1e-9)],
+    ["年出口量 = 六区域之和 = 132.0 万台（上级页同源）", eq(D.expQty, 132.0, 1e-9)],
+    ["集团总营收 = 内销 112.6 + 出口（内销口径不变）", eq(D.groupRev, DOMESTIC_REV + D.expAmt) && eq(DOMESTIC_REV, 112.6)],
+    ["年产量 902 / 内销年销量 866 只读不改", CAP_OUTPUT === 902 && CAP_DOMESTIC_SALES === 866],
+    ["各区域 27 国出口额之和 = 该区域矩阵列和", REGIONS.every((r) => eq(r.regAmt, r.amt, 1e-9))],
+    ["重点 " + D.fcN + " 国出口额之和 ≤ 年出口额 26.30", D.fcAmt <= D.expAmt + 1e-9],
+    ["重点国出口额逐国 = 上级页 27 国名单原值", FOCUS.every((f) => eq(f.amt, COUNTRIES[cnIndex[f.cn]].amt))],
+    ["各国六产品线之和 = 该国出口额", FOCUS.every((f) => eq(sum(f.lineAmt), f.amt, 1e-9))],
+    ["各国四渠道之和 = 该国出口额", FOCUS.every((f) => eq(sum(f.chanAmt), f.amt, 1e-9))],
+    ["各国近 12 月合计 = 该国年出口额", FOCUS.every((f) => eq(f.recent12 / 1e4, f.amt, 1e-9))],
+    ["各国同比 = (近 12 月 − 前 12 月) ÷ 前 12 月", FOCUS.every((f) => eq(f.yoyCalc, f.yoy, 1e-9))],
+    ["各国出口量 = 出口额 ÷ 出口均价", FOCUS.every((f) => eq(f.qty * f.asp * 1e4, f.amt * 1e8, 1e-3))],
+    ["重点国出口量之和 ≤ 年出口量 132.0 万台", D.fcQty <= D.expQty + 1e-9],
+    ["认证目录逐行 应认证 = 已获 + 在途", CERT_CATALOG.every((c) => c.need === c.pass + c.wip)],
+    ["各国认证完成度 = Σ已获 ÷ Σ应认证", FOCUS.every((f) => eq(f.ctRate, f.ctPass / f.ctNeed * 100, 1e-9))],
+    ["各国门到门 = 海运 + 清关 + 末端", FOCUS.every((f) => eq(f.lead, f.sea + f.clear + f.last, 1e-9))],
+    ["各国市占率 = 出口额 ÷ 当地市场规模", FOCUS.every((f) => eq(f.msRate, f.amt / f.market * 100, 1e-9))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单国家市场详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+
+  let optAcyclic = true;
+  try { FOCUS.forEach((f) => { JSON.stringify(lineOption(f)); JSON.stringify(monthOption(f)); JSON.stringify(compOption(f)); }); }
+  catch (e) { optAcyclic = false; console.error("[单国家市场详情] option 存在循环引用：", e.message); }
+  if (!failed.length && optAcyclic) {
+    console.info("[单国家市场详情] 勾稽自检 " + checks.length + " 项全部通过，option 无循环引用（" + D.fcN + " 国 × 3 图）");
+  }
+})();
+</script>
+</body>
+</html>

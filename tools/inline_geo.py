@@ -34,7 +34,13 @@ import sys
 from collections import OrderedDict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GEO_JS = os.path.join(ROOT, "shared", "geo-data.js")
+# 数据源可以有多个，解析后合并成一张「数据集名 -> GeoJSON」的表；名字全局唯一即可，
+# 调用方只报数据集名（china / world / jiangsu …），不需要关心它来自哪个文件。
+GEO_SOURCES = [
+    os.path.join(ROOT, "shared", "geo-data.js"),    # const GEO_DATA  = { china, yangtzeDelta, jiangsu … }
+    os.path.join(ROOT, "shared", "geo-world.js"),   # const GEO_WORLD = { world }
+]
+GEO_JS = GEO_SOURCES[0]                             # 兼容旧引用
 
 BEGIN_LINE = "/* geo:begin —— 由 tools/inline_geo.py 注入，勿手改。数据源：shared/geo-data.js */"
 END_LINE = "/* geo:end */"
@@ -76,20 +82,20 @@ def scan_value(text, i):
     raise SystemExit("解析 shared/geo-data.js 失败：花括号不配平")
 
 
-def load_datasets():
-    """解析 geo-data.js，返回 {数据集名: 已 json.loads 的对象}（保持文件里的先后顺序）。
+def load_one(path):
+    """解析单个 geo 源文件，返回 {数据集名: 已 json.loads 的对象}（保持文件里的先后顺序）。
 
     它是 JS 不是 JSON（有顶层 `const` 和注释），但结构规整：顶层对象里每个数据集
     一行 `  <名字>: <合法 JSON 值>,`，逐个切出来再用 json.loads 验证。
+    顶层变量名不写死（geo-data.js 是 GEO_DATA、geo-world.js 是 GEO_WORLD），认 `const GEO_*` 即可。
     """
-    if not os.path.exists(GEO_JS):
-        raise SystemExit("找不到 %s" % GEO_JS)
-    with open(GEO_JS, encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         src = f.read()
 
-    m = re.search(r"const\s+GEO_DATA\s*=\s*\{", src)
+    base = os.path.basename(path)
+    m = re.search(r"const\s+GEO_\w*\s*=\s*\{", src)
     if not m:
-        raise SystemExit("解析 shared/geo-data.js 失败：找不到 `const GEO_DATA = {`")
+        raise SystemExit("解析 %s 失败：找不到 `const GEO_… = {`" % base)
 
     out = OrderedDict()
     i = m.end()                      # 停在顶层 `{` 之后
@@ -103,11 +109,28 @@ def load_datasets():
         try:
             out[km.group(1)] = json.loads(raw)
         except ValueError as e:
-            raise SystemExit("数据集 %s 不是合法 JSON：%s" % (km.group(1), e))
+            raise SystemExit("%s 里的数据集 %s 不是合法 JSON：%s" % (base, km.group(1), e))
         i = end
     if not out:
-        raise SystemExit("解析 shared/geo-data.js 失败：没切出任何数据集")
+        raise SystemExit("解析 %s 失败：没切出任何数据集" % base)
     return out
+
+
+def load_datasets():
+    """按 GEO_SOURCES 顺序解析全部数据源并合并。缺失的源直接跳过（不是所有仓库都有世界地图）。"""
+    merged = OrderedDict()
+    found = False
+    for path in GEO_SOURCES:
+        if not os.path.exists(path):
+            continue
+        found = True
+        for k, v in load_one(path).items():
+            if k in merged:
+                raise SystemExit("数据集名冲突：%s 在多个源文件里都有定义" % k)
+            merged[k] = v
+    if not found:
+        raise SystemExit("找不到任何 geo 数据源：%s" % "、".join(GEO_SOURCES))
+    return merged
 
 
 def render_block(indent, datasets):
