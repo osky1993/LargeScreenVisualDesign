@@ -1,0 +1,1420 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电单项目研发详情</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --xf-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 在研项目清单列宽：项目 / 产品线 / 阶段 / 投入 / 进度 */
+    --xf-pcols: 1fr 46px 40px 52px 88px;
+    /* 试验检测记录列宽：编号 / 试验项目 / 样机 / 完成日期 / 结论 */
+    --xf-tcols: 92px 1fr 36px 80px 52px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .xf-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 486px 1fr 448px;
+    grid-template-rows: 84px 118px 44px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .xf-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .xf-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识占位） ===== */
+  .xf-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .xf-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .xf-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .xf-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .xf-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .xf-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .xf-crumb em { font-style: normal; color: #cfeae7; }
+  /* 返回上级：同目录相对路径回到「研发与新品孵化」，暖橙描边与本页青主色区分 */
+  .xf-back {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 157, 69, 0.42);
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.16), rgba(14, 46, 50, 0.6));
+    color: #ffd9b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .xf-back:hover { color: #fff1e2; border-color: rgba(255, 157, 69, 0.9); box-shadow: 0 0 14px rgba(255, 157, 69, 0.4); }
+  .xf-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .xf-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .xf-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .xf-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .xf-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .xf-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .xf-chips { display: flex; align-items: center; gap: 9px; }
+  .xf-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .xf-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .xf-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .xf-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .xf-chip.is-key b { color: var(--mfg-cyan); }
+  .xf-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .xf-clock-time { font: 700 26px/1 var(--xf-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .xf-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .xf-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .xf-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .xf-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .xf-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .xf-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .xf-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .xf-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .xf-kpi.is-warn .xf-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .xf-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .xf-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .xf-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .xf-kpi-val { font: 700 28px/1 var(--xf-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .xf-kpi.is-warn .xf-kpi-val { color: #ffd9b0; }
+  .xf-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .xf-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .xf-kpi-sub b { font-weight: 700; }
+  .xf-up { color: var(--mfg-green); }
+  .xf-down { color: var(--mfg-red); }
+
+  /* ===== 项目切换器（8 个在研项目） ===== */
+  .xf-swbar {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 14px;
+  }
+  .xf-swbar-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #7fc0ba; }
+  .xf-switcher { flex: 1; min-width: 0; display: flex; align-items: stretch; gap: 8px; }
+  .xf-sw {
+    flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: center; gap: 7px;
+    padding: 5px 8px 6px; border-radius: 8px; cursor: pointer; user-select: none; font-family: inherit;
+    border: 1px solid rgba(64, 196, 190, 0.22); background: rgba(10, 38, 42, 0.55);
+    color: #bcdedb; white-space: nowrap; overflow: hidden;
+    transition: color .18s, border-color .18s, background .18s, box-shadow .18s;
+  }
+  .xf-sw b { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
+  .xf-sw i { font-style: normal; font-size: 10.5px; color: rgba(127, 166, 163, 0.9); font-variant-numeric: tabular-nums; }
+  .xf-sw:hover { color: #eafcfa; border-color: rgba(53, 224, 208, 0.6); }
+  .xf-sw.is-on { color: #04191a; border-color: transparent; box-shadow: 0 0 15px rgba(0, 0, 0, 0.3); }
+  .xf-sw.is-on i { color: rgba(4, 25, 26, 0.7); }
+  .xf-swbar-state { flex: none; font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .xf-swbar-state b { font-weight: 700; color: var(--mfg-cyan); }
+  .xf-swbar-state i { font-style: normal; color: rgba(127, 166, 163, 0.4); margin: 0 7px; }
+
+  /* ===== 面板 ===== */
+  .xf-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .xf-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .xf-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .xf-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .xf-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .xf-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .xf-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .xf-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .xf-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 徽章 ===== */
+  .xf-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .xf-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .xf-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .xf-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+  .xf-badge.is-live { color: #04241f; background: var(--mfg-cyan); }
+  .xf-badge.is-todo { color: rgba(127, 166, 163, 0.95); background: rgba(64, 196, 190, 0.14); }
+  .xf-badge.is-info { color: #041b2c; background: var(--mfg-blue); }
+
+  /* ===== CSS grid 模拟表格（非 <table>） ===== */
+  .xf-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .xf-thead { flex: none; padding: 4px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba; }
+  .xf-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .xf-tbody li { padding: 0 8px; border-radius: 5px; font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums; }
+  .xf-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .xf-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+
+  /* 在研项目清单（左栏上，点击切换） */
+  .xf-plist .xf-thead, .xf-plist .xf-tbody li { display: grid; grid-template-columns: var(--xf-pcols); align-items: center; gap: 7px; }
+  .xf-plist .xf-tbody li { height: 22px; cursor: pointer; transition: background .2s, box-shadow .2s; }
+  .xf-plist .xf-thead span:nth-child(4), .xf-plist .xf-tbody li span:nth-child(4) { text-align: right; }
+  .xf-plist .xf-tbody li:hover { background: rgba(53, 224, 208, 0.12); }
+  .xf-plist .xf-tbody li.is-on { background: rgba(53, 224, 208, 0.18); box-shadow: inset 2px 0 0 var(--mfg-cyan); }
+  .xf-plist .xf-tbody li.is-on b { color: #eafcfa; }
+  .xf-prog { display: block; width: 100%; height: 7px; border-radius: 4px; background: rgba(64, 196, 190, 0.14); overflow: hidden; position: relative; }
+  .xf-prog u { display: block; height: 100%; border-radius: 4px; text-decoration: none; transition: width .5s ease; }
+  .xf-prog em { position: absolute; right: 3px; top: -5px; font-style: normal; font-size: 9.5px; color: #cbe6e3; }
+
+  /* 试验检测记录表（右栏中） */
+  .xf-trial .xf-thead, .xf-trial .xf-tbody li { display: grid; grid-template-columns: var(--xf-tcols); align-items: center; gap: 7px; }
+  .xf-trial .xf-tbody li { height: 25px; }
+  .xf-trial .xf-tbody li .xf-no { font: 700 11.5px/1 var(--xf-mono); color: rgba(127, 166, 163, 0.9); letter-spacing: 0.03em; }
+  .xf-trial .xf-thead span:nth-child(3), .xf-trial .xf-tbody li span:nth-child(3) { text-align: right; }
+  .xf-trial .xf-thead span:last-child, .xf-trial .xf-tbody li .xf-badge { justify-self: end; }
+
+  /* ===== 里程碑时间轴（左栏中） ===== */
+  .xf-ms-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+  .xf-ms {
+    flex: 1; min-height: 0; position: relative;
+    display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 10px;
+    padding: 4px 9px; border-radius: 8px;
+    border: 1px solid rgba(64, 196, 190, 0.16); background: rgba(10, 38, 42, 0.5);
+    transition: border-color .25s, background .25s;
+  }
+  .xf-ms.is-todo { opacity: 0.62; }
+  .xf-ms.is-live { border-color: rgba(53, 224, 208, 0.6); background: rgba(18, 68, 68, 0.55); box-shadow: inset 0 0 16px rgba(53, 224, 208, 0.12); }
+  .xf-ms.is-cursor { border-color: rgba(255, 157, 69, 0.62); box-shadow: inset 0 0 16px rgba(255, 157, 69, 0.12); }
+  .xf-ms-no {
+    width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font: 700 13px/1 var(--xf-mono); color: #04191a;
+  }
+  .xf-ms-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .xf-ms-l1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .xf-ms-l1 b { font-size: 13px; font-weight: 700; letter-spacing: 0.05em; color: #d6efec; flex: none; }
+  .xf-ms-l1 span { flex: 1; min-width: 0; font-size: 11px; color: rgba(127, 166, 163, 0.95); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .xf-ms-l2 { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 10.5px; }
+  .xf-ms-l2 i { font-style: normal; color: rgba(127, 166, 163, 0.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .xf-ms-l2 u { margin-left: auto; flex: none; text-decoration: none; color: #bfe4e0; font-variant-numeric: tabular-nums; }
+
+  /* ===== 项目档案卡（左栏下） ===== */
+  .xf-dossier { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px; }
+  .xf-dz { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .xf-dz span { font-size: 10.5px; letter-spacing: 0.1em; color: #5f8a87; white-space: nowrap; }
+  .xf-dz b { font-size: 13px; font-weight: 700; color: #d6efec; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 风险项清单（右栏下） ===== */
+  .xf-risks { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .xf-risk {
+    flex: 1; min-height: 0; display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 9px;
+    padding: 4px 9px; border-radius: 8px;
+    border: 1px solid rgba(64, 196, 190, 0.14); background: rgba(10, 38, 42, 0.5);
+  }
+  .xf-risk-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .xf-risk-body b { font-size: 11.5px; font-weight: 400; color: #cbe6e3; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .xf-risk-body span { font-size: 10.5px; color: rgba(127, 166, 163, 0.8); letter-spacing: 0.04em; }
+
+  /* ===== 底部滚动条 ===== */
+  .xf-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .xf-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .xf-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: xf-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes xf-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .xf-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .xf-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .xf-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .xf-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .xf-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .xf-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="xf-stage" id="xf-stage">
+    <!-- mockflag:begin --><div class="xf-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="xf-error" id="xf-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识占位） -->
+    <header class="xf-header">
+      <div class="xf-head-left">
+        <div class="xf-crumb">
+          <a class="xf-back" href="大屏样板间-厨电研发与新品孵化1920.html" title="返回上级专题页：研发与新品孵化（Esc）">‹ 返回 研发与新品孵化</a>
+          <b>云麓厨电</b><i>›</i><span>研发与新品孵化</span><i>›</i><em id="xf-crumb-obj">--</em>
+        </div>
+        <div class="xf-head-title-row">
+          <div class="xf-head-title" id="xf-title">-- 研发详情</div>
+          <div class="xf-head-meta">
+            <span>在研 <b id="xf-meta-proj">--</b> 项</span><i>|</i>
+            <span><b>5</b> 道阶段门 · <b>5</b> 类研发投入</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="xf-head-right">
+        <div class="xf-chips">
+          <div class="xf-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="xf-chip is-key"><span>PROJECT FEE</span><b id="xf-chip-fee">--</b></div>
+        </div>
+        <div class="xf-clock" aria-label="实时时钟">
+          <span class="xf-clock-time" id="xf-clock-time">--:--:--</span>
+          <span class="xf-clock-date" id="xf-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带（随项目切换重算） -->
+    <div class="xf-band" id="xf-band"></div>
+
+    <!-- 项目切换器 -->
+    <div class="xf-swbar">
+      <span class="xf-swbar-tag">项目切换</span>
+      <div class="xf-switcher" id="xf-switcher" aria-label="在研项目切换"></div>
+      <div class="xf-swbar-state" id="xf-sw-state">--</div>
+    </div>
+
+    <!-- 左栏：项目清单 + 里程碑时间轴 + 项目档案 -->
+    <div class="xf-col">
+      <section class="xf-panel xf-plist" style="flex: none; height: 251px;">
+        <div class="xf-panel-head">
+          <h2>在研项目清单</h2>
+          <span class="xf-panel-tag" id="xf-plist-tag">--</span>
+        </div>
+        <div class="xf-table">
+          <div class="xf-thead">
+            <span>项目</span><span>产品线</span><span>阶段</span><span>投入</span><span>进度</span>
+          </div>
+          <ul class="xf-tbody" id="xf-plist-body"></ul>
+        </div>
+      </section>
+      <section class="xf-panel" style="flex: 1;">
+        <div class="xf-panel-head">
+          <h2>里程碑与阶段门</h2>
+          <span class="xf-panel-tag" id="xf-ms-tag">--</span>
+        </div>
+        <div class="xf-ms-list" id="xf-ms-list"></div>
+      </section>
+      <section class="xf-panel" style="flex: none; height: 126px;">
+        <div class="xf-panel-head">
+          <h2>项目档案</h2>
+          <span class="xf-panel-tag" id="xf-dz-tag">--</span>
+        </div>
+        <div class="xf-dossier" id="xf-dossier"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：BOM 穿透（旭日）+ 单台成本构成 -->
+    <div class="xf-col">
+      <section class="xf-panel" style="flex: 1.32;">
+        <div class="xf-panel-head">
+          <h2>整机 BOM 穿透</h2>
+          <span class="xf-panel-tag" id="xf-bom-tag">--</span>
+        </div>
+        <div class="xf-chart" id="xf-chart-bom" role="img" aria-label="选中项目的 BOM 四层旭日图：整机 → 总成 → 部件 → 物料"></div>
+      </section>
+      <section class="xf-panel" style="flex: 1;">
+        <div class="xf-panel-head">
+          <h2>单台目标成本构成</h2>
+          <span class="xf-panel-tag" id="xf-cost-tag">--</span>
+        </div>
+        <div class="xf-chart" id="xf-chart-cost" role="img" aria-label="单台目标售价拆解为料本、制造费用、研发摊销、包装物流、销售费用与目标毛利"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：投入执行 + 试验检测记录 + 风险项 -->
+    <div class="xf-col">
+      <section class="xf-panel" style="flex: 1;">
+        <div class="xf-panel-head">
+          <h2>投入执行 · 五类分解</h2>
+          <span class="xf-panel-tag" id="xf-fee-tag">--</span>
+        </div>
+        <div class="xf-chart" id="xf-chart-fee" role="img" aria-label="按五类研发投入分解的项目预算与实际投入对比条形图"></div>
+      </section>
+      <section class="xf-panel xf-trial" style="flex: none; height: 225px;">
+        <div class="xf-panel-head">
+          <h2>试验与检测记录</h2>
+          <span class="xf-panel-tag" id="xf-trial-tag">--</span>
+        </div>
+        <div class="xf-table">
+          <div class="xf-thead">
+            <span>试验编号</span><span>试验项目</span><span>样机</span><span>完成日期</span><span>结论</span>
+          </div>
+          <ul class="xf-tbody" id="xf-trial-body"></ul>
+        </div>
+      </section>
+      <section class="xf-panel" style="flex: none; height: 181px;">
+        <div class="xf-panel-head">
+          <h2>风险项清单</h2>
+          <span class="xf-panel-tag" id="xf-risk-tag">--</span>
+        </div>
+        <div class="xf-risks" id="xf-risks"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="xf-foot">
+      <div class="xf-foot-tag">项目研判</div>
+      <div class="xf-foot-view"><div class="xf-foot-track" id="xf-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("xf-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("xf-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const wan2yi = (w) => w / 10000;
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+
+     ★ 建模铁律（本专题踩过的最深的坑）：进 ECharts option 的数据只放**标量与数组**，
+       业务对象之间一律用 name / 索引关联，绝不互相持有对象引用。setOption 会深拷贝
+       整个 option，只要成环就 RangeError: Maximum call stack size exceeded，整页图表
+       全空，且堆栈里只有 echarts 内部帧。
+       本页最高危的是旭日图（sunburst）的递归树：BOM 由「纯规格数组 → 每次现建纯对象」
+       生成，子节点绝不回指父节点（没有 node.parent / node.proj 之类的字段），
+       tooltip 需要的层级 / 父级信息一律靠 name 去扁平表 INFO 里反查。
+       页尾自检对每一个 option 都跑 JSON.stringify 做环检测。
+
+     ★ 与上级页「研发与新品孵化」严格同源：8 个在研项目的名称 / 产品线 / 阶段 / 投入 /
+       进度一字不改；五道阶段门通过率一字不改；五类研发投入的波形参数一字不改（本页
+       照同一公式现算出近 12 月 4.70 亿元与研发费率 4.18%）；净享 X9 的 BOM 规格
+       与上级页 净享 X7 的 BOM 规格逐条相同（X9 延续 X7 平台，料本口径同源）。
+       本页在同源基础上只新增子页字段：立项月序、目标售价、预计年销量、三项费率、风险项。 ===== */
+
+  /* 4.0 全系列基准盘（跨页共用，本页只读不改） */
+  const BASE = {
+    revenue: 112.6,       /* 年营收（亿元，内销口径） */
+    volume: 866,          /* 年销量（万台） */
+    output: 902           /* 年产量（万台） */
+  };
+
+  /* 4.1 六产品线配色（P4/P7/P13 口径顺序） */
+  const LINE_META = [
+    { name: "吸油烟机",   short: "烟机", color: C.cyan },
+    { name: "燃气灶具",   short: "灶具", color: C.orange },
+    { name: "洗碗机",     short: "洗碗", color: C.blue },
+    { name: "蒸烤一体机", short: "蒸烤", color: C.green },
+    { name: "集成灶",     short: "集成", color: C.amber },
+    { name: "净水热水",   short: "净水", color: C.violet }
+  ];
+  const LINE_IDX = {};
+  LINE_META.forEach((l, i) => { LINE_IDX[l.name] = i; });
+
+  /* 4.2 五类研发投入 × 24 个月（2024-08 → 2026-07，万元）
+         ★ 波形参数与上级页一字不同：本页据此现算出同一个 4.70 亿元 / 4.18%，
+           而不是把上级页的结论抄成常量。 */
+  const RD_CATS = [
+    { name: "基础研究", color: C.violet, base: 600,  growth: 0.42, amp: 46,  w: 0.55, ph: 0.40 },
+    { name: "新品开发", color: C.cyan,   base: 1560, growth: 0.12, amp: 210, w: 0.78, ph: 1.10 },
+    { name: "工艺改进", color: C.blue,   base: 720,  growth: 0.18, amp: 82,  w: 0.62, ph: 2.30 },
+    { name: "试验检测", color: C.green,  base: 520,  growth: 0.22, amp: 58,  w: 0.91, ph: 0.90 },
+    { name: "知识产权", color: C.orange, base: 350,  growth: 0.30, amp: 34,  w: 0.47, ph: 1.80 }
+  ];
+  const RD_N = 24;
+
+  /* 4.3 五阶段与五道阶段门（上级页口径，一字不改）
+         STAGE_LEN 是立项 / 设计 / 打样 / 试产四段的时长（月），合计 11 个月 = 上市前置周期；
+         第 i 道门设在第 i 段的段末。 */
+  const STAGE_NAMES = ["立项", "设计", "打样", "试产", "上市"];
+  const STAGE_BENCH = [20, 40, 60, 80, 100];
+  const STAGE_LEN = [2.5, 3.5, 2.5, 2.5];
+  const GATES = [
+    { no: 1, name: "立项", key: "G1", rate: 92.0, color: C.violet, note: "需求与市场论证" },
+    { no: 2, name: "设计", key: "G2", rate: 86.4, color: C.blue,   note: "结构与电控冻结" },
+    { no: 3, name: "打样", key: "G3", rate: 78.6, color: C.cyan,   note: "样机可靠性首轮" },
+    { no: 4, name: "试产", key: "G4", rate: 84.2, color: C.amber,  note: "工艺与良率验证" },
+    { no: 5, name: "上市", key: "G5", rate: 95.0, color: C.green,  note: "渠道与交付就绪" }
+  ];
+
+  /* 4.4 八项在研项目 —— 前六个字段（name/short/line/stage/fee/prog）与上级页逐字相同。
+         m0 = 立项月序（0 = 2025-01），由它 + STAGE_LEN 反推出的当前阶段必须等于 stage（页尾自检）。
+         price 是目标售价（元）；两个共性技术平台不是整机，price 取模组内部结算价。
+         vol 是预计年销量（万台，平台按搭载量）；mfg/pkg 是按料本计提的制造与包装物流费率，
+         sell 是按售价计提的销售费率。全部为杜撰口径，不指向任何真实企业。 */
+  const PROJECTS = [
+    { name: "净享 X9 洗碗机", short: "净享X9", line: "洗碗机", stage: 3, fee: 1860, prog: 78,
+      note: "增长品类续作 · 洗净率与静音双升", m0: 10, price: 4980, vol: 13.5, mfg: 0.16, pkg: 0.06, sell: 0.13, kind: "整机" },
+    { name: "风语 K10 烟机", short: "风语K10", line: "吸油烟机", stage: 2, fee: 1420, prog: 56,
+      note: "大风压平台 · 直面「吸力不足」", m0: 11, price: 3980, vol: 10.2, mfg: 0.18, pkg: 0.07, sell: 0.14, kind: "整机" },
+    { name: "悦烤 S7 蒸烤", short: "悦烤S7", line: "蒸烤一体机", stage: 1, fee: 1180, prog: 38,
+      note: "腔体易洁涂层换代", m0: 14, price: 5480, vol: 9.8, mfg: 0.20, pkg: 0.06, sell: 0.15, kind: "整机" },
+    { name: "净澈 W5 净水", short: "净澈W5", line: "净水热水", stage: 3, fee: 960, prog: 88,
+      note: "长效滤芯 · 降更换成本", m0: 9, price: 2680, vol: 11.6, mfg: 0.15, pkg: 0.05, sell: 0.12, kind: "整机" },
+    { name: "星焰 P11 集成灶", short: "星焰P11", line: "集成灶", stage: 2, fee: 1340, prog: 51,
+      note: "下排烟风道重构", m0: 12, price: 8980, vol: 5.8, mfg: 0.19, pkg: 0.08, sell: 0.20, kind: "整机" },
+    { name: "炽焰 G8 灶具", short: "炽焰G8", line: "燃气灶具", stage: 0, fee: 520, prog: 18,
+      note: "快启点火针方案立项", m0: 17, price: 2380, vol: 4.6, mfg: 0.18, pkg: 0.06, sell: 0.18, kind: "整机" },
+    { name: "静音风机平台", short: "静音平台", line: "吸油烟机", stage: 1, fee: 1560, prog: 47,
+      note: "共性技术 · 对齐热词「噪音大」", m0: 13, price: 2180, vol: 22.0, mfg: 0.17, pkg: 0.05, sell: 0.04, kind: "平台" },
+    { name: "智控中枢平台", short: "智控平台", line: "洗碗机", stage: 2, fee: 1720, prog: 62,
+      note: "共性技术 · 对齐故障件「电控板」", m0: 12, price: 1880, vol: 26.0, mfg: 0.13, pkg: 0.04, sell: 0.04, kind: "平台" }
+  ];
+
+  /* 4.5 八份 BOM 规格（三层嵌套的**纯数组**：总成 → 部件 → 物料 [名, 单机成本(元), 故障高发件名]）
+         第三项非空 = 与 P4 品质管理 / P10 故障部件分析口径对齐的故障高发部件。
+         ★ 这里只有数组和字面量，节点之间没有任何对象引用，是防循环引用的第一道闸。
+         ★ 第 1 份（净享 X9）与上级页 净享 X7 的 BOM_SPEC 逐条相同 —— 页尾自检核对料本 2316 元。 */
+  const BOM_SPEC = [
+    /* 0 净享 X9 洗碗机 —— 与上级页 净享 X7 同源 */
+    [["洗涤总成", [
+        ["喷淋部件", [["上喷淋臂", 68], ["下喷淋臂", 74], ["喷淋分配阀", 52]]],
+        ["洗涤泵部件", [["洗涤泵电机", 186], ["泵体壳", 46], ["泵轴密封圈", 18, "密封圈"]]],
+        ["加热部件", [["加热管", 92], ["温控探头", 26]]]]],
+     ["电控总成", [
+        ["主控部件", [["主控电控板", 238, "电控板"], ["电源模块", 86]]],
+        ["交互部件", [["触控面板玻璃", 74, "面板玻璃"], ["显示驱动板", 42]]],
+        ["线束部件", [["主线束端子", 38, "线束端子"], ["传感线束", 24]]]]],
+     ["门体总成", [
+        ["门板部件", [["外门板", 96], ["内门胆", 78]]],
+        ["密封部件", [["门封密封圈", 32, "密封圈"], ["门铰链", 44]]],
+        ["锁扣部件", [["门锁开关", 28], ["阻尼器", 36]]]]],
+     ["循环水路总成", [
+        ["进排水部件", [["进水阀", 42], ["排水泵", 78], ["波纹管", 22]]],
+        ["过滤部件", [["粗滤网", 16], ["精滤芯", 34]]],
+        ["软水部件", [["软水器", 88], ["树脂料", 46]]]]],
+     ["箱体结构总成", [
+        ["内胆部件", [["不锈钢内胆", 268, "腔体内胆"], ["隔音棉", 38]]],
+        ["框架部件", [["底盘结构件", 84, "结构件"], ["侧板", 62]]],
+        ["支撑部件", [["碗篮组件", 112], ["滑轨", 48]]]]]],
+    /* 1 风语 K10 烟机 */
+    [["风机总成", [
+        ["电机部件", [["风机电机", 268], ["电机支架", 44]]],
+        ["蜗壳部件", [["蜗壳", 96], ["叶轮", 82]]],
+        ["减振部件", [["减振垫", 22], ["平衡环", 18]]]]],
+     ["集烟总成", [
+        ["烟罩部件", [["拢烟罩", 118], ["导流板", 54]]],
+        ["油网部件", [["多层油网", 66], ["集油盒", 28]]]]],
+     ["电控总成", [
+        ["主控部件", [["主控电控板", 186, "电控板"], ["电源模块", 62]]],
+        ["交互部件", [["触控面板玻璃", 88, "面板玻璃"], ["感应模块", 46]]],
+        ["线束部件", [["主线束端子", 32, "线束端子"], ["传感线束", 20]]]]],
+     ["排烟总成", [
+        ["风道部件", [["止回阀", 38], ["排烟管", 44]]],
+        ["密封部件", [["风道密封圈", 24, "密封圈"]]]]],
+     ["箱体结构总成", [
+        ["外壳部件", [["不锈钢外壳", 132], ["侧板", 48]]],
+        ["支撑部件", [["挂装结构件", 58, "结构件"]]]]]],
+    /* 2 悦烤 S7 蒸烤 */
+    [["腔体总成", [
+        ["内胆部件", [["搪瓷腔体内胆", 386, "腔体内胆"], ["易洁涂层料", 74]]],
+        ["隔热部件", [["隔热棉", 56], ["反射板", 42]]]]],
+     ["蒸汽总成", [
+        ["发生器部件", [["蒸汽发生器", 318], ["循环水泵", 88]]],
+        ["水路部件", [["水箱", 62], ["进水管", 24]]]]],
+     ["加热总成", [
+        ["上加热部件", [["上加热管", 96], ["温控探头", 26]]],
+        ["下加热部件", [["下加热管", 92], ["热风电机", 138]]]]],
+     ["电控总成", [
+        ["主控部件", [["主控电控板", 246, "电控板"], ["电源模块", 84]]],
+        ["交互部件", [["触控面板玻璃", 96, "面板玻璃"], ["显示驱动板", 48]]],
+        ["线束部件", [["主线束端子", 36, "线束端子"]]]]],
+     ["门体总成", [
+        ["门板部件", [["三层隔热玻璃门", 168], ["门铰链", 52]]],
+        ["密封部件", [["腔体密封圈", 38, "密封圈"]]]]]],
+    /* 3 净澈 W5 净水 */
+    [["滤芯总成", [
+        ["前置部件", [["PP 棉滤芯", 32], ["活性炭滤芯", 46]]],
+        ["RO 部件", [["长效 RO 膜", 268], ["膜壳", 54]]],
+        ["后置部件", [["后置碳棒", 38]]]]],
+     ["水路总成", [
+        ["增压部件", [["增压泵", 118], ["逆止阀", 22]]],
+        ["阀体部件", [["进水电磁阀", 42], ["废水比例阀", 36]]],
+        ["密封部件", [["水路密封圈", 18, "密封圈"]]]]],
+     ["电控总成", [
+        ["主控部件", [["主控电控板", 156, "电控板"], ["电源适配器", 64]]],
+        ["检测部件", [["TDS 传感器", 34], ["流量传感器", 28]]],
+        ["线束部件", [["主线束端子", 26, "线束端子"]]]]],
+     ["箱体结构总成", [
+        ["外壳部件", [["前面板玻璃", 62, "面板玻璃"], ["机身结构件", 74, "结构件"]]],
+        ["支撑部件", [["滤瓶支架", 38]]]]]],
+    /* 4 星焰 P11 集成灶 */
+    [["下排烟总成", [
+        ["风机部件", [["大风压风机电机", 368], ["蜗壳", 118]]],
+        ["风道部件", [["下排风道结构件", 186, "结构件"], ["止回阀", 46]]],
+        ["降噪部件", [["降噪棉", 42], ["减振垫", 26]]]]],
+     ["灶具总成", [
+        ["燃烧部件", [["燃烧器", 198], ["分火盖", 62]]],
+        ["点火部件", [["点火针", 34, "点火针"], ["熄火保护针", 38]]],
+        ["面板部件", [["钢化玻璃面板", 148, "面板玻璃"], ["锅支架", 76]]]]],
+     ["蒸烤腔总成", [
+        ["腔体部件", [["蒸烤腔内胆", 328, "腔体内胆"], ["隔热棉", 52]]],
+        ["加热部件", [["加热管", 96], ["蒸汽发生器", 176]]]]],
+     ["电控总成", [
+        ["主控部件", [["主控电控板", 226, "电控板"], ["电源模块", 78]]],
+        ["交互部件", [["触控显示屏", 148], ["旋钮编码器", 32]]],
+        ["线束部件", [["主线束端子", 42, "线束端子"]]]]],
+     ["箱体结构总成", [
+        ["框架部件", [["箱体结构件", 208, "结构件"], ["侧板", 72]]],
+        ["密封部件", [["腔体密封圈", 34, "密封圈"], ["灶面密封条", 22]]]]]],
+    /* 5 炽焰 G8 灶具 */
+    [["燃烧总成", [
+        ["燃烧器部件", [["铜火盖", 96], ["炉头", 68]]],
+        ["供气部件", [["燃气阀体", 82], ["喷嘴", 18]]],
+        ["点火部件", [["快启点火针", 42, "点火针"], ["熄火保护针", 36]]]]],
+     ["面板总成", [
+        ["面板部件", [["钢化玻璃面板", 128, "面板玻璃"], ["面板边框", 46]]],
+        ["支撑部件", [["铸铁锅支架", 88], ["底盘结构件", 62, "结构件"]]]]],
+     ["电控总成", [
+        ["主控部件", [["脉冲点火电控板", 78, "电控板"]]],
+        ["线束部件", [["点火线束端子", 24, "线束端子"]]]]],
+     ["密封总成", [
+        ["密封部件", [["进气密封圈", 16, "密封圈"], ["面板密封条", 14]]]]]],
+    /* 6 静音风机平台（模组，非整机） */
+    [["风机总成", [
+        ["电机部件", [["低噪直流电机", 312], ["电机支架", 46]]],
+        ["叶轮部件", [["静音叶轮", 128], ["动平衡环", 34]]],
+        ["蜗壳部件", [["流线蜗壳", 108]]]]],
+     ["降噪总成", [
+        ["隔声部件", [["隔声棉", 58], ["阻尼板", 42]]],
+        ["减振部件", [["减振垫", 26], ["柔性接管", 22]]]]],
+     ["风道总成", [
+        ["导流部件", [["导流结构件", 86, "结构件"], ["消声器", 74]]],
+        ["密封部件", [["风道密封圈", 28, "密封圈"]]]]],
+     ["电控总成", [
+        ["驱动部件", [["无刷驱动电控板", 196, "电控板"], ["电源模块", 68]]],
+        ["感知部件", [["转速传感器", 32], ["风压传感器", 38]]],
+        ["线束部件", [["驱动线束端子", 30, "线束端子"]]]]]],
+    /* 7 智控中枢平台（模组，非整机） */
+    [["主控总成", [
+        ["计算部件", [["主控 SoC 电控板", 268, "电控板"], ["存储模块", 86]]],
+        ["电源部件", [["电源模块", 74], ["滤波模块", 32]]]]],
+     ["通信总成", [
+        ["无线部件", [["WiFi/BLE 模组", 118], ["天线组件", 26]]],
+        ["网关部件", [["总线网关板", 96]]]]],
+     ["交互总成", [
+        ["显示部件", [["触控面板玻璃", 92, "面板玻璃"], ["显示驱动板", 54]]],
+        ["语音部件", [["麦克风阵列", 68], ["功放模组", 42]]]]],
+     ["感知总成", [
+        ["传感部件", [["浊度传感器", 46], ["温度传感器", 24], ["水位传感器", 28]]],
+        ["安全部件", [["漏水检测模组", 38]]]]],
+     ["线束总成", [
+        ["连接部件", [["主线束端子", 34, "线束端子"], ["传感线束", 26]]]]]]
+  ];
+
+  /* 4.6 风险项清单（每项目 3 条，lv 决定颜色与排序；stg 是责任阶段的索引） */
+  const RISKS = [
+    [["高", 3, "洗涤泵电机供应商产能爬坡滞后，试产批次交付缺口 12%"],
+     ["中", 2, "门封密封圈 1200 次耐久后压缩永久变形超标，需换配方"],
+     ["低", 4, "目标毛利率为八项在研最低，需靠料本谈判回补"]],
+    [["高", 2, "大风压平台风机噪声 58.6 dB(A)，距 56 dB 目标仍差 2.6"],
+     ["中", 1, "触控面板玻璃指纹残留复评未过，涂层方案待二选一"],
+     ["低", 3, "蜗壳注塑开模周期 45 天，压缩试产窗口"]],
+    [["高", 1, "易洁涂层换代仅 1 家合格供应商，单点供应未解除"],
+     ["中", 1, "搪瓷腔体内胆单件 386 元，为全 BOM 最贵物料"],
+     ["低", 2, "蒸汽发生器结垢试验尚未排期，样机 8 月到位"]],
+    [["高", 3, "长效 RO 膜 3000L 通量衰减 14%，逼近 15% 判定线"],
+     ["中", 3, "增压泵异响批次占比 3.2%，需锁定轴承供应商"],
+     ["低", 4, "滤芯更换成本宣称口径待法务复核"]],
+    [["高", 2, "下排风道重构后灶面温升 +6℃，安规复测未通过"],
+     ["中", 2, "大风压风机电机 368 元，推高整机料本率"],
+     ["低", 1, "台面开孔尺寸与三家橱柜厂标准不兼容"]],
+    [["高", 0, "快启点火 0.8s 目标缺乏对标数据，指标可行性待验证"],
+     ["中", 0, "项目投入为八项最低，试验检测预算偏紧"],
+     ["低", 1, "铸铁锅支架涂层供应商需重新认证"]],
+    [["高", 1, "需同时适配烟机与集成灶两种风道，接口尚未冻结"],
+     ["中", 1, "无刷驱动板与智控中枢平台的通信协议未对齐"],
+     ["低", 2, "隔声棉阻燃等级需补 UL94 V-0 认证"]],
+    [["高", 2, "主控 SoC 单一货源、交期 26 周，缺料风险最高"],
+     ["中", 2, "六产品线固件分支合并冲突，OTA 回滚链路未验证"],
+     ["低", 3, "语音功放模组功耗超设计值 0.6W"]]
+  ];
+
+  /* 4.7 试验类型池（编号一律杜撰，不指向任何真实报告） */
+  const TRIAL_TYPES = ["可靠性寿命", "能效实测", "安规耐压", "噪声与振动", "高低温冲击", "电磁兼容", "跌落运输"];
+
+  /* ===== 5. 派生量：全部现算，页面上不出现任何硬编码的合计值 ===== */
+  const D = {};
+
+  /* 5.1 五类研发投入 → 近 12 月合计与研发费率（与上级页同公式、同结果） */
+  RD_CATS.forEach((c) => {
+    c.series = Array.from({ length: RD_N }, (_, i) => {
+      const trend = c.base * (1 + c.growth * (i - (RD_N - 1) / 2) / (RD_N - 1));
+      return Math.round(trend + c.amp * Math.sin(i * c.w + c.ph));
+    });
+    c.last12 = sum(c.series.slice(12));
+  });
+  D.rdWan12 = sum(RD_CATS.map((c) => c.last12));
+  D.rd12 = wan2yi(D.rdWan12);
+  D.rdRate = D.rd12 / BASE.revenue * 100;
+  RD_CATS.forEach((c) => { c.share12 = c.last12 / D.rdWan12 * 100; });
+
+  /* 5.2 时间轴口径：月序 0 = 2025-01；今日 = 2026-07-31 */
+  const TODAY_F = (2026 - 2025) * 12 + 6 + 30 / 31;
+  const LEAD = sum(STAGE_LEN);                                   /* 上市前置周期 = 11 个月 */
+  const CUM_LEN = [0];
+  STAGE_LEN.forEach((l) => CUM_LEN.push(CUM_LEN[CUM_LEN.length - 1] + l));   /* [0,2.5,6,8.5,11] */
+  /* 月序浮点 → YYYY-MM-DD（小数部分按 28 天折算，得到确定性的日） */
+  function dFmt(f) {
+    const k = Math.floor(f);
+    const day = clamp(1 + Math.round((f - k) * 27), 1, 28);
+    return (2025 + Math.floor(k / 12)) + "-" + pad((k % 12) + 1) + "-" + pad(day);
+  }
+  const ymFmt = (f) => { const k = Math.floor(f); return (2025 + Math.floor(k / 12)) + "-" + pad((k % 12) + 1); };
+
+  /* 5.3 逐项目派生：BOM 展开 / 里程碑 / 投入执行 / 成本构成 / 试验记录 */
+  PROJECTS.forEach((p, i) => {
+    p.idx = i;
+    p.lineShort = LINE_META[LINE_IDX[p.line]].short;
+    p.color = LINE_META[LINE_IDX[p.line]].color;
+    p.stageName = STAGE_NAMES[p.stage];
+    p.bench = STAGE_BENCH[p.stage];
+    p.gap = p.prog - p.bench;
+    p.verdict = p.gap >= 5 ? { t: "领先", c: "is-good" }
+              : p.gap >= -8 ? { t: "正常", c: "is-mid" }
+              : { t: "滞后", c: "is-bad" };
+
+    /* 5.3.1 BOM 展开：规格数组 → 层级数组 + 逐层求和（子 → 父，绝不反向持有引用） */
+    p.bom = BOM_SPEC[i].map((asm) => ({
+      name: asm[0],
+      parts: asm[1].map((prt) => ({
+        name: prt[0],
+        mats: prt[1].map((m) => ({ name: m[0], cost: m[1], risk: m[2] || "" }))
+      }))
+    }));
+    p.bom.forEach((asm) => {
+      asm.parts.forEach((prt) => { prt.cost = sum(prt.mats.map((m) => m.cost)); });
+      asm.cost = sum(asm.parts.map((q) => q.cost));
+    });
+    p.bomCost = sum(p.bom.map((a) => a.cost));                       /* 单机料本（元） */
+    p.bomPartSum = sum(p.bom.map((a) => sum(a.parts.map((q) => q.cost))));
+    p.bomMatSum = sum(p.bom.map((a) => sum(a.parts.map((q) => sum(q.mats.map((m) => m.cost))))));
+    p.asmCnt = p.bom.length;
+    p.partCnt = sum(p.bom.map((a) => a.parts.length));
+    p.matCnt = sum(p.bom.map((a) => sum(a.parts.map((q) => q.mats.length))));
+    p.riskCost = 0; p.riskCnt = 0;
+    /* 扁平索引：name → 纯标量信息，供 tooltip 反查父级，杜绝节点回指 */
+    p.info = {};
+    p.info[p.short] = { level: p.kind, cost: p.bomCost, parent: "—", risk: "", kids: p.asmCnt, kidName: "总成" };
+    p.bom.forEach((asm) => {
+      p.info[asm.name] = { level: "总成", cost: asm.cost, parent: p.short, risk: "", kids: asm.parts.length, kidName: "部件" };
+      asm.parts.forEach((prt) => {
+        p.info[prt.name] = { level: "部件", cost: prt.cost, parent: asm.name, risk: "", kids: prt.mats.length, kidName: "物料" };
+        prt.mats.forEach((m) => {
+          p.info[m.name] = { level: "物料", cost: m.cost, parent: prt.name, risk: m.risk, kids: 0, kidName: "" };
+          if (m.risk) { p.riskCost += m.cost; p.riskCnt += 1; }
+        });
+      });
+    });
+    p.riskShare = p.riskCost / p.bomCost * 100;
+    p.bomRate = p.bomCost / p.price * 100;
+    p.asmTop = p.bom.slice().sort((a, b) => b.cost - a.cost)[0];
+    p.matTop = [].concat.apply([], p.bom.map((a) => [].concat.apply([], a.parts.map((q) => q.mats))))
+      .slice().sort((a, b) => b.cost - a.cost)[0];
+
+    /* 5.3.2 里程碑：由立项月序 m0 + STAGE_LEN 推出五段起止与五道门评审日 */
+    p.elapsed = TODAY_F - p.m0;
+    p.launchF = p.m0 + LEAD;
+    p.toLaunch = p.launchF - TODAY_F;
+    p.calcStage = 4;
+    for (let s = 0; s < 4; s++) { if (p.elapsed >= CUM_LEN[s] && p.elapsed < CUM_LEN[s + 1]) { p.calcStage = s; break; } }
+    p.ms = STAGE_NAMES.map((nm, si) => {
+      const s = p.m0 + (si < 4 ? CUM_LEN[si] : LEAD);
+      const e = si < 4 ? p.m0 + CUM_LEN[si + 1] : p.launchF;
+      const state = si < p.stage ? "done" : (si === p.stage ? "live" : "todo");
+      /* 已过的门：结论确定（不用 Math.random，kiosk 每次打开必须一致）；
+         当前段的门待评审；未开始的段不显示结论。 */
+      const cond = ((i * 3 + si * 5) % 7) === 1;
+      const g = GATES[si];
+      return {
+        si: si, name: nm, s: s, e: e, state: state, gateName: g.name, gateKey: g.key,
+        gateRate: g.rate, gateNote: g.note, gateColor: g.color,
+        result: state === "done" ? (cond ? "有条件通过" : "已通过") : (state === "live" ? "待评审" : "未开始"),
+        badge: state === "done" ? (cond ? "is-mid" : "is-good") : (state === "live" ? "is-live" : "is-todo"),
+        gateDate: dFmt(e)
+      };
+    });
+    p.gatePassed = p.ms.filter((m) => m.state === "done").length;
+    p.gateCond = p.ms.filter((m) => m.result === "有条件通过").length;
+    /* 已过门的累计通过率 = 逐门相乘 */
+    p.gateCum = p.ms.filter((m) => m.state === "done").reduce((a, m) => a * m.gateRate / 100, 100);
+
+    /* 5.3.3 投入执行：五类实际 = 项目投入按「集团五类结构 × 项目确定性偏置」拆分，
+             末类取余数保证 Σ 实际 ≡ p.fee；预算 = 实际 ÷ 执行率（执行率随进度走）。 */
+    const w = RD_CATS.map((c, k) => c.share12 * (1 + 0.5 * Math.sin(i * 1.9 + k * 1.3)));
+    const wSum = sum(w);
+    p.actual = w.map((x, k) => (k < 4 ? Math.round(p.fee * x / wSum) : 0));
+    p.actual[4] = p.fee - sum(p.actual.slice(0, 4));
+    p.exec = RD_CATS.map((c, k) => clamp(p.prog / 100 * (1.04 + 0.20 * Math.sin(i * 2.3 + k * 0.9)), 0.12, 0.985));
+    p.budget = p.actual.map((a, k) => Math.round(a / p.exec[k]));
+    p.budgetTotal = sum(p.budget);
+    p.actualTotal = sum(p.actual);
+    p.execAll = p.actualTotal / p.budgetTotal * 100;
+    p.feeTop = RD_CATS.map((c, k) => ({ name: c.name, v: p.actual[k] })).sort((a, b) => b.v - a.v)[0];
+
+    /* 5.3.4 单台目标成本构成：售价 = 六项之和（毛利取残差，毛利率现算） */
+    p.cAmort = p.fee * 10000 / (p.vol * 10000 * 3);                 /* 研发摊销 = 项目投入 ÷ 三年生命周期销量 */
+    p.cMfg = p.bomCost * p.mfg;
+    p.cPkg = p.bomCost * p.pkg;
+    p.cSell = p.price * p.sell;
+    p.cGross = p.price - (p.bomCost + p.cMfg + p.cAmort + p.cPkg + p.cSell);
+    p.grossRate = p.cGross / p.price * 100;
+    p.costParts = [
+      { name: "料本", v: p.bomCost, color: C.cyan },
+      { name: "制造费用", v: p.cMfg, color: C.blue },
+      { name: "研发摊销", v: p.cAmort, color: C.violet },
+      { name: "包装与物流", v: p.cPkg, color: C.green },
+      { name: "销售费用", v: p.cSell, color: C.orange },
+      { name: "目标毛利", v: p.cGross, color: C.amber }
+    ];
+    p.costSum = sum(p.costParts.map((x) => x.v));
+
+    /* 5.3.5 试验与检测记录：条数随进度、日期落在已发生的窗口内，编号 / 类型 / 结论全确定性 */
+    const cnt = 4 + Math.floor(p.prog / 30);
+    const t0 = p.m0 + 0.6;
+    const t1 = Math.min(TODAY_F - 0.15, p.m0 + 10.6);
+    p.trials = Array.from({ length: cnt }, (_, k) => {
+      const r = (i * 5 + k * 3) % 9;
+      const res = r === 2 ? { t: "复测", c: "is-mid" } : (r === 7 ? { t: "不通过", c: "is-bad" } : { t: "通过", c: "is-good" });
+      return {
+        no: "TR-26-" + String(401 + i * 137 + k * 29).slice(-4),
+        type: TRIAL_TYPES[(i * 2 + k) % TRIAL_TYPES.length],
+        n: 3 + ((i + k * 2) % 5),
+        date: dFmt(t0 + (t1 - t0) * (k + 0.5) / cnt),
+        res: res.t, badge: res.c
+      };
+    });
+    p.trialPass = p.trials.filter((t) => t.res === "通过").length;
+    p.trialRetest = p.trials.filter((t) => t.res === "复测").length;
+    p.trialFail = p.trials.filter((t) => t.res === "不通过").length;
+    p.trialRate = p.trialPass / p.trials.length * 100;
+
+    /* 5.3.6 风险项 */
+    const LV = { "高": { c: C.red, k: "is-bad" }, "中": { c: C.orange, k: "is-mid" }, "低": { c: C.amber, k: "is-todo" } };
+    p.risks = RISKS[i].map((r) => ({ lv: r[0], color: LV[r[0]].c, badge: LV[r[0]].k, stage: STAGE_NAMES[r[1]], text: r[2] }));
+    p.riskHigh = p.risks.filter((r) => r.lv === "高").length;
+  });
+
+  /* 5.4 组合层派生 */
+  D.projCnt = PROJECTS.length;
+  D.feeWan = sum(PROJECTS.map((p) => p.fee));                       /* = 上级页在研项目合计 10560 万元 */
+  D.feeYi = wan2yi(D.feeWan);
+  D.feeShare = D.feeWan / D.rdWan12 * 100;                          /* 在研占近 12 月研发投入 */
+  D.late = PROJECTS.filter((p) => p.verdict.t === "滞后");
+  D.lead = PROJECTS.filter((p) => p.verdict.t === "领先");
+  D.avgProg = sum(PROJECTS.map((p) => p.prog)) / D.projCnt;
+  D.gateCumAll = GATES.reduce((a, g) => a * g.rate / 100, 100);
+  D.gateWorst = GATES.slice().sort((a, b) => a.rate - b.rate)[0];
+  D.riskHighAll = sum(PROJECTS.map((p) => p.riskHigh));
+  D.trialAll = sum(PROJECTS.map((p) => p.trials.length));
+  D.trialFailAll = sum(PROJECTS.map((p) => p.trialFail));
+  D.nearest = PROJECTS.slice().sort((a, b) => a.launchF - b.launchF)[0];
+  D.feeTop = PROJECTS.slice().sort((a, b) => b.fee - a.fee)[0];
+
+  /* ===== 6. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("xf-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("xf-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("xf-meta-proj").textContent = String(D.projCnt);
+
+  /* ===== 7. hash 传参：打开时按 #<项目名> 定位，未命中落第 0 个 =====
+         对象名 = 上级页在研项目表里的项目名（全名），简称与去空格写法也认。 */
+  const PARENT = "大屏样板间-厨电研发与新品孵化1920.html";
+  const norm = (s) => String(s).replace(/\s+/g, "").toUpperCase();
+  const HASH_ALIAS = {};
+  PROJECTS.forEach((p, i) => {
+    [p.name, p.short, p.name.replace(/\s+/g, ""), p.short + " " + p.line, p.line + p.short].forEach((k) => {
+      const kk = norm(k);
+      if (HASH_ALIAS[kk] === undefined) HASH_ALIAS[kk] = i;
+    });
+  });
+  function hashIdx() {
+    let h = "";
+    try { h = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim(); }
+    catch (e) { h = (location.hash || "").replace(/^#/, "").trim(); }        /* 坏码兜底：按原文匹配 */
+    if (!h) return -1;
+    const hit = HASH_ALIAS[norm(h)];
+    return hit === undefined ? -1 : hit;
+  }
+  let idx = Math.max(0, hashIdx());
+
+  /* ===== 8. 静态 DOM 骨架（★ 必须在 echarts.init 之前把与图表同属 flex 容器的兄弟块填满）
+         .xf-panel-head 是 .xf-chart 的 flex 兄弟，若等到 init 之后再写文案，
+         它会把 flex:1 的图表容器压矮、图表按旧高度布局（本专题物流线路详情页栽过）。
+         左栏清单 / 右栏试验表 / 风险清单三块另外写死了高度 + overflow:hidden，双保险。 ===== */
+
+  /* 8.1 KPI 带骨架（5 枚，数值由 renderKpi 翻牌） */
+  const KPI_META = [
+    { icon: "◈", label: "项目投入",   unit: "万元", dec: 0, warn: false },
+    { icon: "▤", label: "项目进度",   unit: "%",    dec: 0, warn: false },
+    { icon: "⛭", label: "当前阶段门", unit: "/ 5",  dec: 0, warn: false },
+    { icon: "⏱", label: "距预计上市", unit: "个月", dec: 1, warn: false },
+    { icon: "％", label: "目标毛利率", unit: "%",    dec: 1, warn: true }
+  ];
+  $("xf-band").innerHTML = KPI_META.map((k, i) => (
+    '<div class="xf-kpi' + (k.warn ? " is-warn" : "") + '" id="xf-kpicard-' + i + '">' +
+      '<div class="xf-kpi-icon">' + k.icon + "</div>" +
+      '<div class="xf-kpi-main">' +
+        '<div class="xf-kpi-label">' + k.label + "</div>" +
+        '<div class="xf-kpi-num"><span class="xf-kpi-val" id="xf-kpi-' + i + '">0</span><span class="xf-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="xf-kpi-sub" id="xf-kpisub-' + i + '">—</div>' +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，0.9 秒收敛；每次切项目换一代 token，旧动画自动作废 */
+  const kpiGen = KPI_META.map(() => 0);
+  function countUp(i, target, dec) {
+    const el = $("xf-kpi-" + i), g = ++kpiGen[i];
+    const from = parseFloat(String(el.textContent).replace(/,/g, "")) || 0;
+    const dur = 900, t0 = performance.now();
+    (function step(now) {
+      if (kpiGen[i] !== g) return;
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      const v = from + (target - from) * e;
+      el.textContent = dec === 0 ? fmtInt(v) : fmtDec(v, dec);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = dec === 0 ? fmtInt(target) : fmtDec(target, dec);
+    })(t0);
+  }
+
+  /* 8.2 项目切换器 + 左栏清单（两处都能切，内容一次性铺满，之后只改 class） */
+  $("xf-switcher").innerHTML = PROJECTS.map((p, i) => (
+    '<button class="xf-sw" type="button" data-i="' + i + '" title="' + p.name + " · " + p.note + '">' +
+      "<b>" + p.short + "</b><i>" + p.stageName + " " + p.prog + "%</i>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from($("xf-switcher").children);
+
+  $("xf-plist-body").innerHTML = PROJECTS.map((p, i) => (
+    '<li data-i="' + i + '" title="' + p.name + " · " + p.note + '">' +
+      "<span><b>" + p.short + "</b></span>" +
+      '<span style="color:' + p.color + '">' + p.lineShort + "</span>" +
+      "<span>" + p.stageName + "</span>" +
+      "<span>" + p.fee + "</span>" +
+      '<span><span class="xf-prog"><u style="width:' + p.prog + "%;background:" +
+        (p.gap >= 5 ? C.green : p.gap >= -8 ? C.cyan : C.orange) + '"></u><em>' + p.prog + "%</em></span></span>" +
+    "</li>"
+  )).join("");
+  const listRows = Array.from($("xf-plist-body").children);
+  $("xf-plist-tag").innerHTML = "合计投入 <b>" + fmtInt(D.feeWan) + "</b> 万元 · 均进度 " + fmtDec(D.avgProg, 0) + "%";
+
+  /* 8.3 里程碑 / 档案 / 试验表 / 风险清单：先按第 0 个项目铺满骨架（高度自此固定） */
+  function renderMilestones(p) {
+    $("xf-ms-list").innerHTML = p.ms.map((m) => (
+      '<div class="xf-ms is-' + m.state + '" data-si="' + m.si + '">' +
+        '<div class="xf-ms-no" style="background:' + (m.state === "todo" ? "rgba(127,166,163,.45)" : m.gateColor) + '">' + (m.si + 1) + "</div>" +
+        '<div class="xf-ms-body">' +
+          '<div class="xf-ms-l1"><b>' + m.name + "</b><span>" +
+            (m.si === 4 ? "计划上市 " + dFmt(m.s) : dFmt(m.s) + " → " + dFmt(m.e)) +
+          '</span><em class="xf-badge ' + m.badge + '">' + m.result + "</em></div>" +
+          '<div class="xf-ms-l2"><i>' + m.gateKey + " 门 · " + m.gateNote + "</i><u>通过率 " +
+            fmtDec(m.gateRate, 1) + " % · " + (m.state === "todo" ? "计划 " : "评审 ") + m.gateDate + "</u></div>" +
+        "</div>" +
+      "</div>"
+    )).join("");
+    $("xf-ms-tag").innerHTML = "已过 <b>" + p.gatePassed + "</b> / 5 道 · 累计通过 " +
+      (p.gatePassed ? fmtDec(p.gateCum, 1) + "%" : "— 尚未过门");
+  }
+  function renderDossier(p) {
+    const F = [
+      ["所属产品线", p.line],
+      ["项目类型", p.kind === "平台" ? "共性技术平台" : "整机项目"],
+      ["立项日期", dFmt(p.m0)],
+      ["预计上市", ymFmt(p.launchF)],
+      [p.kind === "平台" ? "模组结算价" : "目标售价", fmtInt(p.price) + " 元"],
+      ["预计年销量", fmtDec(p.vol, 1) + " 万台"]
+    ];
+    $("xf-dossier").innerHTML = F.map((f) => (
+      '<div class="xf-dz"><span>' + f[0] + "</span><b>" + f[1] + "</b></div>"
+    )).join("");
+    $("xf-dz-tag").innerHTML = "单机研发摊销 <b>" + fmtDec(p.cAmort, 1) + "</b> 元 · 前置 " + fmtDec(LEAD, 0) + " 个月";
+  }
+  function renderTrials(p) {
+    $("xf-trial-body").innerHTML = p.trials.map((t) => (
+      "<li>" +
+        '<span class="xf-no">' + t.no + "</span>" +
+        "<span>" + t.type + "</span>" +
+        "<span>" + t.n + "</span>" +
+        "<span>" + t.date + "</span>" +
+        '<span class="xf-badge ' + t.badge + '">' + t.res + "</span>" +
+      "</li>"
+    )).join("");
+    $("xf-trial-tag").innerHTML = "共 <b>" + p.trials.length + "</b> 项 · 通过率 " + fmtDec(p.trialRate, 0) +
+      "% · 复测 " + p.trialRetest + " / 不通过 " + p.trialFail;
+  }
+  function renderRisks(p) {
+    $("xf-risks").innerHTML = p.risks.map((r) => (
+      '<div class="xf-risk" style="box-shadow: inset 2px 0 0 ' + r.color + '">' +
+        '<span class="xf-badge ' + r.badge + '">' + r.lv + "</span>" +
+        '<div class="xf-risk-body"><b>' + r.text + "</b><span>责任阶段 · " + r.stage + "</span></div>" +
+      "</div>"
+    )).join("");
+    $("xf-risk-tag").innerHTML = "高风险 <b>" + p.riskHigh + "</b> 项 · 全量在研 " + D.riskHighAll + " 项";
+  }
+  /* 面板头 tag 也必须先写好：它是图表容器的 flex 兄弟 */
+  function renderTags(p) {
+    $("xf-bom-tag").innerHTML = p.asmCnt + " 总成 / " + p.partCnt + " 部件 / " + p.matCnt +
+      " 物料 · 料本 <b>" + fmtInt(p.bomCost) + "</b> 元";
+    $("xf-cost-tag").innerHTML = (p.kind === "平台" ? "模组结算价 " : "目标售价 ") + fmtInt(p.price) +
+      " 元 · 毛利率 <b>" + fmtDec(p.grossRate, 1) + "%</b>";
+    $("xf-fee-tag").innerHTML = "预算 " + fmtInt(p.budgetTotal) + " 万元 · 已投 <b>" + fmtInt(p.fee) +
+      "</b> 万元 · 执行 " + fmtDec(p.execAll, 0) + "%";
+  }
+  renderMilestones(PROJECTS[idx]);
+  renderDossier(PROJECTS[idx]);
+  renderTrials(PROJECTS[idx]);
+  renderRisks(PROJECTS[idx]);
+  renderTags(PROJECTS[idx]);
+
+  /* 8.4 底部项目研判滚动条（文案里的数字全部由派生量现算） */
+  const TICKS = [
+    { lv: "投入", c: C.cyan, t: "八项在研累计投入 " + fmtInt(D.feeWan) + " 万元（" + fmtDec(D.feeYi, 3) +
+        " 亿元），与上级页在研项目合计同源；占近 12 月研发投入 " + fmtDec(D.rd12, 2) + " 亿元的 " + fmtDec(D.feeShare, 1) + "%" },
+    { lv: "费率", c: C.blue, t: "近 12 月研发费率 " + fmtDec(D.rdRate, 2) + "%（= 研发投入 ÷ 年营收 " +
+        fmtDec(BASE.revenue, 1) + " 亿元），本页按上级页同一波形现算，不抄结论" },
+    { lv: "进度", c: C.green, t: "八项平均进度 " + fmtDec(D.avgProg, 1) + "%，领先 " + D.lead.length + " 项、滞后 " +
+        D.late.length + " 项" + (D.late.length ? "（" + D.late.map((p) => p.short).join("、") + "）" : "") },
+    { lv: "上市", c: C.amber, t: "最近一个上市窗口是「" + D.nearest.short + "」" + ymFmt(D.nearest.launchF) +
+        "，距今 " + fmtDec(D.nearest.toLaunch, 1) + " 个月；立项到上市前置 " + fmtDec(LEAD, 0) + " 个月" },
+    { lv: "门评", c: C.violet, t: "阶段门最窄一道是「" + D.gateWorst.name + "」" + fmtDec(D.gateWorst.rate, 1) +
+        "%，五道门累计通过 " + fmtDec(D.gateCumAll, 1) + "%（逐门相乘）" },
+    { lv: "试验", c: C.orange, t: "八项累计试验 " + D.trialAll + " 项，不通过 " + D.trialFailAll +
+        " 项；投入最大的是「" + D.feeTop.short + "」" + D.feeTop.fee + " 万元" },
+    { lv: "风险", c: C.red, t: "高风险项合计 " + D.riskHighAll + " 条，集中在打样与试产两段；BOM 中的故障高发件与 P4 品质管理 / P10 故障部件分析口径对齐" }
+  ];
+  const track = $("xf-foot-track");
+  const tickHtml = TICKS.map((a) => (
+    '<div class="xf-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = tickHtml + tickHtml;                            /* 两份首尾相接，滚动无缝 */
+
+  /* ===== 9. 图表 =====
+     ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize()
+     ★ 循环引用红线：进 option 的 data 只放标量与数组；旭日的递归树每次现建纯对象，
+       子节点不持有父节点引用，tooltip 靠 name 去 p.info 反查。 */
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const TIP = (extra) => Object.assign({
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  }, extra || {});
+
+  const bomChart = echarts.init($("xf-chart-bom"));
+  const costChart = echarts.init($("xf-chart-cost"));
+  const feeChart = echarts.init($("xf-chart-fee"));
+
+  /* 9.1 ★ BOM 四层旭日（本页主角图；上级页用 tree 横向展开，本页换旭日做同数据的另一种表达）
+         整机 → 总成 → 部件 → 物料，环宽逐层收窄；故障高发件描红。
+         ★ 三个 xxNode() 每次调用都新建纯对象：只有 name / value / itemStyle / label / children，
+           没有任何指回父节点或业务对象的字段。 */
+  const RING_ALPHA = ["", "d8", "9c"];                              /* 总成 / 部件 / 物料 的透明度后缀 */
+  function matNode(m, base) {
+    return {
+      name: m.name,
+      value: m.cost,
+      itemStyle: { color: m.risk ? C.red + "b4" : base + RING_ALPHA[2], borderColor: "rgba(7,27,30,.9)", borderWidth: 1 },
+      label: { color: m.risk ? "#ffd9dc" : "#dff3f0" }
+    };
+  }
+  function partNode(q, base) {
+    return {
+      name: q.name,
+      value: q.cost,
+      itemStyle: { color: base + RING_ALPHA[1], borderColor: "rgba(7,27,30,.9)", borderWidth: 1.4 },
+      children: q.mats.map((m) => matNode(m, base))
+    };
+  }
+  function asmNode(a, base) {
+    return {
+      name: a.name,
+      value: a.cost,
+      itemStyle: { color: base, borderColor: "rgba(7,27,30,.92)", borderWidth: 1.8 },
+      label: { color: "#04191a", fontWeight: 700 },
+      children: a.parts.map((q) => partNode(q, base))
+    };
+  }
+  function bomOption(p) {
+    const info = p.info;                                            /* 闭包里读扁平表，option 里不放它 */
+    return {
+      backgroundColor: "transparent",
+      tooltip: TIP({
+        trigger: "item", confine: true,
+        formatter: (e) => {
+          const it = info[e.name];
+          if (!it) return e.name;
+          const share = it.cost / p.bomCost * 100;
+          return "<b>" + e.name + "</b>　<span style=\"color:" + C.textDim + "\">" + it.level + "</span><br/>" +
+            "成本 <b style=\"color:" + C.cyan + "\">" + fmtInt(it.cost) + "</b> 元 · 占料本 " + fmtDec(share, 1) + "%<br/>" +
+            "上级 " + it.parent + (it.kids ? "　下辖 " + it.kids + " " + it.kidName : "") +
+            (it.risk ? "<br/><span style=\"color:" + C.red + "\">故障高发件 · " + it.risk + "</span>" : "");
+        }
+      }),
+      series: [{
+        type: "sunburst",
+        center: ["50%", "52%"],
+        radius: [0, "94%"],
+        sort: null,
+        nodeClick: false,
+        emphasis: { focus: "ancestor" },
+        itemStyle: { borderColor: "rgba(7,27,30,.9)", borderWidth: 1 },
+        levels: [
+          {},                                                       /* levels[0] 是返回按钮位，留空 */
+          { r0: "0%", r: "24%",
+            label: { rotate: 0, fontSize: 11, lineHeight: 14, color: "#eafcfa", fontWeight: 700,
+              formatter: () => p.short + "\n" + fmtInt(p.bomCost) + " 元" },
+            itemStyle: { color: "rgba(12,50,54,.9)", borderColor: "rgba(53,224,208,.55)", borderWidth: 1.5 } },
+          { r0: "25%", r: "50%", label: { rotate: "tangential", fontSize: 11, minAngle: 6, overflow: "truncate", width: 74 } },
+          { r0: "51%", r: "72%", label: { rotate: "tangential", fontSize: 10, minAngle: 6, overflow: "truncate", width: 62 } },
+          { r0: "73%", r: "94%", label: { rotate: "radial", fontSize: 9, minAngle: 10, overflow: "truncate", width: 44 } }
+        ],
+        data: [{
+          name: p.short,
+          value: p.bomCost,
+          children: p.bom.map((a, k) => asmNode(a, C.series[k % C.series.length]))
+        }]
+      }]
+    };
+  }
+
+  /* 9.2 单台目标成本构成环形：六项之和恒等于售价，中心显示目标毛利率 */
+  function costOption(p) {
+    return {
+      backgroundColor: "transparent",
+      title: {
+        text: fmtDec(p.grossRate, 1) + "%", left: "27%", top: "42%", textAlign: "center",
+        textStyle: { color: p.grossRate >= 30 ? C.green : C.amber, fontSize: 24, fontWeight: 700,
+          fontFamily: "Bahnschrift, DIN Alternate, sans-serif" },
+        subtext: "目标毛利率", subtextStyle: { color: C.textDim, fontSize: 11 }, itemGap: 3
+      },
+      tooltip: TIP({
+        trigger: "item",
+        formatter: (e) => {
+          const v = p.costParts[e.dataIndex].v;
+          return "<b>" + e.name + "</b><br/>单台 <b style=\"color:" + C.cyan + "\">" + fmtDec(v, 1) +
+            "</b> 元 · 占售价 " + fmtDec(v / p.price * 100, 1) + "%<br/><span style=\"color:" + C.textDim +
+            "\">六项之和 = " + (p.kind === "平台" ? "模组结算价 " : "目标售价 ") + fmtInt(p.price) + " 元</span>";
+        }
+      }),
+      legend: {
+        orient: "vertical", right: 10, top: "center", itemWidth: 11, itemHeight: 8, itemGap: 9,
+        textStyle: { color: C.textDim, fontSize: 11 },
+        data: p.costParts.map((x) => x.name),
+        formatter: (name) => {
+          const x = p.costParts.filter((y) => y.name === name)[0];
+          return name + "  " + fmtDec(x.v, 0) + " 元  " + fmtDec(x.v / p.price * 100, 1) + "%";
+        }
+      },
+      series: [{
+        type: "pie", center: ["27%", "50%"], radius: ["52%", "78%"], avoidLabelOverlap: false,
+        label: { show: false }, labelLine: { show: false },
+        itemStyle: { borderColor: "rgba(7,27,30,.9)", borderWidth: 2, borderRadius: 3 },
+        data: p.costParts.map((x) => ({ name: x.name, value: Number(fmtDec(x.v, 1)), itemStyle: { color: x.color } }))
+      }]
+    };
+  }
+
+  /* 9.3 投入执行：五类研发投入的预算 vs 实际（横向分组条 + 执行率标签） */
+  function feeOption(p) {
+    const names = RD_CATS.map((c) => c.name);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 46, top: 26, bottom: 2, containLabel: true },
+      tooltip: TIP({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex;
+          return "<b>" + names[k] + "</b><br/>预算 <b>" + fmtInt(p.budget[k]) + "</b> 万元<br/>实际 <b style=\"color:" +
+            C.cyan + "\">" + fmtInt(p.actual[k]) + "</b> 万元<br/>执行率 <b style=\"color:" + C.amber + "\">" +
+            fmtDec(p.actual[k] / p.budget[k] * 100, 1) + "%</b><br/><span style=\"color:" + C.textDim +
+            "\">五类实际之和 = 项目投入 " + fmtInt(p.fee) + " 万元</span>";
+        }
+      }),
+      legend: { top: 0, right: 2, itemWidth: 13, itemHeight: 8, textStyle: { color: C.textDim, fontSize: 11 },
+        data: ["预算", "实际"] },
+      xAxis: { type: "value", axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10 }),
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false }, axisTick: { show: false } },
+      yAxis: { type: "category", inverse: true, data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 11 }) },
+      series: [
+        { name: "预算", type: "bar", barWidth: 9, barGap: "24%", data: p.budget.slice(),
+          itemStyle: { color: "rgba(79,168,232,.42)", borderRadius: [0, 3, 3, 0] } },
+        { name: "实际", type: "bar", barWidth: 9, data: p.actual.slice(),
+          itemStyle: { borderRadius: [0, 3, 3, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: C.cyanDeep }, { offset: 1, color: C.cyan }]) },
+          label: { show: true, position: "right", color: C.amber, fontSize: 10, fontWeight: 700,
+            formatter: (e) => fmtDec(p.actual[e.dataIndex] / p.budget[e.dataIndex] * 100, 0) + "%" } }
+      ]
+    };
+  }
+
+  /* ===== 10. 切换主流程：一次调用刷新页头 / KPI / 三图 / 四块 DOM ===== */
+  function renderKpi(p) {
+    const vals = [p.fee, p.prog, p.stage + 1, Math.max(0, p.toLaunch), p.grossRate];
+    const subs = [
+      "占八项合计 <b>" + fmtDec(p.fee / D.feeWan * 100, 1) + "%</b> · 预算 " + fmtInt(p.budgetTotal) +
+        " 万元 · 执行 " + fmtDec(p.execAll, 0) + "%",
+      "阶段基准 " + p.bench + "% · 偏差 <b class=\"" + (p.gap >= 0 ? "xf-up" : "xf-down") + "\">" +
+        signed(p.gap, 0) + "pp</b> · 判定 " + p.verdict.t,
+      p.stageName + "门 " + p.ms[p.stage].gateKey + " · 单门通过 <b>" + fmtDec(GATES[p.stage].rate, 1) +
+        "%</b> · 已过 " + p.gatePassed + " 道",
+      "计划 <b>" + ymFmt(p.launchF) + "</b> · 立项 " + ymFmt(p.m0) + " · 前置 " + fmtDec(LEAD, 0) + " 个月",
+      (p.kind === "平台" ? "模组结算价 " : "目标售价 ") + fmtInt(p.price) + " 元 · 料本 <b>" +
+        fmtInt(p.bomCost) + "</b> 元（" + fmtDec(p.bomRate, 1) + "%）"
+    ];
+    KPI_META.forEach((k, i) => {
+      countUp(i, vals[i], k.dec);
+      $("xf-kpisub-" + i).innerHTML = subs[i];
+    });
+    $("xf-kpicard-4").classList.toggle("is-warn", p.grossRate < 30);
+    $("xf-kpicard-1").classList.toggle("is-warn", p.gap < -8);
+  }
+
+  let msCursor = -1;
+  function applyProject(i, pushHash) {
+    const n = PROJECTS.length;
+    idx = ((i % n) + n) % n;
+    const p = PROJECTS[idx];
+
+    /* 页头 */
+    $("xf-crumb-obj").textContent = p.name;
+    $("xf-title").textContent = p.short + " 研发详情";
+    $("xf-chip-fee").textContent = fmtInt(p.fee) + " 万";
+
+    /* 切换器与清单高亮 */
+    swTabs.forEach((el, k) => {
+      const on = k === idx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? PROJECTS[k].color : "";
+      el.style.borderColor = on ? PROJECTS[k].color : "";
+    });
+    listRows.forEach((el, k) => el.classList.toggle("is-on", k === idx));
+    $("xf-sw-state").innerHTML = "当前 <b>" + p.short + "</b><i>|</i>" + p.line + " · " + p.stageName +
+      "<i>|</i>投入 " + fmtInt(p.fee) + " 万元<i>|</i>进度 " + p.prog + "%";
+
+    /* DOM 块（高度均已由 CSS 固定，重填不影响图表容器） */
+    renderKpi(p);
+    renderMilestones(p);
+    renderDossier(p);
+    renderTrials(p);
+    renderRisks(p);
+    renderTags(p);
+
+    /* 三图：数据长度随项目变 → notMerge 全量重设 */
+    bomChart.setOption(bomOption(p), true);
+    costChart.setOption(costOption(p), true);
+    feeChart.setOption(feeOption(p), true);
+    msCursor = -1;
+
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    if (pushHash) {
+      try { history.replaceState(null, "", "#" + encodeURIComponent(p.name)); }
+      catch (e) { /* file:// 下部分浏览器禁止 replaceState，忽略即可 */ }
+    }
+  }
+  applyProject(idx, true);
+
+  /* ===== 11. 交互：切换器 / 左侧清单 / 键盘 ← → / Esc 回上级 / hashchange / kiosk 轮换 ===== */
+  swTabs.forEach((el) => el.addEventListener("click", () => { applyProject(Number(el.dataset.i), true); restart(); }));
+  listRows.forEach((el) => el.addEventListener("click", () => { applyProject(Number(el.dataset.i), true); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyProject(idx - 1, true); restart(); }
+    else if (e.key === "ArrowRight") { applyProject(idx + 1, true); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+  /* 父页可多次下钻同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = hashIdx();
+    if (k >= 0 && k !== idx) { applyProject(k, false); restart(); }
+  });
+
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => applyProject(idx + 1, true), 16000); }
+  restart();
+  const listPanel = $("xf-plist-body");
+  listPanel.addEventListener("mouseenter", () => clearInterval(timer));
+  listPanel.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 活性：里程碑游标巡航 + 成本环扇区巡航（kiosk 常驻，不做 teardown） ===== */
+  setInterval(() => {
+    const rows = Array.from($("xf-ms-list").children);
+    if (!rows.length) return;
+    msCursor = (msCursor + 1) % rows.length;
+    rows.forEach((r, k) => r.classList.toggle("is-cursor", k === msCursor));
+  }, 2200);
+
+  let costIdx = 0;
+  setInterval(() => {
+    costChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    costChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: costIdx });
+    costIdx = (costIdx + 1) % 6;
+  }, 2000);
+
+  let feeIdx = 0;
+  setInterval(() => {
+    feeChart.dispatchAction({ type: "showTip", seriesIndex: 1, dataIndex: feeIdx });
+    feeIdx = (feeIdx + 1) % RD_CATS.length;
+  }, 3000);
+
+  /* ===== 13. 底部滚动条推进 ===== */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 14. 开发期自检：勾稽关系 + option 环检测（不影响页面渲染） =====
+         ★ 环检测必须对**每一个** option 跑 JSON.stringify —— setOption 的深拷贝遇环即
+           RangeError，而 node 打桩测不出（桩的 setOption 是空函数，不走深拷贝）。 */
+  let optAcyclic = true;
+  try { PROJECTS.forEach((p) => { JSON.stringify(bomOption(p)); JSON.stringify(costOption(p)); JSON.stringify(feeOption(p)); }); }
+  catch (e) { optAcyclic = false; console.error("[单项目研发详情] option 存在循环引用：", e.message); }
+
+  const eq = (a, b, tol) => Math.abs(a - b) < (tol == null ? 1e-6 : tol);
+  const checks = [
+    ["八项在研投入合计 = 10560 万元 = 1.056 亿元（与上级页同源）", D.feeWan === 10560 && eq(D.feeYi, 1.056, 1e-9)],
+    ["每项目五类实际投入之和 = 该项目投入", PROJECTS.every((p) => p.actualTotal === p.fee)],
+    ["每项目预算 ≥ 实际（执行率 ≤ 100%）", PROJECTS.every((p) => p.budgetTotal >= p.fee)],
+    ["净享 X9 单机料本 2316 元 = 上级页 净享 X7 BOM 口径", PROJECTS[0].bomCost === 2316],
+    ["净享 X9 故障高发件 7 项 / 752 元（与上级页同源）", PROJECTS[0].riskCnt === 7 && PROJECTS[0].riskCost === 752],
+    ["每项目 BOM：料本 = Σ总成 = Σ部件 = Σ物料", PROJECTS.every((p) =>
+      eq(p.bomCost, p.bomPartSum, 1e-9) && eq(p.bomCost, p.bomMatSum, 1e-9) &&
+      eq(p.bomCost, sum(p.bom.map((a) => a.cost)), 1e-9))],
+    ["每项目料本率落在 20% ~ 70%", PROJECTS.every((p) => p.bomRate > 20 && p.bomRate < 70)],
+    ["单台成本六项之和 = 目标售价（毛利取残差）", PROJECTS.every((p) => eq(p.costSum, p.price, 1e-6))],
+    ["每项目目标毛利率落在 15% ~ 55%", PROJECTS.every((p) => p.grossRate > 15 && p.grossRate < 55)],
+    ["由立项月序推出的当前阶段 = 上级页阶段", PROJECTS.every((p) => p.calcStage === p.stage)],
+    ["上市前置周期 = 四段之和 = 11 个月", eq(LEAD, 11, 1e-9) && eq(CUM_LEN[4], 11, 1e-9)],
+    ["每项目预计上市日 = 立项 + 11 个月且晚于今日", PROJECTS.every((p) => eq(p.launchF, p.m0 + LEAD, 1e-9) && p.launchF > TODAY_F)],
+    ["五道阶段门累计通过率 = 逐门相乘", eq(D.gateCumAll, GATES.reduce((a, g) => a * g.rate / 100, 100), 1e-9)],
+    ["近 12 月研发投入 4.70 亿元 / 费率 4.18%（与上级页同公式现算）",
+      eq(D.rd12, 4.7011, 0.001) && eq(D.rdRate, 4.175, 0.005)],
+    ["试验记录：通过 + 复测 + 不通过 = 总条数", PROJECTS.every((p) =>
+      p.trialPass + p.trialRetest + p.trialFail === p.trials.length)],
+    ["试验完成日期均不晚于 2026-07-31", PROJECTS.every((p) => p.trials.every((t) => t.date <= "2026-07-31"))],
+    ["hash 传参：全名与简称都能命中八个项目", PROJECTS.every((p, i) =>
+      HASH_ALIAS[norm(p.name)] === i && HASH_ALIAS[norm(p.short)] === i) && hashIdx() >= -1],
+    ["三张图的 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单项目研发详情] 自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

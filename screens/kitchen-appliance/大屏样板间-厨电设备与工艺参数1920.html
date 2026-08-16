@@ -1,0 +1,1308 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电设备与工艺参数</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --sg-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 设备类别台账列宽：类别 / 台数 / 在运 / MTBF / 故障 / 判定 */
+    --sg-tcols: 92px 1fr 1fr 62px 50px 44px;
+    /* 工艺窗口看板列宽：序号 / 参数·窗口 / 均值 / Cpk / 判定 */
+    --sg-wcols: 24px 1fr 62px 68px 42px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .sg-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 69, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 132px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .sg-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .sg-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .sg-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .sg-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 69, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(255, 157, 69, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .sg-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .sg-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .sg-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .sg-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .sg-crumb em { font-style: normal; color: #cfeae7; }
+  .sg-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .sg-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .sg-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .sg-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .sg-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .sg-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .sg-chips { display: flex; align-items: center; gap: 9px; }
+  .sg-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .sg-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .sg-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .sg-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .sg-chip.is-key b { color: var(--mfg-cyan); }
+  .sg-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .sg-clock-time { font: 700 26px/1 var(--sg-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .sg-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .sg-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .sg-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .sg-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .sg-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .sg-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .sg-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .sg-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .sg-kpi.is-warn .sg-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .sg-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .sg-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .sg-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .sg-kpi-val { font: 700 30px/1 var(--sg-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .sg-kpi.is-warn .sg-kpi-val { color: #ffd9b0; }
+  .sg-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .sg-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sg-kpi-sub b { font-weight: 700; }
+  .sg-up { color: var(--mfg-green); }
+  .sg-down { color: var(--mfg-red); }
+
+  /* ===== 三栏主体 ===== */
+  .sg-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .sg-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .sg-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .sg-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .sg-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .sg-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .sg-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .sg-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .sg-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* 示波器风格的面板角标：四角刻线，强化工业仪表语言 */
+  .sg-panel::after {
+    content: ""; position: absolute; right: 10px; top: 8px; width: 16px; height: 16px;
+    border-top: 1px solid rgba(64, 196, 190, 0.4); border-right: 1px solid rgba(64, 196, 190, 0.4);
+    border-radius: 0 4px 0 0; pointer-events: none;
+  }
+
+  /* ===== 工艺窗口能力看板（右栏下） ===== */
+  .sg-wins { flex: none; display: flex; flex-direction: column; gap: 5px; }
+  .sg-win-row {
+    display: grid; grid-template-columns: var(--sg-wcols); align-items: center; gap: 7px;
+    padding: 5px 8px; border-radius: 8px; height: 30px;
+    border: 1px solid rgba(64, 196, 190, 0.16); background: rgba(10, 38, 42, 0.5);
+    transition: border-color .25s, background .25s;
+  }
+  .sg-win-row.is-active { border-color: rgba(53, 224, 208, 0.6); background: rgba(18, 68, 68, 0.55); box-shadow: inset 0 0 16px rgba(53, 224, 208, 0.12); }
+  .sg-win-no { font: 700 11px/1 var(--sg-mono); color: #5f8a87; text-align: center; }
+  .sg-win-name { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  .sg-win-name b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.03em; color: #d6efec; white-space: nowrap; }
+  .sg-win-name span { font-size: 10.5px; color: rgba(127, 166, 163, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .sg-win-val { text-align: right; font: 700 13px/1 var(--sg-mono); color: #cbe6e3; font-variant-numeric: tabular-nums; }
+  .sg-win-cpk { text-align: right; font-size: 11px; color: var(--mfg-text-dim); font-variant-numeric: tabular-nums; }
+  .sg-win-cpk b { font: 700 13px/1 var(--sg-mono); }
+
+  /* ===== CSS grid 模拟表格 ===== */
+  .sg-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .sg-thead, .sg-tbody li {
+    display: grid; grid-template-columns: var(--sg-tcols); align-items: center; gap: 6px;
+  }
+  .sg-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .sg-thead span:not(:first-child), .sg-tbody li span:not(:first-child) { text-align: right; }
+  .sg-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .sg-tbody li {
+    padding: 0 8px; height: 30px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .sg-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .sg-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .sg-tbody li b { font-weight: 700; color: #eafcfa; }
+  .sg-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .sg-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .sg-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .sg-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+
+  /* ===== 底部预警滚动条 ===== */
+  .sg-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .sg-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-orange);
+  }
+  .sg-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-orange);
+    box-shadow: 0 0 10px var(--mfg-orange); animation: sg-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes sg-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .sg-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .sg-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .sg-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .sg-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .sg-foot-item b { font-weight: 700; }
+  .sg-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .sg-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="sg-stage" id="sg-stage">
+    <!-- mockflag:begin --><div class="sg-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="sg-error" id="sg-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="sg-header">
+      <div class="sg-head-left">
+        <div class="sg-crumb"><b>云麓厨电</b><i>›</i><em>设备与工艺参数</em></div>
+        <div class="sg-head-title-row">
+          <div class="sg-head-title">设备与工艺参数</div>
+          <div class="sg-head-meta">
+            <span>关键设备 <b id="sg-meta-eq">--</b> 台</span><i>|</i>
+            <span><b>18</b> 条产线 · <b>3</b> 大基地</span><i>|</i>
+            <span>工艺维度 <b>8</b> 项</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="sg-head-right">
+        <div class="sg-chips">
+          <div class="sg-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="sg-chip is-key"><span>OEE</span><b id="sg-chip-oee">--</b></div>
+        </div>
+        <div class="sg-clock" aria-label="实时时钟">
+          <span class="sg-clock-time" id="sg-clock-time">--:--:--</span>
+          <span class="sg-clock-date" id="sg-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="sg-band" id="sg-band"></div>
+
+    <!-- 左栏：良率分布箱线图 + 设备类别台账 -->
+    <div class="sg-col">
+      <section class="sg-panel" style="flex: 1.15;">
+        <div class="sg-panel-head">
+          <h2>六产品线良率分布</h2>
+          <span class="sg-panel-tag">箱线 · 样本 <b id="sg-box-n">--</b> 批</span>
+        </div>
+        <div class="sg-chart" id="sg-chart-box"></div>
+      </section>
+      <section class="sg-panel" style="flex: 1;">
+        <div class="sg-panel-head">
+          <h2>设备类别台账</h2>
+          <span class="sg-panel-tag">合计 <b id="sg-tbl-eq">--</b> 台</span>
+        </div>
+        <div class="sg-table">
+          <div class="sg-thead">
+            <span>设备类别</span><span>台数</span><span>在运</span><span>MTBF/h</span><span>故障</span><span>判定</span>
+          </div>
+          <ul class="sg-tbody" id="sg-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中栏：平行坐标（工艺参数）+ 力导向设备关联网络 -->
+    <div class="sg-col">
+      <section class="sg-panel" style="flex: 1;">
+        <div class="sg-panel-head">
+          <h2>多维工艺参数窗口</h2>
+          <span class="sg-panel-tag" id="sg-par-tag">拖动任一轴刷选 · 当前 <b>--</b></span>
+        </div>
+        <div class="sg-chart" id="sg-chart-parallel"></div>
+      </section>
+      <section class="sg-panel" style="flex: 1.02;">
+        <div class="sg-panel-head">
+          <h2>设备关联网络</h2>
+          <span class="sg-panel-tag">基地 → 车间 → 产线 → 设备类别 · <b id="sg-graph-n">--</b></span>
+        </div>
+        <div class="sg-chart" id="sg-chart-graph"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：设备 × 故障类型热力矩阵 + 工艺窗口能力看板 -->
+    <div class="sg-col">
+      <section class="sg-panel" style="flex: 1;">
+        <div class="sg-panel-head">
+          <h2>设备 × 故障类型矩阵</h2>
+          <span class="sg-panel-tag">年故障 <b id="sg-hm-total">--</b> 次</span>
+        </div>
+        <div class="sg-chart" id="sg-chart-heat"></div>
+      </section>
+      <section class="sg-panel" style="flex: none;">
+        <div class="sg-panel-head">
+          <h2>工艺窗口能力</h2>
+          <span class="sg-panel-tag">均值 ± 窗口 · Cpk 现算</span>
+        </div>
+        <div class="sg-wins" id="sg-wins"></div>
+      </section>
+    </div>
+
+    <!-- 底部预警滚动条 -->
+    <div class="sg-foot">
+      <div class="sg-foot-tag">设备预警</div>
+      <div class="sg-foot-view"><div class="sg-foot-track" id="sg-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("sg-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("sg-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const sortAsc = (a) => a.slice().sort((x, y) => x - y);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+         口径与专题内其他页严格同源：三基地 / 六产品线 / 18 条产线的定义逐字段取自
+         「基地生产详情」页，年产量 902 万台、综合 OEE ≈ 83.93%、全司 FPY ≈ 96.42%。
+         本页新增的是「设备台账 + 工艺参数」两层，一律挂在这 18 条产线之下，
+         逐层求和（设备 → 产线 → 基地 → 全司）严格成立。
+
+         ★ 循环引用红线：本文件所有进入 option 的数据只放标量与数组，业务对象之间
+           一律用 下标 / name 关联（BASES.pIdx、PLINES.li、graph links 的 source/target
+           全是字符串或数字）。绝不写 p.base = baseObj 之类的对象回指 ——
+           setOption 会深拷贝整个 option，成环即 RangeError 且整页图表全空。 ===== */
+
+  const GROUP_REV = 112.6;      /* 年营收 亿元（基准盘，跨页同值） */
+  const RUN_HOURS = 4800;       /* 单台设备 / 单线年有效运行工时（两班制），节拍与 MTBF 由它现算 */
+  const OEE_TARGET = 85;        /* OEE 目标线 */
+  const CPK_GOOD = 1.33, CPK_OK = 1.00;
+
+  /* 4.1 六大产品线：产量 out（万台）· 制程直通率 fpy（%）—— 与生产制造总览 / 品质管理逐字段同值 */
+  const LINES = [
+    { name: "吸油烟机",   short: "烟机", base: "hz", out: 236, fpy: 96.8 },
+    { name: "燃气灶具",   short: "灶具", base: "hz", out: 218, fpy: 97.2 },
+    { name: "洗碗机",     short: "洗碗", base: "wh", out: 132, fpy: 95.2 },
+    { name: "蒸烤一体机", short: "蒸烤", base: "wh", out:  96, fpy: 94.4 },
+    { name: "集成灶",     short: "集成", base: "fs", out: 108, fpy: 96.1 },
+    { name: "净水热水",   short: "净水", base: "fs", out: 112, fpy: 97.6 }
+  ];
+
+  /* 4.2 三大生产基地：OEE 三因子 a × p × q，OEE 现算（与基地生产详情同值） */
+  const BASES = [
+    { key: "hz", name: "杭州临平", short: "临平", color: C.cyan,   a: 92.5, p: 94.8, q: 98.5 },
+    { key: "wh", name: "安徽芜湖", short: "芜湖", color: C.blue,   a: 88.2, p: 92.4, q: 97.9 },
+    { key: "fs", name: "广东佛山", short: "佛山", color: C.violet, a: 90.4, p: 93.6, q: 98.3 }
+  ];
+
+  /* 4.3 18 条产线：逐条照抄「基地生产详情」页的权威定义（编号 / 车间 / 名称 / 状态 / 归属） */
+  const ST = {
+    run:  { t: "运行", c: C.green, share: 0.92 },
+    idle: { t: "待机", c: C.amber, share: 0.14 },
+    fix:  { t: "检修", c: C.blue,  share: 0.06 },
+    down: { t: "故障", c: C.red,   share: 0.00 }
+  };
+  const PLINES = [
+    /* 杭州临平 · 8 条 */
+    { base: "hz", li: 0, code: "L1-01", ws: "A 区 · 烟机装配", name: "烟机装配一线", st: "run" },
+    { base: "hz", li: 0, code: "L1-02", ws: "A 区 · 烟机装配", name: "烟机装配二线", st: "run" },
+    { base: "hz", li: 0, code: "L1-03", ws: "A 区 · 烟机装配", name: "烟机装配三线", st: "idle" },
+    { base: "hz", li: 0, code: "L1-04", ws: "A 区 · 烟机装配", name: "烟机总装四线", st: "run" },
+    { base: "hz", li: 1, code: "L2-01", ws: "B 区 · 灶具装配", name: "灶具装配一线", st: "run" },
+    { base: "hz", li: 1, code: "L2-02", ws: "B 区 · 灶具装配", name: "灶具装配二线", st: "run" },
+    { base: "hz", li: 1, code: "L2-03", ws: "B 区 · 灶具装配", name: "灶具装配三线", st: "fix" },
+    { base: "hz", li: 1, code: "L2-04", ws: "B 区 · 灶具装配", name: "灶具总装四线", st: "run" },
+    /* 安徽芜湖 · 5 条 */
+    { base: "wh", li: 2, code: "W1-01", ws: "A 区 · 洗碗机装配", name: "洗碗装配一线", st: "run" },
+    { base: "wh", li: 2, code: "W1-02", ws: "A 区 · 洗碗机装配", name: "洗碗装配二线", st: "run" },
+    { base: "wh", li: 2, code: "W1-03", ws: "A 区 · 洗碗机装配", name: "洗碗总装三线", st: "down" },
+    { base: "wh", li: 3, code: "W2-01", ws: "B 区 · 蒸烤装配",   name: "蒸烤装配一线", st: "run" },
+    { base: "wh", li: 3, code: "W2-02", ws: "B 区 · 蒸烤装配",   name: "蒸烤总装二线", st: "fix" },
+    /* 广东佛山 · 5 条 */
+    { base: "fs", li: 4, code: "F1-01", ws: "A 区 · 集成灶装配", name: "集成灶一线",   st: "run" },
+    { base: "fs", li: 4, code: "F1-02", ws: "A 区 · 集成灶装配", name: "集成灶二线",   st: "run" },
+    { base: "fs", li: 5, code: "F2-01", ws: "B 区 · 净水热水装配", name: "净水机一线", st: "run" },
+    { base: "fs", li: 5, code: "F2-02", ws: "B 区 · 净水热水装配", name: "热水机二线", st: "idle" },
+    { base: "fs", li: 5, code: "F2-03", ws: "B 区 · 净水热水装配", name: "水机总装三线", st: "run" }
+  ];
+
+  /* 4.4 八大关键设备类别：fr = 年故障率（次/台/年）· pri/sec = 主/次故障类型下标 */
+  const EQ = [
+    { name: "焊接机器人",   short: "焊接", icon: "⌁", fr: 3.4, pri: 0, sec: 6 },
+    { name: "注塑机",       short: "注塑", icon: "⬢", fr: 4.1, pri: 1, sec: 7 },
+    { name: "冲压线",       short: "冲压", icon: "▤", fr: 2.8, pri: 5, sec: 7 },
+    { name: "喷涂线",       short: "喷涂", icon: "◍", fr: 3.6, pri: 2, sec: 1 },
+    { name: "烘干炉",       short: "烘干", icon: "☰", fr: 2.2, pri: 1, sec: 3 },
+    { name: "装配机械手",   short: "装配", icon: "✥", fr: 3.0, pri: 0, sec: 5 },
+    { name: "检测台",       short: "检测", icon: "◎", fr: 2.5, pri: 4, sec: 3 },
+    { name: "包装机",       short: "包装", icon: "▣", fr: 3.8, pri: 5, sec: 6 }
+  ];
+
+  /* 4.5 八类设备故障 —— 与品质管理页的八类产品缺陷一一对应（设备侧因 → 产品侧果） */
+  const FAULTS = [
+    { name: "伺服异常",   defect: "装配错位", part: "结构件" },
+    { name: "温控偏差",   defect: "涂层脱落", part: "腔体内胆" },
+    { name: "气路泄漏",   defect: "密封不良", part: "密封圈" },
+    { name: "电气短路",   defect: "电控失效", part: "电控板" },
+    { name: "传感器失效", defect: "点火异常", part: "点火针" },
+    { name: "机械磨损",   defect: "噪音超标", part: "风机总成" },
+    { name: "程序报警",   defect: "焊接虚焊", part: "线束端子" },
+    { name: "润滑不良",   defect: "面板划伤", part: "面板玻璃" }
+  ];
+
+  /* 4.6 各产品线的单线设备配置模板（8 类各几台）——产线设备数由它派生，逐层求和成立 */
+  const EQ_TPL = [
+    [6, 4, 5, 4, 3, 8, 4, 2],   /* 烟机 */
+    [5, 3, 6, 3, 3, 7, 4, 2],   /* 灶具 */
+    [7, 6, 4, 3, 4, 9, 5, 2],   /* 洗碗 */
+    [8, 5, 4, 4, 5, 8, 5, 2],   /* 蒸烤 */
+    [7, 5, 5, 4, 4, 9, 5, 2],   /* 集成 */
+    [4, 7, 3, 2, 3, 7, 4, 2]    /* 净水 */
+  ];
+
+  /* 4.7 八项工艺参数窗口（规格上下限）——平行坐标的 8 根轴 */
+  const DIMS = [
+    { name: "焊接电流", unit: "A",   lo: 180,  hi: 240, dec: 1 },
+    { name: "焊接电压", unit: "V",   lo: 22,   hi: 28,  dec: 2 },
+    { name: "注塑温度", unit: "℃",  lo: 195,  hi: 225, dec: 1 },
+    { name: "注塑压力", unit: "MPa", lo: 75,   hi: 95,  dec: 1 },
+    { name: "喷涂膜厚", unit: "μm",  lo: 55,   hi: 75,  dec: 1 },
+    { name: "烘干温度", unit: "℃",  lo: 170,  hi: 195, dec: 1 },
+    /* 节拍窗口取全厂装配线的设计包络：产量最大的烟机线约 24s、产量最小的水机线约 53s，
+       所以下限必须给到 22、上限给到 58，否则「节拍」会被自己的真实取值撑爆窗口。 */
+    { name: "节拍时间", unit: "s",   lo: 22,   hi: 58,  dec: 1 },
+    { name: "良率",     unit: "%",   lo: 93.5, hi: 100, dec: 2 }
+  ];
+  /* 定向注入的超窗样本：row = 班次样本下标，d = 越界的维度，k = 方向，f = 偏移量（窗口宽度的倍数）。
+     常规样本的波动幅度被限制在窗口半宽的 37% 以内，注入量 f 又都大于 0.62，
+     所以「哪些样本超窗」完全由这张表决定；
+     但页面上的越窗判定仍是逐值与窗口现算比较的（不读这张表），两者在自检里对账。 */
+  const OUT_SPEC = [
+    { row: 3,  d: 0, k:  1, f: 0.75 },   /* 焊接电流偏高 */
+    { row: 11, d: 3, k: -1, f: 0.75 },   /* 注塑压力偏低 */
+    { row: 18, d: 5, k:  1, f: 0.75 },   /* 烘干温度偏高 */
+    { row: 25, d: 7, k: -1, f: 0.62 },   /* 良率跌破下限 */
+    { row: 32, d: 2, k:  1, f: 0.75 }    /* 注塑温度偏高 */
+  ];
+
+  /* ===== 4.8 派生量：全部现算，页面上不出现任何硬编码的合计值 ===== */
+  const D = {};
+  const BY_KEY = {};
+
+  BASES.forEach((b, bi) => {
+    BY_KEY[b.key] = b;
+    b.idx = bi;
+    b.liIdx = [];                                                  /* 只留下标，不持有产品线对象 */
+    LINES.forEach((l, li) => { if (l.base === b.key) b.liIdx.push(li); });
+    b.out = sum(b.liIdx.map((li) => LINES[li].out));
+    b.oee = b.a * b.p * b.q / 1e4;                                 /* OEE = A × P × Q */
+    b.fpy = sum(b.liIdx.map((li) => LINES[li].fpy * LINES[li].out)) / b.out;
+    b.pIdx = [];
+    PLINES.forEach((p, pi) => { if (p.base === b.key) b.pIdx.push(pi); });
+    b.lineCnt = b.pIdx.length;
+  });
+
+  /* 产线年产出：同一产品线内按确定性权重拆分，末条吸收舍入 → 与基地生产详情页同算法同结果 */
+  LINES.forEach((l, li) => {
+    const own = PLINES.filter((p) => p.li === li);
+    const w = own.map((p, j) => 1 + 0.16 * Math.sin(j * 1.4 + li * 0.9) + 0.08 * Math.sin(j * 2.3 + li * 1.7));
+    const wSum = sum(w);
+    own.forEach((p, j) => { p.out = l.out * w[j] / wSum; });
+    own[own.length - 1].out = l.out - sum(own.slice(0, -1).map((p) => p.out));
+  });
+
+  /* 产线设备台账：模板 + 确定性微扰（±1 台，下限 1）。合计一律从这里往上求和。 */
+  PLINES.forEach((p, pi) => {
+    const l = LINES[p.li];
+    p.idx = pi;
+    p.plName = l.name;
+    p.plShort = l.short;
+    p.baseName = BY_KEY[p.base].name;
+    p.takt = 3600 * RUN_HOURS / (p.out * 1e4);                     /* 秒/台，与基地生产详情同公式 */
+    p.eq = EQ_TPL[p.li].map((n, k) => Math.max(1, n + Math.round(Math.sin(pi * 1.3 + k * 0.9))));
+    p.eqTotal = sum(p.eq);
+    p.onShare = ST[p.st].share;
+    p.eqOn = p.eq.map((n) => n * p.onShare);
+    p.eqOnTotal = sum(p.eqOn);
+  });
+
+  /* 设备类别口径：台数 / 在运 = 18 条产线之和 */
+  EQ.forEach((e, k) => {
+    e.idx = k;
+    e.count = sum(PLINES.map((p) => p.eq[k]));
+    e.on = Math.round(sum(PLINES.map((p) => p.eqOn[k])));
+  });
+  /* 基地口径：设备数 = 其下产线之和 */
+  BASES.forEach((b) => {
+    b.eqTotal = sum(b.pIdx.map((pi) => PLINES[pi].eqTotal));
+    b.eqByCat = EQ.map((e, k) => sum(b.pIdx.map((pi) => PLINES[pi].eq[k])));
+  });
+  /* 车间口径（图上第二层）：按 ws 归并，车间设备数 = 其下产线之和 */
+  const SHOPS = [];
+  PLINES.forEach((p, pi) => {
+    let s = SHOPS.filter((x) => x.name === p.ws)[0];
+    if (!s) { s = { name: p.ws, base: p.base, li: p.li, pIdx: [], eqTotal: 0 }; SHOPS.push(s); }
+    s.pIdx.push(pi);
+    s.eqTotal += p.eqTotal;
+  });
+
+  /* 设备 × 故障类型矩阵：行合计 = 台数 × 年故障率（四舍五入），主/次故障类型加权后
+     把舍入尾差全部塞回主故障类型 → 行和严格等于该类设备的年故障次数。 */
+  const MATRIX = EQ.map((e, k) => {
+    const total = Math.round(e.count * e.fr);
+    const w = FAULTS.map((f, j) => {
+      let x = 1 + 0.35 * Math.sin(j * 1.31 + k * 0.77);
+      if (j === e.pri) x *= 3.4;
+      else if (j === e.sec) x *= 2.0;
+      return x;
+    });
+    const wSum = sum(w);
+    const row = w.map((x) => Math.round(total * x / wSum));
+    row[e.pri] += total - sum(row);                                /* 尾差归主故障类型 */
+    e.faults = total;
+    return row;
+  });
+  EQ.forEach((e, k) => {
+    e.mtbf = e.count * RUN_HOURS / e.faults;                       /* MTBF = 台数 × 年工时 ÷ 故障次数 */
+    e.verdict = e.mtbf >= 1800 ? { t: "优", c: "is-good" }
+              : e.mtbf >= 1300 ? { t: "良", c: "is-mid" }
+              : { t: "关注", c: "is-bad" };
+  });
+  FAULTS.forEach((f, j) => { f.total = sum(MATRIX.map((row) => row[j])); });
+
+  /* 集团口径：一律由分项求和 / 加权现算 */
+  D.out = sum(BASES.map((b) => b.out));                            /* 902 万台 */
+  D.eqTotal = sum(EQ.map((e) => e.count));                         /* = 18 条产线之和 = 3 基地之和 */
+  D.eqOn = sum(EQ.map((e) => e.on));
+  D.eqOnRate = D.eqOn / D.eqTotal * 100;
+  D.faultTotal = sum(EQ.map((e) => e.faults));                     /* = 矩阵 64 格之和 */
+  D.mtbf = D.eqTotal * RUN_HOURS / D.faultTotal;
+  D.oee = sum(BASES.map((b) => b.oee * b.out)) / D.out;            /* ≈ 83.93% */
+  D.fpy = sum(LINES.map((l) => l.fpy * l.out)) / D.out;            /* ≈ 96.42% */
+  D.lineCnt = PLINES.length;
+  /* 产线状态计数：底部预警条里的「停机来源」由它现算，不写死条数 */
+  D.stCnt = { run: 0, idle: 0, fix: 0, down: 0 };
+  PLINES.forEach((p) => { D.stCnt[p.st] += 1; });
+  D.stText = ["down", "fix", "idle"].filter((k) => D.stCnt[k] > 0)
+    .map((k) => D.stCnt[k] + " 条" + ST[k].t + "线").join(" + ");
+  D.eqWorst = EQ.slice().sort((a, b) => a.mtbf - b.mtbf)[0];
+  D.eqBest = EQ.slice().sort((a, b) => b.mtbf - a.mtbf)[0];
+  D.faultTop = FAULTS.slice().sort((a, b) => b.total - a.total)[0];
+  D.matMax = Math.max.apply(null, MATRIX.map((r) => Math.max.apply(null, r)));
+  D.matHotK = 0; D.matHotJ = 0;
+  MATRIX.forEach((row, k) => row.forEach((v, j) => { if (v === D.matMax) { D.matHotK = k; D.matHotJ = j; } }));
+
+  /* ===== 4.9 平行坐标样本：18 条产线 × 2 班次 = 36 组当班工艺参数中心值 =====
+         波动一律用 Math.sin 确定性波形（kiosk 常驻，每次打开必须完全一致）。
+         ★ value 里额外挂了第 9 个元素 = 样本下标：parallelAxis 只声明 8 根轴，
+           多出来的分量 ECharts 会忽略，正好当成 tooltip 的回查索引 ——
+           这是「只放标量、不放对象引用」的合规做法，避免 setOption 深拷贝成环。 */
+  const SHIFTS = ["白班", "夜班"];
+  const ROWS = [];
+  PLINES.forEach((p, pi) => {
+    SHIFTS.forEach((sh, si) => {
+      const row = pi * 2 + si;
+      const v = DIMS.map((d, di) => {
+        if (di === 6) {                                            /* 节拍时间：直接用产线现算节拍 */
+          return p.takt + 0.9 * Math.sin(row * 1.17 + si * 2.1);
+        }
+        if (di === 7) {                                            /* 良率：锚定所属产品线 FPY */
+          return LINES[p.li].fpy + 0.38 * Math.sin(row * 0.91 + si * 1.9) + 0.17 * Math.sin(row * 2.3);
+        }
+        const mid = (d.lo + d.hi) / 2, amp = (d.hi - d.lo) * 0.16;
+        return mid + amp * (0.72 * Math.sin(row * 0.83 + di * 1.7 + si * 2.4) + 0.42 * Math.sin(row * 1.57 + di * 0.9));
+      });
+      OUT_SPEC.forEach((o) => {
+        if (o.row !== row) return;
+        v[o.d] += o.k * (DIMS[o.d].hi - DIMS[o.d].lo) * o.f;       /* 定向推出工艺窗口 */
+      });
+      const value = v.map((x, di) => Number(fmtDec(x, DIMS[di].dec)));
+      /* 越窗判定：逐值与窗口比较现算，不读 OUT_SPEC */
+      const bad = [];
+      value.forEach((x, di) => { if (x < DIMS[di].lo || x > DIMS[di].hi) bad.push(di); });
+      value.push(row);                                             /* 第 9 个分量 = 回查下标 */
+      ROWS.push({
+        row: row, pi: pi, code: p.code, line: p.name, shift: sh,
+        baseName: p.baseName, plName: p.plName, value: value, bad: bad, out: bad.length > 0
+      });
+    });
+  });
+  D.parN = ROWS.length;
+  D.parOut = ROWS.filter((r) => r.out).length;
+  D.parOk = D.parN - D.parOut;
+  D.winRate = D.parOk / D.parN * 100;
+
+  /* 每维过程能力 Cpk = min((USL-μ)/3σ, (μ-LSL)/3σ)，μ/σ 由 36 组样本现算。
+     顺带算出平行坐标每根轴的取值域：★ 必须同时包住「窗口上下限」与「实际样本极值」——
+     只按窗口定轴域，被定向推出窗口的那几条线会画到轴外、被静默裁掉，
+     红色超窗线反而看不见，本图就白做了。 */
+  DIMS.forEach((d, di) => {
+    const xs = ROWS.map((r) => r.value[di]);
+    const lo = Math.min(d.lo, Math.min.apply(null, xs));
+    const hi = Math.max(d.hi, Math.max.apply(null, xs));
+    const padAx = (hi - lo) * 0.08;
+    d.axMin = Number(fmtDec(lo - padAx, 2));
+    d.axMax = Number(fmtDec(hi + padAx, 2));
+    d.mu = sum(xs) / xs.length;
+    d.sd = Math.sqrt(sum(xs.map((x) => (x - d.mu) * (x - d.mu))) / xs.length);
+    d.cpk = d.sd > 0 ? Math.min((d.hi - d.mu) / (3 * d.sd), (d.mu - d.lo) / (3 * d.sd)) : 9.99;
+    d.outCnt = xs.filter((x) => x < d.lo || x > d.hi).length;
+    d.verdict = d.cpk >= CPK_GOOD ? { t: "优", c: "is-good" }
+              : d.cpk >= CPK_OK ? { t: "良", c: "is-mid" }
+              : { t: "关注", c: "is-bad" };
+  });
+  D.cpkWorst = DIMS.slice().sort((a, b) => a.cpk - b.cpk)[0];
+
+  /* ===== 4.10 箱线图样本：每条产线 24 个批次良率，按产品线归组 =====
+         生成后整体平移，使各组中位数严格等于该产品线的 FPY 基准值 ——
+         「箱体中位数 = FPY」因此是结构性成立的，不是凑出来的。 */
+  function quantile(s, q) {
+    const n = s.length;
+    if (!n) return NaN;
+    const pos = (n - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
+    return lo === hi ? s[lo] : s[lo] + (s[hi] - s[lo]) * (pos - lo);
+  }
+  /* 五数概括：须线取 1.5×IQR 栅栏内最远的真实样本，栅栏外的算离群点 */
+  function boxStats(vals) {
+    const s = sortAsc(vals), n = s.length;
+    const q1 = quantile(s, 0.25), med = quantile(s, 0.5), q3 = quantile(s, 0.75);
+    const iqr = q3 - q1, loF = q1 - 1.5 * iqr, hiF = q3 + 1.5 * iqr;
+    let wl = q1, wh = q3;
+    for (let i = 0; i < n; i++) { if (s[i] >= loF) { wl = s[i]; break; } }
+    for (let i = n - 1; i >= 0; i--) { if (s[i] <= hiF) { wh = s[i]; break; } }
+    return {
+      n: n, q1: q1, med: med, q3: q3, iqr: iqr, wl: wl, wh: wh,
+      min: s[0], max: s[n - 1], outliers: s.filter((v) => v < loF || v > hiF)
+    };
+  }
+  const BATCH_PER_LINE = 24;
+  const GROUPS = LINES.map((l, li) => {
+    const lineCnt = PLINES.filter((p) => p.li === li).length;
+    const n = lineCnt * BATCH_PER_LINE;
+    const raw = [];
+    for (let k = 0; k < n; k++) {
+      raw.push(l.fpy
+        + 1.10 * Math.sin(k * 0.71 + li * 2.3)
+        + 0.62 * Math.sin(k * 1.83 + li * 1.1)
+        + 0.31 * Math.sin(k * 3.70 + li));
+    }
+    /* 定向注入两个低位离群批次（确定性，非随机） */
+    raw.push(l.fpy - 4.2 - li * 0.2, l.fpy - 3.6 - li * 0.15);
+    const shift = l.fpy - quantile(sortAsc(raw), 0.5);             /* 平移使中位数 = FPY */
+    const vals = raw.map((v) => Number(fmtDec(v + shift, 2)));
+    const b = boxStats(vals);
+    return {
+      li: li, name: l.name, short: l.short, base: l.base, fpy: l.fpy,
+      lineCnt: lineCnt, stat: b, color: C.series[li % C.series.length]
+    };
+  });
+  D.boxN = sum(GROUPS.map((g) => g.stat.n));
+  D.boxOut = sum(GROUPS.map((g) => g.stat.outliers.length));
+  D.boxSpread = GROUPS.slice().sort((a, b) => b.stat.iqr - a.stat.iqr)[0];
+
+  /* ===== 4.11 力导向网络：基地(3) → 车间(6) → 产线(18) → 设备类别(8) =====
+         ★ links 里只放节点 name 字符串，节点对象里只有标量 —— 严禁 links 放节点对象、
+           或给节点写 node.links 回指，那会让 setOption 的深拷贝无限递归。 */
+  const GRAPH_CATS = [
+    { name: "基地", color: C.cyan },
+    { name: "车间", color: C.blue },
+    { name: "产线", color: C.violet },
+    { name: "设备类别", color: C.orange }
+  ];
+  const gNodes = [], gLinks = [];
+  const sizeOf = (v, lo, hi, vMin, vMax) => lo + (hi - lo) * Math.sqrt(Math.max(0, (v - vMin)) / Math.max(1e-6, vMax - vMin));
+  BASES.forEach((b) => {
+    gNodes.push({
+      name: b.name, category: 0, value: b.eqTotal, symbolSize: sizeOf(b.eqTotal, 30, 42, 150, 300),
+      layer: "基地", note: b.lineCnt + " 条产线 · 产量 " + fmtDec(b.out, 0) + " 万台",
+      label: { show: true, fontSize: 12, fontWeight: 700, color: "#eafcfa" },
+      itemStyle: { color: b.color, shadowBlur: 16, shadowColor: "rgba(53,224,208,.5)" }
+    });
+  });
+  SHOPS.forEach((s) => {
+    gNodes.push({
+      name: s.name, category: 1, value: s.eqTotal, symbolSize: sizeOf(s.eqTotal, 18, 26, 60, 160),
+      layer: "车间", note: s.pIdx.length + " 条产线 · " + LINES[s.li].name,
+      label: { show: true, fontSize: 10, color: "#bfe4e0" },
+      itemStyle: { color: C.blue }
+    });
+    gLinks.push({ source: BY_KEY[s.base].name, target: s.name, lv: 1 });
+  });
+  PLINES.forEach((p) => {
+    gNodes.push({
+      name: p.name, category: 2, value: p.eqTotal, symbolSize: sizeOf(p.eqTotal, 8, 15, 28, 45),
+      layer: "产线", note: p.code + " · " + ST[p.st].t + " · 设备 " + p.eqTotal + " 台",
+      label: { show: false },
+      itemStyle: { color: p.st === "down" ? C.red : p.st === "fix" ? C.amber : p.st === "idle" ? C.textDim : C.violet }
+    });
+    gLinks.push({ source: p.ws, target: p.name, lv: 2 });
+    /* 产线 → 设备类别：只连「归因故障次数」最高的 2 类。
+       归因口径 = 该类设备全司年故障 × 本线该类台数 ÷ 全司该类台数（按台数分摊，现算）。
+       设备类别节点被多条产线共享，图上「多条产线汇聚到同一设备节点」= 共因故障通道。 */
+    p.attrib = p.eq.map((n, k) => EQ[k].faults * n / EQ[k].count);
+    const top2 = p.attrib.map((v, k) => ({ k: k, v: v })).sort((a, b) => b.v - a.v).slice(0, 2);
+    top2.forEach((t) => { gLinks.push({ source: p.name, target: EQ[t.k].name, lv: 3, n: p.eq[t.k], f: Number(fmtDec(t.v, 1)) }); });
+  });
+  /* 兜底：任何一类设备若一条产线都没连上，会变成飘在画布角落的孤点。
+     给它补一条到「配置台数最多的那条产线」的边 —— 层级仍然成立，且图上无孤岛。 */
+  EQ.forEach((e, k) => {
+    if (gLinks.some((l) => l.lv === 3 && l.target === e.name)) return;
+    const host = PLINES.slice().sort((a, b) => b.eq[k] - a.eq[k])[0];
+    gLinks.push({ source: host.name, target: e.name, lv: 3, n: host.eq[k], f: Number(fmtDec(host.attrib[k], 1)) });
+  });
+  /* 设备 ↔ 设备 共因边：主故障类型相同的两类设备用橙色虚线连起来，
+     读作「同一失效机理，一处整改可同时受益」——本图第二层叙事。 */
+  EQ.forEach((e, k) => {
+    for (let k2 = k + 1; k2 < EQ.length; k2++) {
+      if (EQ[k2].pri !== e.pri) continue;
+      gLinks.push({
+        source: e.name, target: EQ[k2].name, lv: 4, cause: FAULTS[e.pri].name,
+        lineStyle: { color: "rgba(255,157,69,.55)", width: 1.6, type: "dashed", curveness: 0.22, opacity: 0.9 }
+      });
+    }
+  });
+  EQ.forEach((e) => {
+    gNodes.push({
+      name: e.name, category: 3, value: e.count, symbolSize: sizeOf(e.count, 16, 30, 30, 145),
+      layer: "设备类别", note: e.count + " 台 · 年故障 " + e.faults + " 次 · MTBF " + fmtDec(e.mtbf, 0) + " h",
+      label: { show: true, fontSize: 10.5, color: "#ffd9b0" },
+      itemStyle: { color: C.orange }
+    });
+  });
+  D.gNodeN = gNodes.length;
+  D.gLinkN = gLinks.length;
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("sg-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("sg-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("sg-chip-oee").textContent = fmtDec(D.oee, 2) + "%";
+  $("sg-meta-eq").textContent = fmtDec(D.eqTotal, 0);
+
+  /* ===== 6. DOM 填充（★ 必须全部早于 echarts.init）=====
+         与图表同属一个 flex 容器的兄弟块（右栏「工艺窗口能力」看板、左栏台账表）
+         若在 init 之后才填内容，会把 flex:1 的图表容器压矮、图表按旧高度布局。
+         所以本节把 KPI 带 / 台账表 / 窗口看板一次性写完，第 8 节才开始 init。 */
+
+  /* 6.1 KPI 带：5 枚 */
+  const KPI_DEFS = [
+    { icon: "▤", label: "关键设备总数", val: D.eqTotal, unit: "台", dec: 0, warn: false,
+      sub: () => "8 类 · 18 条产线归集 · 在运 <b>" + D.eqOn + "</b> 台" },
+    { icon: "⛭", label: "设备综合稼动率 OEE", val: D.oee, unit: "%", dec: 2, warn: false,
+      sub: () => "A×P×Q 按产量加权 · 目标 " + fmtDec(OEE_TARGET, 1) + "%" },
+    { icon: "◈", label: "工艺窗口达标率", val: D.winRate, unit: "%", dec: 1, warn: false,
+      sub: () => D.parN + " 组班次样本 · 超窗 <b class=\"sg-down\">" + D.parOut + "</b> 组" },
+    { icon: "◷", label: "平均无故障时间", val: D.mtbf, unit: "h", dec: 0, warn: false,
+      sub: () => "= " + D.eqTotal + " 台 × " + RUN_HOURS + "h ÷ " + D.faultTotal + " 次" },
+    { icon: "⚠", label: "年度设备故障", val: D.faultTotal, unit: "次", dec: 0, warn: true,
+      sub: () => "首位「" + D.faultTop.name + "」<b>" + D.faultTop.total + "</b> 次 · 关联" + D.faultTop.defect }
+  ];
+  $("sg-band").innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="sg-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="sg-kpi-icon">' + k.icon + "</div>" +
+      '<div class="sg-kpi-main">' +
+        '<div class="sg-kpi-label">' + k.label + "</div>" +
+        '<div class="sg-kpi-num"><span class="sg-kpi-val" id="sg-kpi-' + i + '">0</span><span class="sg-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="sg-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 6.2 设备类别台账表 */
+  const tbody = $("sg-tbody");
+  tbody.innerHTML = EQ.map((e, i) => (
+    "<li data-i=\"" + i + "\">" +
+      "<span><b>" + e.name + "</b></span>" +
+      "<span>" + e.count + "</span>" +
+      "<span style=\"color:" + (e.on / e.count < 0.6 ? C.orange : "#cbe6e3") + "\">" + e.on + "</span>" +
+      "<span style=\"color:" + (e.mtbf < 1300 ? C.red : e.mtbf < 1800 ? C.amber : C.green) + "\">" + fmtDec(e.mtbf, 0) + "</span>" +
+      "<span>" + e.faults + "</span>" +
+      '<span class="sg-badge ' + e.verdict.c + '">' + e.verdict.t + "</span>" +
+    "</li>"
+  )).join("");
+  const tbodyRows = Array.from(tbody.children);
+
+  /* 6.3 工艺窗口能力看板（8 行，flex:none，高度由内容定 —— 必须在 init 前写完） */
+  $("sg-wins").innerHTML = DIMS.map((d, i) => (
+    '<div class="sg-win-row" data-i="' + i + '">' +
+      '<span class="sg-win-no">' + (i + 1) + "</span>" +
+      '<div class="sg-win-name"><b>' + d.name + "</b><span>窗口 " + fmtDec(d.lo, d.dec === 2 ? 1 : 0) + "~" + fmtDec(d.hi, d.dec === 2 ? 1 : 0) + " " + d.unit + " · 越窗 " + d.outCnt + "</span></div>" +
+      '<div class="sg-win-val">' + fmtDec(d.mu, d.dec === 2 ? 2 : 1) + "</div>" +
+      '<div class="sg-win-cpk">Cpk <b style="color:' + (d.cpk >= CPK_GOOD ? C.green : d.cpk >= CPK_OK ? C.amber : C.red) + '">' + fmtDec(d.cpk, 2) + "</b></div>" +
+      '<span class="sg-badge ' + d.verdict.c + '">' + d.verdict.t + "</span>" +
+    "</div>"
+  )).join("");
+  const winRows = Array.from($("sg-wins").children);
+
+  /* 6.4 面板头统计位 */
+  $("sg-tbl-eq").textContent = fmtDec(D.eqTotal, 0);
+  $("sg-box-n").textContent = fmtDec(D.boxN, 0);
+  $("sg-hm-total").textContent = fmtDec(D.faultTotal, 0);
+  $("sg-graph-n").textContent = D.gNodeN + " 节点 / " + D.gLinkN + " 边";
+
+  /* ===== 7. KPI 翻牌缓动（DOM 已就绪，纯文本更新不改变布局高度） ===== */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("sg-kpi-" + i), k.val, k.dec));
+
+  /* ===== 8. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = {
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line,
+    textStyle: { color: C.text, fontSize: 12 }
+  };
+
+  /* ---------------------------------------------------------------------
+     8.1 ★ 平行坐标：8 维工艺参数 × 36 组班次样本，带轴上刷选（brush）
+     - parallelAxis 上给 areaSelectStyle → 每根轴都能直接拖出选区；
+     - series 的 inactiveOpacity / activeOpacity 控制「选中高亮、其余淡出」；
+     - 超窗样本单独拆成第二个 series 用 --mfg-red 画，两个 series 共用同一套轴，
+       刷选对两者同时生效。
+     --------------------------------------------------------------------- */
+  const parallel = makeChart("sg-chart-parallel");
+  const PAX_ID = (i) => "sg-pax-" + i;
+  const parallelAxis = DIMS.map((d, i) => ({
+    id: PAX_ID(i), dim: i, name: d.name + "\n" + d.unit,
+    min: d.axMin, max: d.axMax,
+    /* nameLocation:"end" = 竖轴的**顶端**。这里 parallel.top 给到 64px 就是给轴名留的位置；
+       若改成 "start"（底端）必须同步把 bottom 加大，否则轴名会被裁掉。 */
+    nameLocation: "end", nameGap: 20,
+    nameTextStyle: { color: "#9fd0cb", fontSize: 10.5, lineHeight: 13 },
+    axisLine: { lineStyle: { color: "rgba(64,196,190,.45)" } },
+    axisTick: { lineStyle: { color: "rgba(64,196,190,.3)" } },
+    axisLabel: { color: C.textDim, fontSize: 9.5 },
+    /* ★ 刷选的灵魂：给每根轴配 areaSelectStyle，轴上即可直接拖出选区，
+       命中的线走 activeOpacity、未命中走 inactiveOpacity 淡出。 */
+    areaSelectStyle: { width: 20, borderWidth: 1, borderColor: "rgba(53,224,208,.75)", color: "rgba(53,224,208,.22)", opacity: 0.9 }
+  }));
+  const rowTip = (idx) => {
+    const r = ROWS[idx];
+    if (!r) return "";                                             /* 窗口包络线没有回查下标 */
+    const body = DIMS.map((d, i) => {
+      const v = r.value[i], bad = r.bad.indexOf(i) >= 0;
+      return "<span style=\"color:" + (bad ? C.red : C.textDim) + "\">" + d.name + "</span> " +
+        "<b style=\"color:" + (bad ? C.red : "#eafcfa") + "\">" + fmtDec(v, d.dec) + "</b> " + d.unit +
+        (bad ? " <span style=\"color:" + C.red + "\">超窗</span>" : "");
+    }).join("<br/>");
+    return "<b>" + r.code + " " + r.line + " · " + r.shift + "</b><br/>" +
+      "<span style=\"color:" + C.textDim + "\">" + r.baseName + " · " + r.plName + "</span><br/>" + body;
+  };
+  parallel.setOption({
+    backgroundColor: "transparent",
+    tooltip: Object.assign({ trigger: "item", confine: true, formatter: (p) => rowTip(p.value[8]) }, TIP),
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 16, itemHeight: 3, itemGap: 14,
+      textStyle: { color: C.textDim, fontSize: 11 },
+      data: ["窗口内批次", "超窗批次", "工艺窗口"]
+    },
+    parallel: {
+      left: 42, right: 36, top: 66, bottom: 16,
+      parallelAxisDefault: { nameTextStyle: { color: "#9fd0cb", fontSize: 10.5 } }
+    },
+    parallelAxis: parallelAxis,
+    series: [
+      /* 工艺窗口包络线：两条折线分别把 8 根轴的规格下限、上限连起来。
+         平行坐标里这是最直观的「窗口」表达 —— 落在两条琥珀虚线之间即合格。
+         两端 opacity 都设成 1，刷选时不跟着淡出，始终当参照系。 */
+      {
+        name: "工艺窗口", type: "parallel", silent: true, z: 1,
+        data: [DIMS.map((d) => d.lo), DIMS.map((d) => d.hi)],
+        lineStyle: { width: 1.4, opacity: 0.85, color: C.amber, type: "dashed" },
+        inactiveOpacity: 1, activeOpacity: 1, emphasis: { disabled: true }
+      },
+      {
+        name: "窗口内批次", type: "parallel",
+        data: ROWS.filter((r) => !r.out).map((r) => ({ name: r.code + " " + r.shift, value: r.value })),
+        lineStyle: { width: 1.4, opacity: 0.55, color: C.cyan },
+        inactiveOpacity: 0.04, activeOpacity: 0.92,
+        emphasis: { lineStyle: { width: 3, opacity: 1, color: "#8ff0e6" } },
+        smooth: 0.12
+      },
+      {
+        name: "超窗批次", type: "parallel", z: 5,
+        data: ROWS.filter((r) => r.out).map((r) => ({ name: r.code + " " + r.shift, value: r.value })),
+        lineStyle: { width: 2.4, opacity: 0.95, color: C.red, shadowBlur: 8, shadowColor: "rgba(255,95,107,.7)" },
+        inactiveOpacity: 0.06, activeOpacity: 1,
+        emphasis: { lineStyle: { width: 3.6 } },
+        smooth: 0.12
+      }
+    ]
+  });
+
+  /* 刷选回显：官方推荐的取数方式（getRawIndicesByActiveState），包一层容错兜底 */
+  const parTag = $("sg-par-tag");
+  function renderParTag(activeN) {
+    parTag.innerHTML = activeN == null
+      ? "拖动任一轴刷选 · 共 <b>" + D.parN + "</b> 组 · 超窗 <b>" + D.parOut + "</b>"
+      : "刷选命中 <b>" + activeN + "</b> / " + D.parN + " 组 · 超窗 <b>" + D.parOut + "</b>";
+  }
+  renderParTag(null);
+  parallel.on("axisareaselected", () => {
+    let n = null;
+    try {
+      /* 只统计第 1、2 个 series（窗口内 / 超窗）；第 0 个是工艺窗口包络线，不是样本 */
+      const list = parallel.getModel().getSeries();
+      n = [1, 2].reduce((a, i) => a + (list[i] ? list[i].getRawIndicesByActiveState("active").length : 0), 0);
+    } catch (e) { n = null; }
+    renderParTag(n);
+  });
+
+  /* ---------------------------------------------------------------------
+     8.2 ★ 箱线图：六产品线良率分布，五数概括由 §4.10 手算（不用 dataset transform，
+         这样须线口径、离群点判定完全可控），离群点用 scatter 叠加。
+     --------------------------------------------------------------------- */
+  const box = makeChart("sg-chart-box");
+  const boxOutPts = [];
+  GROUPS.forEach((g, gi) => {
+    g.stat.outliers.forEach((v) => boxOutPts.push({ value: [gi, v], gi: gi }));
+  });
+  const boxData = GROUPS.map((g) => ({
+    value: [g.stat.wl, g.stat.q1, g.stat.med, g.stat.q3, g.stat.wh],
+    itemStyle: { color: "rgba(53,224,208,.16)", borderColor: g.color, borderWidth: 1.5 }
+  }));
+  box.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 4, right: 12, top: 26, bottom: 4, containLabel: true },
+    tooltip: Object.assign({
+      trigger: "item", confine: true,
+      formatter: (p) => {
+        if (p.seriesType === "scatter") {
+          const g = GROUPS[p.data.gi];
+          return "<b>" + g.name + " · 离群批次</b><br/>良率 <b style=\"color:" + C.red + "\">" +
+            fmtDec(p.value[1], 2) + "%</b><br/><span style=\"color:" + C.textDim + "\">超出 1.5×IQR 栅栏</span>";
+        }
+        const g = GROUPS[p.dataIndex], b = g.stat, v = p.value;
+        return "<b>" + g.name + "</b>（n=" + b.n + " 批 · " + g.lineCnt + " 条产线）<br/>" +
+          "须上 <b>" + fmtDec(v[5], 2) + "</b> · Q3 <b>" + fmtDec(v[4], 2) + "</b><br/>" +
+          "中位数 <b style=\"color:" + g.color + "\">" + fmtDec(v[3], 2) + "%</b>（= 产品线 FPY " + fmtDec(g.fpy, 1) + "%）<br/>" +
+          "Q1 <b>" + fmtDec(v[2], 2) + "</b> · 须下 <b>" + fmtDec(v[1], 2) + "</b><br/>" +
+          "<span style=\"color:" + C.textDim + "\">IQR " + fmtDec(b.iqr, 2) + " · 离群 " + b.outliers.length + " 批 · 须线口径 1.5×IQR</span>";
+      }
+    }, TIP),
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 12,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["良率分布", "离群批次"]
+    },
+    xAxis: {
+      type: "category", data: GROUPS.map((g) => g.short + "\nn=" + g.stat.n),
+      boundaryGap: true,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10.5, lineHeight: 13 })
+    },
+    yAxis: {
+      type: "value", name: "%", min: 89, max: 100, interval: 2,
+      nameTextStyle: { color: C.textDim, fontSize: 10 },
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    series: [
+      {
+        name: "良率分布", type: "boxplot", boxWidth: [12, 34], data: boxData,
+        markLine: {
+          silent: true, symbol: "none",
+          data: [{ yAxis: 95 }],
+          lineStyle: { color: "rgba(255,201,77,.55)", type: "dashed", width: 1 },
+          label: { formatter: "FPY 目标 95.0%", color: C.amber, fontSize: 10, position: "insideEndTop" }
+        }
+      },
+      {
+        name: "离群批次", type: "scatter", data: boxOutPts, symbolSize: 6,
+        itemStyle: { color: C.red, opacity: 0.85 }
+      }
+    ]
+  });
+
+  /* ---------------------------------------------------------------------
+     8.3 ★ 力导向设备关联网络（基地 → 车间 → 产线 → 设备类别）
+     ⚠ kiosk 常驻的两条硬约束：
+       ① force.layoutAnimation:false —— 布局一次性算完即固定，不做逐帧迭代，
+          否则力导向会长期占满一个 CPU 核心，大屏跑一夜风扇狂转；
+       ② links 只放 source/target 的 name 字符串、节点只放标量，
+          绝不互相持有对象，否则 setOption 深拷贝成环 → RangeError 整页空白。
+     --------------------------------------------------------------------- */
+  const graph = makeChart("sg-chart-graph");
+  const NODE_BY_NAME = {};
+  gNodes.forEach((n) => { NODE_BY_NAME[n.name] = n; });
+  graph.setOption({
+    backgroundColor: "transparent",
+    tooltip: Object.assign({
+      trigger: "item", confine: true,
+      formatter: (p) => {
+        if (p.dataType === "edge") {
+          if (p.data.lv === 4) {
+            return "<b>" + p.data.source + " ↔ " + p.data.target + "</b><br/>" +
+              "共因故障 <b style=\"color:" + C.orange + "\">" + p.data.cause + "</b><br/>" +
+              "<span style=\"color:" + C.textDim + "\">同一失效机理，整改可同时受益</span>";
+          }
+          return "<b>" + p.data.source + "</b> → <b>" + p.data.target + "</b>" +
+            (p.data.n != null ? "<br/>配置 <b>" + p.data.n + "</b> 台 · 归因年故障 <b>" + p.data.f + "</b> 次" : "");
+        }
+        const n = NODE_BY_NAME[p.name];
+        return "<b>" + p.name + "</b><br/><span style=\"color:" + C.textDim + "\">" + n.layer + "</span><br/>" +
+          "关键设备 <b style=\"color:" + C.cyan + "\">" + n.value + "</b> 台<br/>" +
+          "<span style=\"color:" + C.textDim + "\">" + n.note + "</span>";
+      }
+    }, TIP),
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 10, itemHeight: 10, itemGap: 12,
+      textStyle: { color: C.textDim, fontSize: 11 },
+      data: GRAPH_CATS.map((c) => c.name)
+    },
+    series: [{
+      type: "graph", layout: "force", roam: false, top: 30, bottom: 6, left: 10, right: 10,
+      categories: GRAPH_CATS.map((c) => ({ name: c.name, itemStyle: { color: c.color } })),
+      data: gNodes,
+      links: gLinks,
+      label: { position: "right", distance: 5 },
+      labelLayout: { hideOverlap: true },
+      lineStyle: { color: "rgba(64,196,190,.34)", width: 1, curveness: 0.08, opacity: 0.8 },
+      emphasis: { focus: "adjacency", scale: 1.12, lineStyle: { width: 2.4, color: C.cyan, opacity: 1 } },
+      itemStyle: { borderWidth: 0 },
+      /* ★ layoutAnimation:false = 一次性把力学迭代跑完再落笔，之后节点固定不动 */
+      force: { initLayout: "circular", repulsion: 102, edgeLength: [20, 60], gravity: 0.12, friction: 0.16, layoutAnimation: false },
+      animationDuration: 600, animationEasing: "cubicOut"
+    }]
+  });
+
+  /* ---------------------------------------------------------------------
+     8.4 设备 × 故障类型热力矩阵
+     ⚠ 分段式 visualMap 一旦设了两端 text，showLabel 默认变 false、每档 label 会被
+        整体吞掉，图例只剩色块 —— 所以下面显式补了 showLabel: true。
+     --------------------------------------------------------------------- */
+  const heat = makeChart("sg-chart-heat");
+  const heatData = [];
+  MATRIX.forEach((row, k) => row.forEach((v, j) => heatData.push([j, k, v])));
+  heat.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 2, right: 6, top: 6, bottom: 30, containLabel: true },
+    tooltip: Object.assign({
+      trigger: "item", confine: true,
+      formatter: (p) => {
+        const j = p.value[0], k = p.value[1], v = p.value[2];
+        const f = FAULTS[j], e = EQ[k];
+        return "<b>" + e.name + " × " + f.name + "</b><br/>年故障 <b style=\"color:" + C.orange + "\">" + v +
+          "</b> 次 · 占该类 " + fmtDec(v / e.faults * 100, 1) + "%<br/>" +
+          "<span style=\"color:" + C.textDim + "\">关联产品缺陷：" + f.defect + "（" + f.part + "）</span>";
+      }
+    }, TIP),
+    xAxis: {
+      type: "category", data: FAULTS.map((f) => f.name), splitArea: { show: true, areaStyle: { color: ["rgba(10,38,42,.32)", "transparent"] } },
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: { color: C.textDim, fontSize: 9.5, interval: 0, rotate: 42 }
+    },
+    yAxis: {
+      type: "category", data: EQ.map((e) => e.short), splitArea: { show: true, areaStyle: { color: ["rgba(10,38,42,.32)", "transparent"] } },
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: { color: C.textDim, fontSize: 10.5 }
+    },
+    visualMap: {
+      type: "piecewise", orient: "horizontal", left: "center", bottom: 0,
+      itemWidth: 11, itemHeight: 9, itemGap: 5,
+      textStyle: { color: C.textDim, fontSize: 9.5 },
+      text: ["高", "低"],
+      showLabel: true,                                  /* ★ 设了 text 后必须显式补，否则每档 label 全被吞 */
+      pieces: [
+        { min: 90, label: "≥90", color: C.red },
+        { min: 60, max: 89, label: "60~89", color: C.orange },
+        { min: 40, max: 59, label: "40~59", color: C.amber },
+        { min: 20, max: 39, label: "20~39", color: C.cyanDeep },
+        { max: 19, label: "<20", color: "rgba(26,158,150,.34)" }
+      ]
+    },
+    series: [{
+      type: "heatmap", data: heatData,
+      label: { show: true, color: "#04191a", fontSize: 9.5, fontWeight: 700 },
+      itemStyle: { borderColor: "rgba(7,27,30,.75)", borderWidth: 1, borderRadius: 2 },
+      emphasis: { itemStyle: { shadowBlur: 8, shadowColor: "rgba(53,224,208,.8)" } }
+    }]
+  });
+
+  /* ===== 9. 底部设备预警滚动条（全部由派生量现算，不另编数字） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: D.eqWorst.name + " MTBF 仅 " + fmtDec(D.eqWorst.mtbf, 0) + " h（" + D.eqWorst.count + " 台 · 年故障 " + D.eqWorst.faults + " 次），为八类设备最低" },
+    { lv: "高", c: C.red, t: "工艺窗口超窗 " + D.parOut + " / " + D.parN + " 组班次样本，达标率 " + fmtDec(D.winRate, 1) + "%" },
+    { lv: "中", c: C.orange, t: "过程能力最弱维度「" + D.cpkWorst.name + "」Cpk " + fmtDec(D.cpkWorst.cpk, 2) + "（&lt; 1.33 判定关注），窗口 " + fmtDec(D.cpkWorst.lo, 1) + "~" + fmtDec(D.cpkWorst.hi, 1) + " " + D.cpkWorst.unit },
+    { lv: "中", c: C.orange, t: "热点单元「" + EQ[D.matHotK].name + " × " + FAULTS[D.matHotJ].name + "」年故障 " + D.matMax + " 次，关联产品缺陷" + FAULTS[D.matHotJ].defect },
+    { lv: "低", c: C.amber, t: "在运设备 " + D.eqOn + " / " + D.eqTotal + " 台（" + fmtDec(D.eqOnRate, 1) + "%），停机来自 " + D.stText },
+    { lv: "低", c: C.green, t: D.eqBest.name + " MTBF " + fmtDec(D.eqBest.mtbf, 0) + " h 为八类最优；六线良率中位数与 FPY 逐条勾稽，全司 FPY " + fmtDec(D.fpy, 2) + "%" },
+    { lv: "低", c: C.cyan, t: "综合 OEE " + fmtDec(D.oee, 2) + "%（目标 " + fmtDec(OEE_TARGET, 1) + "%），支撑年产量 " + fmtDec(D.out, 0) + " 万台 / 年营收 " + fmtDec(GROUP_REV, 1) + " 亿元" }
+  ];
+  const track = $("sg-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="sg-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                          /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 10. 活性：三处轮播高亮 + 平行坐标自动刷选演示 ===== */
+
+  /* 10.1 设备类别台账 ↔ 热力矩阵行 ↔ 网络图设备节点 三处联动 */
+  let eqIdx = 0;
+  const GRAPH_EQ_BASE = BASES.length + SHOPS.length + PLINES.length;  /* 设备节点在 gNodes 中的起始下标 */
+  function playEq() {
+    tbodyRows.forEach((r, i) => r.classList.toggle("is-active", i === eqIdx));
+    heat.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    for (let j = 0; j < FAULTS.length; j++) {
+      heat.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: eqIdx * FAULTS.length + j });
+    }
+    graph.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    graph.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: GRAPH_EQ_BASE + eqIdx });
+    eqIdx = (eqIdx + 1) % EQ.length;
+  }
+  playEq();
+  setInterval(playEq, 3000);
+
+  /* 10.2 工艺窗口看板逐行扫描 */
+  let winIdx = 0;
+  setInterval(() => {
+    winRows.forEach((r, i) => r.classList.toggle("is-active", i === winIdx));
+    winIdx = (winIdx + 1) % DIMS.length;
+  }, 2400);
+
+  /* 10.3 箱线组轮播提示 */
+  let boxIdx = 0;
+  setInterval(() => {
+    box.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    box.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: boxIdx });
+    boxIdx = (boxIdx + 1) % GROUPS.length;
+  }, 2800);
+
+  /* 10.4 平行坐标自动刷选演示：轮流在几根轴上拉出选区，演示「刷哪根轴、其余线淡出」。
+         用户一旦自己在图上按下鼠标即永久停止自动演示，把控制权交回人手。
+         dispatchAction 的 axisAreaSelect 是公开动作，intervals 传空数组即清空选区。 */
+  let autoBrush = true;
+  const parEl = $("sg-chart-parallel");
+  parEl.addEventListener("pointerdown", () => { autoBrush = false; }, { passive: true });
+  const BRUSH_STEPS = [
+    { d: 7, from: (dd) => dd.lo, to: (dd) => 95.0, tip: "良率低于 95% 的班次" },
+    { d: null },
+    { d: 0, from: (dd) => 215, to: (dd) => dd.hi + (dd.hi - dd.lo) * 0.1, tip: "焊接电流偏高的班次" },
+    { d: null },
+    { d: 6, from: (dd) => 40, to: (dd) => dd.hi + (dd.hi - dd.lo) * 0.1, tip: "节拍偏慢的班次" },
+    { d: null }
+  ];
+  let brushStep = 0, brushAxis = null;
+  function clearBrush() {
+    if (brushAxis == null) return;
+    try { parallel.dispatchAction({ type: "axisAreaSelect", parallelAxisId: PAX_ID(brushAxis), intervals: [] }); } catch (e) { /* 忽略 */ }
+    brushAxis = null;
+  }
+  setInterval(() => {
+    if (!autoBrush) { clearBrush(); return; }
+    const s = BRUSH_STEPS[brushStep];
+    brushStep = (brushStep + 1) % BRUSH_STEPS.length;
+    clearBrush();
+    if (s.d == null) { renderParTag(null); return; }
+    const dd = DIMS[s.d];
+    try {
+      parallel.dispatchAction({ type: "axisAreaSelect", parallelAxisId: PAX_ID(s.d), intervals: [[s.from(dd), s.to(dd)]] });
+      brushAxis = s.d;
+    } catch (e) { /* 老版本不支持则跳过，用户手动刷选不受影响 */ }
+  }, 5200);
+
+  /* ===== 11. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const eqByLine = sum(PLINES.map((p) => p.eqTotal));
+  const eqByBase = sum(BASES.map((b) => b.eqTotal));
+  const matSum = sum(MATRIX.map((row) => sum(row)));
+  const faultByCol = sum(FAULTS.map((f) => f.total));
+  const checks = [
+    ["设备台数：8 类之和 = 18 条产线之和", Math.abs(D.eqTotal - eqByLine) < 1e-9],
+    ["设备台数：8 类之和 = 3 基地之和", Math.abs(D.eqTotal - eqByBase) < 1e-9],
+    ["故障次数：8 类行和 = 矩阵 64 格之和", Math.abs(D.faultTotal - matSum) < 1e-9],
+    ["故障次数：行合计 = 列合计", Math.abs(matSum - faultByCol) < 1e-9],
+    ["每类设备行和 = 台数 × 年故障率（取整）", EQ.every((e, k) => sum(MATRIX[k]) === e.faults)],
+    ["MTBF = 台数 × 4800h ÷ 故障次数", Math.abs(D.mtbf - D.eqTotal * RUN_HOURS / D.faultTotal) < 1e-9],
+    ["产量合计 = 六产品线之和 = 902 万台", Math.abs(D.out - 902) < 1e-9],
+    ["综合 OEE ≈ 83.93%（按产量加权）", Math.abs(D.oee - 83.93) < 0.01],
+    ["全司 FPY ≈ 96.42%（按产量加权）", Math.abs(D.fpy - 96.42) < 0.01],
+    ["产线条数 = 18", D.lineCnt === 18],
+    ["六组箱线中位数 = 对应产品线 FPY", GROUPS.every((g) => Math.abs(g.stat.med - g.fpy) < 0.01)],
+    ["五数概括单调：须下 ≤ Q1 ≤ 中位 ≤ Q3 ≤ 须上", GROUPS.every((g) => {
+      const b = g.stat; return b.wl <= b.q1 + 1e-9 && b.q1 <= b.med + 1e-9 && b.med <= b.q3 + 1e-9 && b.q3 <= b.wh + 1e-9;
+    })],
+    ["工艺窗口达标率 = (总数 − 超窗) ÷ 总数", Math.abs(D.winRate - (D.parN - D.parOut) / D.parN * 100) < 1e-9],
+    ["超窗样本数 = 定向注入条数 " + OUT_SPEC.length, D.parOut === OUT_SPEC.length],
+    ["平行坐标样本 = 18 线 × 2 班次", D.parN === PLINES.length * SHIFTS.length],
+    ["网络节点 = 3 基地 + 6 车间 + 18 产线 + 8 设备", D.gNodeN === BASES.length + SHOPS.length + PLINES.length + EQ.length],
+    /* ★ 下面三条是「循环引用坑」的结构性防线：links 里只允许出现字符串节点名，
+       且必须指向已存在的节点；节点名不得重复，否则 ECharts 会按名索引错乱。 */
+    ["links 的 source/target 全为字符串", gLinks.every((l) => typeof l.source === "string" && typeof l.target === "string")],
+    ["links 均指向已存在的节点", (() => {
+      const s = {}; gNodes.forEach((n) => { s[n.name] = 1; });
+      return gLinks.every((l) => s[l.source] === 1 && s[l.target] === 1);
+    })()],
+    ["网络无孤点（每个节点至少一条边）", (() => {
+      const d = {}; gNodes.forEach((n) => { d[n.name] = 0; });
+      gLinks.forEach((l) => { d[l.source]++; d[l.target]++; });
+      return gNodes.every((n) => d[n.name] > 0);
+    })()],
+    ["节点名唯一", (() => {
+      const s = {}; let ok = true;
+      gNodes.forEach((n) => { if (s[n.name]) ok = false; s[n.name] = 1; });
+      return ok;
+    })()]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[设备与工艺参数] 勾稽自检未通过：", failed.map((c) => c[0]));
+
+  /* ★ 循环引用自检：option 里只要成环，setOption 的深拷贝就会 RangeError、整页图表全空。
+     这里对四张图的 option 各跑一次 JSON.stringify，成环会当场抛错并把路径打在控制台。 */
+  [["平行坐标", parallel], ["箱线图", box], ["关系网络", graph], ["热力矩阵", heat]].forEach((pair) => {
+    try { JSON.stringify(pair[1].getOption()); }
+    catch (e) { console.error("[设备与工艺参数] " + pair[0] + " option 存在循环引用：", e.message); }
+  });
+})();
+</script>
+</body>
+</html>

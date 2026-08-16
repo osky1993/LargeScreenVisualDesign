@@ -1,0 +1,1287 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 厨电研发与新品孵化</title>
+<style>
+  :root {
+  /* mfgpalette:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+    --mfg-bg: #051416;
+    --mfg-stage: #071b1e;
+    --mfg-panel: rgba(14,46,50,.55);
+    --mfg-line: rgba(64,196,190,.22);
+    --mfg-cyan: #35e0d0;
+    --mfg-cyan-deep: #1a9e96;
+    --mfg-blue: #4fa8e8;
+    --mfg-green: #7ee08a;
+    --mfg-orange: #ff9d45;
+    --mfg-amber: #ffc94d;
+    --mfg-red: #ff5f6b;
+    --mfg-violet: #a98cf5;
+    --mfg-text: #d8f2ef;
+    --mfg-text-dim: #7fa6a3;
+  /* mfgpalette:end */
+    --yf-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：在研项目明细（项目 / 产品线 / 阶段 / 投入 / 进度 / 判定） */
+    --yf-tcols: 86px 46px 42px 50px 1fr 44px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--mfg-bg); }
+  body { color: var(--mfg-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .yf-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(53, 224, 208, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(169, 140, 245, 0.09), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(16, 62, 66, 0.40), transparent 56%),
+      linear-gradient(rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(64, 196, 190, 0.045) 1px, transparent 1px),
+      var(--mfg-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    /* 第 4 行是通栏的「河流 + 甘特」带：themeRiver 天生要宽、要矮，塞进侧栏就读不出结构流动 */
+    grid-template-rows: 84px 132px 1fr 264px 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .yf-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .yf-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .yf-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .yf-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(169, 140, 245, 0.55) 16%, rgba(53, 224, 208, 0.9) 50%, rgba(169, 140, 245, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(53, 224, 208, 0.35);
+  }
+  .yf-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .yf-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--mfg-text-dim); }
+  .yf-crumb b { font-weight: 400; color: var(--mfg-cyan); }
+  .yf-crumb i { font-style: normal; color: rgba(127, 166, 163, 0.55); }
+  .yf-crumb em { font-style: normal; color: #cfeae7; }
+  .yf-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .yf-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #8ff0e6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(53, 224, 208, 0.35));
+  }
+  .yf-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mfg-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .yf-head-meta b { font-weight: 400; color: #8ff0e6; }
+  .yf-head-meta i { font-style: normal; color: rgba(127, 166, 163, 0.4); }
+
+  .yf-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .yf-chips { display: flex; align-items: center; gap: 9px; }
+  .yf-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--mfg-line); background: var(--mfg-panel);
+  }
+  .yf-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #5f8a87; }
+  .yf-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfe9e6; font-variant-numeric: tabular-nums; }
+  .yf-chip.is-key { border-color: rgba(53, 224, 208, 0.5); background: rgba(18, 62, 62, 0.5); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.1); }
+  .yf-chip.is-key b { color: var(--mfg-cyan); }
+  .yf-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(64, 196, 190, 0.25); }
+  .yf-clock-time { font: 700 26px/1 var(--yf-mono); color: #eafcfa; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(53, 224, 208, 0.4); }
+  .yf-clock-date { font-size: 12px; color: var(--mfg-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带 ===== */
+  .yf-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .yf-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px 0 18px;
+  }
+  .yf-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--mfg-cyan), transparent); }
+  .yf-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(53, 224, 208, 0.12), transparent 68%);
+  }
+  .yf-kpi.is-warn::before { background: linear-gradient(90deg, var(--mfg-orange), transparent); }
+  .yf-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 69, 0.14), transparent 68%); }
+  .yf-kpi-icon {
+    flex: none; width: 46px; height: 46px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    background: linear-gradient(160deg, rgba(53, 224, 208, 0.26), rgba(79, 168, 232, 0.12));
+    border: 1px solid rgba(53, 224, 208, 0.35); box-shadow: inset 0 0 12px rgba(53, 224, 208, 0.14);
+  }
+  .yf-kpi.is-warn .yf-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 69, 0.28), rgba(255, 201, 77, 0.12));
+    border-color: rgba(255, 157, 69, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 69, 0.16);
+  }
+  .yf-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .yf-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--mfg-text-dim); white-space: nowrap; }
+  .yf-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .yf-kpi-val { font: 700 30px/1 var(--yf-mono); color: #eafcfa; letter-spacing: 0.02em; }
+  .yf-kpi.is-warn .yf-kpi-val { color: #ffd9b0; }
+  .yf-kpi-unit { font-size: 13px; color: var(--mfg-text-dim); }
+  .yf-kpi-sub { font-size: 11.5px; color: rgba(127, 166, 163, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .yf-kpi-sub b { font-weight: 700; }
+  .yf-up { color: var(--mfg-green); }
+  .yf-down { color: var(--mfg-red); }
+
+  /* ===== 栏与面板 ===== */
+  .yf-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .yf-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 12px; background: var(--mfg-panel);
+    padding: 10px 14px 12px;
+  }
+  .yf-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--mfg-cyan), transparent);
+  }
+  .yf-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .yf-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6efec; }
+  .yf-panel-head h2::before { content: "▎"; color: var(--mfg-cyan); margin-right: 2px; }
+  .yf-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 166, 163, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .yf-panel-tag b { font-weight: 700; color: var(--mfg-amber); }
+  .yf-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 第 4 行通栏：主题河流（宽） + 里程碑甘特 ===== */
+  .yf-band2 { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 700px; gap: 14px; min-height: 0; }
+
+  /* ===== 阶段门评审流水条（右栏上，flex:none —— 必须在 init 之前填满） ===== */
+  .yf-gates { flex: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .yf-gate {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 6px 3px 7px; border-radius: 9px;
+    border: 1px solid rgba(64, 196, 190, 0.16); background: rgba(10, 38, 42, 0.5);
+    transition: border-color .25s, background .25s;
+  }
+  .yf-gate.is-active { border-color: rgba(53, 224, 208, 0.6); background: rgba(18, 68, 68, 0.55); box-shadow: inset 0 0 14px rgba(53, 224, 208, 0.12); }
+  .yf-gate-no {
+    width: 17px; height: 17px; border-radius: 5px; display: flex; align-items: center; justify-content: center;
+    font: 700 10px/1 var(--yf-mono); color: #04191a;
+  }
+  .yf-gate b { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: #d6efec; }
+  .yf-gate span { font: 700 13px/1 var(--yf-mono); font-variant-numeric: tabular-nums; }
+  .yf-gate i { font-style: normal; font-size: 10px; color: rgba(127, 166, 163, 0.85); white-space: nowrap; }
+
+  /* ===== CSS grid 模拟表格 ===== */
+  .yf-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .yf-thead, .yf-tbody li {
+    display: grid; grid-template-columns: var(--yf-tcols); align-items: center; gap: 6px;
+  }
+  .yf-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(20, 66, 68, 0.6); border: 1px solid rgba(64, 196, 190, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #7fc0ba;
+  }
+  .yf-thead span:not(:first-child), .yf-tbody li span:not(:first-child) { text-align: right; }
+  .yf-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .yf-tbody li {
+    padding: 0 8px; height: 28px; border-radius: 5px;
+    font-size: 12.5px; color: #cbe6e3; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  /* 行高 28px：右栏「阶段门」面板是 flex:none 的固定块，剩余高度只够 8 行 × 28px */
+  .yf-tbody li:nth-child(odd) { background: rgba(24, 72, 74, 0.26); }
+  .yf-tbody li.is-active { background: rgba(53, 224, 208, 0.16); }
+  .yf-tbody li b { font-weight: 700; color: #eafcfa; }
+  .yf-prog { position: relative; height: 8px; border-radius: 4px; background: rgba(64, 196, 190, 0.16); overflow: hidden; }
+  .yf-prog u { display: block; height: 100%; border-radius: 4px; }
+  .yf-badge {
+    justify-self: end; padding: 2px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .yf-badge.is-good { color: #063a25; background: var(--mfg-green); }
+  .yf-badge.is-mid { color: #3a2405; background: var(--mfg-amber); }
+  .yf-badge.is-bad { color: #3d0a10; background: var(--mfg-red); }
+
+  /* ===== 词云降级：插件缺失时用 DOM 标签云顶上，绝不让面板空着 ===== */
+  .yf-domcloud {
+    flex: 1; min-height: 0; width: 100%; overflow: hidden;
+    display: flex; flex-wrap: wrap; align-content: center; justify-content: center;
+    gap: 6px 12px; padding: 6px 4px; line-height: 1.1;
+  }
+  .yf-domcloud em { font-style: normal; font-weight: 700; white-space: nowrap; }
+  .yf-domcloud-note {
+    flex: none; margin-top: 4px; font-size: 10.5px; letter-spacing: 0.04em;
+    color: rgba(255, 157, 69, 0.9); text-align: center;
+  }
+
+  /* ===== 底部研发动态滚动条 ===== */
+  .yf-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--mfg-line); border-radius: 10px; background: var(--mfg-panel); padding: 0 16px;
+  }
+  .yf-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--mfg-violet);
+  }
+  .yf-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mfg-violet);
+    box-shadow: 0 0 10px var(--mfg-violet); animation: yf-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes yf-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .yf-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .yf-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .yf-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6dcd8; font-variant-numeric: tabular-nums; }
+  .yf-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 166, 163, 0.7); }
+  .yf-foot-item b { font-weight: 700; }
+  .yf-foot-item em { font-style: normal; color: #dff3f0; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .yf-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="yf-stage" id="yf-stage">
+    <!-- mockflag:begin --><div class="yf-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="yf-error" id="yf-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空：模拟数据标识由 tools/inject_mock_flag.py 注入） -->
+    <header class="yf-header">
+      <div class="yf-head-left">
+        <div class="yf-crumb"><b>云麓厨电</b><i>›</i><em>研发与新品孵化</em></div>
+        <div class="yf-head-title-row">
+          <div class="yf-head-title">研发与新品孵化</div>
+          <div class="yf-head-meta">
+            <span>研发投入 <b>5</b> 类 · <b>24</b> 个月</span><i>|</i>
+            <span>在研项目 <b id="yf-meta-proj">--</b> 项 · 已上市新品 <b id="yf-meta-new">--</b> 款</span><i>|</i>
+            <span>期次 <b>2026 年 7 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="yf-head-right">
+        <div class="yf-chips">
+          <div class="yf-chip"><span>DATA AS OF</span><b>2026-07-31</b></div>
+          <div class="yf-chip is-key"><span>R&amp;D RATIO</span><b id="yf-chip-rate">--</b></div>
+        </div>
+        <div class="yf-clock" aria-label="实时时钟">
+          <span class="yf-clock-time" id="yf-clock-time">--:--:--</span>
+          <span class="yf-clock-date" id="yf-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="yf-band" id="yf-band"></div>
+
+    <!-- 左：用户需求热词云 -->
+    <section class="yf-panel" id="yf-panel-word">
+      <div class="yf-panel-head">
+        <h2>用户需求热词</h2>
+        <span class="yf-panel-tag">评价 + 工单 · 提及 <b id="yf-word-total">--</b> 次</span>
+      </div>
+      <div class="yf-chart" id="yf-chart-word" role="img" aria-label="用户评价与售后工单的需求关键词云，字号按提及量、颜色按所属产品线"></div>
+    </section>
+
+    <!-- 中：产品 BOM 层级树 -->
+    <section class="yf-panel">
+      <div class="yf-panel-head">
+        <h2>产品 BOM 层级树</h2>
+        <span class="yf-panel-tag">整机 → 总成 → 部件 → 物料 · 单机料本 <b id="yf-bom-cost">--</b> 元</span>
+      </div>
+      <div class="yf-chart" id="yf-chart-tree" role="img" aria-label="旗舰新品整机四层 BOM 层级树，可折叠展开，选中总成路径高亮"></div>
+    </section>
+
+    <!-- 右：阶段门 + 在研项目明细 -->
+    <div class="yf-col">
+      <section class="yf-panel" style="flex: none;">
+        <div class="yf-panel-head">
+          <h2>阶段门评审</h2>
+          <span class="yf-panel-tag">立项 → 上市累计通过 <b id="yf-gate-cum">--</b></span>
+        </div>
+        <div class="yf-gates" id="yf-gates"></div>
+      </section>
+      <section class="yf-panel" style="flex: 1;">
+        <div class="yf-panel-head">
+          <h2>在研项目明细</h2>
+          <span class="yf-panel-tag">累计投入 <b id="yf-proj-fee">--</b> 亿元</span>
+        </div>
+        <div class="yf-table">
+          <div class="yf-thead">
+            <span>项目</span><span>产品线</span><span>阶段</span><span>投入</span><span>进度</span><span>判定</span>
+          </div>
+          <ul class="yf-tbody" id="yf-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 第 4 行通栏：研发投入结构演化（主题河流） + 新品里程碑甘特 -->
+    <div class="yf-band2">
+      <section class="yf-panel">
+        <div class="yf-panel-head">
+          <h2>研发投入结构演化</h2>
+          <span class="yf-panel-tag" id="yf-river-tag">近 24 个月 · 五类此消彼长</span>
+        </div>
+        <div class="yf-chart" id="yf-chart-river" role="img" aria-label="近 24 个月五类研发投入的主题河流，展示投入结构随时间的此消彼长"></div>
+      </section>
+      <section class="yf-panel">
+        <div class="yf-panel-head">
+          <h2>新品研发里程碑</h2>
+          <span class="yf-panel-tag">立项→设计→打样→试产→上市 · <b>◆</b> 阶段门</span>
+        </div>
+        <div class="yf-chart" id="yf-chart-gantt" role="img" aria-label="六款新品从立项到上市的五阶段里程碑甘特图，含阶段门评审点与今日线"></div>
+      </section>
+    </div>
+
+    <!-- 底部研发动态滚动条 -->
+    <div class="yf-foot">
+      <div class="yf-foot-tag">研发动态</div>
+      <div class="yf-foot-view"><div class="yf-foot-track" id="yf-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("yf-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("yf-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--mfg-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* mfgpalette-js:begin —— 由 tools/sync_mfg_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#051416",
+    stage: "#071b1e",
+    panel: "rgba(14,46,50,.55)",
+    line: "rgba(64,196,190,.22)",
+    cyan: "#35e0d0",
+    "cyan-deep": "#1a9e96",
+    blue: "#4fa8e8",
+    green: "#7ee08a",
+    orange: "#ff9d45",
+    amber: "#ffc94d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#d8f2ef",
+    "text-dim": "#7fa6a3",
+    series: ["#35e0d0", "#ff9d45", "#4fa8e8", "#7ee08a", "#ffc94d", "#a98cf5"]
+  };
+  /* mfgpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    cyanDeep: PAL["cyan-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(64,196,190,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const arrow = (v) => (v >= 0 ? "▲" : "▼");
+  const wan2yi = (w) => w / 10000;
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 7 月 · 云麓厨电集团）
+
+     ★ 建模铁律（本专题踩过的最深的坑）：进 ECharts option 的数据只放**标量与数组**，
+       业务对象之间一律用 name / 索引关联，绝不互相持有对象引用。setOption 会深拷贝
+       整个 option，只要成环就 RangeError: Maximum call stack size exceeded，整页图表
+       全空，且堆栈里只有 echarts 内部帧。
+       本页最高危的是 tree 的递归树：BOM 由「纯规格数组 → 每次现建纯对象」生成，
+       子节点绝不回指父节点（没有 node.parent / node.owner 之类的字段），
+       tooltip 需要的父级信息一律靠 name 去 BOM_INFO 这张扁平表里反查。 ===== */
+
+  /* 4.0 全系列基准盘（跨页共用，本页只读不改） */
+  const BASE = {
+    revenue: 112.6,       /* 年营收（亿元，内销口径） */
+    volume: 866,          /* 年销量（万台） */
+    output: 902           /* 年产量（万台） */
+  };
+
+  /* 4.1 六款已上市新品（P9 营销活动页口径，vol/price 一字不改，营收与销量由此现算）
+         line 字段是**产品线名字符串**，不是对象引用；launch 是相对 2025-08 的月序 */
+  const NEWS = [
+    { name: "净享 X7 洗碗机",   short: "净享X7", line: "洗碗机",     lineShort: "洗碗", launch: 1, vol: 14.6, price: 4280 },
+    { name: "风语 K8 烟机",     short: "风语K8", line: "吸油烟机",   lineShort: "烟机", launch: 2, vol: 9.6,  price: 3680 },
+    { name: "悦烤 S5 蒸烤",     short: "悦烤S5", line: "蒸烤一体机", lineShort: "蒸烤", launch: 3, vol: 11.2, price: 5180 },
+    { name: "净澈 W3 净水",     short: "净澈W3", line: "净水热水",   lineShort: "净水", launch: 5, vol: 12.8, price: 2380 },
+    { name: "星焰 P9 集成灶",   short: "星焰P9", line: "集成灶",     lineShort: "集成", launch: 7, vol: 6.4,  price: 8600 },
+    { name: "炽焰 G6 灶具",     short: "炽焰G6", line: "燃气灶具",   lineShort: "灶具", launch: 9, vol: 4.2,  price: 2180 }
+  ];
+  /* 增长品类（P9 口径，仅作文案引用） */
+  const GROWTH = [{ line: "洗碗机", yoy: 22.3 }, { line: "蒸烤一体机", yoy: 27.2 }];
+
+  /* 4.2 六产品线（P4/P7 口径顺序）与配色：词云按所属产品线取确定性颜色 */
+  const LINE_META = [
+    { name: "吸油烟机",   short: "烟机", color: C.cyan },
+    { name: "燃气灶具",   short: "灶具", color: C.orange },
+    { name: "洗碗机",     short: "洗碗", color: C.blue },
+    { name: "蒸烤一体机", short: "蒸烤", color: C.green },
+    { name: "集成灶",     short: "集成", color: C.amber },
+    { name: "净水热水",   short: "净水", color: C.violet }
+  ];
+  const LINE_IDX = {};
+  LINE_META.forEach((l, i) => { LINE_IDX[l.name] = i; });
+
+  /* 4.3 五类研发投入 × 24 个月（2024-08 → 2026-07，万元）
+         波形是确定性的（Math.sin，不用 Math.random —— kiosk 常驻每次打开必须一致）；
+         合计一律由分项求和，页面上不出现任何硬编码的投入总额。 */
+  const RD_CATS = [
+    { name: "基础研究", color: C.violet, base: 600,  growth: 0.42, amp: 46,  w: 0.55, ph: 0.40, note: "流体 / 燃烧 / 材料预研" },
+    { name: "新品开发", color: C.cyan,   base: 1560, growth: 0.12, amp: 210, w: 0.78, ph: 1.10, note: "六大产品线整机项目" },
+    { name: "工艺改进", color: C.blue,   base: 720,  growth: 0.18, amp: 82,  w: 0.62, ph: 2.30, note: "三大基地制程与模具" },
+    { name: "试验检测", color: C.green,  base: 520,  growth: 0.22, amp: 58,  w: 0.91, ph: 0.90, note: "可靠性 / 能效 / 安规" },
+    { name: "知识产权", color: C.orange, base: 350,  growth: 0.30, amp: 34,  w: 0.47, ph: 1.80, note: "专利布局与标准参与" }
+  ];
+  const RD_N = 24;
+  /* 月序 i=0 → 2024-08，i=23 → 2026-07 */
+  const rdMonthDate = (i) => {
+    const t = 7 + i;                                   /* 2024 年的月偏移（0 = 1 月） */
+    return (2024 + Math.floor(t / 12)) + "/" + pad((t % 12) + 1) + "/01";
+  };
+  const rdMonthLabel = (i) => {
+    const t = 7 + i;
+    return (2024 + Math.floor(t / 12)) + "-" + pad((t % 12) + 1);
+  };
+  RD_CATS.forEach((c) => {
+    c.series = Array.from({ length: RD_N }, (_, i) => {
+      const trend = c.base * (1 + c.growth * (i - (RD_N - 1) / 2) / (RD_N - 1));
+      return Math.round(trend + c.amp * Math.sin(i * c.w + c.ph));
+    });
+  });
+
+  /* 4.4 旗舰新品整机 BOM 规格（四层：整机 → 总成 → 部件 → 物料）
+         叶子第三项是与 P4/P10 故障部件口径对齐的部件名（有值即为故障高发件）。
+         ★ 纯数组规格，节点之间没有任何引用；成本一律自底向上求和。 */
+  const BOM_HOST = "净享 X7 洗碗机";
+  const BOM_SPEC = [
+    ["洗涤总成", [
+      ["喷淋部件",   [["上喷淋臂", 68], ["下喷淋臂", 74], ["喷淋分配阀", 52]]],
+      ["洗涤泵部件", [["洗涤泵电机", 186], ["泵体壳", 46], ["泵轴密封圈", 18, "密封圈"]]],
+      ["加热部件",   [["加热管", 92], ["温控探头", 26]]]
+    ]],
+    ["电控总成", [
+      ["主控部件", [["主控电控板", 238, "电控板"], ["电源模块", 86]]],
+      ["交互部件", [["触控面板玻璃", 74, "面板玻璃"], ["显示驱动板", 42]]],
+      ["线束部件", [["主线束端子", 38, "线束端子"], ["传感线束", 24]]]
+    ]],
+    ["门体总成", [
+      ["门板部件", [["外门板", 96], ["内门胆", 78]]],
+      ["密封部件", [["门封密封圈", 32, "密封圈"], ["门铰链", 44]]],
+      ["锁扣部件", [["门锁开关", 28], ["阻尼器", 36]]]
+    ]],
+    ["循环水路总成", [
+      ["进排水部件", [["进水阀", 42], ["排水泵", 78], ["波纹管", 22]]],
+      ["过滤部件",   [["粗滤网", 16], ["精滤芯", 34]]],
+      ["软水部件",   [["软水器", 88], ["树脂料", 46]]]
+    ]],
+    ["箱体结构总成", [
+      ["内胆部件", [["不锈钢内胆", 268, "腔体内胆"], ["隔音棉", 38]]],
+      ["框架部件", [["底盘结构件", 84, "结构件"], ["侧板", 62]]],
+      ["支撑部件", [["碗篮组件", 112], ["滑轨", 48]]]
+    ]]
+  ];
+
+  /* 4.5 八项在研项目：阶段 / 投入（万元）/ 进度（%）——判定由进度与阶段基准现算 */
+  const STAGE_NAMES = ["立项", "设计", "打样", "试产", "上市"];
+  const STAGE_BENCH = [20, 40, 60, 80, 100];            /* 各阶段应达进度基准 */
+  const PROJECTS = [
+    { name: "净享 X9 洗碗机", short: "净享X9", line: "洗碗机",     stage: 3, fee: 1860, prog: 78, note: "增长品类续作 · 洗净率与静音双升" },
+    { name: "风语 K10 烟机",  short: "风语K10", line: "吸油烟机",   stage: 2, fee: 1420, prog: 56, note: "大风压平台 · 直面「吸力不足」" },
+    { name: "悦烤 S7 蒸烤",   short: "悦烤S7", line: "蒸烤一体机", stage: 1, fee: 1180, prog: 38, note: "腔体易洁涂层换代" },
+    { name: "净澈 W5 净水",   short: "净澈W5", line: "净水热水",   stage: 3, fee: 960,  prog: 88, note: "长效滤芯 · 降更换成本" },
+    { name: "星焰 P11 集成灶", short: "星焰P11", line: "集成灶",    stage: 2, fee: 1340, prog: 51, note: "下排烟风道重构" },
+    { name: "炽焰 G8 灶具",   short: "炽焰G8", line: "燃气灶具",   stage: 0, fee: 520,  prog: 18, note: "快启点火针方案立项" },
+    { name: "静音风机平台",   short: "静音平台", line: "吸油烟机", stage: 1, fee: 1560, prog: 47, note: "共性技术 · 对齐热词「噪音大」" },
+    { name: "智控中枢平台",   short: "智控平台", line: "洗碗机",   stage: 2, fee: 1720, prog: 62, note: "共性技术 · 对齐故障件「电控板」" }
+  ];
+
+  /* 4.6 五道阶段门：单门通过率 → 累计通过率逐门相乘 */
+  const GATES = [
+    { no: 1, name: "立项", key: "G1", rate: 92.0, color: C.violet, note: "需求与市场论证" },
+    { no: 2, name: "设计", key: "G2", rate: 86.4, color: C.blue,   note: "结构与电控冻结" },
+    { no: 3, name: "打样", key: "G3", rate: 78.6, color: C.cyan,   note: "样机可靠性首轮" },
+    { no: 4, name: "试产", key: "G4", rate: 84.2, color: C.amber,  note: "工艺与良率验证" },
+    { no: 5, name: "上市", key: "G5", rate: 95.0, color: C.green,  note: "渠道与交付就绪" }
+  ];
+
+  /* 4.7 用户需求热词（来自用户评价与售后工单）：value 是提及次数，
+         line 决定颜色（确定性，绝不用随机色，否则每次刷新配色都变），
+         part 与 P4/P10 的故障部件口径对齐 */
+  const WORDS = [
+    { w: "噪音大",       v: 1860, line: "吸油烟机",   part: "风机总成" },
+    { w: "吸力不足",     v: 1420, line: "吸油烟机",   part: "风机总成" },
+    { w: "拢烟效果",     v: 980,  line: "吸油烟机",   part: "结构件" },
+    { w: "油网难拆洗",   v: 860,  line: "吸油烟机",   part: "结构件" },
+    { w: "排烟返味",     v: 620,  line: "吸油烟机",   part: "密封圈" },
+    { w: "面板留指纹",   v: 540,  line: "吸油烟机",   part: "面板玻璃" },
+    { w: "感应灵敏度",   v: 430,  line: "吸油烟机",   part: "电控板" },
+
+    { w: "点火慢",       v: 1180, line: "燃气灶具",   part: "点火针" },
+    { w: "火力不均",     v: 940,  line: "燃气灶具",   part: "结构件" },
+    { w: "熄火保护",     v: 720,  line: "燃气灶具",   part: "点火针" },
+    { w: "溢出物难清",   v: 520,  line: "燃气灶具",   part: "结构件" },
+    { w: "旋钮松动",     v: 480,  line: "燃气灶具",   part: "结构件" },
+    { w: "面板耐磨",     v: 360,  line: "燃气灶具",   part: "面板玻璃" },
+
+    { w: "烘干不彻底",   v: 1560, line: "洗碗机",     part: "电控板" },
+    { w: "洗净率",       v: 1240, line: "洗碗机",     part: "结构件" },
+    { w: "漏水报警",     v: 880,  line: "洗碗机",     part: "密封圈" },
+    { w: "碗篮空间",     v: 760,  line: "洗碗机",     part: "结构件" },
+    { w: "夜洗静音",     v: 690,  line: "洗碗机",     part: "风机总成" },
+    { w: "除菌功能",     v: 610,  line: "洗碗机",     part: "电控板" },
+    { w: "耗水耗电",     v: 540,  line: "洗碗机",     part: "电控板" },
+    { w: "App 连不上",   v: 470,  line: "洗碗机",     part: "电控板" },
+
+    { w: "内胆易挂油",   v: 1120, line: "蒸烤一体机", part: "腔体内胆" },
+    { w: "蒸汽发生器",   v: 830,  line: "蒸烤一体机", part: "腔体内胆" },
+    { w: "温控精度",     v: 780,  line: "蒸烤一体机", part: "电控板" },
+    { w: "门体隔热",     v: 560,  line: "蒸烤一体机", part: "密封圈" },
+    { w: "一键菜谱",     v: 430,  line: "蒸烤一体机", part: "电控板" },
+    { w: "腔体清洁",     v: 390,  line: "蒸烤一体机", part: "腔体内胆" },
+
+    { w: "下排烟效果",   v: 920,  line: "集成灶",     part: "风机总成" },
+    { w: "蒸烤联动",     v: 640,  line: "集成灶",     part: "电控板" },
+    { w: "安装适配",     v: 580,  line: "集成灶",     part: "结构件" },
+    { w: "运行共振",     v: 510,  line: "集成灶",     part: "风机总成" },
+    { w: "台面高度",     v: 420,  line: "集成灶",     part: "结构件" },
+    { w: "显示黑屏",     v: 360,  line: "集成灶",     part: "电控板" },
+
+    { w: "滤芯更换贵",   v: 1080, line: "净水热水",   part: "结构件" },
+    { w: "出水量小",     v: 860,  line: "净水热水",   part: "密封圈" },
+    { w: "水温不稳",     v: 740,  line: "净水热水",   part: "电控板" },
+    { w: "接头渗水",     v: 690,  line: "净水热水",   part: "密封圈" },
+    { w: "废水比",       v: 450,  line: "净水热水",   part: "电控板" },
+    { w: "安装上门",     v: 380,  line: "净水热水",   part: "结构件" },
+    { w: "线束接触",     v: 320,  line: "净水热水",   part: "线束端子" }
+  ];
+
+  /* ===== 5. 派生量：全部现算，不复制数字 ===== */
+  const D = {};
+
+  /* 5.1 新品口径 —— 与 P9 营销活动页同源（同一份 vol/price，合计各自求和） */
+  NEWS.forEach((p) => { p.revYi = p.vol * p.price / 10000; });        /* 万台 × 元 ÷ 1e4 = 亿元 */
+  D.newVol = sum(NEWS.map((p) => p.vol));                            /* 58.8 万台 */
+  D.newRev = sum(NEWS.map((p) => p.revYi));                          /* 25.05 亿元 */
+  D.newVolShare = D.newVol / BASE.volume * 100;
+  D.newRevShare = D.newRev / BASE.revenue * 100;
+  D.newByLine = {};                                                   /* 键是产品线名，值是标量 */
+  NEWS.forEach((p) => { D.newByLine[p.line] = (D.newByLine[p.line] || 0) + p.vol; });
+  D.newByLineTotal = sum(Object.keys(D.newByLine).map((k) => D.newByLine[k]));
+
+  /* 5.2 研发投入：五类逐月求和 → 近 12 月 / 前 12 月 / 24 月合计，费率现算 */
+  RD_CATS.forEach((c) => {
+    c.total = sum(c.series);
+    c.last12 = sum(c.series.slice(12));
+    c.prev12 = sum(c.series.slice(0, 12));
+    c.yoy = (c.last12 - c.prev12) / c.prev12 * 100;
+  });
+  D.rdWan12 = sum(RD_CATS.map((c) => c.last12));                      /* 近 12 月投入（万元） */
+  D.rdWanPrev = sum(RD_CATS.map((c) => c.prev12));
+  D.rdWan24 = sum(RD_CATS.map((c) => c.total));
+  D.rd12 = wan2yi(D.rdWan12);                                        /* 亿元 */
+  D.rd24 = wan2yi(D.rdWan24);
+  D.rdRate = D.rd12 / BASE.revenue * 100;                            /* 研发费率（%） */
+  D.rdYoy = (D.rdWan12 - D.rdWanPrev) / D.rdWanPrev * 100;
+  RD_CATS.forEach((c) => { c.share12 = c.last12 / D.rdWan12 * 100; c.sharePrev = c.prev12 / D.rdWanPrev * 100; });
+  D.rdShiftUp = RD_CATS.slice().sort((a, b) => (b.share12 - b.sharePrev) - (a.share12 - a.sharePrev))[0];
+  D.rdShiftDn = RD_CATS.slice().sort((a, b) => (a.share12 - a.sharePrev) - (b.share12 - b.sharePrev))[0];
+  D.rdTop = RD_CATS.slice().sort((a, b) => b.last12 - a.last12)[0];
+  /* 研发强度：每亿元研发投入撬动的新品营收 */
+  D.rdLeverage = D.newRev / D.rd12;
+
+  /* 5.3 BOM 展开：规格数组 → 扁平索引 + 逐层求和（子 → 父，绝不反向持有引用） */
+  const BOM = BOM_SPEC.map((asm) => ({
+    name: asm[0],
+    parts: asm[1].map((prt) => ({
+      name: prt[0],
+      mats: prt[1].map((m) => ({ name: m[0], cost: m[1], risk: m[2] || "" }))
+    }))
+  }));
+  BOM.forEach((asm) => {
+    asm.parts.forEach((prt) => { prt.cost = sum(prt.mats.map((m) => m.cost)); });
+    asm.cost = sum(asm.parts.map((p) => p.cost));
+  });
+  D.bomCost = sum(BOM.map((a) => a.cost));                            /* 单机料本（元） */
+  D.bomAsmSum = D.bomCost;
+  D.bomPartSum = sum(BOM.map((a) => sum(a.parts.map((p) => p.cost))));
+  D.bomMatSum = sum(BOM.map((a) => sum(a.parts.map((p) => sum(p.mats.map((m) => m.cost))))));
+  D.bomMatCnt = sum(BOM.map((a) => sum(a.parts.map((p) => p.mats.length))));
+  D.bomPartCnt = sum(BOM.map((a) => a.parts.length));
+  D.bomAsmCnt = BOM.length;
+  D.bomHostPrice = NEWS.filter((p) => p.name === BOM_HOST)[0].price;
+  D.bomRate = D.bomCost / D.bomHostPrice * 100;                       /* 料本占售价 */
+  D.bomRiskCost = 0; D.bomRiskCnt = 0;
+  /* 扁平索引：name → 标量信息（tooltip 靠它反查父级，杜绝节点回指） */
+  const BOM_INFO = {};
+  BOM_INFO[BOM_HOST] = { level: "整机", cost: D.bomCost, parent: "—", risk: "", kids: D.bomAsmCnt, kidName: "总成" };
+  BOM.forEach((asm) => {
+    BOM_INFO[asm.name] = { level: "总成", cost: asm.cost, parent: BOM_HOST, risk: "", kids: asm.parts.length, kidName: "部件" };
+    asm.parts.forEach((prt) => {
+      BOM_INFO[prt.name] = { level: "部件", cost: prt.cost, parent: asm.name, risk: "", kids: prt.mats.length, kidName: "物料" };
+      prt.mats.forEach((m) => {
+        BOM_INFO[m.name] = { level: "物料", cost: m.cost, parent: prt.name, risk: m.risk, kids: 0, kidName: "" };
+        if (m.risk) { D.bomRiskCost += m.cost; D.bomRiskCnt += 1; }
+      });
+    });
+  });
+  D.bomRiskShare = D.bomRiskCost / D.bomCost * 100;
+  D.bomAsmTop = BOM.slice().sort((a, b) => b.cost - a.cost)[0];
+
+  /* 5.4 在研项目：判定 = 实际进度 − 阶段基准 */
+  PROJECTS.forEach((p) => {
+    p.stageName = STAGE_NAMES[p.stage];
+    p.bench = STAGE_BENCH[p.stage];
+    p.gap = p.prog - p.bench;
+    p.verdict = p.gap >= 5 ? { t: "领先", c: "is-good" }
+              : p.gap >= -8 ? { t: "正常", c: "is-mid" }
+              : { t: "滞后", c: "is-bad" };
+    p.lineShort = LINE_META[LINE_IDX[p.line]].short;
+    p.color = LINE_META[LINE_IDX[p.line]].color;
+  });
+  D.projCnt = PROJECTS.length;
+  D.projFeeWan = sum(PROJECTS.map((p) => p.fee));
+  D.projFee = wan2yi(D.projFeeWan);
+  D.projLate = PROJECTS.filter((p) => p.verdict.t === "滞后");
+  D.projLead = PROJECTS.filter((p) => p.verdict.t === "领先");
+  D.projAvgProg = sum(PROJECTS.map((p) => p.prog)) / PROJECTS.length;
+
+  /* 5.5 阶段门：在研项目按阶段归集（现算）+ 累计通过率逐门相乘 */
+  let gcum = 100;
+  GATES.forEach((g, i) => {
+    g.live = PROJECTS.filter((p) => p.stage === i).length;
+    gcum = gcum * g.rate / 100;
+    g.cum = gcum;
+  });
+  D.gateLiveTotal = sum(GATES.map((g) => g.live));
+  D.gateCum = gcum;
+  D.gateWorst = GATES.slice().sort((a, b) => a.rate - b.rate)[0];
+
+  /* 5.6 热词：合计 / 按部件归集 / 按产品线归集 —— 全部现算 */
+  D.wordTotal = sum(WORDS.map((w) => w.v));
+  D.wordTop = WORDS.slice().sort((a, b) => b.v - a.v)[0];
+  D.byPart = {};
+  WORDS.forEach((w) => { D.byPart[w.part] = (D.byPart[w.part] || 0) + w.v; });
+  D.partRank = Object.keys(D.byPart).map((k) => ({ part: k, v: D.byPart[k] })).sort((a, b) => b.v - a.v);
+  D.byLineWord = {};
+  WORDS.forEach((w) => { D.byLineWord[w.line] = (D.byLineWord[w.line] || 0) + w.v; });
+  D.wordLineTop = Object.keys(D.byLineWord).map((k) => ({ line: k, v: D.byLineWord[k] })).sort((a, b) => b.v - a.v)[0];
+  D.wordByPartTotal = sum(D.partRank.map((p) => p.v));
+  /* 词云字号与颜色：按提及量排名取确定性档位（绝不用随机色 —— 否则每次刷新配色都变） */
+  const wordRank = WORDS.slice().sort((a, b) => b.v - a.v).map((w) => w.w);
+  const WORD_ALPHA = ["", "d8", "b0"];
+  WORDS.forEach((w) => {
+    const r = wordRank.indexOf(w.w);
+    w.rank = r;
+    w.color = LINE_META[LINE_IDX[w.line]].color + WORD_ALPHA[Math.min(2, Math.floor(r / (WORDS.length / 3)))];
+  });
+
+  /* 5.7 里程碑甘特：由 P9 的 launch 月序倒推五阶段（月序 0 = 2025-08） */
+  const STAGE_LEN = [2.5, 3.5, 2.5, 2.5];               /* 立项 / 设计 / 打样 / 试产（月） */
+  const LEAD = sum(STAGE_LEN);                           /* 上市前置周期 = 11 个月 */
+  const TODAY_M = 12;                                    /* 2026-07-31 ≈ 月序 12 */
+  const STAGE_COLOR = [C.violet, C.blue, C.cyan, C.amber, C.green];
+  const MILESTONES = [];
+  NEWS.forEach((p, row) => {
+    let t = p.launch - LEAD;
+    STAGE_LEN.forEach((len, si) => {
+      MILESTONES.push({ row: row, si: si, s: t, e: t + len });
+      t += len;
+    });
+    MILESTONES.push({ row: row, si: 4, s: p.launch, e: TODAY_M });    /* 上市至今 */
+    p.leadMonths = LEAD;
+    p.onMarket = TODAY_M - p.launch;
+  });
+  D.leadMonths = LEAD;
+  D.ganttMin = Math.min.apply(null, MILESTONES.map((g) => g.s)) - 0.6;
+  D.ganttMax = TODAY_M + 0.6;
+  D.newFirst = NEWS.slice().sort((a, b) => a.launch - b.launch)[0];
+  D.newLast = NEWS.slice().sort((a, b) => b.launch - a.launch)[0];
+  /* 甘特 x 轴：月序 → 年月标签 */
+  const mLabel = (m) => {
+    const t = Math.round(m) + 7;                          /* 月序 0 = 2025-08 → 2025 年第 8 月 */
+    const y = 2025 + Math.floor(t / 12);
+    return String(y % 100) + "/" + pad(((t % 12) + 12) % 12 + 1);
+  };
+
+  /* ===== 6. 顶部时钟与页头文案 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("yf-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("yf-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("yf-chip-rate").textContent = fmtDec(D.rdRate, 2) + "%";
+  $("yf-meta-proj").textContent = String(D.projCnt);
+  $("yf-meta-new").textContent = String(NEWS.length);
+  $("yf-word-total").textContent = fmtDec(D.wordTotal / 10000, 2) + " 万";
+  $("yf-bom-cost").textContent = fmtDec(D.bomCost, 0);
+  $("yf-gate-cum").textContent = fmtDec(D.gateCum, 1) + "%";
+  $("yf-proj-fee").textContent = fmtDec(D.projFee, 2);
+
+  /* ===== 7. DOM 填充（★ 必须全部先于 echarts.init 完成）
+         与图表同属一个 flex 容器的兄弟块若在 init 之后才填内容，会把 flex:1 的图表容器
+         压矮，图表按旧高度布局、底部被静默裁掉（本专题的物流线路详情页栽过）。
+         本页右栏的「阶段门」是 flex:none 的兄弟块，故一律在这里填满，再进第 9 节建图。 ===== */
+
+  /* 7.1 KPI 带：5 枚 */
+  const KPI_DEFS = [
+    { icon: "◈", label: "研发投入", val: D.rd12, unit: "亿元", dec: 2, warn: false,
+      sub: () => "近 12 月 · 五类合计 · 同比 <b class=\"" + (D.rdYoy >= 0 ? "yf-up" : "yf-down") + "\">" + arrow(D.rdYoy) + fmtDec(Math.abs(D.rdYoy), 1) + "%</b>" },
+    { icon: "％", label: "研发费率", val: D.rdRate, unit: "%", dec: 2, warn: false,
+      sub: () => "= 投入 ÷ 年营收 <b>" + fmtDec(BASE.revenue, 1) + "</b> 亿元 · 行业带 3~5%" },
+    { icon: "✦", label: "新品营收贡献", val: D.newRev, unit: "亿元", dec: 2, warn: false,
+      sub: () => "占年营收 <b>" + fmtDec(D.newRevShare, 1) + "%</b> · 与营销活动页同源" },
+    { icon: "▣", label: "新品销量", val: D.newVol, unit: "万台", dec: 1, warn: false,
+      sub: () => "占年销量 " + fmtDec(BASE.volume, 0) + " 万台的 <b>" + fmtDec(D.newVolShare, 1) + "%</b>" },
+    { icon: "⚙", label: "在研项目", val: D.projCnt, unit: "项", dec: 0, warn: D.projLate.length > 0,
+      sub: () => "投入 <b>" + fmtDec(D.projFee, 2) + "</b> 亿元 · 滞后 <b class=\"yf-down\">" + D.projLate.length + "</b> 项 · 领先 <b class=\"yf-up\">" + D.projLead.length + "</b> 项" }
+  ];
+  const band = $("yf-band");
+  band.innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="yf-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="yf-kpi-icon">' + k.icon + "</div>" +
+      '<div class="yf-kpi-main">' +
+        '<div class="yf-kpi-label">' + k.label + "</div>" +
+        '<div class="yf-kpi-num"><span class="yf-kpi-val" id="yf-kpi-' + i + '">0</span><span class="yf-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="yf-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 7.2 阶段门评审流水条（右栏上，flex:none） */
+  const gatesBox = $("yf-gates");
+  gatesBox.innerHTML = GATES.map((g, i) => (
+    '<div class="yf-gate" data-i="' + i + '" title="' + g.name + "门 · " + g.note + "　单门通过 " + fmtDec(g.rate, 1) + "%　累计 " + fmtDec(g.cum, 1) + '%">' +
+      '<div class="yf-gate-no" style="background:' + g.color + '">' + g.no + "</div>" +
+      "<b>" + g.name + "</b>" +
+      '<span style="color:' + g.color + '">' + fmtDec(g.rate, 1) + "%</span>" +
+      "<i>在研 " + g.live + " 项</i>" +
+    "</div>"
+  )).join("");
+  const gateCards = Array.from(gatesBox.children);
+
+  /* 7.3 在研项目明细表（右栏下） */
+  const tbody = $("yf-tbody");
+  tbody.innerHTML = PROJECTS.map((p, i) => (
+    "<li data-i=\"" + i + "\" title=\"" + p.name + " · " + p.note + "\">" +
+      "<span><b>" + p.short + "</b></span>" +
+      "<span style=\"color:" + p.color + "\">" + p.lineShort + "</span>" +
+      "<span>" + p.stageName + "</span>" +
+      "<span>" + p.fee + "</span>" +
+      "<span><span class=\"yf-prog\"><u style=\"width:" + p.prog + "%;background:" +
+        (p.gap >= 5 ? C.green : p.gap >= -8 ? C.cyan : C.orange) + "\"></u></span></span>" +
+      '<span class="yf-badge ' + p.verdict.c + '">' + p.verdict.t + "</span>" +
+    "</li>"
+  )).join("");
+  const tbodyRows = Array.from(tbody.children);
+
+  /* 7.4 底部研发动态滚动条（数据全部由派生量现算，不另编数字） */
+  const NEWS_TICK = [
+    { lv: "投入", c: C.cyan, t: "近 12 月研发投入 " + fmtDec(D.rd12, 2) + " 亿元，费率 " + fmtDec(D.rdRate, 2) +
+        "%（= 投入 ÷ 年营收 " + fmtDec(BASE.revenue, 1) + " 亿元），同比 " + signed(D.rdYoy, 1) + "%" },
+    { lv: "结构", c: C.violet, t: "投入结构此消彼长：「" + D.rdShiftUp.name + "」占比升至 " + fmtDec(D.rdShiftUp.share12, 1) +
+        "%（+" + fmtDec(D.rdShiftUp.share12 - D.rdShiftUp.sharePrev, 1) + "pp），「" + D.rdShiftDn.name + "」降至 " +
+        fmtDec(D.rdShiftDn.share12, 1) + "%" },
+    { lv: "新品", c: C.green, t: "六款新品年销 " + fmtDec(D.newVol, 1) + " 万台、营收 " + fmtDec(D.newRev, 2) +
+        " 亿元，贡献率 " + fmtDec(D.newRevShare, 1) + "%；每亿元研发投入撬动新品营收 " + fmtDec(D.rdLeverage, 2) + " 亿元" },
+    { lv: "增长", c: C.amber, t: "增长品类 " + GROWTH.map((g) => g.line + " " + signed(g.yoy, 1) + "%").join("、") +
+        "，对应新品 " + fmtDec(D.newByLine[GROWTH[0].line] + D.newByLine[GROWTH[1].line], 1) + " 万台" },
+    { lv: "需求", c: C.orange, t: "热词首位「" + D.wordTop.w + "」" + D.wordTop.v + " 次，主责部件「" + D.wordTop.part +
+        "」；部件维度提及最多的是「" + D.partRank[0].part + "」" + D.partRank[0].v + " 次，占 " +
+        fmtDec(D.partRank[0].v / D.wordTotal * 100, 1) + "%" },
+    { lv: "BOM", c: C.blue, t: BOM_HOST + " 整机 " + D.bomAsmCnt + " 总成 / " + D.bomPartCnt + " 部件 / " + D.bomMatCnt +
+        " 物料，单机料本 " + fmtDec(D.bomCost, 0) + " 元，占售价 " + fmtDec(D.bomRate, 1) + "%；故障高发件 " +
+        D.bomRiskCnt + " 项占料本 " + fmtDec(D.bomRiskShare, 1) + "%" },
+    { lv: "门评", c: C.red, t: "阶段门最窄一道是「" + D.gateWorst.name + "」" + fmtDec(D.gateWorst.rate, 1) +
+        "%，立项到上市累计通过 " + fmtDec(D.gateCum, 1) + "%；在研 " + D.gateLiveTotal + " 项中滞后 " + D.projLate.length + " 项" +
+        (D.projLate.length ? "（" + D.projLate.map((p) => p.short).join("、") + "）" : "") }
+  ];
+  const track = $("yf-foot-track");
+  const tickHtml = NEWS_TICK.map((a) => (
+    '<div class="yf-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = tickHtml + tickHtml;                      /* 两份首尾相接，滚动无缝 */
+
+  /* ===== 8. KPI 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值 ===== */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("yf-kpi-" + i), k.val, k.dec));
+
+  /* ===== 9. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const TIP = (extra) => Object.assign({
+    backgroundColor: "rgba(7,27,30,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  }, extra || {});
+
+  /* ---------------------------------------------------------------------------
+     9.1 ★ 产品 BOM 层级树（tree · 本页第一张主角图）
+         四层：整机 → 总成 → 部件 → 物料，orthogonal / LR 横向展开，可折叠展开。
+         ★ 防循环引用：每次调用 buildTree() 都**现建纯对象**，children 是新数组，
+           节点里只有 name / value / itemStyle / lineStyle / label / collapsed 这些
+           标量与数组，没有任何指回父节点或业务对象的字段。tooltip 要的父级信息
+           从 option 外面的扁平表 BOM_INFO 按 name 反查。
+  --------------------------------------------------------------------------- */
+  const TREE_C = [C.amber, C.cyan, C.blue, C.green];          /* 按层深取色 */
+  const DIM = "rgba(127,166,163,.45)";
+
+  function matNode(m, on) {
+    return {
+      name: m.name,
+      value: m.cost,
+      symbolSize: m.risk ? 9 : 6,
+      itemStyle: { color: on ? (m.risk ? C.red : TREE_C[3]) : DIM, borderWidth: 0 },
+      lineStyle: { color: on ? "rgba(126,224,138,.45)" : "rgba(127,166,163,.16)", width: on ? 1.2 : 0.8 },
+      label: { color: on ? (m.risk ? "#ffc9cd" : "#cbe6e3") : "rgba(127,166,163,.55)", fontSize: 10.5 }
+    };
+  }
+  function partNode(p, on) {
+    return {
+      name: p.name,
+      value: p.cost,
+      symbolSize: on ? 9 : 7,
+      /* ★ 折叠放在**物料层**而不是总成层：只展开聚焦总成时全树只剩十来个可见叶子，
+         ECharts orthogonal 布局会把它们均分到整个容器高度，节点被撑得极稀疏、
+         画布利用率不到两成（实测 408px 高只用了顶部一小块）。改为总成层恒展开、
+         物料层按聚焦与否折叠后，非聚焦分支仍贡献部件层结构，聚焦分支才铺到物料，
+         可见叶子数稳定在 20 上下、行距 ~17px，树形才立得住。 */
+      collapsed: !on,
+      itemStyle: { color: on ? TREE_C[2] : DIM, borderWidth: 0 },
+      lineStyle: { color: on ? "rgba(79,168,232,.6)" : "rgba(127,166,163,.18)", width: on ? 1.5 : 0.9 },
+      label: { color: on ? "#d6efec" : "rgba(127,166,163,.6)", fontSize: 11 },
+      children: p.mats.map((m) => matNode(m, on))
+    };
+  }
+  function asmNode(a, on) {
+    return {
+      name: a.name,
+      value: a.cost,
+      symbolSize: on ? 13 : 10,
+      /* 总成层恒展开（折叠下沉到物料层，见 partNode 注释），聚焦靠配色与线宽区分 */
+      itemStyle: {
+        color: on ? TREE_C[1] : DIM, borderWidth: on ? 2 : 0,
+        borderColor: "rgba(234,252,250,.75)",
+        shadowBlur: on ? 14 : 0, shadowColor: "rgba(53,224,208,.6)"
+      },
+      lineStyle: { color: on ? "rgba(53,224,208,.85)" : "rgba(127,166,163,.22)", width: on ? 2.2 : 1 },
+      label: { color: on ? "#eafcfa" : "rgba(127,166,163,.75)", fontSize: 12, fontWeight: on ? 700 : 400 },
+      children: a.parts.map((p) => partNode(p, on))
+    };
+  }
+  function buildTree(focus) {
+    return {
+      name: BOM_HOST,
+      value: D.bomCost,
+      symbolSize: 16,
+      itemStyle: { color: TREE_C[0], borderColor: "rgba(255,255,255,.85)", borderWidth: 2, shadowBlur: 16, shadowColor: "rgba(255,201,77,.6)" },
+      label: { color: "#fff3d6", fontSize: 12.5, fontWeight: 700 },
+      children: BOM.map((a, i) => asmNode(a, i === focus))
+    };
+  }
+
+  const tree = makeChart("yf-chart-tree");
+  function treeOption(focus) {
+    return {
+      backgroundColor: "transparent",
+      tooltip: TIP({
+        trigger: "item", triggerOn: "mousemove", confine: true,
+        formatter: (p) => {
+          const info = BOM_INFO[p.name];
+          if (!info) return p.name;
+          const share = info.cost / D.bomCost * 100;
+          return "<b style=\"color:" + (info.risk ? C.red : C.cyan) + "\">" + p.name + "</b>　<span style=\"color:" + C.textDim + "\">" +
+            info.level + "</span><br/>物料成本 <b>" + fmtDec(info.cost, 0) + "</b> 元 · 占单机料本 " + fmtDec(share, 1) + "%<br/>" +
+            (info.kids ? "下辖 <b>" + info.kids + "</b> 个" + info.kidName + "<br/>" : "") +
+            "<span style=\"color:" + C.textDim + "\">上级：" + info.parent +
+            (info.risk ? "　·　故障高发件：" + info.risk : "") + "</span>";
+        }
+      }),
+      series: [{
+        type: "tree",
+        data: [buildTree(focus)],
+        layout: "orthogonal", orient: "LR",
+        /* 边距按四层节点的标签宽度实测收紧：根标签在左（96 太宽，给到 118 才不压根节点），
+           叶子标签在右（物料名 + 数值约 120px）。上下各留 10 足够。 */
+        left: 118, right: 140, top: 10, bottom: 10,
+        symbol: "circle", symbolSize: 7,
+        /* ★ BOM 用**折线**而非贝塞尔曲线：正交连接是工程 BOM 图的惯例，
+           层级归属一眼可辨；曲线在 922×408 这种扁容器里几条线一交叉就糊成一团。 */
+        edgeShape: "polyline", edgeForkPosition: "62%",
+        initialTreeDepth: -1,                                   /* 展开层级由每个节点的 collapsed 决定 */
+        expandAndCollapse: true, animationDurationUpdate: 520,
+        roam: false,
+        /* ★ 标签不用 rich：rich 子样式会盖掉每个节点自己的 label.color，
+             而「选中路径提亮 / 其余置灰」正是靠节点级 label.color 实现的。 */
+        label: {
+          position: "left", verticalAlign: "middle", align: "right", distance: 7,
+          formatter: (p) => (p.value == null ? p.name : p.name + "  " + fmtDec(p.value, 0))
+        },
+        leaves: {
+          label: { position: "right", verticalAlign: "middle", align: "left", distance: 7 }
+        },
+        emphasis: { focus: "descendant", itemStyle: { shadowBlur: 16, shadowColor: "rgba(53,224,208,.7)" } },
+        animationDuration: 620, animationEasing: "cubicOut"
+      }]
+    };
+  }
+  let treeFocus = 0;
+  tree.setOption(treeOption(treeFocus));
+
+  /* ---------------------------------------------------------------------------
+     9.2 ★ 研发投入结构演化（themeRiver · 本页第二张主角图）
+         24 个月 × 5 类投入，themeRiver 天生就是画「结构随时间流动」的：
+         每条带的粗细 = 当月该类投入，带与带的挤压关系直接读出此消彼长。
+         data 行是 [时间字符串, 数值, 类目名] 三元组数组，纯标量。
+  --------------------------------------------------------------------------- */
+  const river = makeChart("yf-chart-river");
+  const RIVER_ROWS = [];
+  RD_CATS.forEach((c) => {
+    c.series.forEach((v, i) => { RIVER_ROWS.push([rdMonthDate(i), v, c.name]); });
+  });
+  river.setOption({
+    backgroundColor: "transparent",
+    color: RD_CATS.map((c) => c.color),
+    tooltip: TIP({
+      trigger: "axis", confine: true,
+      axisPointer: { type: "line", lineStyle: { color: "rgba(53,224,208,.45)", width: 1 } },
+      formatter: (ps) => {
+        if (!ps || !ps.length) return "";
+        /* themeRiver 的 params.value 是原始数据行 [时间, 数值, 类目]；防御一手异常形态 */
+        const row = ps[0].value;
+        const t = new Date(Array.isArray(row) ? row[0] : ps[0].name);
+        if (isNaN(t.getTime())) return "";
+        const idx = Math.max(0, Math.min(RD_N - 1, (t.getFullYear() - 2024) * 12 + t.getMonth() - 7));
+        const tot = sum(RD_CATS.map((c) => c.series[idx]));
+        let s = "<b>" + rdMonthLabel(idx) + "</b>　当月合计 <b style=\"color:" + C.cyan + "\">" + tot + "</b> 万元<br/>";
+        RD_CATS.forEach((c) => {
+          s += "<span style=\"color:" + c.color + "\">■</span> " + c.name + "　<b>" + c.series[idx] +
+            "</b> 万元 · " + fmtDec(c.series[idx] / tot * 100, 1) + "%<br/>";
+        });
+        return s;
+      }
+    }),
+    legend: {
+      top: 0, right: 2, icon: "roundRect", itemWidth: 13, itemHeight: 7, itemGap: 13,
+      data: RD_CATS.map((c) => c.name), textStyle: { color: C.textDim, fontSize: 11 }, inactiveColor: "#3d6f6c"
+    },
+    /* ★ left 留 78px：themeRiver 的层标签画在每条带的左端**外侧**，
+         左边距不够会被画布裁掉，只剩半个字。 */
+    singleAxis: {
+      type: "time", left: 78, right: 26, top: 30, bottom: 24,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, {
+        fontSize: 10.5, hideOverlap: true,
+        formatter: (v) => { const d = new Date(v); return (d.getMonth() === 0 ? d.getFullYear() + "年" : "") + (d.getMonth() + 1) + "月"; }
+      })
+    },
+    series: [{
+      type: "themeRiver",
+      data: RIVER_ROWS,
+      boundaryGap: ["8%", "8%"],
+      label: { show: true, color: "#eafcfa", fontSize: 10, fontWeight: 700, position: "left" },
+      itemStyle: { opacity: 0.92, shadowBlur: 8, shadowColor: "rgba(4,16,18,.5)" },
+      emphasis: { itemStyle: { shadowBlur: 18, shadowColor: "rgba(53,224,208,.45)" } },
+      animationDuration: 900, animationEasing: "cubicOut"
+    }]
+  });
+
+  /* ---------------------------------------------------------------------------
+     9.3 ★ 用户需求热词（wordCloud · 本页第三张主角图）
+         wordCloud 不在 ECharts 核心里，靠 echarts-wordcloud 插件。
+         ★ 资源守卫：插件缺失（离线 / CDN 被拦）时**不让整页白屏**，也不让面板空着——
+           先拿一个屏外容器探测能否 setOption 出 wordCloud，探测失败就把这一格降级成
+           DOM 标签云（字号仍按提及量、颜色仍按产品线），其余图表照常渲染。
+         ★ 颜色确定性：textStyle.color 若用随机色，每次刷新配色都不同；
+           这里按「所属产品线 + 提及量排名档位」取色，刷新前后完全一致。
+  --------------------------------------------------------------------------- */
+  function wordCloudReady() {
+    const holder = document.createElement("div");
+    holder.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:120px;height:90px;";
+    document.body.appendChild(holder);
+    let probe = null, ok = false;
+    try {
+      probe = echarts.init(holder);
+      probe.setOption({ series: [{ type: "wordCloud", data: [{ name: "探测", value: 1 }] }] });
+      ok = true;
+    } catch (err) { ok = false; }
+    if (probe) probe.dispose();
+    holder.remove();
+    return ok;
+  }
+  const WC_OK = wordCloudReady();
+  let wc = null;
+
+  if (WC_OK) {
+    wc = makeChart("yf-chart-word");
+    wc.setOption({
+      backgroundColor: "transparent",
+      tooltip: TIP({
+        trigger: "item", confine: true,
+        formatter: (p) => {
+          const w = WORDS.filter((x) => x.w === p.name)[0];
+          if (!w) return p.name;
+          return "<b style=\"color:" + LINE_META[LINE_IDX[w.line]].color + "\">" + w.w + "</b><br/>提及 <b>" + w.v +
+            "</b> 次 · 占 " + fmtDec(w.v / D.wordTotal * 100, 1) + "%<br/>产品线：" + w.line +
+            "<br/><span style=\"color:" + C.textDim + "\">主责部件：" + w.part + "（与售后故障部件口径一致）</span>";
+        }
+      }),
+      series: [{
+        type: "wordCloud",
+        left: "center", top: "center", width: "98%", height: "94%",
+        sizeRange: [12, 40], rotationRange: [-60, 60], rotationStep: 30,
+        gridSize: 6, shape: "circle", drawOutOfBound: false, shrinkToFit: true,
+        layoutAnimation: true,
+        textStyle: { fontFamily: "PingFang SC, Microsoft YaHei, sans-serif", fontWeight: 700 },
+        emphasis: { focus: "self", textStyle: { textShadowBlur: 12, textShadowColor: "rgba(53,224,208,.65)" } },
+        /* data 只放标量：name / value / textStyle.color */
+        data: WORDS.map((w) => ({ name: w.w, value: w.v, textStyle: { color: w.color } }))
+      }]
+    });
+  } else {
+    /* 降级：DOM 标签云。挂在图表容器自身（不是它的 flex 兄弟），不会压矮别的块。 */
+    const host = $("yf-chart-word");
+    host.classList.remove("yf-chart");
+    host.className = "yf-domcloud";
+    const vmax = Math.max.apply(null, WORDS.map((w) => w.v));
+    const vmin = Math.min.apply(null, WORDS.map((w) => w.v));
+    host.innerHTML = WORDS.slice().sort((a, b) => b.v - a.v).map((w) => {
+      const fs = 12 + (w.v - vmin) / (vmax - vmin) * 22;
+      return '<em style="font-size:' + fmtDec(fs, 1) + "px;color:" + w.color + '" title="' + w.line + " · " + w.part + " · " + w.v + ' 次">' + w.w + "</em>";
+    }).join("");
+    const note = document.createElement("div");
+    note.className = "yf-domcloud-note";
+    note.textContent = "词云插件 echarts-wordcloud 未加载，已降级为标签云（字号按提及量 · 颜色按产品线）";
+    $("yf-panel-word").appendChild(note);
+  }
+
+  /* ---------------------------------------------------------------------------
+     9.4 新品研发里程碑甘特（custom 系列 + renderItem）
+         坐标系是 value(月序) × category(新品)，encode 把 value[1]/value[2] 映射到 x、
+         value[0] 映射到 y；阶段门评审点画成小菱形，今日线挂在 dataIndex 0 的 renderItem 里。
+  --------------------------------------------------------------------------- */
+  const gantt = makeChart("yf-chart-gantt");
+  /* value = [行号, 起月序, 止月序, 阶段索引] —— 全是数字，绝无对象 */
+  const ganttValue = (g) => [g.row, Number(g.s.toFixed(3)), Number(g.e.toFixed(3)), g.si];
+  const ganttData = (focusRow) => MILESTONES.map((g) => {
+    const on = focusRow < 0 || focusRow === g.row;
+    const col = STAGE_COLOR[g.si];
+    return {
+      name: STAGE_NAMES[g.si],
+      value: ganttValue(g),
+      itemStyle: on
+        ? { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: col }, { offset: 1, color: col + "aa" }]),
+            borderColor: focusRow === g.row ? "rgba(255,255,255,.85)" : "transparent", borderWidth: focusRow === g.row ? 1.2 : 0, opacity: 0.98 }
+        : { color: col + "55", borderWidth: 0, opacity: 0.7 }
+    };
+  });
+
+  function todayMark(params, api) {
+    const x = api.coord([TODAY_M, 0])[0];
+    const cs = params.coordSys;
+    if (x < cs.x || x > cs.x + cs.width) return null;
+    return {
+      type: "group", silent: true,
+      children: [
+        { type: "line", shape: { x1: x, y1: cs.y - 6, x2: x, y2: cs.y + cs.height },
+          style: { stroke: "rgba(255,255,255,.85)", lineWidth: 1.3, lineDash: [5, 4] } },
+        { type: "text", style: { text: "今日", x: x - 22, y: cs.y - 5, fill: "#dff3f0", fontSize: 10 } }
+      ]
+    };
+  }
+  function ganttItem(params, api) {
+    const row = api.value(0);
+    const si = api.value(3);
+    const st = api.coord([api.value(1), row]);
+    const en = api.coord([api.value(2), row]);
+    const rowH = api.size([0, 1])[1];
+    const h = Math.max(9, rowH * 0.46);
+    const cs = params.coordSys;
+    const clipTo = { x: cs.x, y: cs.y, width: cs.width, height: cs.height };
+    const rect = echarts.graphic.clipRectByRect(
+      { x: st[0], y: st[1] - h / 2, width: Math.max(en[0] - st[0], 2), height: h }, clipTo
+    );
+    const children = [];
+    if (params.dataIndex === 0) { const tm = todayMark(params, api); if (tm) children.push(tm); }
+    if (rect) {
+      children.push({ type: "rect", shape: Object.assign({ r: 3 }, rect), style: api.style() });
+      if (rect.width > 34) {
+        children.push({ type: "text", silent: true, style: {
+          text: STAGE_NAMES[si], x: rect.x + rect.width / 2, y: rect.y + rect.height / 2,
+          fill: "#04191a", fontSize: 10, fontWeight: 700, align: "center", verticalAlign: "middle"
+        } });
+      }
+    }
+    /* 阶段门评审点：非末阶段在段末画一枚菱形 */
+    if (si < 4 && en[0] >= cs.x && en[0] <= cs.x + cs.width) {
+      children.push({
+        type: "polygon", silent: true,
+        shape: { points: [[en[0], st[1] - h * 0.72], [en[0] + h * 0.42, st[1]], [en[0], st[1] + h * 0.72], [en[0] - h * 0.42, st[1]]] },
+        style: { fill: C.orange, stroke: "rgba(7,27,30,.85)", lineWidth: 1 }
+      });
+    }
+    return { type: "group", children: children };
+  }
+
+  gantt.setOption({
+    backgroundColor: "transparent",
+    tooltip: TIP({
+      trigger: "item", confine: true,
+      formatter: (p) => {
+        const g = MILESTONES[p.dataIndex];
+        const n = NEWS[g.row];
+        const months = g.e - g.s;
+        return "<b style=\"color:" + STAGE_COLOR[g.si] + "\">" + n.name + " · " + STAGE_NAMES[g.si] + "</b><br/>" +
+          mLabel(g.s) + " → " + (g.si === 4 ? "至今" : mLabel(g.e)) + "（" + fmtDec(months, 1) + " 个月）<br/>" +
+          (g.si < 4 ? "段末设 <b style=\"color:" + C.orange + "\">" + GATES[g.si].name + "门</b> 评审 · 通过率 " + fmtDec(GATES[g.si].rate, 1) + "%<br/>" : "") +
+          "<span style=\"color:" + C.textDim + "\">上市 " + mLabel(n.launch) + " · 前置 " + fmtDec(D.leadMonths, 0) +
+          " 个月 · 在架 " + fmtDec(n.onMarket, 0) + " 个月 · 年销 " + fmtDec(n.vol, 1) + " 万台</span>";
+      }
+    }),
+    grid: { left: 74, right: 16, top: 24, bottom: 22, containLabel: false },
+    xAxis: {
+      type: "value", min: D.ganttMin, max: D.ganttMax, interval: 3,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      splitLine: { show: true, lineStyle: { color: "rgba(64,196,190,.10)" } },
+      axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 10, hideOverlap: true, formatter: (v) => mLabel(v) })
+    },
+    yAxis: {
+      type: "category", inverse: true, data: NEWS.map((n) => n.short),
+      axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: { fontSize: 11, margin: 8, color: "#cbe6e3" }
+    },
+    series: [{
+      name: "研发阶段", type: "custom", renderItem: ganttItem, encode: { x: [1, 2], y: 0 },
+      clip: false, data: ganttData(-1), animationDuration: 700, animationDurationUpdate: 0
+    }]
+  });
+  function focusGantt(row) { gantt.setOption({ series: [{ data: ganttData(row) }] }); }
+
+  /* ===== 10. 底部滚动条推进 ===== */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 11. 活性轮播（kiosk 常驻，不做 teardown） ===== */
+
+  /* 11.1 BOM 树：逐条总成路径展开高亮（选中路径 = 展开 + 提亮 + 加粗连线） */
+  function playTree() {
+    tree.setOption(treeOption(treeFocus), true);
+    treeFocus = (treeFocus + 1) % BOM.length;
+  }
+  setInterval(playTree, 5200);
+
+  /* 11.2 阶段门卡片 ↔ 甘特行：同步巡航 */
+  let gateIdx = 0;
+  function playGate() {
+    gateCards.forEach((c, i) => c.classList.toggle("is-active", i === gateIdx));
+    gateIdx = (gateIdx + 1) % GATES.length;
+  }
+  playGate();
+  setInterval(playGate, 2800);
+
+  let ganttIdx = 0;
+  function playGantt() {
+    focusGantt(ganttIdx);
+    ganttIdx = (ganttIdx + 1) % NEWS.length;
+  }
+  playGantt();
+  setInterval(playGantt, 3400);
+
+  /* 11.3 在研项目表行巡航 */
+  let projIdx = 0;
+  function playProj() {
+    tbodyRows.forEach((r, i) => r.classList.toggle("is-active", i === projIdx));
+    projIdx = (projIdx + 1) % PROJECTS.length;
+  }
+  playProj();
+  setInterval(playProj, 2400);
+
+  /* 11.4 主题河流：面板标签轮播各类占比；词云：逐词高亮 */
+  const riverTag = $("yf-river-tag");
+  let rdIdx = 0;
+  function playRiver() {
+    const c = RD_CATS[rdIdx];
+    const dpp = c.share12 - c.sharePrev;
+    riverTag.innerHTML = "近 24 个月 · " + c.name + " 占 <b>" + fmtDec(c.share12, 1) + "%</b>（" + signed(dpp, 1) + "pp）";
+    rdIdx = (rdIdx + 1) % RD_CATS.length;
+  }
+  playRiver();
+  setInterval(playRiver, 3000);
+
+  if (wc) {
+    let wcIdx = 0;
+    setInterval(() => {
+      try {
+        wc.dispatchAction({ type: "downplay", seriesIndex: 0 });
+        wc.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: wcIdx });
+      } catch (e) { /* 插件版本差异时静默跳过，不影响其他面板 */ }
+      wcIdx = (wcIdx + 1) % WORDS.length;
+    }, 1600);
+  }
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const eq = (a, b, tol) => Math.abs(a - b) < (tol == null ? 1e-6 : tol);
+  const checks = [
+    ["新品销量合计 = 58.8 万台（与营销活动页同值）", eq(D.newVol, 58.8, 1e-9)],
+    ["新品营收合计 ≈ 25.05 亿元 = Σ(销量 × 均价)", eq(D.newRev, 25.05, 0.01)],
+    ["新品按产品线归集之和 = 新品销量合计", eq(D.newByLineTotal, D.newVol, 1e-9)],
+    ["新品覆盖六产品线", Object.keys(D.newByLine).length === 6],
+    ["新品销量不超过年销量 866 万台", D.newVol < BASE.volume],
+    ["研发投入合计 = 五类之和（近 12 月）", eq(D.rdWan12, sum(RD_CATS.map((c) => c.last12)), 1e-9)],
+    ["研发投入 24 月合计 = 近 12 月 + 前 12 月", eq(D.rdWan24, D.rdWan12 + D.rdWanPrev, 1e-9)],
+    ["研发费率落在家电行业带 3.0% ~ 5.0%", D.rdRate >= 3 && D.rdRate <= 5],
+    ["主题河流数据行数 = 5 类 × 24 月", RIVER_ROWS.length === RD_CATS.length * RD_N],
+    ["BOM：整机料本 = Σ总成 = Σ部件 = Σ物料", eq(D.bomCost, D.bomAsmSum, 1e-9) && eq(D.bomCost, D.bomPartSum, 1e-9) && eq(D.bomCost, D.bomMatSum, 1e-9)],
+    ["BOM 料本占旗舰新品售价 40% ~ 70%", D.bomRate > 40 && D.bomRate < 70],
+    ["阶段门在研项目数之和 = 在研项目总数", D.gateLiveTotal === D.projCnt],
+    ["阶段门累计通过率 = 逐门相乘", eq(D.gateCum, GATES.reduce((a, g) => a * g.rate / 100, 100), 1e-9)],
+    ["热词按部件归集之和 = 提及总量", eq(D.wordByPartTotal, D.wordTotal, 1e-9)],
+    ["甘特段数 = 6 款新品 × 5 阶段", MILESTONES.length === NEWS.length * 5],
+    ["甘特上市前置周期 = 四段之和 = 11 个月", eq(D.leadMonths, 11, 1e-9)]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[研发与新品孵化] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
