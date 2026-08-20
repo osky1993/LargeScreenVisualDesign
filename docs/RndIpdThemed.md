@@ -209,3 +209,26 @@ W1 起新建 `tools/inject_carousel_rnd.py`、W2 起 `tools/inject_subnav_rnd.py
 ### 批次〇 · 地基（I0）
 
 色板单一源 + 同步脚本 + 契约文档（本文）+ 门户基准页 + mock_flag 目录接入。
+
+### 批次一 · 一期 IPD 顶层治理 4 页（W1）
+
+**立意**：先把 IPMT 视角的顶层治理立起来（组合 → 管道 → 需求 → 投入），四页由 4 个产页代理
+并行产出，全部只读本契约 + 抄门户基准页骨架，验证「契约先行 + 一代理一文件」的并行产页协议。
+
+| 页 | 前缀 | 主角图表 |
+|---|---|---|
+| 产品组合与路标 | lb | 版本火车 custom 甘特（14 区块三态 + 今日线）、四象限气泡 |
+| IPD 管道与评审 | ip | 对称双向条管道、TR×产品线热力、阶段停留 boxplot |
+| 需求全生命周期 | rq | 分层漏斗 + AR 放大独立档、来源桑基、状态 CFD |
+| 投入与预算 | ty | 24 月×五类主题河流、双向收敛投入热力矩阵、子弹图 |
+
+**实测坑**：
+- `inject_mock_flag.py` 与 `inject_carousel_rnd.py` 都往 `</style>` 前插 CSS 块，两者交替重跑会互相
+  翻转位次产生假 diff。**收敛态 = mockflag 块在最后**（波尾固定顺序：carousel → palette →
+  build_index → mock_flag 最后，且 mock_flag 之后不再跑 nav 脚本）；厨电 19 页的 mockflag 位次
+  在本批做了一次性搬移收敛，此后全仓重跑均零改动。
+- 浏览器面板处于后台时 `document.hidden=true`，轮播计时按设计冻结——验收自动轮播要看进度条
+  在可见态下的累积，别把冻结当 bug。
+
+**导航规模变化**：轮播 4/17 页（PAGES_ALL 全序定稿、按文件存在过滤）、build_index 半接入
+（分类/count=1/FAMILY_OF/徽章色，THEME_ORDER 待 W2 全接入）、门户宫格 17 格已于 I0 写死。
