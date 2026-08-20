@@ -1,0 +1,1196 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发开源合规与技术债台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --sm-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：组件 / 版本 / 许可证 / 风险等级 / 使用范围 / 处置建议 / 复核日期 */
+    --sm-tcols: 150px 78px 116px 56px 152px 1fr 92px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .sm-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 500px;
+    grid-template-rows: 84px 46px 74px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .sm-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .sm-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .sm-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .sm-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .sm-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .sm-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .sm-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .sm-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .sm-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到技术资产与复用，琥珀描边与本页星蓝主色区分 */
+  .sm-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .sm-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .sm-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .sm-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .sm-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .sm-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .sm-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .sm-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .sm-chips { display: flex; align-items: center; gap: 9px; }
+  .sm-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 120px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .sm-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .sm-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .sm-chip.is-key { border-color: rgba(255, 95, 107, 0.45); background: rgba(76, 24, 34, 0.42); box-shadow: inset 0 0 14px rgba(255, 95, 107, 0.1); }
+  .sm-chip.is-key b { color: var(--rnd-red); }
+  .sm-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .sm-clock-time { font: 700 26px/1 var(--sm-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .sm-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 筛选条：风险等级 chip（一级，hash 契约落点）+ 归属域 chip（二级） ===== */
+  .sm-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .sm-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .sm-rchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 5px 14px 6px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13.5px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .sm-rchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .sm-rchip b { font: 700 14px/1 var(--sm-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .sm-rchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .sm-rchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .sm-rchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .sm-rchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .sm-rchip.is-hit { animation: sm-hit 0.9s ease-in-out 2; }
+  @keyframes sm-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--sm-cc, rgba(92, 157, 255, 0.8)); } }
+  .sm-fdiv { flex: none; width: 1px; height: 24px; margin: 0 4px; background: rgba(96, 140, 255, 0.28); }
+  .sm-gchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 4px 11px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .sm-gchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .sm-gchip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .sm-gchip.is-on { color: #071026; font-weight: 700; }
+  .sm-gchip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  .sm-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .sm-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .sm-filters-state em { font-style: normal; color: #d3e2ff; }
+  .sm-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 带（6 枚） ===== */
+  .sm-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .sm-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 14px 0 16px;
+  }
+  .sm-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .sm-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .sm-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-orange), transparent); }
+  .sm-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 92, 0.14), transparent 68%); }
+  .sm-kpi-icon {
+    flex: none; width: 42px; height: 42px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 19px;
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.26), rgba(70, 214, 200, 0.12));
+    border: 1px solid rgba(92, 157, 255, 0.35); box-shadow: inset 0 0 12px rgba(92, 157, 255, 0.14);
+  }
+  .sm-kpi.is-warn .sm-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 92, 0.28), rgba(255, 194, 77, 0.12));
+    border-color: rgba(255, 157, 92, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 92, 0.16);
+  }
+  .sm-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .sm-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .sm-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .sm-kpi-val { font: 700 28px/1 var(--sm-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .sm-kpi.is-warn .sm-kpi-val { color: #ffd9b0; }
+  .sm-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .sm-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sm-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 面板 ===== */
+  .sm-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .sm-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .sm-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .sm-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .sm-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .sm-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .sm-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .sm-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .sm-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：行高 30px × 10 行 + 表头，overflow hidden 防撑破 */
+  .sm-panel.is-ledger { flex: none; height: 400px; min-height: 0; overflow: hidden; }
+  /* ★ 依赖路径区由 JS 填充（选中行联动重绘），与两块图表同属 .sm-col 一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .sm-panel.is-path { flex: none; height: 320px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .sm-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .sm-thead, .sm-tbody li {
+    display: grid; grid-template-columns: var(--sm-tcols); align-items: center; gap: 8px;
+  }
+  .sm-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .sm-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .sm-tbody li {
+    padding: 0 8px; height: 30px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: sm-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes sm-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .sm-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .sm-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .sm-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .sm-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sm-tbody li .sm-comp { font: 700 12.5px/1 var(--sm-mono); color: #dfe9ff; letter-spacing: 0.02em; }
+  .sm-tbody li.is-hot .sm-comp { color: #ffc0c5; }
+  .sm-tbody li .sm-ver { font: 600 11.5px/1 var(--sm-mono); color: #a9bce4; }
+  .sm-tbody li .sm-lic { font: 600 11px/1 var(--sm-mono); color: #9cc2ff; letter-spacing: 0.01em; }
+  .sm-tbody li .sm-scope { font-size: 11.5px; color: #a9bce4; }
+  .sm-tbody li .sm-act { font-size: 11.5px; color: #c9d8f8; }
+  .sm-tbody li .sm-due { font: 600 11.5px/1 var(--sm-mono); color: #9fb4e2; }
+  .sm-tbody li .sm-due.is-soon { color: var(--rnd-orange); }
+  .sm-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  /* 风险三档 */
+  .sm-badge.is-lv0 { color: #3d060c; background: var(--rnd-red); }
+  .sm-badge.is-lv1 { color: #3a2a05; background: var(--rnd-amber); }
+  .sm-badge.is-lv2 { color: #063a25; background: var(--rnd-green); }
+
+  /* ===== 右上：单组件依赖引入路径（纯 HTML/CSS，写死高度） ===== */
+  .sm-path-meta {
+    flex: none; display: flex; flex-direction: column; gap: 4px; height: 54px; overflow: hidden;
+    padding: 6px 10px 7px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2);
+  }
+  .sm-path-no { display: flex; align-items: center; gap: 9px; }
+  .sm-path-no b { font: 700 13.5px/1 var(--sm-mono); color: var(--rnd-blue); letter-spacing: 0.02em; }
+  .sm-path-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sm-path-sub b { font-weight: 700; color: #c9d8f8; }
+  .sm-path { flex: none; height: 156px; display: flex; flex-direction: column; margin: 8px 0; }
+  .sm-path-node {
+    flex: 1; position: relative; display: grid; grid-template-columns: 74px 1fr auto; align-items: center; gap: 10px;
+    padding: 0 10px 0 8px; border-radius: 6px; min-height: 0;
+  }
+  .sm-path-node:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .sm-path-node::after {
+    content: ""; position: absolute; left: 22px; bottom: -5px; width: 10px; height: 10px;
+    border-right: 2px solid var(--sm-nc, var(--rnd-blue)); border-bottom: 2px solid var(--sm-nc, var(--rnd-blue));
+    transform: rotate(45deg); opacity: 0.72;
+  }
+  .sm-path-node:last-child::after { display: none; }
+  .sm-path-node.is-leaf { background: rgba(96, 26, 38, 0.3); box-shadow: inset 2px 0 0 var(--sm-nc, var(--rnd-red)); }
+  .sm-path-kind {
+    justify-self: start; padding: 2px 7px; border-radius: 4px; font-size: 10px; letter-spacing: 0.06em;
+    border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4);
+  }
+  .sm-path-node.is-leaf .sm-path-kind { border-color: rgba(255, 95, 107, 0.55); color: #ffb3b9; background: rgba(96, 26, 38, 0.4); }
+  .sm-path-name { font-size: 13px; font-weight: 700; color: #e3ecff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sm-path-node.is-leaf .sm-path-name { color: #ffd2d6; }
+  .sm-path-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--sm-nc, var(--rnd-blue)); box-shadow: 0 0 9px var(--sm-nc, var(--rnd-blue)); }
+  .sm-path-foot { flex: none; height: 40px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .sm-path-cell {
+    display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 0 9px; border-radius: 7px;
+    background: rgba(14, 26, 66, 0.5); border: 1px solid rgba(96, 140, 255, 0.16); overflow: hidden;
+  }
+  .sm-path-cell span { font-size: 10.5px; color: var(--rnd-text-dim); letter-spacing: 0.05em; white-space: nowrap; }
+  .sm-path-cell b { font: 700 15px/1 var(--sm-mono); color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  .sm-path-cell b em { font-style: normal; font-size: 10.5px; font-weight: 400; color: var(--rnd-text-dim); margin-left: 4px; }
+  .sm-path-cell.is-wide b { font-size: 11.5px; font-family: inherit; color: #c9d8f8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 左下：技术债四类卡片（init 前填充完毕，写死高度） ===== */
+  .sm-debt-cards { flex: none; height: 92px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
+  .sm-debt-card {
+    position: relative; display: flex; flex-direction: column; gap: 3px; padding: 6px 10px 7px; border-radius: 8px; overflow: hidden;
+    background: rgba(14, 26, 66, 0.5); border: 1px solid rgba(96, 140, 255, 0.16);
+  }
+  .sm-debt-card::before { content: ""; position: absolute; left: 0; top: 0; width: 3px; height: 100%; background: var(--sm-dc, var(--rnd-blue)); }
+  .sm-debt-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .sm-debt-top span { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: #d6e2fa; }
+  .sm-debt-top i { font-style: normal; font-size: 10.5px; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .sm-debt-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .sm-debt-num b { font: 700 21px/1 var(--sm-mono); color: #eaf1ff; }
+  .sm-debt-num u { text-decoration: none; font-size: 10.5px; color: var(--rnd-text-dim); }
+  .sm-debt-flow { display: flex; align-items: center; gap: 8px; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .sm-debt-flow em { font-style: normal; }
+  .sm-debt-flow em.is-add { color: var(--rnd-orange); }
+  .sm-debt-flow em.is-pay { color: var(--rnd-green); }
+  .sm-debt-flow em.is-eta { color: #9cc2ff; margin-left: auto; }
+
+  /* ===== 底部滚动条 ===== */
+  .sm-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .sm-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange);
+  }
+  .sm-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: sm-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes sm-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .sm-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .sm-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .sm-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .sm-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .sm-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .sm-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="sm-stage" id="sm-stage">
+    <!-- mockflag:begin --><div class="sm-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="sm-error" id="sm-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="sm-header">
+      <div class="sm-head-left">
+        <div class="sm-crumb">
+          <a class="sm-crumb-up" href="大屏样板间-研发技术资产与复用1920.html" title="返回上级专题页（Esc）">‹ 返回 技术资产与复用</a>
+          <b>云麓智联科技</b><i>›</i><span>技术资产与复用</span><i>›</i><em>开源合规与技术债台账</em>
+        </div>
+        <div class="sm-head-title-row">
+          <div class="sm-head-title">开源合规与技术债台账</div>
+          <div class="sm-head-meta">
+            <span>在册开源组件 <b id="sm-meta-n">--</b> 个 · 许可证 <b id="sm-meta-lic">--</b> 类</span><i>|</i>
+            <span>技术债 <b>4</b> 类 · 存量 <b id="sm-meta-debt">--</b> 人月 · 滚动 <b>24</b> 月</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="sm-head-right">
+        <div class="sm-chips">
+          <div class="sm-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="sm-chip is-key"><span id="sm-chip-key">高风险占比 · 全部</span><b id="sm-chip-val">--</b></div>
+        </div>
+        <div class="sm-clock" aria-label="实时时钟">
+          <span class="sm-clock-time" id="sm-clock-time">--:--:--</span>
+          <span class="sm-clock-date" id="sm-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 筛选条：风险等级 chip（hash 契约目标为 10 个组件名，命中后按其风险等级切档）+ 归属域二级过滤 -->
+    <div class="sm-filters">
+      <span class="sm-filters-tag">风险等级</span>
+      <div id="sm-rchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="sm-fdiv"></span>
+      <span class="sm-filters-tag">归属域</span>
+      <div id="sm-gchips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="sm-filters-state" id="sm-filters-state">--</div>
+    </div>
+
+    <!-- KPI 带（6 枚） -->
+    <div class="sm-band" id="sm-band"></div>
+
+    <!-- 左：开源组件明细台账（写死高度）+ 技术债四类明细 -->
+    <div class="sm-col">
+      <section class="sm-panel is-ledger">
+        <div class="sm-panel-head">
+          <h2>开源组件合规明细台账</h2>
+          <span class="sm-panel-tag" id="sm-table-tag">--</span>
+        </div>
+        <div class="sm-table">
+          <div class="sm-thead">
+            <span>组件</span><span>版本</span><span>许可证</span><span>风险</span>
+            <span>使用范围</span><span>处置建议</span><span>复核日期</span>
+          </div>
+          <ul class="sm-tbody" id="sm-tbody"></ul>
+        </div>
+      </section>
+      <section class="sm-panel" style="flex: 1;">
+        <div class="sm-panel-head">
+          <h2>技术债四类明细 · 月度新增 vs 偿还</h2>
+          <span class="sm-panel-tag">四类存量 Σ <b id="sm-debt-sum">--</b> 人月 · 目标线 <b id="sm-debt-target">--</b> 人月 · 达标预计 <b id="sm-debt-eta">--</b></span>
+        </div>
+        <div class="sm-debt-cards" id="sm-debt-cards"></div>
+        <div class="sm-chart" id="sm-chart-debt"></div>
+      </section>
+    </div>
+
+    <!-- 右：单组件依赖引入路径 + 许可证分布环形 + 风险等级堆叠条 -->
+    <div class="sm-col">
+      <section class="sm-panel is-path">
+        <div class="sm-panel-head">
+          <h2>单组件依赖引入路径</h2>
+          <span class="sm-panel-tag" id="sm-path-tag">--</span>
+        </div>
+        <div class="sm-path-meta" id="sm-path-meta"></div>
+        <div class="sm-path" id="sm-path"></div>
+        <div class="sm-path-foot" id="sm-path-foot"></div>
+      </section>
+      <section class="sm-panel" style="flex: 1;">
+        <div class="sm-panel-head">
+          <h2>许可证分布</h2>
+          <span class="sm-panel-tag">Σ <b id="sm-lic-total">--</b> 个组件 · <b id="sm-lic-kinds">--</b> 类许可证</span>
+        </div>
+        <div class="sm-chart" id="sm-chart-lic"></div>
+      </section>
+      <section class="sm-panel" style="flex: 1;">
+        <div class="sm-panel-head">
+          <h2>归属域 × 风险等级堆叠</h2>
+          <span class="sm-panel-tag">六域合计 <b id="sm-risk-total">--</b> 个组件</span>
+        </div>
+        <div class="sm-chart" id="sm-chart-risk"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="sm-foot">
+      <div class="sm-foot-tag">合规与债务研判</div>
+      <div class="sm-foot-view"><div class="sm-foot-track" id="sm-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("sm-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("sm-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const uniq = (arr) => arr.filter((v, i) => arr.indexOf(v) === i);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技）
+         ★ 与父页 P16「技术资产与复用」严格同源（docs/RndIpdThemed.md §2.2 / §6）：
+           开源组件 10 个（comp / ver / lic / lv / scope / act 六字段逐字照抄父页 OSS 数组）；
+           技术债四类 24 月存量序列（架构/代码/测试/文档）逐字照抄父页 DEBT_CATS，
+           末月 Σ = 1,580 人月 = 父页技术债存量；年产能 3,860 × 12 = 46,320 人月（契约 §2.2）。
+         ★ 二级拆分（复核日期、影响仓库数/产品线、依赖引入路径、期初存量与月度新增/偿还
+           流量、四类目标线）为本页自编，Σ 必须收敛到上级数，全部进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，组件与域/许可证之间一律用
+           索引与名称字符串关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 开源组件台账（10 项，顺序与父页 OSS 数组一致；hash 契约键 = comp 逐字）
+         due  = 合规复核日期（本页自编，高风险 45 日内）
+         repos/lines = 影响仓库数 / 影响产品线（本页自编）
+         path = 依赖引入路径（3~4 层，末节点 = 组件名 + 版本，与 comp/ver 现算拼接） */
+  const OSS = [
+    { comp: "netty", ver: "4.1.106", lic: "Apache-2.0", lv: "低",
+      scope: "云平台·设备接入", act: "跟随上游安全版本基线", due: "2026-11-20", repos: 34,
+      lines: ["云平台服务", "AIoT模组"],
+      path: [["产品线", "云平台服务"], ["服务", "设备接入网关"], ["中间层", "lm-net 传输栈"]] },
+    { comp: "ffmpeg", ver: "6.1", lic: "LGPL-2.1", lv: "中",
+      scope: "智家终端·多媒体", act: "动态链接隔离，禁止静态编译", due: "2026-09-30", repos: 12,
+      lines: ["智家终端", "行业方案"],
+      path: [["产品线", "智家终端"], ["应用", "中控大屏 HMI"], ["中间层", "多媒体播放框架"]] },
+    { comp: "mysql-connector-j", ver: "8.3.0", lic: "GPL-2.0(例外)", lv: "中",
+      scope: "云平台·计费配额", act: "走 FOSS 例外条款并留存意见", due: "2026-10-15", repos: 18,
+      lines: ["云平台服务"],
+      path: [["产品线", "云平台服务"], ["服务", "计费与配额中台"], ["中间层", "数据访问层 DAL"]] },
+    { comp: "ghostscript-lite", ver: "10.02", lic: "AGPL-3.0", lv: "高",
+      scope: "行业方案·文档转换", act: "30 日内替换或申请商业授权", due: "2026-09-05", repos: 6,
+      lines: ["行业方案"],
+      path: [["产品线", "行业方案"], ["应用", "智楼5.0 文档中心"], ["中间层", "报表转换服务"]] },
+    { comp: "qt-embedded", ver: "5.15.12", lic: "GPL-3.0", lv: "高",
+      scope: "智家终端·HMI", act: "切换 LGPL 动态链接分支", due: "2026-09-18", repos: 9,
+      lines: ["智家终端"],
+      path: [["产品线", "智家终端"], ["应用", "星澜S3 HMI 固件"], ["中间层", "图形渲染层"]] },
+    { comp: "mongodb-core", ver: "7.0.5", lic: "SSPL-1.0", lv: "高",
+      scope: "云平台·可观测性", act: "评估迁移方案或商业订阅", due: "2026-09-25", repos: 11,
+      lines: ["云平台服务", "行业方案"],
+      path: [["产品线", "云平台服务"], ["服务", "可观测性平台"], ["中间层", "指标存储驱动"]] },
+    { comp: "openssl", ver: "3.2.1", lic: "Apache-2.0", lv: "低",
+      scope: "全域·安全与加密", act: "纳入 SBOM 月度扫描", due: "2026-12-10", repos: 96,
+      lines: ["智家终端", "云平台服务", "AIoT模组", "行业方案"],
+      path: [["全域基座", "统一安全基座"], ["中间层", "lm-crypto 套件"]] },
+    { comp: "tflite-micro", ver: "2.15.0", lic: "Apache-2.0", lv: "低",
+      scope: "AIoT模组·端侧推理", act: "保持版本基线，跟踪 CVE", due: "2026-12-01", repos: 14,
+      lines: ["AIoT模组", "智家终端"],
+      path: [["产品线", "AIoT模组"], ["应用", "澜芯M60 端侧推理"], ["中间层", "端云统一推理层"]] },
+    { comp: "zlib", ver: "1.3.1", lic: "Zlib", lv: "低",
+      scope: "全域·压缩解压", act: "例行台账，暂无需处置", due: "2027-02-28", repos: 88,
+      lines: ["智家终端", "云平台服务", "AIoT模组", "行业方案"],
+      path: [["全域基座", "通用压缩基础库"], ["中间层", "lm-utils 基础库"]] },
+    { comp: "libsass-fork", ver: "3.6.5", lic: "MIT", lv: "低",
+      scope: "工具链·前端构建", act: "上游停维，规划替换路径", due: "2026-11-06", repos: 7,
+      lines: ["云平台服务", "行业方案"],
+      path: [["工具链", "前端构建流水线"], ["模块", "样式编译插件"]] }
+  ];
+  /* 契约 §6 逐字基准（P16 → S17 的 10 个对象名）+ 父页 OSS 的许可证 / 风险等级逐字基准 */
+  const REF_COMPS = ["netty", "ffmpeg", "mysql-connector-j", "ghostscript-lite", "qt-embedded",
+                     "mongodb-core", "openssl", "tflite-micro", "zlib", "libsass-fork"];
+  const REF_LICS = ["Apache-2.0", "LGPL-2.1", "GPL-2.0(例外)", "AGPL-3.0", "GPL-3.0",
+                    "SSPL-1.0", "Apache-2.0", "Apache-2.0", "Zlib", "MIT"];
+  const REF_LVS = ["低", "中", "中", "高", "高", "高", "低", "低", "低", "低"];
+  const REF_LV_CNT = { "高": 3, "中": 2, "低": 5 };
+  const PRODUCT_LINES = ["智家终端", "云平台服务", "AIoT模组", "行业方案"];
+  const DATA_AS_OF = new Date(2026, 7, 19);          /* 2026-08-19，与页头 DATA AS OF 同源 */
+
+  /* 4.2 风险三档与许可证族（强 copyleft = GPL / AGPL / SSPL，判高风险；与父页同一判据） */
+  const LV_NAMES = ["高", "中", "低"];
+  const LV_COLORS = [C.red, C.amber, C.green];
+  const LV_CLASS = ["is-lv0", "is-lv1", "is-lv2"];
+  const COPYLEFT_STRONG = ["GPL-3.0", "AGPL-3.0", "SSPL-1.0"];
+  const COPYLEFT_WEAK = ["LGPL-2.1", "GPL-2.0(例外)"];
+  const licFamily = (lic) => COPYLEFT_STRONG.indexOf(lic) >= 0 ? "强Copyleft"
+    : COPYLEFT_WEAK.indexOf(lic) >= 0 ? "弱Copyleft" : "宽松";
+  const FAM_COLOR = { "强Copyleft": C.red, "弱Copyleft": C.amber, "宽松": C.green };
+
+  /* 4.3 技术债务：24 个月四类存量（人月），逐字同父页 DEBT_CATS；
+         open = 期初（2024-08 末）存量，用于第 1 个月的「新增 − 偿还 = 存量变化」恒等；
+         r0 / rk = 月度偿还产能基线与月增系数（本页自编二级拆分，偿还量 = r0 + round(i×rk)，
+         新增量 = 偿还量 + 当月存量变化 —— 三者天然满足恒等，页尾逐期硬校验）；
+         tgt = 分类压降目标线，Σ = 父页 DEBT_TARGET 1,400 人月。 */
+  const DEBT_CATS = [
+    { name: "架构债", color: C.red, open: 410, r0: 16, rk: 0.55, tgt: 430,
+      m: [418, 426, 435, 442, 451, 458, 466, 473, 479, 486, 492, 498, 503, 508, 512, 515, 517, 516, 512, 506, 499, 492, 487, 482] },
+    { name: "代码债", color: C.orange, open: 546, r0: 22, rk: 0.80, tgt: 560,
+      m: [556, 566, 578, 589, 601, 612, 622, 633, 643, 652, 661, 669, 676, 682, 687, 690, 692, 691, 687, 681, 673, 663, 648, 634] },
+    { name: "测试债", color: C.amber, open: 281, r0: 12, rk: 0.35, tgt: 285,
+      m: [286, 291, 296, 302, 307, 312, 317, 321, 325, 329, 332, 335, 337, 339, 340, 341, 341, 340, 338, 335, 331, 327, 322, 318] },
+    { name: "文档债", color: C.cyan, open: 125, r0: 7, rk: 0.20, tgt: 125,
+      m: [128, 131, 134, 137, 140, 143, 146, 149, 151, 153, 155, 157, 158, 159, 160, 160, 160, 159, 157, 155, 152, 150, 148, 146] }
+  ];
+  const DEBT_TARGET = 1400;                          /* 年度压降目标线（人月，同父页） */
+  const DEBT_REF = 1580;                             /* 父页技术债存量总额（人月） */
+  const HEADCOUNT = 3860;                            /* 研发人员（契约 §2.2） */
+  const MONTHS_PER_YEAR = 12;
+
+  const MONTHS = [];
+  for (let i = 0; i < 24; i++) {
+    const off = 8 + i;                               /* 0 → 2024-09 */
+    MONTHS.push(String(2024 + Math.floor(off / 12)).slice(2) + "-" + pad(off % 12 + 1));
+  }
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 5.1 组件派生：风险索引、许可证族、归属域、路径末节点 */
+  OSS.forEach((o) => {
+    o.lvIdx = LV_NAMES.indexOf(o.lv);
+    o.fam = licFamily(o.lic);
+    o.dom = o.scope.split("·")[0];                   /* 归属域 = 使用范围一级段 */
+    o.use = o.scope.split("·")[1];
+    o.leaf = o.comp + " " + o.ver;                   /* 依赖链末节点 = 组件 + 版本（现算） */
+    o.chain = o.path.concat([["开源组件", o.leaf]]); /* 3~4 层：路径前缀 + 末节点 */
+    o.dueD = new Date(Number(o.due.slice(0, 4)), Number(o.due.slice(5, 7)) - 1, Number(o.due.slice(8, 10)));
+    o.dueIn = Math.round((o.dueD - DATA_AS_OF) / 86400000);
+  });
+  D.n = OSS.length;
+  D.lvCnt = LV_NAMES.map((lv) => OSS.filter((o) => o.lv === lv).length);
+  D.h = D.lvCnt[0]; D.m = D.lvCnt[1]; D.l = D.lvCnt[2];
+  D.pending = D.h + D.m;                             /* 待处置 = 高 + 中风险（低风险为例行台账） */
+  D.highShare = 100 * D.h / D.n;
+  D.licKinds = uniq(OSS.map((o) => o.lic));
+  D.licCnt = D.licKinds.map((k) => OSS.filter((o) => o.lic === k).length);
+  D.doms = uniq(OSS.map((o) => o.dom));
+  D.domLv = D.doms.map((g) => LV_NAMES.map((lv) => OSS.filter((o) => o.dom === g && o.lv === lv).length));
+  D.domCnt = D.domLv.map((r) => sum(r));
+  D.famKinds = ["强Copyleft", "弱Copyleft", "宽松"];
+  D.famCnt = D.famKinds.map((f) => OSS.filter((o) => o.fam === f).length);
+  D.highAllStrong = OSS.filter((o) => o.lv === "高").every((o) => COPYLEFT_STRONG.indexOf(o.lic) >= 0);
+  D.strongAllHigh = OSS.filter((o) => COPYLEFT_STRONG.indexOf(o.lic) >= 0).every((o) => o.lv === "高");
+  D.reposAll = sum(OSS.map((o) => o.repos));
+  D.dueSoon = OSS.filter((o) => o.dueIn <= 45).length;
+  D.hotTop = OSS.filter((o) => o.lv === "高").slice().sort((a, b) => a.dueIn - b.dueIn)[0];
+  D.repoTop = OSS.slice().sort((a, b) => b.repos - a.repos)[0];
+
+  /* 5.2 技术债：逐类月度新增 / 偿还 / 存量变化恒等（新增 − 偿还 = 存量变化，逐期现算） */
+  DEBT_CATS.forEach((c) => {
+    c.delta = c.m.map((v, i) => v - (i === 0 ? c.open : c.m[i - 1]));
+    c.repay = c.m.map((_, i) => c.r0 + Math.round(i * c.rk));
+    c.add = c.repay.map((r, i) => r + c.delta[i]);   /* 恒等构造：新增 = 偿还 + 存量变化 */
+    c.now = c.m[c.m.length - 1];
+    c.peak = Math.max.apply(null, c.m);
+    c.net6 = (c.m[c.m.length - 7] - c.now) / 6;      /* 近 6 月月均净偿还 */
+    c.eta = (c.now - c.tgt) / c.net6;                /* 达标预计月数 */
+    c.addNow = c.add[c.add.length - 1];
+    c.repayNow = c.repay[c.repay.length - 1];
+  });
+  D.debtMonth = MONTHS.map((_, i) => sum(DEBT_CATS.map((c) => c.m[i])));
+  D.addMonth = MONTHS.map((_, i) => sum(DEBT_CATS.map((c) => c.add[i])));
+  D.repayMonth = MONTHS.map((_, i) => sum(DEBT_CATS.map((c) => c.repay[i])));
+  D.debtNow = D.debtMonth[D.debtMonth.length - 1];
+  D.debtOpen = sum(DEBT_CATS.map((c) => c.open));
+  D.debtPeak = Math.max.apply(null, D.debtMonth);
+  D.debtPeakM = MONTHS[D.debtMonth.indexOf(D.debtPeak)];
+  D.net6 = (D.debtMonth[D.debtMonth.length - 7] - D.debtNow) / 6;
+  D.eta = (D.debtNow - DEBT_TARGET) / D.net6;
+  D.tgtSum = sum(DEBT_CATS.map((c) => c.tgt));
+  D.capacityPM = HEADCOUNT * MONTHS_PER_YEAR;        /* 年产能（人月），债务比率分母 */
+  D.debtRatio = 100 * D.debtNow / D.capacityPM;
+  D.addNow = D.addMonth[D.addMonth.length - 1];
+  D.repayNow = D.repayMonth[D.repayMonth.length - 1];
+  D.netNow = D.repayNow - D.addNow;
+  D.debtTop = DEBT_CATS.slice().sort((a, b) => b.now - a.now)[0];
+  D.etaTop = DEBT_CATS.slice().sort((a, b) => b.eta - a.eta)[0];
+  /* 逐期恒等与存量重建（自检用） */
+  D.identityOk = DEBT_CATS.every((c) => c.m.every((v, i) => c.add[i] - c.repay[i] === c.delta[i]));
+  D.rebuildOk = DEBT_CATS.every((c) => {
+    let acc = c.open;
+    return c.m.every((v, i) => { acc += c.add[i] - c.repay[i]; return acc === v; });
+  });
+  D.flowPositive = DEBT_CATS.every((c) => c.add.every((v) => v > 0) && c.repay.every((v) => v > 0));
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("sm-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("sm-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("sm-meta-n").textContent = fmtInt(D.n);
+  $("sm-meta-lic").textContent = fmtInt(D.licKinds.length);
+  $("sm-meta-debt").textContent = fmtInt(D.debtNow);
+  $("sm-lic-total").textContent = fmtInt(D.n);
+  $("sm-lic-kinds").textContent = fmtInt(D.licKinds.length);
+  $("sm-risk-total").textContent = fmtInt(D.n);
+  $("sm-debt-sum").textContent = fmtInt(D.debtNow);
+  $("sm-debt-target").textContent = fmtInt(DEBT_TARGET);
+  $("sm-debt-eta").textContent = fmtDec(D.eta, 1) + " 个月";
+
+  /* ===== 7. KPI 带（6 枚，数值翻牌缓动） ===== */
+  const KPI_DEFS = [
+    { icon: "⌸", label: "在册开源组件", val: D.n, unit: "个", dec: 0, warn: false,
+      sub: () => "许可证 <b>" + D.licKinds.length + "</b> 类 · 归属域 <b>" + D.doms.length +
+        "</b> 个 · 影响仓库 <b>" + fmtInt(D.reposAll) + "</b> 个" },
+    { icon: "⚠", label: "高风险组件", val: D.h, unit: "个", dec: 0, warn: true,
+      sub: () => "占比 <b>" + fmtDec(D.highShare, 1) + "%</b> · 均为强 Copyleft（GPL/AGPL/SSPL）" },
+    { icon: "☑", label: "待处置组件", val: D.pending, unit: "个", dec: 0, warn: D.pending > 3,
+      sub: () => "高 <b>" + D.h + "</b> + 中 <b>" + D.m + "</b> · 45 日内复核 <b>" + D.dueSoon + "</b> 个" },
+    { icon: "⚑", label: "技术债存量", val: D.debtNow, unit: "人月", dec: 0, warn: D.debtNow > DEBT_TARGET,
+      sub: () => "四类 Σ · 债务比率 <b>" + fmtDec(D.debtRatio, 2) + "%</b>（÷ " + fmtInt(D.capacityPM) + " 人月产能）" },
+    { icon: "↓", label: "月净偿还", val: D.net6, unit: "人月/月", dec: 1, warn: false,
+      sub: () => "近 6 月均 · 末月 偿还 <b>" + D.repayNow + "</b> − 新增 <b>" + D.addNow + "</b> = <b>" + D.netNow + "</b>" },
+    { icon: "◷", label: "达标预计", val: D.eta, unit: "个月", dec: 1, warn: D.eta > 6,
+      sub: () => "（<b>" + fmtInt(D.debtNow) + "</b> − 目标 <b>" + fmtInt(DEBT_TARGET) + "</b>）÷ <b>" + fmtDec(D.net6, 1) + "</b>" }
+  ];
+  $("sm-band").innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="sm-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="sm-kpi-icon">' + k.icon + "</div>" +
+      '<div class="sm-kpi-main">' +
+        '<div class="sm-kpi-label">' + k.label + "</div>" +
+        '<div class="sm-kpi-num"><span class="sm-kpi-val" id="sm-kpi-' + i + '">0</span><span class="sm-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="sm-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("sm-kpi-" + i), k.val, k.dec));
+
+  /* ===== 8. 风险等级筛选 chip（全部 + 高/中/低，计数与父页一致：高 3 / 中 2 / 低 5） ===== */
+  const RFILTERS = [{ name: "全部", color: C.blue, cnt: D.n }]
+    .concat(LV_NAMES.map((lv, k) => ({ name: lv, color: LV_COLORS[k], cnt: D.lvCnt[k] })));
+  const rbox = $("sm-rchips");
+  rbox.innerHTML = RFILTERS.map((f, i) => (
+    '<button class="sm-rchip" type="button" data-i="' + i + '" style="--sm-cc:' + f.color + '">' +
+      "<u>" + f.name + "</u><b>" + f.cnt + "</b><i>个组件</i>" +
+    "</button>"
+  )).join("");
+  const rchips = Array.from(rbox.children);
+
+  /* ===== 9. 归属域二级过滤 chip（全部 + 六域；计数随风险筛选联动重算） ===== */
+  const gbox = $("sm-gchips");
+  function renderGChips(ri, gi) {
+    const pool = OSS.filter((o) => ri === 0 || o.lvIdx === ri - 1);
+    const items = [{ name: "全部", color: C.blue, cnt: pool.length }]
+      .concat(D.doms.map((g) => ({ name: g, color: C.blue, cnt: pool.filter((o) => o.dom === g).length })));
+    gbox.innerHTML = items.map((f, i) => (
+      '<button class="sm-gchip' + (i === gi ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === gi ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + f.cnt + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(gbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(rIdx, Number(el.dataset.i), -1, true));
+    });
+  }
+
+  /* ===== 10. hash 契约：父页下钻「子页#encodeURIComponent(组件名)」，10 个组件名逐字匹配
+         归一化：decodeURIComponent → 去空白（含全角）→ 转小写；★ 连字符必须保留，
+         mysql-connector-j / ghostscript-lite / qt-embedded / mongodb-core / tflite-micro
+         / libsass-fork 六个名字全靠连字符区分。 ===== */
+  const HASH_COMP = {};                              /* 归一化键 → 组件索引 */
+  const HASH_LV = {};                                /* 归一化键 → 风险 chip 索引（辅助别名） */
+  const norm = (s) => String(s).replace(/[\s　]+/g, "").toLowerCase();
+  OSS.forEach((o, i) => {
+    HASH_COMP[norm(o.comp)] = i;
+    HASH_COMP[norm(o.comp + "@" + o.ver)] = i;       /* 兼容「组件@版本」写法 */
+  });
+  HASH_LV[norm("全部")] = 0; HASH_LV[norm("ALL")] = 0; HASH_LV[norm("全量")] = 0;
+  LV_NAMES.forEach((lv, k) => {
+    HASH_LV[norm(lv)] = k + 1;
+    HASH_LV[norm(lv + "风险")] = k + 1;
+  });
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    const key = norm(raw);
+    if (!key) return null;                           /* 无 hash：默认全部，不触发定位高亮 */
+    if (HASH_COMP[key] !== undefined) return { kind: "comp", i: HASH_COMP[key] };
+    if (HASH_LV[key] !== undefined) return { kind: "lv", i: HASH_LV[key] };
+    return null;
+  }
+  let hashSuppress = false;
+  function syncHash(text) {
+    const want = "#" + encodeURIComponent(text);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 台账主表渲染（行高 30px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("sm-tbody");
+  let view = OSS.slice(), rIdx = 0, gIdx = 0, selPos = 0;
+
+  function rowHtml(o, k) {
+    const idx = OSS.indexOf(o);
+    return '<li data-i="' + idx + '" data-comp="' + o.comp + '"' + (o.lv === "高" ? ' class="is-hot"' : "") +
+      ' style="animation-delay:' + (k * 16) + 'ms">' +
+      '<span class="sm-comp">' + o.comp + "</span>" +
+      '<span class="sm-ver">' + o.ver + "</span>" +
+      '<span class="sm-lic" title="' + o.fam + '">' + o.lic + "</span>" +
+      '<span class="sm-badge ' + LV_CLASS[o.lvIdx] + '">' + o.lv + "</span>" +
+      '<span class="sm-scope">' + o.scope + "</span>" +
+      '<span class="sm-act">' + o.act + "</span>" +
+      '<span class="sm-due' + (o.dueIn <= 45 ? " is-soon" : "") + '">' + o.due + "</span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      li.addEventListener("click", () => {
+        selPos = k; renderSel();
+        syncHash(view[selPos].comp);                 /* 手动点行：hash 回写当前组件 */
+        pauseRotate(20000);
+      });
+    });
+    $("sm-table-tag").textContent =
+      "全量 " + D.n + " 个在册组件 · 强 Copyleft " + D.famCnt[0] + " / 弱 Copyleft " + D.famCnt[1] + " / 宽松 " + D.famCnt[2];
+    $("sm-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 个 / 共 " + D.n + " 个<i>|</i>影响仓库 <em>" +
+      fmtInt(sum(view.map((o) => o.repos))) + "</em> 个<i>|</i>行点击或轮巡联动依赖路径";
+  }
+
+  /* ===== 12. 单组件依赖引入路径（纯 HTML/CSS，写死高度；选中行联动重绘） ===== */
+  function renderSel() {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("sm-path-tag").textContent = "当前筛选无组件";
+      $("sm-path-meta").innerHTML = '<div class="sm-path-sub">调整风险等级或归属域筛选后，此处展示选中组件的依赖引入路径。</div>';
+      $("sm-path").innerHTML = "";
+      $("sm-path-foot").innerHTML = "";
+      return;
+    }
+    selPos = selPos % view.length;
+    const o = view[selPos];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    $("sm-path-tag").textContent = o.chain.length + " 层引入链 · 自顶向下";
+    $("sm-path-meta").innerHTML =
+      '<div class="sm-path-no"><b>' + o.comp + " " + o.ver + "</b>" +
+        '<span class="sm-badge ' + LV_CLASS[o.lvIdx] + '">' + o.lv + "风险</span>" +
+        '<span class="sm-lic" style="font-size:11px">' + o.lic + " · " + o.fam + "</span></div>" +
+      '<div class="sm-path-sub">' + o.scope + " · 处置建议：<b>" + o.act + "</b> · 复核 <b>" + o.due +
+        "</b>（" + (o.dueIn >= 0 ? "剩 " + o.dueIn + " 天" : "已逾期") + "）</div>";
+    const nCol = LV_COLORS[o.lvIdx];
+    $("sm-path").innerHTML = o.chain.map((nd, k) => {
+      const leaf = k === o.chain.length - 1;
+      const col = leaf ? nCol : (k === 0 ? C.blue : C.cyan);
+      return '<div class="sm-path-node' + (leaf ? " is-leaf" : "") + '" style="--sm-nc:' + col + '">' +
+        '<span class="sm-path-kind">' + nd[0] + "</span>" +
+        '<span class="sm-path-name">' + nd[1] + "</span>" +
+        '<span class="sm-path-dot"></span>' +
+      "</div>";
+    }).join("");
+    $("sm-path-foot").innerHTML =
+      '<div class="sm-path-cell"><span>影响仓库数</span><b>' + fmtInt(o.repos) + "<em>个</em></b></div>" +
+      '<div class="sm-path-cell"><span>影响产品线</span><b>' + o.lines.length + "<em>/ " + PRODUCT_LINES.length + " 条</em></b></div>" +
+      '<div class="sm-path-cell is-wide"><span>覆盖产品线</span><b>' + o.lines.join(" · ") + "</b></div>";
+  }
+
+  /* ===== 13. 许可证分布环形（Σ = 10 个组件，色随许可证族；筛选时非命中项压暗） ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function licOption(ri, gi) {
+    const inScope = (lic) => view.some((o) => o.lic === lic);
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const lic = p.name, fam = licFamily(lic);
+          const comps = OSS.filter((o) => o.lic === lic).map((o) => o.comp).join("、");
+          return "<b>" + lic + "</b>（" + fam + "）<br/>组件 <b>" + p.value + "</b> 个 · 占 " +
+            fmtDec(100 * p.value / D.n, 1) + "%<br/><span style=\"color:" + C.textDim + "\">" + comps + "</span>";
+        }
+      }, TIP),
+      legend: {
+        type: "scroll", orient: "vertical", right: 4, top: "middle", itemWidth: 10, itemHeight: 8, itemGap: 7,
+        textStyle: { color: C.textDim, fontSize: 10.5 },
+        formatter: (name) => name + "  " + OSS.filter((o) => o.lic === name).length
+      },
+      title: {
+        text: String(D.n), subtext: "个组件", left: "31%", top: "40%", textAlign: "center",
+        textStyle: { color: "#eaf1ff", fontSize: 24, fontWeight: 700 },
+        subtextStyle: { color: C.textDim, fontSize: 10.5 }
+      },
+      series: [{
+        type: "pie", radius: ["46%", "72%"], center: ["31%", "50%"],
+        avoidLabelOverlap: true, label: { show: false }, labelLine: { show: false },
+        itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 2 },
+        emphasis: { scaleSize: 6, itemStyle: { shadowBlur: 12, shadowColor: "rgba(0,0,0,.5)" } },
+        data: D.licKinds.map((lic, k) => ({
+          name: lic, value: D.licCnt[k],
+          itemStyle: { color: FAM_COLOR[licFamily(lic)], opacity: inScope(lic) ? 1 : 0.2 }
+        }))
+      }]
+    };
+  }
+
+  /* ===== 14. 归属域 × 风险等级堆叠条（Σ = 10，与筛选计数自洽） ===== */
+  function riskOption(ri, gi) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 34, top: 22, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex, g = D.doms[k];
+          const comps = OSS.filter((o) => o.dom === g).map((o) => o.comp + "（" + o.lv + "）").join("、");
+          return "<b>" + g + "</b>　组件 <b>" + D.domCnt[k] + "</b> 个<br/>" +
+            ps.filter((p) => p.value > 0).map((p) => p.marker + p.seriesName + "风险 <b>" + p.value + "</b> 个").join("<br/>") +
+            "<br/><span style=\"color:" + C.textDim + "\">" + comps + "</span>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: LV_NAMES
+      },
+      xAxis: {
+        type: "value", minInterval: 1,
+        axisLabel: { color: C.textDim, fontSize: 10 }, axisLine: { show: false },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      yAxis: {
+        type: "category", inverse: true, data: D.doms.slice(),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: "#bcd2f8", fontSize: 11.5, fontWeight: 700 }
+      },
+      series: LV_NAMES.map((lv, k) => ({
+        name: lv, type: "bar", stack: "lv", barWidth: "58%",
+        emphasis: { focus: "series" },
+        label: k === LV_NAMES.length - 1 ? {
+          show: true, position: "right", color: C.textDim, fontSize: 10,
+          formatter: (p) => D.domCnt[p.dataIndex]
+        } : { show: false },
+        data: D.doms.map((g, j) => {
+          const on = (ri === 0 || ri - 1 === k) && (gi === 0 || D.doms[gi - 1] === g);
+          return { value: D.domLv[j][k], itemStyle: { color: LV_COLORS[k], opacity: on ? 1 : 0.22 } };
+        })
+      }))
+    };
+  }
+
+  /* ===== 15. 技术债 24 月：月新增（正）/ 月偿还（负）双向柱 + 存量总额折线（右轴） ===== */
+  function debtOption() {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 4, top: 24, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>20" + MONTHS[i] + "</b>　存量 <b style=\"color:" + C.blue + "\">" + fmtInt(D.debtMonth[i]) + "</b> 人月<br/>" +
+            "新增 <b style=\"color:" + C.orange + "\">" + D.addMonth[i] + "</b> − 偿还 <b style=\"color:" + C.green + "\">" +
+            D.repayMonth[i] + "</b> = 净 <b>" + (D.addMonth[i] - D.repayMonth[i]) + "</b> 人月<br/>" +
+            "<span style=\"color:" + C.textDim + "\">" +
+            DEBT_CATS.map((c) => c.name + " " + c.m[i] + "（+" + c.add[i] + " / −" + c.repay[i] + "）").join("　") +
+            "</span>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["月新增", "月偿还", "存量"]
+      },
+      xAxis: {
+        type: "category", data: MONTHS.slice(),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5, interval: 2 }
+      },
+      yAxis: [
+        { type: "value", name: "人月/月", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10, formatter: (v) => Math.abs(v) },
+          splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+        { type: "value", name: "存量", min: 1200, max: 1800, nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10 }, splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "月新增", type: "bar", stack: "flow", barWidth: "48%",
+          data: D.addMonth.slice(),
+          itemStyle: { color: "rgba(255,157,92,.85)", borderRadius: [2, 2, 0, 0] } },
+        { name: "月偿还", type: "bar", stack: "flow", barWidth: "48%",
+          data: D.repayMonth.map((v) => -v),
+          itemStyle: { color: "rgba(111,224,154,.85)", borderRadius: [0, 0, 2, 2] } },
+        { name: "存量", type: "line", yAxisIndex: 1, smooth: true, symbol: "none",
+          data: D.debtMonth.slice(),
+          lineStyle: { width: 2.2, color: C.blue }, itemStyle: { color: C.blue },
+          areaStyle: { color: "rgba(92,157,255,.08)" },
+          markLine: {
+            symbol: "none", silent: true,
+            label: { formatter: "目标 " + fmtInt(DEBT_TARGET), color: C.amber, fontSize: 10, position: "insideEndTop" },
+            lineStyle: { color: C.amber, type: "dashed", width: 1.4 },
+            data: [{ yAxis: DEBT_TARGET }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 16. 技术债四类卡片（★ 与图表同属一个 flex 容器，写死高度且在 init 之前填充完毕） ===== */
+  $("sm-debt-cards").innerHTML = DEBT_CATS.map((c) => (
+    '<div class="sm-debt-card" style="--sm-dc:' + c.color + '">' +
+      '<div class="sm-debt-top"><span>' + c.name + "</span><i>占 " + fmtDec(100 * c.now / D.debtNow, 1) + "%</i></div>" +
+      '<div class="sm-debt-num"><b>' + fmtInt(c.now) + "</b><u>人月 · 目标 " + fmtInt(c.tgt) + "</u></div>" +
+      '<div class="sm-debt-flow">' +
+        '<em class="is-add">+' + c.addNow + "</em>" +
+        '<em class="is-pay">−' + c.repayNow + "</em>" +
+        "<em>净 " + fmtDec(c.net6, 1) + "/月</em>" +
+        '<em class="is-eta">' + fmtDec(c.eta, 1) + " 月达标</em>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* ===== 17. 筛选主流程：一次调用刷新 chip / 表 / 路径 / 两图 / 页头 chip ===== */
+  function applyFilter(ri, gi, wantSel, pushHash) {
+    rIdx = clamp(ri, 0, RFILTERS.length - 1);
+    const pool = OSS.filter((o) => rIdx === 0 || o.lvIdx === rIdx - 1);
+    const gMax = D.doms.length;
+    gIdx = clamp(gi, 0, gMax);
+    view = pool.filter((o) => gIdx === 0 || o.dom === D.doms[gIdx - 1]);
+    if (!view.length && gIdx !== 0) { gIdx = 0; view = pool.slice(); }
+    selPos = 0;
+    if (wantSel >= 0) {
+      const p = view.findIndex((o) => OSS.indexOf(o) === wantSel);
+      if (p >= 0) selPos = p;
+    }
+    rchips.forEach((el, i) => {
+      const on = i === rIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? RFILTERS[i].color : "";
+      el.style.borderColor = on ? RFILTERS[i].color : "";
+    });
+    renderGChips(rIdx, gIdx);
+    const scopeName = RFILTERS[rIdx].name + (gIdx === 0 ? "" : " · " + D.doms[gIdx - 1]);
+    const hi = view.filter((o) => o.lv === "高").length;
+    $("sm-chip-key").textContent = "高风险占比 · " + scopeName;
+    $("sm-chip-val").textContent = view.length ? fmtDec(100 * hi / view.length, 1) + "%" : "--";
+    renderTable();
+    renderSel();
+    if (licChart) licChart.setOption(licOption(rIdx, gIdx), true);
+    if (riskChart) riskChart.setOption(riskOption(rIdx, gIdx), true);
+    if (pushHash && view.length) syncHash(view[selPos].comp);
+  }
+
+  rchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), 0, -1, true)));
+
+  /* hash 定位：命中组件 → 按其风险等级切筛选 + 选中该行 + 闪烁对应 chip；命中风险档 → 仅切筛选 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (!hit) { applyFilter(0, 0, -1, false); return; }
+    let chipIdx = 0;
+    if (hit.kind === "comp") {
+      chipIdx = OSS[hit.i].lvIdx + 1;
+      applyFilter(chipIdx, 0, hit.i, false);
+    } else {
+      chipIdx = hit.i;
+      applyFilter(chipIdx, 0, -1, false);
+    }
+    if (chipIdx > 0) {
+      const chip = rchips[chipIdx];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                          /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发技术资产与复用1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 18. kiosk 轮巡：台账行 3 秒逐行高亮并联动依赖路径；hash 定位或手动点行后暂停 20 秒 ===== */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 19. 初始渲染：先填充全部 DOM（表 + 路径 + 债务卡），再 init 图表 ===== */
+  let licChart = null, riskChart = null, debtChart = null;
+  applyFilter(0, 0, -1, false);                       /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  licChart = echarts.init($("sm-chart-lic"));
+  licChart.setOption(licOption(0, 0));
+  riskChart = echarts.init($("sm-chart-risk"));
+  riskChart.setOption(riskOption(0, 0));
+  debtChart = echarts.init($("sm-chart-debt"));
+  debtChart.setOption(debtOption());
+  locateByHash();                                     /* 初始解析 hash（无 hash 落全部） */
+
+  /* 环形图轮播提示 */
+  let tipIdx = 0;
+  setInterval(() => {
+    licChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % D.licKinds.length;
+  }, 4200);
+
+  /* ===== 20. 底部研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "高风险组件 " + D.h + " 个（占 " + fmtDec(D.highShare, 1) +
+        "%）均为强 Copyleft：" + OSS.filter((o) => o.lv === "高").map((o) => o.comp).join("、") + "，须按处置建议闭环" },
+    { lv: "高", c: C.red, t: "最紧迫复核「" + D.hotTop.comp + " " + D.hotTop.ver + "」" + D.hotTop.lic + " · " +
+        D.hotTop.act + "，距复核日 " + D.hotTop.due + " 仅 " + D.hotTop.dueIn + " 天" },
+    { lv: "中", c: C.orange, t: "待处置（高+中）" + D.pending + " 个 · 45 日内需复核 " + D.dueSoon +
+        " 个；弱 Copyleft " + D.famCnt[1] + " 个须保持动态链接隔离" },
+    { lv: "中", c: C.orange, t: "「" + D.repoTop.comp + "」影响面最广，横跨 " + D.repoTop.repos + " 个仓库、" +
+        D.repoTop.lines.length + " 条产品线，版本升级须走全域灰度" },
+    { lv: "中", c: C.orange, t: "技术债存量 " + fmtInt(D.debtNow) + " 人月，高于目标线 " + fmtInt(DEBT_TARGET) +
+        " 人月 " + fmtInt(D.debtNow - DEBT_TARGET) + " 人月；「" + D.etaTop.name + "」达标最慢，预计 " +
+        fmtDec(D.etaTop.eta, 1) + " 个月" },
+    { lv: "低", c: C.green, t: "债务自峰值 " + fmtInt(D.debtPeak) + " 人月（" + D.debtPeakM + "）回落 " +
+        fmtInt(D.debtPeak - D.debtNow) + " 人月，近 6 月月均净偿还 " + fmtDec(D.net6, 1) +
+        " 人月，按此速率 " + fmtDec(D.eta, 1) + " 个月达标" },
+    { lv: "低", c: C.green, t: "勾稽：四类末值 Σ = " + fmtInt(D.debtNow) + " 人月（同父页存量）· 四类目标 Σ = " +
+        fmtInt(D.tgtSum) + " · 逐期「新增 − 偿还 = 存量变化」恒等；组件 " + D.n + " 个 = 高 " + D.h +
+        " + 中 " + D.m + " + 低 " + D.l }
+  ];
+  const track = $("sm-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="sm-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;            /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 21. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(licOption(0, 0)); JSON.stringify(riskOption(0, 0)); JSON.stringify(debtOption()); }
+  catch (e) { optAcyclic = false; console.error("[开源合规与技术债台账] option 存在循环引用：", e.message); }
+
+  /* hash 大小写变体样本（含全大写 / 首字母大写 / 前后空白），全部应解析到同一组件 */
+  const HASH_VARIANTS = REF_COMPS.map((n) => [n, n.toUpperCase(), n.charAt(0).toUpperCase() + n.slice(1), " " + n + " "]);
+
+  const checks = [
+    ["10 个组件名逐字同父页 / 契约 §6", REF_COMPS.length === D.n &&
+      OSS.every((o, i) => o.comp === REF_COMPS[i])],
+    ["10 条许可证逐字同父页 OSS.lic", OSS.every((o, i) => o.lic === REF_LICS[i])],
+    ["10 条风险等级逐字同父页 OSS.lv", OSS.every((o, i) => o.lv === REF_LVS[i])],
+    ["风险三档 Σ = 10 且 高 3 / 中 2 / 低 5（与父页计数一致）",
+      sum(D.lvCnt) === D.n && D.h === REF_LV_CNT["高"] && D.m === REF_LV_CNT["中"] && D.l === REF_LV_CNT["低"]],
+    ["风险 chip 计数 == 现算计数（全部 = 三档之和）",
+      RFILTERS[0].cnt === D.n && LV_NAMES.every((lv, k) => RFILTERS[k + 1].cnt === OSS.filter((o) => o.lv === lv).length)],
+    ["许可证分布 Σ = 10 且类别数 = 去重后类别数", sum(D.licCnt) === D.n && D.licKinds.length === uniq(REF_LICS).length],
+    ["强 Copyleft ⇔ 高风险（GPL/AGPL/SSPL 判据同父页）", D.highAllStrong && D.strongAllHigh],
+    ["许可证族三分 Σ = 10", sum(D.famCnt) === D.n],
+    ["归属域 × 风险矩阵 Σ = 10 且行和 = 域计数",
+      sum(D.domCnt) === D.n && D.domLv.every((r, j) => sum(r) === D.domCnt[j])],
+    ["组件名两两不重复且均为小写 ASCII（含连字符）",
+      uniq(OSS.map((o) => o.comp)).length === D.n && OSS.every((o) => /^[a-z0-9-]+$/.test(o.comp))],
+    ["依赖引入路径 3~4 层且末节点 = 组件名 + 版本（现算拼接）",
+      OSS.every((o) => o.chain.length >= 3 && o.chain.length <= 4 &&
+        o.chain[o.chain.length - 1][1] === o.comp + " " + o.ver)],
+    ["影响仓库数为正、影响产品线 ⊆ 四条产品线且非空",
+      OSS.every((o) => o.repos > 0 && o.lines.length > 0 &&
+        o.lines.every((l) => PRODUCT_LINES.indexOf(l) >= 0))],
+    ["复核日期均晚于数据日期 2026-08-19，且高风险 3 个均在 45 日内",
+      OSS.every((o) => o.dueIn > 0) && OSS.filter((o) => o.lv === "高").every((o) => o.dueIn <= 45)],
+    ["技术债四类末值 Σ = 父页存量总额 1,580 人月",
+      sum(DEBT_CATS.map((c) => c.now)) === D.debtNow && D.debtNow === DEBT_REF],
+    ["技术债四类逐月 Σ = 当月总额，且四类序列各 24 个月",
+      DEBT_CATS.every((c) => c.m.length === 24) &&
+      MONTHS.every((_, i) => sum(DEBT_CATS.map((c) => c.m[i])) === D.debtMonth[i])],
+    ["月度「新增 − 偿还 = 存量变化」逐类逐期恒等", D.identityOk],
+    ["由期初 + Σ(新增 − 偿还) 逐期重建存量，与四类序列完全一致", D.rebuildOk],
+    ["月度新增 / 偿还流量恒为正（无负流量）", D.flowPositive],
+    ["全盘月流量 Σ 与四类分项一致（新增 / 偿还两口径）",
+      MONTHS.every((_, i) => D.addMonth[i] === sum(DEBT_CATS.map((c) => c.add[i])) &&
+        D.repayMonth[i] === sum(DEBT_CATS.map((c) => c.repay[i])))],
+    ["四类目标线 Σ = 父页目标 1,400 人月且逐类低于当前存量",
+      D.tgtSum === DEBT_TARGET && DEBT_CATS.every((c) => c.tgt < c.now)],
+    ["近 6 月净偿还：四类之和 = 全盘 21.0 人月/月",
+      Math.abs(sum(DEBT_CATS.map((c) => c.net6)) - D.net6) < 1e-9 && Math.abs(D.net6 - 21) < 1e-9],
+    ["达标预计 = (存量 − 目标) ÷ 月净偿还 且为正",
+      Math.abs(D.eta - (D.debtNow - DEBT_TARGET) / D.net6) < 1e-9 && D.eta > 0],
+    ["债务比率 = 存量 ÷ 年产能（3,860 × 12 = 46,320 人月）",
+      D.capacityPM === 46320 && Math.abs(D.debtRatio - 100 * D.debtNow / 46320) < 1e-9],
+    ["hash 10 个组件名（含全大写 / 首字母大写 / 带空白变体）均可解析到本体",
+      HASH_VARIANTS.every((vs, i) => vs.every((v) => HASH_COMP[norm(v)] === i))],
+    ["hash 连字符未被归一化破坏（六个含连字符的组件名可区分）",
+      ["mysql-connector-j", "ghostscript-lite", "qt-embedded", "mongodb-core", "tflite-micro", "libsass-fork"]
+        .every((n) => HASH_COMP[norm(n)] === REF_COMPS.indexOf(n))],
+    ["hash 风险档别名（全部 / 高 / 中 / 低）可解析",
+      HASH_LV[norm("全部")] === 0 && HASH_LV[norm("高")] === 1 &&
+      HASH_LV[norm("中")] === 2 && HASH_LV[norm("低")] === 3],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[开源合规与技术债台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

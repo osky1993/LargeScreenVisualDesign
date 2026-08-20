@@ -29,26 +29,32 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 研发管理专题所在目录（页面互链是同目录相对路径，移动目录时只改这里）
 PAGES_DIR = os.path.join(ROOT, "screens", "rnd-ipd")
 
-# 父页 → (子页展示名, 页内入口位置, 子页文件)；无子页则为 None。
-# 归属与 docs/RndIpdThemed.md §3 一致。
+# 父页 → [(子页展示名, 页内入口位置, 子页文件), ...]；无子页则为 None 或空列表。
+# 归属与 docs/RndIpdThemed.md §3 / §5.1 一致。
+# ★ 一个父页可挂多个子页：value 是**列表**，渲染成一枚标签内的多个链接 chip
+#   （页头右侧只剩 ~380px，多枚独立标签放不下第 3 枚，故走「一标签多链接」形态）。
 SUB = {
-    "大屏样板间-研发产品组合与路标1920.html": ("单产品线路标详情", "产品线概览表行", "大屏样板间-研发单产品线路标详情1920.html"),
-    "大屏样板间-研发IPD管道与评审1920.html": ("单项目IPD详情", "重点项目表行", "大屏样板间-研发单项目IPD详情1920.html"),
-    "大屏样板间-研发需求全生命周期1920.html": ("需求条目台账", "来源明细表行", "大屏样板间-研发需求条目台账1920.html"),
-    "大屏样板间-研发投入与预算1920.html": None,
-    "大屏样板间-研发敏捷交付总览1920.html": ("单团队冲刺详情", "团队速率表行", "大屏样板间-研发单团队冲刺详情1920.html"),
-    "大屏样板间-研发看板流动效率1920.html": ("阻塞在制品台账", "阻塞帕累托面板头", "大屏样板间-研发阻塞在制品台账1920.html"),
-    "大屏样板间-研发工程效能1920.html": None,
-    "大屏样板间-研发质量与缺陷1920.html": ("缺陷台账", "缺陷域明细行", "大屏样板间-研发缺陷台账1920.html"),
-    "大屏样板间-研发软硬云AI集成协同1920.html": ("单集成基线详情", "基线列车甘特行", "大屏样板间-研发单集成基线详情1920.html"),
-    "大屏样板间-研发硬件与样机1920.html": ("单样机批次详情", "样机批次表行", "大屏样板间-研发单样机批次详情1920.html"),
-    "大屏样板间-研发AI模型迭代1920.html": ("单模型详情", "模型台账行", "大屏样板间-研发单模型详情1920.html"),
-    "大屏样板间-研发云端服务与发布1920.html": None,
-    "大屏样板间-研发交付流水线数字孪生1920.html": None,
-    "大屏样板间-研发多中心布局1920.html": ("单中心详情", "站点明细表行", "大屏样板间-研发单中心详情1920.html"),
-    "大屏样板间-研发人才与能力1920.html": None,
-    "大屏样板间-研发技术资产与复用1920.html": None,
-    "大屏样板间-研发效能指数1920.html": None,
+    "大屏样板间-研发产品组合与路标1920.html": [("单产品线路标详情", "产品线概览表行", "大屏样板间-研发单产品线路标详情1920.html")],
+    "大屏样板间-研发IPD管道与评审1920.html": [("单项目IPD详情", "重点项目表行", "大屏样板间-研发单项目IPD详情1920.html")],
+    "大屏样板间-研发需求全生命周期1920.html": [("需求条目台账", "来源明细表行", "大屏样板间-研发需求条目台账1920.html")],
+    "大屏样板间-研发投入与预算1920.html": [("单投入类别详情", "投入五类明细行", "大屏样板间-研发单投入类别详情1920.html")],
+    "大屏样板间-研发敏捷交付总览1920.html": [("单团队冲刺详情", "团队速率表行", "大屏样板间-研发单团队冲刺详情1920.html")],
+    "大屏样板间-研发看板流动效率1920.html": [("阻塞在制品台账", "阻塞帕累托面板头", "大屏样板间-研发阻塞在制品台账1920.html")],
+    "大屏样板间-研发工程效能1920.html": [("单仓库群工程详情", "覆盖率箱线面板头", "大屏样板间-研发单仓库群工程详情1920.html")],
+    "大屏样板间-研发质量与缺陷1920.html": [("缺陷台账", "缺陷域明细行", "大屏样板间-研发缺陷台账1920.html")],
+    "大屏样板间-研发软硬云AI集成协同1920.html": [("单集成基线详情", "基线列车甘特行", "大屏样板间-研发单集成基线详情1920.html")],
+    "大屏样板间-研发硬件与样机1920.html": [("单样机批次详情", "样机批次表行", "大屏样板间-研发单样机批次详情1920.html")],
+    "大屏样板间-研发AI模型迭代1920.html": [("单模型详情", "模型台账行", "大屏样板间-研发单模型详情1920.html")],
+    "大屏样板间-研发云端服务与发布1920.html": [("线上事件台账", "最近线上事件行", "大屏样板间-研发线上事件台账1920.html")],
+    "大屏样板间-研发交付流水线数字孪生1920.html": [("单链路节点详情", "等距链路节点", "大屏样板间-研发单链路节点详情1920.html")],
+    # 多中心布局挂两个：指标视角（单中心详情）与孪生视角（园区数字孪生），两者互为姊妹页
+    "大屏样板间-研发多中心布局1920.html": [
+        ("单中心详情", "站点明细表行", "大屏样板间-研发单中心详情1920.html"),
+        ("园区数字孪生", "站点孪生视角", "大屏样板间-研发园区数字孪生1920.html"),
+    ],
+    "大屏样板间-研发人才与能力1920.html": [("关键岗位与招聘台账", "关键岗位饱和度面板头", "大屏样板间-研发关键岗位与招聘台账1920.html")],
+    "大屏样板间-研发技术资产与复用1920.html": [("开源合规与技术债台账", "开源组件合规行", "大屏样板间-研发开源合规与技术债台账1920.html")],
+    "大屏样板间-研发效能指数1920.html": [("单维度追溯详情", "加权明细可追溯表行", "大屏样板间-研发单维度追溯详情1920.html")],
 }
 
 CSS_BEGIN = "  /* subnav:begin —— 由 tools/inject_subnav_rnd.py 注入，勿手改 */"
@@ -68,16 +74,24 @@ CSS_TPL = """
   .{p}-subnav > u {{ display: flex; align-items: baseline; gap: 6px; text-decoration: none; white-space: nowrap; }}
   .{p}-subnav b {{ font-size: 14px; font-weight: 700; letter-spacing: 0.04em; color: #a3b4dc; }}
   .{p}-subnav i {{ font-style: normal; font-size: 10.5px; color: #7f92c4; }}
-  /* 有子页：转星蓝并可点击 */
+  /* 有子页：整枚标签转星蓝。★ 多子页时每个链接是独立 chip，故 cursor/hover 下沉到 <a>，
+     不再挂在外层——外层挂了会让「标签空白处」也显示成可点，实际点不动。 */
   .{p}-subnav.is-on {{
-    cursor: pointer; border-color: rgba(92, 157, 255, 0.55);
+    border-color: rgba(92, 157, 255, 0.55);
     background: linear-gradient(160deg, rgba(92, 157, 255, 0.16), rgba(18, 34, 78, 0.6));
     box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1);
-    transition: border-color .18s, box-shadow .18s;
   }}
-  .{p}-subnav.is-on b {{ color: #9cc2ff; }}
-  .{p}-subnav.is-on i {{ color: #6f8ec4; }}
-  .{p}-subnav.is-on:hover {{ border-color: rgba(92, 157, 255, 0.95); box-shadow: 0 0 16px -2px rgba(92, 157, 255, 0.7); }}
+  .{p}-subnav a {{
+    display: inline-flex; align-items: baseline; gap: 5px; cursor: pointer;
+    text-decoration: none; border-radius: 5px; padding: 1px 5px; margin: 0 -2px;
+    transition: background .18s, box-shadow .18s;
+  }}
+  .{p}-subnav a b {{ color: #9cc2ff; }}
+  .{p}-subnav a i {{ color: #6f8ec4; }}
+  .{p}-subnav a:hover {{ background: rgba(92, 157, 255, 0.22); box-shadow: 0 0 12px -3px rgba(92, 157, 255, 0.85); }}
+  .{p}-subnav a:hover b {{ color: #dce8ff; }}
+  /* 多链接之间的分隔点 */
+  .{p}-subnav em {{ font-style: normal; color: rgba(127, 146, 196, 0.5); font-size: 12px; }}
 """
 
 # 研发专题的色板 token 是 `--rnd-*`（3 字母，全专题共用），页面里没有 `--xx-bg`，
@@ -125,10 +139,17 @@ def apply(fname, remove=False):
 
     info = SUB.get(fname)
     if info:
-        name, where, sub = info
-        tag = ('%s<a class="%s-subnav is-on" href="%s" title="点击进入子页：%s（页内入口：%s）">'
-               '<span>二级子页 · SUB-PAGE</span><u><b>%s</b><i>· %s</i></u></a>'
-               % (indent, p, sub, name, where, name, where))
+        # 一枚标签内 N 个链接 chip（N=1 时与旧形态视觉一致）：
+        # 单子页保留「名称 · 页内入口」两段；多子页时入口说明下沉到 title，只留名称，省宽度。
+        multi = len(info) > 1
+        links = []
+        for name, where, sub in info:
+            inner = ("<b>%s</b>" % name) if multi else ("<b>%s</b><i>· %s</i>" % (name, where))
+            links.append('<a href="%s" title="点击进入子页：%s（页内入口：%s）">%s</a>'
+                         % (sub, name, where, inner))
+        head = "二级子页 · SUB-PAGE" + ("　×%d" % len(info) if multi else "")
+        tag = ('%s<div class="%s-subnav is-on"><span>%s</span><u>%s</u></div>'
+               % (indent, p, head, '<em>·</em>'.join(links)))
     else:
         tag = ('%s<div class="%s-subnav" title="本专题页没有二级详情子页">'
                '<span>二级子页 · SUB-PAGE</span><u><b>本页无</b><i>· 详见门户页导航</i></u></div>'
@@ -146,7 +167,8 @@ def apply(fname, remove=False):
     else:
         html = html.replace("</style>", css + "</style>", 1)
     io.open(path, "w", encoding="utf-8").write(html)
-    return "%-40s 前缀 %s · %s" % (label(fname), p, (info[0] + " ← " + info[1]) if info else "本页无子页")
+    desc = "；".join("%s ← %s" % (n, w) for n, w, _s in info) if info else "本页无子页"
+    return "%-40s 前缀 %s · %s" % (label(fname), p, desc)
 
 
 def main():

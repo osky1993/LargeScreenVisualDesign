@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发线上事件台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --rz-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：事件号 / 发生时间 / 等级 / 影响系统 / 事件摘要 / 影响时长 / 根因分类 / 状态 */
+    --rz-tcols: 112px 118px 44px 132px 1fr 116px 92px 74px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .rz-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 95, 107, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 640px;
+    grid-template-rows: 84px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .rz-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .rz-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .rz-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .rz-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 95, 107, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 95, 107, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .rz-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .rz-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .rz-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .rz-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .rz-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到云端服务与发布，琥珀描边与本页星蓝主色区分 */
+  .rz-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .rz-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .rz-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .rz-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .rz-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .rz-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .rz-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .rz-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .rz-chips { display: flex; align-items: center; gap: 9px; }
+  .rz-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 122px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .rz-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .rz-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .rz-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .rz-chip.is-key b { color: var(--rnd-blue); }
+  .rz-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .rz-clock-time { font: 700 26px/1 var(--rz-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .rz-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 筛选条：等级 chip（hash 契约目标 P1~P4）+ 状态二级过滤 ===== */
+  .rz-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .rz-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .rz-lchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 6px 14px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13.5px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .rz-lchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .rz-lchip b { font: 700 14px/1 var(--rz-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .rz-lchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .rz-lchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .rz-lchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .rz-lchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .rz-lchip.is-hit { animation: rz-hit 0.9s ease-in-out 2; }
+  @keyframes rz-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--rz-cc, rgba(92, 157, 255, 0.8)); } }
+  .rz-fdiv { flex: none; width: 1px; height: 24px; margin: 0 4px; background: rgba(96, 140, 255, 0.28); }
+  .rz-schip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 4px 11px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .rz-schip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .rz-schip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .rz-schip.is-on { color: #071026; font-weight: 700; }
+  .rz-schip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  .rz-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .rz-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .rz-filters-state em { font-style: normal; color: #d3e2ff; }
+  .rz-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .rz-kpis {
+    grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0;
+  }
+  .rz-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .rz-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--rz-kc, var(--rnd-blue));
+  }
+  .rz-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .rz-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .rz-kpi-v b { font: 700 24px/1 var(--rz-mono); color: var(--rz-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .rz-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .rz-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .rz-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .rz-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .rz-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .rz-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .rz-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .rz-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .rz-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rz-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .rz-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：行高 28px × 23 行 + 表头，tbody overflow hidden 防撑破 */
+  .rz-panel.is-ledger { flex: none; height: 742px; min-height: 0; overflow: hidden; }
+  /* ★ 时间轴块由 JS 填充（选中行联动重绘），且与两块图表同属 .rz-col 一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .rz-panel.is-tl { flex: none; height: 290px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .rz-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .rz-thead, .rz-tbody li {
+    display: grid; grid-template-columns: var(--rz-tcols); align-items: center; gap: 8px;
+  }
+  .rz-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .rz-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .rz-tbody li {
+    padding: 0 8px; height: 28px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: rz-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes rz-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .rz-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .rz-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .rz-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .rz-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rz-tbody li .rz-no { font: 700 11.5px/1 var(--rz-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.03em; }
+  .rz-tbody li .rz-when { font-size: 11.5px; color: #a9bce4; }
+  .rz-tbody li .rz-sys { font-size: 11.5px; color: #bfd2f6; }
+  .rz-tbody li .rz-sum { color: #dfe9ff; }
+  .rz-tbody li .rz-cause { font-size: 11.5px; }
+  .rz-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  /* 等级四档（与父页 INC_LEVELS 配色同源） */
+  .rz-badge.is-l0 { color: #3d060c; background: var(--rnd-red); }
+  .rz-badge.is-l1 { color: #3a1c05; background: var(--rnd-orange); }
+  .rz-badge.is-l2 { color: #3a2a05; background: var(--rnd-amber); }
+  .rz-badge.is-l3 { color: #041b3a; background: var(--rnd-blue); }
+  /* 复盘状态三档 */
+  .rz-badge.is-c0 { color: #063a25; background: var(--rnd-green); }
+  .rz-badge.is-c1 { color: #3a2a05; background: var(--rnd-amber); }
+  .rz-badge.is-c2 { border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+  /* 影响时长：微条 + 数值 */
+  .rz-dur { display: flex; align-items: center; gap: 8px; }
+  .rz-dur-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .rz-dur-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .rz-dur em { flex: none; width: 52px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+
+  /* ===== 右上：单事件五段处置时间轴（纯 HTML/CSS） ===== */
+  .rz-tl-head { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 7px 10px 8px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 8px; min-height: 62px; }
+  .rz-tl-no { display: flex; align-items: center; gap: 9px; }
+  .rz-tl-no b { font: 700 13px/1 var(--rz-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .rz-tl-title { font-size: 13px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rz-tl-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rz-tl-sub b { font-weight: 700; color: #c9d8f8; }
+  .rz-tl-bar { flex: none; display: flex; height: 24px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; background: rgba(14, 26, 66, 0.5); }
+  .rz-tl-seg { position: relative; min-width: 16px; }
+  .rz-tl-seg + .rz-tl-seg { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .rz-tl-seg.is-cur {
+    background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px) !important;
+    animation: rz-breath 1.6s ease-in-out infinite;
+  }
+  @keyframes rz-breath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+  .rz-tl-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .rz-tl-row { flex: 1; display: grid; grid-template-columns: 58px 1fr 70px; align-items: center; gap: 10px; padding: 0 4px; border-radius: 5px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .rz-tl-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .rz-tl-row b { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.04em; }
+  .rz-tl-row b::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--rz-pc, var(--rnd-blue)); }
+  .rz-tl-row.is-todo b { color: rgba(127, 146, 196, 0.6); }
+  .rz-tl-row.is-todo b::before { opacity: 0.3; }
+  .rz-tl-row span { color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rz-tl-row em { font-style: normal; text-align: right; font: 700 13px/1 var(--rz-mono); color: var(--rnd-cyan); }
+  .rz-tl-row.is-cur em { color: var(--rnd-amber); }
+  .rz-tl-row.is-todo em { color: rgba(127, 146, 196, 0.5); }
+
+  /* ===== 底部滚动条 ===== */
+  .rz-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .rz-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange);
+  }
+  .rz-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: rz-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes rz-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .rz-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .rz-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .rz-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .rz-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .rz-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .rz-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="rz-stage" id="rz-stage">
+    <!-- mockflag:begin --><div class="rz-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="rz-error" id="rz-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="rz-header">
+      <div class="rz-head-left">
+        <div class="rz-crumb">
+          <a class="rz-crumb-up" href="大屏样板间-研发云端服务与发布1920.html" title="返回上级专题页（Esc）">‹ 返回 云端服务与发布</a>
+          <b>云麓智联科技</b><i>›</i><span>云端服务与发布</span><i>›</i><em>线上事件台账</em>
+        </div>
+        <div class="rz-head-title-row">
+          <div class="rz-head-title">线上事件台账</div>
+          <div class="rz-head-meta">
+            <span>全年 <b id="rz-meta-inc">--</b> 起 · 本表样例 <b id="rz-meta-n">--</b> 起（抽样展示）</span><i>|</i>
+            <span><b>4</b> 档等级 · <b>7</b> 类根因 · <b>5</b> 段处置</span><i>|</i>
+            <span>统计窗口 <b>FY2026（2025-09 ~ 2026-08）</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="rz-head-right">
+        <div class="rz-chips">
+          <div class="rz-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="rz-chip is-key"><span id="rz-chip-key">MTTR · 全部</span><b id="rz-chip-mttr">--</b></div>
+        </div>
+        <div class="rz-clock" aria-label="实时时钟">
+          <span class="rz-clock-time" id="rz-clock-time">--:--:--</span>
+          <span class="rz-clock-date" id="rz-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 筛选条：等级 chip（hash 契约目标 P1~P4）+ 复盘状态二级过滤 -->
+    <div class="rz-filters">
+      <span class="rz-filters-tag">等级筛选</span>
+      <div id="rz-lchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="rz-fdiv"></span>
+      <span class="rz-filters-tag">复盘状态</span>
+      <div id="rz-schips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="rz-filters-state" id="rz-filters-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="rz-kpis" id="rz-kpis"></div>
+
+    <!-- 左：事件明细台账（写死高度 742px = 23 行 × 28px + 表头） -->
+    <div class="rz-col">
+      <section class="rz-panel is-ledger">
+        <div class="rz-panel-head">
+          <h2>线上事件明细台账（等级 × 复盘状态）</h2>
+          <span class="rz-panel-tag" id="rz-table-tag">--</span>
+        </div>
+        <div class="rz-table">
+          <div class="rz-thead">
+            <span>事件号</span><span>发生时间</span><span>等级</span><span>影响系统</span>
+            <span>事件摘要</span><span>影响时长</span><span>根因分类</span><span>状态</span>
+          </div>
+          <ul class="rz-tbody" id="rz-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右：单事件五段处置时间轴 + 根因帕累托 + 月度事件与 MTTR 双轴 -->
+    <div class="rz-col">
+      <section class="rz-panel is-tl">
+        <div class="rz-panel-head">
+          <h2>单事件五段处置时间轴</h2>
+          <span class="rz-panel-tag" id="rz-tl-tag">--</span>
+        </div>
+        <div class="rz-tl-head" id="rz-tl-headbox"></div>
+        <div class="rz-tl-bar" id="rz-tl-bar"></div>
+        <div class="rz-tl-list" id="rz-tl-list"></div>
+      </section>
+      <section class="rz-panel" style="flex: 1;">
+        <div class="rz-panel-head">
+          <h2>根因分类帕累托</h2>
+          <span class="rz-panel-tag" id="rz-pareto-tag">--</span>
+        </div>
+        <div class="rz-chart" id="rz-chart-pareto"></div>
+      </section>
+      <section class="rz-panel" style="flex: 1;">
+        <div class="rz-panel-head">
+          <h2>月度事件与 MTTR · 12 月</h2>
+          <span class="rz-panel-tag">Σ <b id="rz-mon-n">--</b> 起 · 加权 MTTR <b id="rz-mon-mttr">--</b> min（全盘口径）</span>
+        </div>
+        <div class="rz-chart" id="rz-chart-month"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="rz-foot">
+      <div class="rz-foot-tag">稳定性研判</div>
+      <div class="rz-foot-view"><div class="rz-foot-track" id="rz-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("rz-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("rz-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · SRE 视角）
+         ★ 与父页 P12「云端服务与发布」严格同源（docs/RndIpdThemed.md §2.2 / §6 P12→S14）：
+           线上事件 116 起、Σ 影响时长 4,872 min、加权 MTTR = 4,872 ÷ 116 = 42 min（DORA 契约值）；
+           等级 P1 3 起 / P2 11 起 / P3 34 起 / P4 68 起，级内 MTTR 200 / 104 / 50 / 21 min（父页 INC_LEVELS 逐字）；
+           逐月事件数与逐月 Σ 时长为父页 INC_CNT / INC_DOWN 逐字（窗口 2025-09 ~ 2026-08，父页 CAP_LABELS 同轴）。
+         ★ 本页口径声明：影响时长 = 发现 + 响应 + 定位 + 恢复 + 复盘归档 五段之和（分钟），
+           即「事件处置全周期」，其加权均值恰为契约 MTTR 42 min；未复盘/免复盘的事件只有前四段，
+           其影响时长 = 已完成四段之和（第五段为空态，不计时长）。
+         ★ 二级拆分（7 类根因 × 4 等级矩阵、复盘闭环口径、23 条抽样行）为本页自编，
+           Σ 一律收敛到上级数，全部进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，行与等级/根因之间一律用索引（lv / cs）
+           关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 契约锚点（勿改，与父页逐字） */
+  const INC_REF   = 116;             /* 12 月线上事件总起数 */
+  const DOWN_REF  = 4872;            /* Σ 影响时长 min */
+  const MTTR_REF  = 42;              /* 加权 MTTR min = DOWN_REF ÷ INC_REF */
+  const LV_N_REF    = [3, 11, 34, 68];
+  const LV_MTTR_REF = [200, 104, 50, 21];
+
+  /* 4.2 等级四档（父页 INC_LEVELS 逐字；down 由 n × mttr 现算，不另写一份）
+         rvNeed / rvDone = 复盘闭环口径（P1~P3 应复盘，P4 可自愈免复盘），本页二级自编。 */
+  const LEVELS = [
+    { lv: "P1", n: 3,  mttr: 200, color: C.red,    rvNeed: 3,  rvDone: 3,
+      note: "全站不可用 / 核心链路中断" },
+    { lv: "P2", n: 11, mttr: 104, color: C.orange, rvNeed: 11, rvDone: 11,
+      note: "关键功能受损 / 大面积降级" },
+    { lv: "P3", n: 34, mttr: 50,  color: C.amber,  rvNeed: 34, rvDone: 31,
+      note: "局部功能异常 / 单可用区抖动" },
+    { lv: "P4", n: 68, mttr: 21,  color: C.blue,   rvNeed: 0,  rvDone: 0,
+      note: "轻微影响 / 可自愈告警（免复盘）" }
+  ];
+
+  /* 4.3 逐月事件数与逐月 Σ 影响时长（父页 INC_CNT / INC_DOWN 逐字，窗口同父页 CAP_LABELS） */
+  const MON_LABELS = ["25-09", "25-10", "25-11", "25-12", "26-01", "26-02",
+                      "26-03", "26-04", "26-05", "26-06", "26-07", "26-08"];
+  const MON_CNT  = [14, 13, 12, 11, 10, 10, 9, 9, 8, 7, 7, 6];
+  const MON_DOWN = [742, 650, 576, 495, 430, 410, 351, 333, 280, 224, 210, 171];
+
+  /* 4.4 根因分类 × 等级矩阵（7 类；lv = [P1,P2,P3,P4] 起数）
+         行和 = 该类起数（现算），列和 == 等级起数，全表 Σ == 116；
+         down = 该类 Σ 影响时长 min，Σ == 4,872。两个方向都进自检。 */
+  const CAUSES = [
+    { name: "配置变更",   lv: [1, 4, 9, 14], down: 1288, color: C.blue },
+    { name: "依赖故障",   lv: [1, 3, 7, 11], down: 1122, color: C.violet },
+    { name: "容量不足",   lv: [0, 2, 6, 11], down: 722,  color: C.cyan },
+    { name: "代码缺陷",   lv: [0, 1, 5, 11], down: 731,  color: C.orange },
+    { name: "网络抖动",   lv: [1, 1, 3, 8],  down: 468,  color: C.amber },
+    { name: "第三方服务", lv: [0, 0, 3, 7],  down: 350,  color: C.green },
+    { name: "人为操作",   lv: [0, 0, 1, 6],  down: 191,  color: C.red }
+  ];
+
+  /* 4.5 五段处置与复盘状态 */
+  const PHASES = ["发现", "响应", "定位", "恢复", "复盘"];
+  const PHASE_HINT = ["告警触发 → 值班确认", "确认 → 处置小组到岗", "到岗 → 定位根因",
+                      "定位 → 业务完全恢复", "恢复 → 复盘归档"];
+  const PHASE_COLORS = [C.amber, C.cyan, C.blue, C.green, C.violet];
+  const ST_NAMES  = ["已闭环", "待复盘", "免复盘"];
+  const ST_BADGE  = ["is-c0", "is-c1", "is-c2"];
+  const ST_COLORS = [C.green, C.amber, C.blueDeep];
+
+  /* 4.6 台账抽样 23 行（按发生时间倒序；116 起不可能逐条陈列）
+         no = 窗口内流水号 INC-2026-0001~0116（按时序编，落在所在月的号段内，进自检）
+         lv = 等级索引 cs = 根因索引 st = 复盘状态索引
+         seg = 五段耗时（min）：已闭环 5 段、待复盘/免复盘 4 段；影响时长 = Σseg 现算。
+         ★ 末 6 行 = 父页 RECENT（2026-08 全部 6 起）逐字：条数 == MON_CNT[11]、Σ 时长 == MON_DOWN[11]。
+         ★ P1 三行 = 全年 P1 全量：Σ 时长必须 == 3 × 200 = 600 min。 */
+  const ROWS = [
+    { no: "INC-2026-0116", d: "2026-08-18 21:07", lv: 1, sys: "云枢 API 网关",   cs: 0, st: 0,
+      sm: "灰度批次配置错误致网关 5xx 抬升，回滚 R26.6-rc3", seg: [3, 4, 18, 29, 4] },
+    { no: "INC-2026-0115", d: "2026-08-15 14:32", lv: 1, sys: "设备接入集群",   cs: 2, st: 0,
+      sm: "长连接雪崩，扩容 120 节点后恢复",               seg: [4, 3, 12, 18, 4] },
+    { no: "INC-2026-0114", d: "2026-08-12 09:48", lv: 2, sys: "OTA 分发服务",   cs: 5, st: 0,
+      sm: "CDN 回源超时，切备用源站",                     seg: [3, 2, 8, 10, 3] },
+    { no: "INC-2026-0113", d: "2026-08-09 03:15", lv: 2, sys: "模型推理网关",   cs: 3, st: 1,
+      sm: "御风边缘模型热加载 OOM",                       seg: [2, 3, 6, 8] },
+    { no: "INC-2026-0112", d: "2026-08-05 16:52", lv: 3, sys: "运营监控看板",   cs: 2, st: 2,
+      sm: "指标写入积压，自愈重放",                       seg: [2, 2, 5, 6] },
+    { no: "INC-2026-0111", d: "2026-08-02 11:20", lv: 3, sys: "构建制品库",     cs: 2, st: 2,
+      sm: "存储卷 IOPS 打满，限流后恢复",                 seg: [1, 2, 4, 5] },
+    { no: "INC-2026-0109", d: "2026-07-24 20:11", lv: 2, sys: "数据管道",       cs: 3, st: 0,
+      sm: "乱序补偿窗口过小致运营指标漏点",               seg: [3, 3, 12, 12, 3] },
+    { no: "INC-2026-0105", d: "2026-07-08 13:26", lv: 3, sys: "开放 API 网关",  cs: 3, st: 2,
+      sm: "分页游标越界返回 500",                         seg: [2, 2, 6, 7] },
+    { no: "INC-2026-0102", d: "2026-06-29 17:40", lv: 2, sys: "规则引擎服务",   cs: 3, st: 1,
+      sm: "规则热更新死循环致 CPU 打满",                   seg: [4, 4, 20, 19] },
+    { no: "INC-2026-0098", d: "2026-06-11 08:22", lv: 0, sys: "统一鉴权服务",   cs: 0, st: 0,
+      sm: "证书批量过期致全链路鉴权失败",                 seg: [5, 4, 28, 74, 7] },
+    { no: "INC-2026-0094", d: "2026-05-21 22:05", lv: 3, sys: "日志检索服务",   cs: 2, st: 2,
+      sm: "索引分片热点致查询超时",                       seg: [2, 2, 4, 6] },
+    { no: "INC-2026-0090", d: "2026-05-06 09:33", lv: 1, sys: "数据管道",       cs: 2, st: 0,
+      sm: "消息分区倾斜致消费积压",                       seg: [7, 6, 30, 48, 5] },
+    { no: "INC-2026-0086", d: "2026-04-22 23:50", lv: 2, sys: "边缘调度服务",   cs: 4, st: 0,
+      sm: "边缘节点心跳误判致任务重调度",                 seg: [3, 3, 14, 15, 3] },
+    { no: "INC-2026-0081", d: "2026-04-03 10:14", lv: 3, sys: "制品分发 CDN",   cs: 5, st: 2,
+      sm: "缓存预热失败致首包延迟抬升",                   seg: [2, 2, 5, 7] },
+    { no: "INC-2026-0077", d: "2026-03-27 19:04", lv: 0, sys: "设备接入集群",   cs: 4, st: 0,
+      sm: "机房网络割接引发长连接全断",                   seg: [8, 7, 62, 126, 11] },
+    { no: "INC-2026-0072", d: "2026-03-09 15:47", lv: 3, sys: "告警通道服务",   cs: 5, st: 2,
+      sm: "短信网关限流致告警延迟",                       seg: [3, 3, 7, 7] },
+    { no: "INC-2026-0067", d: "2026-02-26 15:18", lv: 1, sys: "云枢配置中心",   cs: 0, st: 0,
+      sm: "配置推送灰度未生效致新老配置并存",             seg: [5, 5, 34, 38, 6] },
+    { no: "INC-2026-0062", d: "2026-02-05 08:56", lv: 2, sys: "OTA 分发服务",   cs: 6, st: 0,
+      sm: "灰度名单重复下发致重复升级",                   seg: [3, 2, 10, 11, 3] },
+    { no: "INC-2026-0058", d: "2026-01-19 11:02", lv: 3, sys: "运营监控看板",   cs: 2, st: 2,
+      sm: "看板查询并发超阈值触发限流",                   seg: [2, 2, 4, 5] },
+    { no: "INC-2026-0052", d: "2026-01-04 02:36", lv: 0, sys: "云枢 API 网关",  cs: 1, st: 0,
+      sm: "主库故障切换失败致全站写入中断",               seg: [12, 9, 96, 138, 13] },
+    { no: "INC-2026-0047", d: "2025-12-18 21:35", lv: 2, sys: "统一鉴权服务",   cs: 1, st: 1,
+      sm: "令牌刷新风暴致鉴权 QPS 突增",                   seg: [4, 4, 17, 19] },
+    { no: "INC-2026-0041", d: "2025-12-02 14:09", lv: 3, sys: "构建制品库",     cs: 6, st: 2,
+      sm: "制品清理任务误删灰度包",                       seg: [3, 3, 8, 8] },
+    { no: "INC-2026-0033", d: "2025-11-13 16:28", lv: 1, sys: "模型推理网关",   cs: 1, st: 0,
+      sm: "依赖的向量检索服务超时熔断",                   seg: [6, 5, 42, 58, 7] }
+  ];
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 5.1 等级维度 */
+  LEVELS.forEach((l) => { l.down = l.n * l.mttr; });
+  D.incN = sum(LEVELS.map((l) => l.n));
+  D.down = sum(LEVELS.map((l) => l.down));
+  D.mttr = D.down / D.incN;
+  LEVELS.forEach((l) => { l.share = 100 * l.n / D.incN; l.downShare = 100 * l.down / D.down; });
+  D.sevShare = 100 * (LEVELS[0].n + LEVELS[1].n) / D.incN;      /* P1+P2 占比 */
+  D.rvNeed = sum(LEVELS.map((l) => l.rvNeed));
+  D.rvDone = sum(LEVELS.map((l) => l.rvDone));
+  D.rvRate = 100 * D.rvDone / D.rvNeed;
+  D.rvOpen = D.rvNeed - D.rvDone;
+
+  /* 5.2 月度维度（与等级维度双向收敛到同一对总量） */
+  D.monN = sum(MON_CNT);
+  D.monDown = sum(MON_DOWN);
+  D.monMttr = D.monDown / D.monN;
+  const MON_MTTR = MON_DOWN.map((v, i) => Math.round(v / MON_CNT[i] * 10) / 10);
+  D.monMttrFirst = MON_MTTR[0];
+  D.monMttrLast = MON_MTTR[MON_MTTR.length - 1];
+  D.monDrop = 100 * (1 - D.monMttrLast / D.monMttrFirst);
+
+  /* 5.3 根因维度：行和现算，列和与等级起数比对 */
+  CAUSES.forEach((c) => { c.n = sum(c.lv); c.mttr = c.down / c.n; });
+  D.causeN = sum(CAUSES.map((c) => c.n));
+  D.causeDown = sum(CAUSES.map((c) => c.down));
+  D.causeColSum = LEVELS.map((l, li) => sum(CAUSES.map((c) => c.lv[li])));
+  D.causeTop = CAUSES.slice().sort((a, b) => b.n - a.n)[0];
+
+  /* 5.4 月号段：窗口内流水号按时序连续编，第 i 月号段 = (前缀和, 前缀和 + 当月数] */
+  const MON_LO = [], MON_HI = [];
+  (function () {
+    let acc = 0;
+    MON_CNT.forEach((v) => { MON_LO.push(acc + 1); acc += v; MON_HI.push(acc); });
+  })();
+  const monIdxOf = (ds) => (Number(ds.slice(0, 4)) - 2025) * 12 + (Number(ds.slice(5, 7)) - 9);
+
+  /* 5.5 抽样行派生：影响时长 = Σseg（现算，不复制数字） */
+  ROWS.forEach((r) => {
+    r.min = sum(r.seg);
+    r.mi = monIdxOf(r.d);
+    r.seq = Number(r.no.slice(-4));
+  });
+  D.n = ROWS.length;
+  D.rowsByLv = LEVELS.map((l, li) => ROWS.filter((r) => r.lv === li).length);
+  D.rowsBySt = ST_NAMES.map((s, si) => ROWS.filter((r) => r.st === si).length);
+  D.sampleP1 = ROWS.filter((r) => r.lv === 0);
+  D.sampleP1Down = sum(D.sampleP1.map((r) => r.min));
+  D.lastMonRows = ROWS.filter((r) => r.mi === MON_CNT.length - 1);
+  D.lastMonDown = sum(D.lastMonRows.map((r) => r.min));
+  D.longest = ROWS.slice().sort((a, b) => b.min - a.min)[0];
+  D.sampleDown = sum(ROWS.map((r) => r.min));
+  D.durMax = D.longest.min;
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("rz-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("rz-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("rz-meta-inc").textContent = fmtInt(D.incN);
+  $("rz-meta-n").textContent = fmtInt(D.n);
+  $("rz-mon-n").textContent = fmtInt(D.monN);
+  $("rz-mon-mttr").textContent = fmtDec(D.monMttr, 1);
+
+  /* ===== 7. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "全年线上事件", v: D.incN, dec: 0, unit: "起", color: C.blue,
+      s: "FY2026 · 2025-09 ~ 2026-08 · 等级 Σ 与月度 Σ 双向收敛" },
+    { k: "Σ 影响时长", v: D.down, dec: 0, unit: "min", color: C.violet,
+      s: "≈ " + fmtDec(D.down / 60, 1) + " h · 五段处置全周期口径" },
+    { k: "加权 MTTR", v: D.mttr, dec: 1, unit: "min", color: C.amber,
+      s: fmtInt(D.down) + " ÷ " + fmtInt(D.incN) + " 现算 · DORA 契约同源" },
+    { k: "P1+P2 占比", v: D.sevShare, dec: 1, unit: "%", color: C.red,
+      s: (LEVELS[0].n + LEVELS[1].n) + " 起 / " + D.incN + " 起 · 重大事件占比" },
+    { k: "复盘闭环率", v: D.rvRate, dec: 1, unit: "%", color: C.green,
+      s: D.rvDone + " / " + D.rvNeed + " · P1–P3 应复盘，P4 自愈免复盘" },
+    { k: "最长一起", v: D.longest.min, dec: 0, unit: "min", color: C.orange,
+      s: D.longest.no + " · " + LEVELS[D.longest.lv].lv + " " + D.longest.sys }
+  ];
+  $("rz-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="rz-kpi" style="--rz-kc:' + p.color + '">' +
+      '<div class="rz-kpi-k">' + p.k + "</div>" +
+      '<div class="rz-kpi-v"><b id="rz-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="rz-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("rz-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 等级筛选 chip（全部 + P1~P4；每 chip 带起数与该级 MTTR） ===== */
+  const LFILTERS = [{ name: "全部", color: C.blue, n: D.incN, mttr: D.mttr, cnt: D.n }]
+    .concat(LEVELS.map((l, li) => ({ name: l.lv, color: l.color, n: l.n, mttr: l.mttr, cnt: D.rowsByLv[li] })));
+  const lbox = $("rz-lchips");
+  lbox.innerHTML = LFILTERS.map((f, i) => (
+    '<button class="rz-lchip" type="button" data-i="' + i + '" style="--rz-cc:' + f.color + '">' +
+      "<u>" + f.name + "</u><b>" + fmtInt(f.n) + "</b>" +
+      "<i>起 · MTTR " + fmtDec(f.mttr, f.mttr % 1 ? 1 : 0) + " min · 样例 " + f.cnt + "</i>" +
+    "</button>"
+  )).join("");
+  const lchips = Array.from(lbox.children);
+
+  /* ===== 9. 复盘状态二级过滤 chip（全部 + 三档；计数随等级筛选联动重算） ===== */
+  const sbox = $("rz-schips");
+  function stScopeCnt(li, si) {
+    return ROWS.filter((r) => (li === 0 || r.lv === li - 1) && (si === 0 || r.st === si - 1)).length;
+  }
+  function renderSChips(li, si) {
+    const items = [{ name: "全部", color: C.blue }]
+      .concat(ST_NAMES.map((n, k) => ({ name: n, color: ST_COLORS[k] })));
+    sbox.innerHTML = items.map((f, i) => (
+      '<button class="rz-schip' + (i === si ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === si ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + stScopeCnt(li, i) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(sbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(lIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 10. hash 契约：父页 P12 下钻「子页#encodeURIComponent(等级代号)」，P1~P4 逐字匹配
+         归一化后（trim + 全角空白剔除）查表；HASH_ALIAS 收「P1 事件」「p1」「P1级」等别名。 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("all", 0); alias("全量", 0);
+  LEVELS.forEach((l, li) => {
+    const up = l.lv, low = l.lv.toLowerCase();
+    [up, low].forEach((base) => {
+      alias(base, li + 1);
+      alias(base + "事件", li + 1);
+      alias(base + "级", li + 1);
+      alias(base + "级事件", li + 1);
+      alias(base + "线上事件", li + 1);
+    });
+  });
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                      /* trim + 全角空白剔除归一化 */
+    if (!raw) return -1;                                     /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(li) {
+    const want = "#" + encodeURIComponent(LFILTERS[li].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 台账主表渲染（行高 28px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("rz-tbody");
+  let view = ROWS, lIdx = 0, sIdx = 0, selPos = 0;
+
+  function rowHtml(r, k) {
+    const w = clamp(r.min / D.durMax * 100, 6, 100);
+    const cDur = r.min > 120 ? C.red : r.min > 45 ? C.amber : C.cyan;
+    return "<li data-no=\"" + r.no + "\" style=\"animation-delay:" + (k * 12) + "ms\">" +
+      '<span class="rz-no">' + r.no + "</span>" +
+      '<span class="rz-when">' + r.d.slice(2) + "</span>" +
+      '<span class="rz-badge is-l' + r.lv + '">' + LEVELS[r.lv].lv + "</span>" +
+      '<span class="rz-sys">' + r.sys + "</span>" +
+      '<span class="rz-sum">' + r.sm + "</span>" +
+      '<span class="rz-dur"><span class="rz-dur-t"><u style="width:' + fmtDec(w, 1) + "%;background:" + cDur +
+        '"></u></span><em style="color:' + cDur + '">' + r.min + " min</em></span>" +
+      '<span class="rz-cause" style="color:' + CAUSES[r.cs].color + '">' + CAUSES[r.cs].name + "</span>" +
+      '<span class="rz-badge ' + ST_BADGE[r.st] + '">' + ST_NAMES[r.st] + "</span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      /* 手动点行 → 选中并暂停轮巡 20 秒（与 hash 定位同一门闩） */
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    const scopeN = lIdx === 0 ? D.incN : LEVELS[lIdx - 1].n;
+    const scopeDown = lIdx === 0 ? D.down : LEVELS[lIdx - 1].down;
+    $("rz-table-tag").textContent =
+      "抽样展示：全年 " + fmtInt(D.incN) + " 起不逐条陈列 · 样例 " + D.n +
+      " 起（P1 全量 " + D.rowsByLv[0] + " 起 + P2/P3/P4 抽样）";
+    $("rz-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 起样例 / 共 " + D.n + " 起<i>|</i>全盘该口径 <em>" + fmtInt(scopeN) +
+      "</em> 起 · Σ <em>" + fmtInt(scopeDown) + "</em> min<i>|</i>行点击或轮巡联动处置时间轴";
+  }
+
+  /* ===== 12. 单事件五段处置时间轴（纯 HTML/CSS；选中行联动，五段宽度 ∝ 耗时）
+         各段起止时刻由事件发生时刻 + 累计分钟现算；复盘未完成的事件第五段为空态。 ===== */
+  function parseAt(ds) {
+    return new Date(Number(ds.slice(0, 4)), Number(ds.slice(5, 7)) - 1, Number(ds.slice(8, 10)),
+                    Number(ds.slice(11, 13)), Number(ds.slice(14, 16)));
+  }
+  const hhmm = (dt) => pad(dt.getHours()) + ":" + pad(dt.getMinutes());
+  function renderSel() {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("rz-tl-tag").textContent = "当前筛选无样例行";
+      $("rz-tl-headbox").innerHTML = '<div class="rz-tl-sub">调整等级或复盘状态筛选后，此处展示选中事件的五段处置。</div>';
+      $("rz-tl-bar").innerHTML = "";
+      $("rz-tl-list").innerHTML = "";
+      return;
+    }
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    $("rz-tl-tag").textContent = "发现→响应→定位→恢复→复盘 · 各段耗时（min）Σ = 影响时长";
+    $("rz-tl-headbox").innerHTML =
+      '<div class="rz-tl-no"><b>' + r.no + "</b>" +
+        '<span class="rz-badge is-l' + r.lv + '">' + LEVELS[r.lv].lv + "</span>" +
+        '<span class="rz-badge ' + ST_BADGE[r.st] + '">' + ST_NAMES[r.st] + "</span>" +
+        '<span class="rz-tl-sub">' + r.sys + " · " + CAUSES[r.cs].name + "</span></div>" +
+      '<div class="rz-tl-title">' + r.sm + "</div>" +
+      '<div class="rz-tl-sub">发生 <b>' + r.d + "</b> · 影响时长 <b>" + r.min +
+        "</b> min（Σ " + r.seg.length + " 段）· 级内 MTTR <b>" + LEVELS[r.lv].mttr + "</b> min</div>";
+    $("rz-tl-bar").innerHTML = r.seg.map((v, k) => (
+      '<span class="rz-tl-seg" style="flex:' + v + ";background:" + PHASE_COLORS[k] +
+        '" title="' + PHASES[k] + " " + v + ' min"></span>'
+    )).join("");
+    const t0 = parseAt(r.d);
+    let acc = 0;
+    $("rz-tl-list").innerHTML = PHASES.map((name, k) => {
+      const entered = k < r.seg.length;
+      let body, val;
+      if (entered) {
+        const a = new Date(t0.getTime() + acc * 60000);
+        acc += r.seg[k];
+        const b = new Date(t0.getTime() + acc * 60000);
+        body = hhmm(a) + " → " + hhmm(b) + " · " + PHASE_HINT[k];
+        val = r.seg[k] + " min";
+      } else {
+        body = r.st === 1 ? "待复盘 · 复盘会与改进项尚未归档" : "P4 自愈事件 · 按制度免复盘";
+        val = "--";
+      }
+      return '<div class="rz-tl-row ' + (entered ? "" : "is-todo") + '" style="--rz-pc:' + PHASE_COLORS[k] + '">' +
+        "<b>" + name + "</b><span>" + body + "</span><em>" + val + "</em></div>";
+    }).join("");
+  }
+
+  /* ===== 13. 根因分类帕累托（柱 = 起数降序，线 = 累计占比，末值恒为 100%）
+         全部口径用行和；选中等级时取该等级列，两种口径的 Σ 都收敛。 ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function paretoData(li) {
+    const items = CAUSES.map((c, ci) => ({
+      name: c.name, color: c.color, ci: ci,
+      n: li === 0 ? c.n : c.lv[li - 1],
+      down: li === 0 ? c.down : 0
+    }));
+    items.sort((a, b) => (b.n - a.n) || (a.ci - b.ci));
+    const total = sum(items.map((it) => it.n));
+    let acc = 0;
+    items.forEach((it) => { acc += it.n; it.cum = total ? 100 * acc / total : 0; });
+    return { items: items, total: total };
+  }
+  function paretoOption(li) {
+    const pd = paretoData(li);
+    /* ★ 只把标量与数组下发给 option，items 对象本身不进 series.data（避免任何回指） */
+    const names = pd.items.map((it) => it.name);
+    const vals = pd.items.map((it) => it.n);
+    const cols = pd.items.map((it) => it.color);
+    const cums = pd.items.map((it) => Number(fmtDec(it.cum, 1)));
+    const downs = pd.items.map((it) => it.down);
+    const total = pd.total;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 34, top: 26, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const share = total ? 100 * vals[i] / total : 0;
+          return "<b>" + names[i] + "</b><br/>起数 <b>" + vals[i] + "</b> 起 · 占 <b>" +
+            fmtDec(share, 1) + "%</b><br/>累计占比 <b style=\"color:" + C.amber + "\">" +
+            fmtDec(cums[i], 1) + "%</b>" +
+            (downs[i] ? "<br/><span style=\"color:" + C.textDim + "\">Σ 影响时长 " + fmtInt(downs[i]) +
+              " min · 类内 MTTR " + fmtDec(downs[i] / vals[i], 1) + " min</span>" : "");
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["起数", "累计占比"]
+      },
+      xAxis: {
+        type: "category", data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10, interval: 0, rotate: 22 }
+      },
+      yAxis: [
+        { type: "value", name: "起", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10 },
+          splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+        { type: "value", name: "%", min: 0, max: 100, nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10, formatter: "{value}" },
+          splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "起数", type: "bar", barWidth: "48%",
+          label: { show: true, position: "top", color: "#cfdcff", fontSize: 10, fontWeight: 700 },
+          data: vals.map((v, i) => ({ value: v, itemStyle: { color: cols[i], borderRadius: [3, 3, 0, 0] } })) },
+        { name: "累计占比", type: "line", yAxisIndex: 1, smooth: false,
+          symbol: "circle", symbolSize: 5, z: 5, data: cums.slice(),
+          lineStyle: { width: 2, color: C.amber }, itemStyle: { color: C.amber },
+          markLine: {
+            symbol: "none", silent: true,
+            lineStyle: { color: "rgba(255,157,92,.65)", type: "dashed", width: 1.4 },
+            label: { color: C.orange, fontSize: 10, position: "insideEndTop", formatter: "80% 线" },
+            data: [{ yAxis: 80 }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 14. 月度事件与 MTTR 双轴（12 月；父页 INC_CNT / INC_DOWN 逐字，全盘口径不随筛选变化） ===== */
+  function monthOption() {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 8, top: 26, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>20" + MON_LABELS[i] + "</b><br/>事件 <b style=\"color:" + C.blue + "\">" + MON_CNT[i] +
+            "</b> 起 · Σ 时长 <b>" + fmtInt(MON_DOWN[i]) + "</b> min<br/>月度 MTTR <b style=\"color:" +
+            C.orange + "\">" + fmtDec(MON_MTTR[i], 1) + "</b> min";
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["事件数", "月度 MTTR"]
+      },
+      xAxis: {
+        type: "category", data: MON_LABELS.slice(),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10, interval: 0, rotate: 26 }
+      },
+      yAxis: [
+        { type: "value", name: "起", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10 },
+          splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+        { type: "value", name: "min", min: 0, nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10 }, splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "事件数", type: "bar", barWidth: "42%", data: MON_CNT.slice(),
+          itemStyle: { borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: C.blue }, { offset: 1, color: "rgba(47,111,214,.3)" }]) } },
+        { name: "月度 MTTR", type: "line", yAxisIndex: 1, smooth: true,
+          symbol: "circle", symbolSize: 5, z: 5, data: MON_MTTR.slice(),
+          lineStyle: { width: 2.4, color: C.orange }, itemStyle: { color: C.orange },
+          markLine: {
+            symbol: "none", silent: true,
+            lineStyle: { color: C.amber, type: "dashed", width: 1.6 },
+            label: { color: C.amber, fontSize: 10.5, fontWeight: 700, position: "insideEndTop",
+              formatter: () => "加权均值 " + fmtDec(D.mttr, 0) + " min" },
+            data: [{ yAxis: D.mttr }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 15. 筛选主流程：一次调用刷新 chip / 表 / 时间轴 / 帕累托 / 页头 chip（单一入口） ===== */
+  function applyFilter(li, si, pushHash) {
+    lIdx = clamp(li, 0, LFILTERS.length - 1);
+    sIdx = clamp(si, 0, ST_NAMES.length);
+    view = ROWS.filter((r) =>
+      (lIdx === 0 || r.lv === lIdx - 1) && (sIdx === 0 || r.st === sIdx - 1));
+    selPos = 0;
+    lchips.forEach((el, i) => {
+      const on = i === lIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? LFILTERS[i].color : "";
+      el.style.borderColor = on ? LFILTERS[i].color : "";
+    });
+    renderSChips(lIdx, sIdx);
+    const l = lIdx === 0 ? null : LEVELS[lIdx - 1];
+    $("rz-chip-key").textContent = "MTTR · " + LFILTERS[lIdx].name;
+    $("rz-chip-mttr").textContent = fmtDec(l ? l.mttr : D.mttr, 1) + " min";
+    const pd = paretoData(lIdx);
+    $("rz-pareto-tag").innerHTML = "七类 Σ <b>" + fmtInt(pd.total) + "</b> 起 · 累计末值 <b>" +
+      fmtDec(pd.items[pd.items.length - 1].cum, 0) + "%</b> · 口径 " + LFILTERS[lIdx].name;
+    renderTable();
+    renderSel();
+    if (paretoChart) paretoChart.setOption(paretoOption(lIdx), true);
+    if (pushHash) syncHash(lIdx);
+  }
+
+  lchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), 0, true)));
+
+  /* hash 定位：命中等级则激活筛选 chip、闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyFilter(0, 0, false); return; }
+    applyFilter(hit, 0, false);
+    if (hit > 0) {
+      const chip = lchips[hit];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                 /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发云端服务与发布1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 16. kiosk 轮巡：台账行 3 秒逐行高亮并联动处置时间轴；hash 定位或手动点行后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 17. 初始渲染：先填充全部 DOM（KPI + 表 + 时间轴），再 init 图表 ===== */
+  let paretoChart = null, monthChart = null;
+  applyFilter(0, 0, false);                                  /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  paretoChart = echarts.init($("rz-chart-pareto"));
+  paretoChart.setOption(paretoOption(0));
+  monthChart = echarts.init($("rz-chart-month"));
+  monthChart.setOption(monthOption());
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* 月度图轮播提示 */
+  let tipIdx = 0;
+  setInterval(() => {
+    monthChart.dispatchAction({ type: "showTip", seriesIndex: 1, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % MON_LABELS.length;
+  }, 4200);
+
+  /* ===== 18. 底部稳定性研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "P1 全年 " + LEVELS[0].n + " 起、级内 MTTR " + LEVELS[0].mttr +
+        " min，Σ 影响 " + fmtInt(LEVELS[0].down) + " min（占全盘 " + fmtDec(LEVELS[0].downShare, 1) +
+        "%），最长一起「" + D.longest.no + "」" + D.longest.min + " min" },
+    { lv: "高", c: C.red, t: "P1+P2 合计 " + (LEVELS[0].n + LEVELS[1].n) + " 起，仅占 " +
+        fmtDec(D.sevShare, 1) + "% 起数却吃掉 " + fmtDec(LEVELS[0].downShare + LEVELS[1].downShare, 1) +
+        "% 影响时长，重大事件仍是 MTTR 的主要拉高项" },
+    { lv: "中", c: C.orange, t: "根因首位「" + D.causeTop.name + "」" + D.causeTop.n + " 起（占 " +
+        fmtDec(100 * D.causeTop.n / D.causeN, 1) + "%），类内 MTTR " + fmtDec(D.causeTop.mttr, 1) +
+        " min；前三类累计已达 " + fmtDec(paretoData(0).items[2].cum, 1) + "%" },
+    { lv: "中", c: C.orange, t: "复盘闭环 " + D.rvDone + " / " + D.rvNeed + " = " + fmtDec(D.rvRate, 1) +
+        "%，尚有 " + D.rvOpen + " 起 P3 待复盘（样例内 " + D.rowsBySt[1] + " 起标记为待复盘，全量在册）" },
+    { lv: "低", c: C.amber, t: "月度 MTTR 由首月 " + fmtDec(D.monMttrFirst, 1) + " min 收敛到末月 " +
+        fmtDec(D.monMttrLast, 1) + " min，降幅 " + fmtDec(D.monDrop, 1) + "%，12 月加权均值 " +
+        fmtDec(D.monMttr, 0) + " min 与 DORA 契约同源" },
+    { lv: "低", c: C.green, t: "末月（20" + MON_LABELS[MON_LABELS.length - 1] + "）" + D.lastMonRows.length +
+        " 起全部在册，Σ 影响 " + D.lastMonDown + " min，与父页「最近线上事件」清单逐条对齐" },
+    { lv: "低", c: C.green, t: "勾稽：等级 Σ = " + fmtInt(D.incN) + " 起 · 月度 Σ = " + fmtInt(D.monN) +
+        " 起 · 根因 Σ = " + fmtInt(D.causeN) + " 起；Σ 影响时长三口径同为 " + fmtInt(D.down) + " min" }
+  ];
+  const track = $("rz-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="rz-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                    /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 19. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(paretoOption(0)); JSON.stringify(paretoOption(1)); JSON.stringify(monthOption()); }
+  catch (e) { optAcyclic = false; console.error("[线上事件台账] option 存在循环引用：", e.message); }
+
+  const pd0 = paretoData(0);
+  const checks = [
+    ["四等级起数 Σ = 116（契约逐字）", D.incN === INC_REF],
+    ["逐级起数与父页逐字（P1 3 / P2 11 / P3 34 / P4 68）",
+      LEVELS.every((l, i) => l.n === LV_N_REF[i])],
+    ["逐级 MTTR 与父页逐字（200 / 104 / 50 / 21 min）",
+      LEVELS.every((l, i) => l.mttr === LV_MTTR_REF[i])],
+    ["Σ 影响时长 = 4,872 min（Σ 级内 n × MTTR 现算）", D.down === DOWN_REF],
+    ["加权 MTTR ≈ 42 min = 4,872 ÷ 116", Math.abs(D.mttr - MTTR_REF) < 0.05],
+    ["月度 Σ 起数 = 116（12 月与等级维度双向收敛）", D.monN === INC_REF && MON_CNT.length === 12],
+    ["月度 Σ 影响时长 = 4,872 min 且加权 MTTR 同为 42",
+      D.monDown === DOWN_REF && Math.abs(D.monMttr - MTTR_REF) < 0.05],
+    ["月度 MTTR 逐月收敛（末月低于首月）", D.monMttrLast < D.monMttrFirst],
+    ["帕累托七类 Σ = 116 起", D.causeN === INC_REF && CAUSES.length === 7],
+    ["帕累托累计末值 = 100%", Math.abs(pd0.items[pd0.items.length - 1].cum - 100) < 1e-9],
+    ["帕累托柱按起数降序（累计线单调不减）",
+      pd0.items.every((it, i) => i === 0 || it.n <= pd0.items[i - 1].n)],
+    ["根因 Σ 影响时长 = 4,872 min", D.causeDown === DOWN_REF],
+    ["根因 × 等级矩阵列和 == 逐级起数（二级拆分收敛）",
+      D.causeColSum.every((v, i) => v === LEVELS[i].n)],
+    ["各等级口径下帕累托 Σ == 该级起数且末值 100%",
+      LEVELS.every((l, i) => {
+        const p = paretoData(i + 1);
+        return p.total === l.n && Math.abs(p.items[p.items.length - 1].cum - 100) < 1e-9;
+      })],
+    ["P1+P2 占比 ≈ 12.1% = 14 ÷ 116", Math.abs(D.sevShare - 100 * 14 / 116) < 1e-9],
+    ["复盘闭环率 = 45 ÷ 48（P1–P3 应复盘，P4 免复盘）",
+      D.rvNeed === 48 && D.rvDone === 45 && Math.abs(D.rvRate - 93.75) < 1e-9],
+    ["抽样行等级分布与筛选计数一致", LFILTERS.every((f, i) =>
+      f.cnt === (i === 0 ? ROWS.length : ROWS.filter((r) => r.lv === i - 1).length))],
+    ["抽样等级分布之和 = 样例总数 23", sum(D.rowsByLv) === D.n && D.n === 23],
+    ["单事件五段耗时 Σ = 该事件影响时长（逐行）",
+      ROWS.every((r) => r.min === sum(r.seg) && r.seg.every((v) => v > 0))],
+    ["段数与复盘状态自洽（已闭环 5 段 / 待复盘·免复盘 4 段）",
+      ROWS.every((r) => r.seg.length === (r.st === 0 ? 5 : 4))],
+    ["待复盘样例数 = 全盘未闭环数 3，且全部为 P3",
+      D.rowsBySt[1] === D.rvOpen && ROWS.filter((r) => r.st === 1).every((r) => r.lv === 2)],
+    ["免复盘样例全部为 P4（自愈口径）",
+      ROWS.filter((r) => r.st === 2).every((r) => r.lv === 3)],
+    ["P1 样例即全年 P1 全量：3 起且 Σ 时长 = 3 × 200 = 600 min",
+      D.sampleP1.length === LEVELS[0].n && D.sampleP1Down === LEVELS[0].down],
+    ["末月样例 = 父页最近事件清单：6 起且 Σ 时长 = 171 min",
+      D.lastMonRows.length === MON_CNT[11] && D.lastMonDown === MON_DOWN[11]],
+    ["样例流水号落在所在月号段内（编号与月度分布自洽）",
+      ROWS.every((r) => r.seq >= MON_LO[r.mi] && r.seq <= MON_HI[r.mi])],
+    ["样例编号唯一、格式 INC-2026-XXXX 且按时间倒序严格递减",
+      (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^INC-2026-\d{4}$/.test(r.no)) &&
+      ROWS.every((r, i) => i === 0 || r.seq < ROWS[i - 1].seq)],
+    ["样例发生时间严格倒序且均落在统计窗口内",
+      ROWS.every((r, i) => (i === 0 || r.d < ROWS[i - 1].d) && r.mi >= 0 && r.mi < 12)],
+    ["样例根因索引合法且七类全部出现",
+      ROWS.every((r) => r.cs >= 0 && r.cs < CAUSES.length) &&
+      (new Set(ROWS.map((r) => r.cs))).size === CAUSES.length],
+    ["hash P1~P4 均可解析（契约逐字，含小写与「P1 事件」别名）",
+      HASH_ALIAS["P1"] === 1 && HASH_ALIAS["P2"] === 2 && HASH_ALIAS["P3"] === 3 && HASH_ALIAS["P4"] === 4 &&
+      HASH_ALIAS["p1"] === 1 && HASH_ALIAS["P1事件"] === 1 && HASH_ALIAS["P4级"] === 4],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[线上事件台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
