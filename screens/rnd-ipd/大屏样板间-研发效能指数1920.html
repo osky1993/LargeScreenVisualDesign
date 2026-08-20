@@ -1,0 +1,1194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发效能指数</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --pi-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 加权明细表列宽：维度 / 原始指标 / 得分 / 权重 / 加权得分 / 来源页 */
+    --pi-tcols: 74px 1fr 52px 58px 78px 190px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .pi-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 540px 1fr 480px;
+    grid-template-rows: 84px 470px 1fr;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .pi-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .pi-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag，由工具注入） ===== */
+  .pi-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .pi-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .pi-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .pi-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .pi-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .pi-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .pi-crumb em { font-style: normal; color: #d3e2ff; }
+  .pi-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .pi-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .pi-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .pi-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .pi-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .pi-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .pi-chips { display: flex; align-items: center; gap: 9px; }
+  .pi-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .pi-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .pi-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .pi-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .pi-chip.is-key b { color: var(--rnd-blue); }
+  .pi-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .pi-clock-time { font: 700 26px/1 var(--pi-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .pi-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 面板 ===== */
+  .pi-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .pi-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .pi-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .pi-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .pi-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .pi-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pi-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .pi-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* 面板栅格定位：上排 仪表 / 明细表 / 雷达，下排 环比 / 走势 / 行动 */
+  .pi-p-gauge { grid-column: 1; grid-row: 2; }
+  .pi-p-table { grid-column: 2; grid-row: 2; }
+  .pi-p-radar { grid-column: 3; grid-row: 2; }
+  .pi-p-delta { grid-column: 1; grid-row: 3; }
+  .pi-p-trend { grid-column: 2; grid-row: 3; }
+  .pi-p-act   { grid-column: 3; grid-row: 3; }
+
+  /* 主视觉仪表：图表 flex:1，下方档位条高度写死（内容在 init 前填充，双保险不压矮图表） */
+  .pi-bands {
+    flex: none; height: 74px; min-height: 0; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center; gap: 7px; padding: 0 2px;
+  }
+  .pi-band-row { display: flex; align-items: center; gap: 8px; }
+  .pi-band {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    height: 27px; border-radius: 8px; white-space: nowrap;
+    border: 1px solid rgba(96, 140, 255, 0.16); background: rgba(14, 26, 66, 0.42);
+    font-size: 11.5px; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums;
+  }
+  .pi-band u { width: 9px; height: 9px; border-radius: 3px; flex: none; text-decoration: none; }
+  .pi-band.is-on { border-color: rgba(92, 157, 255, 0.6); background: rgba(26, 46, 110, 0.6); color: #dfe9ff; font-weight: 700; box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.12); }
+  .pi-band-note { font-size: 11.5px; color: rgba(127, 146, 196, 0.92); text-align: center; font-variant-numeric: tabular-nums; }
+  .pi-band-note b { font-weight: 700; color: #cfdcff; }
+  .pi-band-note em { font-style: normal; color: var(--rnd-green); font-weight: 700; }
+
+  /* ===== CSS grid 模拟表格（加权明细可追溯表） ===== */
+  .pi-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .pi-thead, .pi-tbody li {
+    display: grid; grid-template-columns: var(--pi-tcols); align-items: center; gap: 6px;
+  }
+  .pi-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .pi-thead span:nth-child(3), .pi-thead span:nth-child(4), .pi-thead span:nth-child(5),
+  .pi-tbody li span:nth-child(3), .pi-tbody li span:nth-child(4), .pi-tbody li span:nth-child(5) { text-align: right; }
+  .pi-tbody { flex: 1; min-height: 0; margin: 5px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .pi-tbody li {
+    padding: 0 8px; height: 40px; margin-bottom: 4px; border-radius: 6px;
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .pi-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .pi-tbody li.is-active { background: rgba(92, 157, 255, 0.16); }
+  .pi-tbody li.is-total { background: rgba(255, 194, 77, 0.12); border: 1px solid rgba(255, 194, 77, 0.3); margin-bottom: 0; }
+  .pi-tbody li.is-total span { color: #ffe3b0; }
+  .pi-tbody li b { font-weight: 700; color: #eaf1ff; }
+  .pi-dim { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .pi-dim u { width: 4px; height: 17px; border-radius: 2px; flex: none; text-decoration: none; }
+  .pi-src { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .pi-src b { font-size: 12px; }
+  .pi-src i { font-style: normal; font-size: 10px; color: rgba(127, 146, 196, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pi-ws { font-weight: 700; color: var(--rnd-amber) !important; }
+  .pi-from { font-size: 10.5px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* 验算算式条：把六行乘积原样铺开，读者可肉眼加一遍 */
+  .pi-verify {
+    flex: none; height: 58px; min-height: 0; overflow: hidden; margin-top: 8px;
+    display: flex; flex-direction: column; justify-content: center; gap: 4px;
+    padding: 0 10px; border-radius: 8px;
+    border: 1px dashed rgba(255, 194, 77, 0.34); background: rgba(255, 194, 77, 0.06);
+    font-variant-numeric: tabular-nums;
+  }
+  .pi-verify-l { font-size: 11.5px; color: rgba(127, 146, 196, 0.95); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pi-verify-l b { font-weight: 700; color: #cfdcff; }
+  .pi-verify-l em { font-style: normal; font-weight: 700; color: var(--rnd-amber); }
+  .pi-verify-l i { font-style: normal; color: rgba(127, 146, 196, 0.6); }
+
+  /* ===== 改进行动追踪 ===== */
+  .pi-acts { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+  .pi-act {
+    flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px;
+    padding: 0 10px; border-radius: 9px;
+    border: 1px solid rgba(96, 140, 255, 0.16); background: rgba(14, 26, 66, 0.4);
+    transition: border-color .25s, background .25s;
+  }
+  .pi-act.is-active { border-color: rgba(92, 157, 255, 0.55); background: rgba(26, 46, 110, 0.52); }
+  .pi-act-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .pi-act-name { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 700; color: #dfe9ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pi-act-dim {
+    flex: none; padding: 1px 8px 2px; border-radius: 999px; font-size: 10px; font-style: normal;
+    letter-spacing: 0.06em; border: 1px solid; white-space: nowrap;
+  }
+  .pi-act-bot { display: flex; align-items: center; gap: 8px; font-size: 10.5px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; }
+  .pi-act-owner { flex: none; width: 104px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pi-bar { flex: 1; min-width: 0; height: 5px; border-radius: 3px; background: rgba(96, 140, 255, 0.16); overflow: hidden; }
+  .pi-bar i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--rnd-blue-deep), var(--rnd-blue)); }
+  .pi-act.is-done .pi-bar i { background: linear-gradient(90deg, #35946a, var(--rnd-green)); }
+  .pi-gain { flex: none; font-weight: 700; color: var(--rnd-amber); }
+  .pi-pct { flex: none; width: 34px; text-align: right; color: #c9d8f8; }
+  /* subnav:begin —— 由 tools/inject_subnav_rnd.py 注入，勿手改 */
+  .pi-subnav {
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; flex: none;
+    min-width: 176px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(96, 140, 255, 0.34); background: rgba(18, 34, 78, 0.55);
+  }
+  .pi-subnav > span { font-size: 10.5px; letter-spacing: 0.16em; color: #7f92c4; white-space: nowrap; }
+  .pi-subnav > u { display: flex; align-items: baseline; gap: 6px; text-decoration: none; white-space: nowrap; }
+  .pi-subnav b { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; color: #a3b4dc; }
+  .pi-subnav i { font-style: normal; font-size: 10.5px; color: #7f92c4; }
+  /* 有子页：转星蓝并可点击 */
+  .pi-subnav.is-on {
+    cursor: pointer; border-color: rgba(92, 157, 255, 0.55);
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.16), rgba(18, 34, 78, 0.6));
+    box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1);
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .pi-subnav.is-on b { color: #9cc2ff; }
+  .pi-subnav.is-on i { color: #6f8ec4; }
+  .pi-subnav.is-on:hover { border-color: rgba(92, 157, 255, 0.95); box-shadow: 0 0 16px -2px rgba(92, 157, 255, 0.7); }
+  /* subnav:end */
+  /* carousel:begin —— 由 tools/inject_carousel_rnd.py 注入，勿手改，改脚本后重跑 */
+  .pi-carousel {
+    display: flex; align-items: center; gap: 9px; flex: none;
+    padding-left: 18px; margin-left: 2px;
+    border-left: 1px solid rgba(96, 140, 255, 0.28);
+  }
+  .pi-cbtn {
+    width: 36px; height: 36px; flex: none; padding: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px; font-family: inherit;
+    border: 1px solid rgba(255, 194, 77, 0.36);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.18), rgba(18, 34, 78, 0.6));
+    color: #ffd489;
+    transition: border-color .18s, box-shadow .18s, color .18s, transform .18s;
+  }
+  .pi-cbtn svg { width: 18px; height: 18px; display: block; }
+  .pi-cbtn:hover {
+    color: #ffe9c2; border-color: rgba(255, 194, 77, 0.88);
+    box-shadow: 0 0 14px rgba(255, 194, 77, 0.42), inset 0 0 12px rgba(255, 194, 77, 0.14);
+  }
+  .pi-cbtn:active { transform: scale(0.93); }
+  .pi-cmeta { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 62px; }
+  .pi-cidx { font: 700 15px/1 var(--pi-mono); color: #ffd489; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+  .pi-cidx i { font-style: normal; font-size: 11px; font-weight: 400; color: #7f92c4; margin-left: 1px; }
+  .pi-cbar { width: 58px; height: 3px; border-radius: 2px; background: rgba(96, 140, 255, 0.26); overflow: hidden; }
+  .pi-cbar u {
+    display: block; height: 100%; width: 0; border-radius: 2px;
+    background: linear-gradient(90deg, #c98f22, #ffc24d);
+    box-shadow: 0 0 8px rgba(255, 194, 77, 0.55);
+  }
+  /* 暂停态：进度条停在原地并转灰蓝，播放键换成三角、按钮描边转星蓝，一眼可辨 */
+  .pi-carousel.is-paused .pi-cbar u { background: linear-gradient(90deg, #3d517a, #7f92c4); box-shadow: none; }
+  .pi-cplay .pi-ic-play { display: none; }
+  .pi-carousel.is-paused .pi-cplay .pi-ic-pause { display: none; }
+  .pi-carousel.is-paused .pi-cplay .pi-ic-play { display: block; }
+  .pi-carousel.is-paused .pi-cplay {
+    color: #9cc2ff; border-color: rgba(92, 157, 255, 0.62);
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.2), rgba(18, 34, 78, 0.6));
+    box-shadow: 0 0 12px rgba(92, 157, 255, 0.34);
+  }
+  /* carousel:end */
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .pi-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="pi-stage" id="pi-stage">
+    <!-- mockflag:begin --><div class="pi-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="pi-error" id="pi-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏 -->
+    <header class="pi-header">
+      <div class="pi-head-left">
+        <div class="pi-crumb"><b>云麓智联科技</b><i>›</i><em>组织 · 资产沉淀</em><i>›</i><em>研发效能指数</em></div>
+        <div class="pi-head-title-row">
+          <div class="pi-head-title">研发效能指数</div>
+          <div class="pi-head-meta">
+            <span><b>6</b> 分项加权 · 权重和 <b>1.00</b></span><i>|</i>
+            <span>口径回溯 <b>P2 / P4 / P6-P9 / P15</b> · 走势 <b>24</b> 个月</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="pi-head-right">
+<!-- subnav:begin -->
+<!--ORIG
+        <div class="pi-chips">
+          <div class="pi-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="pi-chip is-key"><span>HEALTH INDEX</span><b id="pi-chip-idx">--</b></div>
+        </div>
+ORIG-->
+        <div class="pi-subnav" title="本专题页没有二级详情子页"><span>二级子页 · SUB-PAGE</span><u><b>本页无</b><i>· 详见门户页导航</i></u></div><span id="pi-chip-idx" hidden></span>
+        <!-- subnav:end -->
+        <div class="pi-clock" aria-label="实时时钟">
+          <span class="pi-clock-time" id="pi-clock-time">--:--:--</span>
+          <span class="pi-clock-date" id="pi-clock-date">----年--月--日 星期-</span>
+        </div>
+<!-- carousel:begin -->
+        <nav class="pi-carousel" id="pi-carousel" aria-label="专题轮播导航">
+          <button class="pi-cbtn" id="pi-c-prev" type="button" aria-label="上一页" title="上一页（← 方向键）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/></svg>
+          </button>
+          <div class="pi-cmeta">
+            <span class="pi-cidx"><b id="pi-c-cur">--</b><i>/ 17</i></span>
+            <span class="pi-cbar" aria-hidden="true"><u id="pi-c-bar"></u></span>
+          </div>
+          <button class="pi-cbtn" id="pi-c-next" type="button" aria-label="下一页" title="下一页（→ 方向键）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 L17 12 L9 20"/></svg>
+          </button>
+          <button class="pi-cbtn pi-cplay" id="pi-c-play" type="button" aria-label="暂停轮播" aria-pressed="false" title="暂停 / 继续（空格键）">
+            <svg class="pi-ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.4"/><rect x="13.5" y="5" width="4" height="14" rx="1.4"/></svg>
+            <svg class="pi-ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2 L19 12 L8 18.8 Z"/></svg>
+          </button>
+        </nav>
+        <!-- carousel:end -->
+      </div>
+    </header>
+
+    <!-- 主视觉：加权合成大仪表 -->
+    <section class="pi-panel pi-p-gauge">
+      <div class="pi-panel-head">
+        <h2>加权合成指数</h2>
+        <span class="pi-panel-tag">Σ 六维加权 · 目标 <b>90</b> · 尚差 <b id="pi-tag-gap">--</b> 分</span>
+      </div>
+      <div class="pi-chart" id="pi-chart-gauge"></div>
+      <div class="pi-bands" id="pi-bands"></div>
+    </section>
+
+    <!-- 加权明细可追溯表 -->
+    <section class="pi-panel pi-p-table">
+      <div class="pi-panel-head">
+        <h2>加权明细可追溯表</h2>
+        <span class="pi-panel-tag">加权得分 = 得分 × 权重（逐行现算）· Σ 权重 <b id="pi-tag-w">--</b> · 合计 <b id="pi-tag-sum">--</b></span>
+      </div>
+      <div class="pi-table">
+        <div class="pi-thead">
+          <span>维度</span><span>原始指标（回溯依据）</span><span>得分</span><span>权重</span><span>加权得分</span><span>来源页</span>
+        </div>
+        <ul class="pi-tbody" id="pi-tbody"></ul>
+        <div class="pi-verify" id="pi-verify"></div>
+      </div>
+    </section>
+
+    <!-- 六分项雷达 -->
+    <section class="pi-panel pi-p-radar">
+      <div class="pi-panel-head">
+        <h2>六分项能力雷达</h2>
+        <span class="pi-panel-tag">六维均值 <b id="pi-tag-avg">--</b> · 最弱 <b id="pi-tag-worst">--</b></span>
+      </div>
+      <div class="pi-chart" id="pi-chart-radar"></div>
+    </section>
+
+    <!-- 六维环比变化 -->
+    <section class="pi-panel pi-p-delta">
+      <div class="pi-panel-head">
+        <h2>六维环比变化</h2>
+        <span class="pi-panel-tag">上季 <b id="pi-tag-prev">--</b> → 本期 <b id="pi-tag-cur">--</b> · <b id="pi-tag-diff">--</b></span>
+      </div>
+      <div class="pi-chart" id="pi-chart-delta"></div>
+    </section>
+
+    <!-- 指数 24 月走势 -->
+    <section class="pi-panel pi-p-trend">
+      <div class="pi-panel-head">
+        <h2>指数 24 月走势</h2>
+        <span class="pi-panel-tag">末值 <b id="pi-tag-last">--</b> 分（= 加权合成，现算收敛）· 良好带 <b>80–90</b> · 目标线 <b>90</b></span>
+      </div>
+      <div class="pi-chart" id="pi-chart-trend"></div>
+    </section>
+
+    <!-- 改进行动追踪 -->
+    <section class="pi-panel pi-p-act">
+      <div class="pi-panel-head">
+        <h2>改进行动追踪</h2>
+        <span class="pi-panel-tag"><b id="pi-tag-actn">--</b> 项 · 全部达成潜在 <b id="pi-tag-pot">--</b> 分 → <b id="pi-tag-after">--</b></span>
+      </div>
+      <div class="pi-acts" id="pi-acts"></div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("pi-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("pi-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const signed = (v, dec) => (v >= 0 ? "+" : "−") + fmtDec(Math.abs(v), dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技）
+         本页是研发管理专题的**收官页**：把全专题 17 张专题页的指标收敛成一个
+         可逐行验算、可回溯到来源页的合成分数。
+         口径与 docs/RndIpdThemed.md §2.2 一致：
+           研发健康指数 = 交付 86×0.20 + 质量 88×0.20 + 效率 81×0.15
+                        + 投入产出 78×0.15 + 协同 83×0.15 + 人才 87×0.15（权重和 = 1）
+         页面上任何合计、比率、涨跌一律由分项现算，不写死。 ===== */
+
+  /* 4.1 六分项评分卡（本页的一级数据源；与门户 P0 的 HEALTH_DIMS 同源同值）
+         score = 评分卡口径得分（0–100）；w = 权重；from = 得分的来源专题页；
+         key   = 该维度对外展示的**原始指标**，回溯到具体专题页的 KPI（见 4.3 METRIC）。 */
+  const DIMS = [
+    { dim: "交付",     score: 86, w: 0.20, from: "P2 IPD管道 · P5 敏捷交付",  key: "otd", color: C.series[0] },
+    { dim: "质量",     score: 88, w: 0.20, from: "P8 质量与缺陷",             key: "esc", color: C.series[1] },
+    { dim: "效率",     score: 81, w: 0.15, from: "P6 看板 · P7 工程效能",     key: "dep", color: C.series[2] },
+    { dim: "投入产出", score: 78, w: 0.15, from: "P4 投入与预算",             key: "exp", color: C.series[3] },
+    { dim: "协同",     score: 83, w: 0.15, from: "P9 集成协同 · P14 多中心",  key: "api", color: C.series[4] },
+    { dim: "人才",     score: 87, w: 0.15, from: "P15 人才与能力",            key: "ppp", color: C.series[5] }
+  ];
+
+  /* ★ 构造性断言用的权威副本：逐字转写自门户页 大屏样板间-研发经营驾驶舱1920.html
+       的 HEALTH_DIMS（dim / score / w / from 四列）。本页 DIMS 若与之有任何一字之差，
+       页尾自检会报出 —— 两页同源不是靠约定，是靠这条断言守住的。 */
+  const AUTH_P0 = [
+    ["交付",     86, 0.20, "P2 IPD管道 · P5 敏捷交付"],
+    ["质量",     88, 0.20, "P8 质量与缺陷"],
+    ["效率",     81, 0.15, "P6 看板 · P7 工程效能"],
+    ["投入产出", 78, 0.15, "P4 投入与预算"],
+    ["协同",     83, 0.15, "P9 集成协同 · P14 多中心"],
+    ["人才",     87, 0.15, "P15 人才与能力"]
+  ];
+
+  const TARGET = 90;                 /* 管理层目标线 */
+  const BAND_GOOD = 80;              /* 良好档下界；≥90 优秀，<80 待改进 */
+
+  /* 4.2 上季（2026 年 Q2）六维得分——环比涨跌由「本期 − 上季」现算，不写死 */
+  const PREV_SCORE = { "交付": 84, "质量": 86, "效率": 79, "投入产出": 79, "协同": 80, "人才": 85 };
+
+  /* 4.3 原始指标的**底数**：每个分项的对外指标都从底数现算，杜绝抄结论
+         （底数取自契约 §2.2 / §2.3，与对应专题页同源） */
+  const SRC = {
+    tr:      { ontime: 259, total: 297 },            /* P2：TR/DCP 按期通过 → 按期交付率 87.2% */
+    defect:  { closed: 8210, open: 430, field: 173 },/* P8：发现 = 关闭 + 遗留；现网 → 逃逸率 2.0% */
+    deploy:  { builds: 3692, days: 260 },            /* P7：年生产部署次数 ÷ 工作日 → 14.2 次/日 */
+    invest:  { rd: 21.4, revenue: 186.0 },           /* P4：研发投入 ÷ 营收 → 研发费率 11.5% */
+    api:     { done: 1234, total: 1350 },            /* P9：联调接口达成 → 91.4% */
+    vel:     [82, 76, 71, 68, 66, 63, 61, 58, 55, 52, 49, 45],      /* P5：12 团队速率（点/Sprint） */
+    sprints: 26,
+    site:    [1240, 680, 720, 480, 420, 320]                        /* P14：六站点研发人数 */
+  };
+
+  /* 4.4 指数 24 月走势（2024-09 → 2026-08）
+         前 23 个月为历史观测，**末值不写数字**，由本页加权合成现算写入（见 D.trend）。
+         2026 Q2（第 19/20/21 项）三月均值 == 上季指数，两条口径互为校验。 */
+  const TREND_HIST = [
+    76.8, 77.2, 77.9, 78.5, 78.1, 78.6, 79.4, 80.1, 80.6, 81.0, 80.7, 81.3,
+    81.9, 82.2, 84.6, 84.9, 85.1, 84.6, 83.8, 81.9, 82.4, 83.05, 83.6
+  ];
+  const TREND_START = { y: 2024, m: 9 };
+  /* 跃升 / 回落的归因（按月份键挂，页面只标注**现算出来**的极值月，不预设是哪一个月） */
+  const TREND_WHY = {
+    "2025-11": "全量流水线切换 + 自动化回归上线",
+    "2026-04": "R26.4 合入延期 + 跨域依赖阻塞 38 张"
+  };
+
+  /* 4.5 改进行动追踪：针对最弱维「投入产出 78」与次弱「效率 81」
+         gain = 行动闭环后该维度的目标提升分；潜在指数提升 = Σ(gain × 该维权重)，现算。 */
+  const ACTIONS = [
+    { name: "需求价值分级与砍单机制", dim: "投入产出", owner: "组合办 周珩",   gain: 2.0, pct: 62 },
+    { name: "云资源与算力配额闭环",   dim: "投入产出", owner: "云平台部 王衡", gain: 1.5, pct: 48 },
+    { name: "外协结构优化与单价复议", dim: "投入产出", owner: "外协组 陆铮",   gain: 1.0, pct: 35 },
+    { name: "CBB 复用率 63% → 70%",   dim: "投入产出", owner: "架构委 韩牧",   gain: 1.5, pct: 41 },
+    { name: "构建时长压降与缓存分层", dim: "效率",     owner: "工效组 陈拓",   gain: 1.8, pct: 76 },
+    { name: "跨域依赖前置拉通例会",   dim: "效率",     owner: "PMO 沈砚",      gain: 1.2, pct: 55 },
+    { name: "看板 WIP 限额与阻塞清理", dim: "效率",    owner: "教练组 贺兰",   gain: 1.0, pct: 44 }
+  ];
+
+  /* ===== 4.6 派生量：全部现算，页面上不出现任何硬编码的合计值 ===== */
+  const D = {};
+
+  /* 原始指标现算（底数 → 指标值） */
+  D.otd     = SRC.tr.ontime / SRC.tr.total * 100;                       /* 按期交付率 % */
+  D.defFound = SRC.defect.closed + SRC.defect.open;                     /* 年缺陷发现 */
+  D.escape  = SRC.defect.field / D.defFound * 100;                      /* 缺陷逃逸率 % */
+  D.deploy  = SRC.deploy.builds / SRC.deploy.days;                      /* 部署频率 次/日 */
+  D.expRate = SRC.invest.rd / SRC.invest.revenue * 100;                 /* 研发费率 % */
+  D.apiRate = SRC.api.done / SRC.api.total * 100;                       /* 联调接口达成 % */
+  D.throughput = sum(SRC.vel) * SRC.sprints;                            /* 年故事点吞吐 */
+  D.hc      = sum(SRC.site);                                            /* 研发人员 */
+  D.ppp     = D.throughput / D.hc;                                      /* 人均产出 点/人年 */
+
+  /* 4.3 的展示层：每个分项对应一条**可回溯的原始指标**（值现算 + 口径注明来源页） */
+  const METRIC = {
+    otd: { name: "按期交付率", val: fmtDec(D.otd, 1) + "%",
+           how: "TR/DCP 按期 " + SRC.tr.ontime + " ÷ 总数 " + SRC.tr.total + "（P2）" },
+    esc: { name: "缺陷逃逸率", val: fmtDec(D.escape, 1) + "%",
+           how: "现网 " + SRC.defect.field + " ÷ 发现 " + fmtInt(D.defFound) + "（P8）" },
+    dep: { name: "DORA 部署频率", val: fmtDec(D.deploy, 1) + " 次/日",
+           how: "年部署 " + fmtInt(SRC.deploy.builds) + " 次 ÷ " + SRC.deploy.days + " 工作日（P7）" },
+    exp: { name: "研发费率", val: fmtDec(D.expRate, 1) + "%",
+           how: "研发投入 " + fmtDec(SRC.invest.rd, 1) + " 亿 ÷ 营收 " + fmtDec(SRC.invest.revenue, 0) + " 亿（P4）" },
+    api: { name: "联调接口达成", val: fmtDec(D.apiRate, 1) + "%",
+           how: "达成 " + fmtInt(SRC.api.done) + " ÷ 应联调 " + fmtInt(SRC.api.total) + "（P9）" },
+    ppp: { name: "人均产出", val: fmtDec(D.ppp, 2) + " 点/人年",
+           how: "年吞吐 " + fmtInt(D.throughput) + " 点 ÷ " + fmtInt(D.hc) + " 人（P15）" }
+  };
+
+  /* 逐行加权：ws = score × w，**每一行独立现算**，表格里渲染的就是这个数 */
+  DIMS.forEach((d) => { d.ws = d.score * d.w; });
+  D.wsum  = sum(DIMS.map((d) => d.w));                   /* 权重合计，应 = 1 */
+  D.index = sum(DIMS.map((d) => d.ws));                  /* 合成指数 = Σ 加权得分 */
+  D.avg   = sum(DIMS.map((d) => d.score)) / DIMS.length; /* 六维算术均值（对照用） */
+  D.worst = DIMS.slice().sort((a, b) => a.score - b.score)[0];
+  D.gap   = TARGET - D.index;
+  D.bandName = D.index >= TARGET ? "优秀" : (D.index >= BAND_GOOD ? "良好" : "待改进");
+  D.bandColor = D.index >= TARGET ? C.green : (D.index >= BAND_GOOD ? C.blue : C.orange);
+
+  /* 环比：逐维 Δ = 本期 − 上季（现算）；上季指数同用一套权重 */
+  DIMS.forEach((d) => { d.prev = PREV_SCORE[d.dim]; d.delta = d.score - d.prev; });
+  D.prevIndex = sum(DIMS.map((d) => d.prev * d.w));
+  D.diff      = D.index - D.prevIndex;
+  D.diffByDim = sum(DIMS.map((d) => d.delta * d.w));     /* 应恒等于 D.diff */
+
+  /* 走势：末值不另写，直接挂本页现算的指数 */
+  D.trend = TREND_HIST.concat([D.index]);
+  D.months = D.trend.map((_, i) => {
+    const t = (TREND_START.y * 12 + (TREND_START.m - 1)) + i;
+    return Math.floor(t / 12) + "-" + pad(t % 12 + 1);
+  });
+  /* 最近一次跃升 / 回落 = 月度环比的最大 / 最小值（argmax / argmin 现算，不预设月份） */
+  D.mom = D.trend.map((v, i) => (i === 0 ? 0 : v - D.trend[i - 1]));
+  let upI = 1, dnI = 1;
+  for (let i = 2; i < D.mom.length; i++) {
+    if (D.mom[i] > D.mom[upI]) upI = i;
+    if (D.mom[i] < D.mom[dnI]) dnI = i;
+  }
+  D.upIdx = upI; D.dnIdx = dnI;
+  D.upWhy = TREND_WHY[D.months[upI]] || "";
+  D.dnWhy = TREND_WHY[D.months[dnI]] || "";
+  /* 2026 Q2 = 走势里的 4/5/6 月三点，其均值应与上季指数收敛（两条口径互为校验） */
+  D.q2Idx = D.months.map((m, i) => (["2026-04", "2026-05", "2026-06"].indexOf(m) >= 0 ? i : -1)).filter((i) => i >= 0);
+  D.q2Avg = sum(D.q2Idx.map((i) => D.trend[i])) / D.q2Idx.length;
+
+  /* 改进行动：潜在提升 = Σ(目标提升 × 所属维权重) */
+  const W_OF = {};
+  DIMS.forEach((d) => { W_OF[d.dim] = d.w; });
+  ACTIONS.forEach((a) => { a.lift = a.gain * W_OF[a.dim]; });
+  D.potential = sum(ACTIONS.map((a) => a.lift));
+  D.after = D.index + D.potential;
+  D.gainByDim = {};
+  DIMS.forEach((d) => {
+    D.gainByDim[d.dim] = sum(ACTIONS.filter((a) => a.dim === d.dim).map((a) => a.gain));
+  });
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS_CN = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("pi-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("pi-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS_CN[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 6. 先把所有 HTML 填满，再 init 图表 =====
+     ★ 与图表同属 flex 容器的兄弟块（档位条 / 验算条 / 行动列表）必须在 echarts.init
+       之前填充完，否则图表容器读到的是偏大的旧高度，画面会被静默裁掉。 */
+
+  /* 6.1 顶栏 chip 与各面板 tag */
+  $("pi-chip-idx").textContent = fmtDec(D.index, 1) + " 分";
+  $("pi-tag-gap").textContent  = fmtDec(D.gap, 2);
+  $("pi-tag-w").textContent    = fmtDec(D.wsum * 100, 0) + "%";
+  $("pi-tag-sum").textContent  = fmtDec(D.index, 2) + " 分";
+  $("pi-tag-avg").textContent  = fmtDec(D.avg, 1);
+  $("pi-tag-worst").textContent = D.worst.dim + " " + fmtDec(D.worst.score, 0);
+  $("pi-tag-prev").textContent = fmtDec(D.prevIndex, 2);
+  $("pi-tag-cur").textContent  = fmtDec(D.index, 2);
+  $("pi-tag-diff").textContent = signed(D.diff, 2) + " 分";
+  $("pi-tag-last").textContent = fmtDec(D.index, 1);
+  $("pi-tag-actn").textContent = String(ACTIONS.length);
+  $("pi-tag-pot").textContent  = signed(D.potential, 2);
+  $("pi-tag-after").textContent = fmtDec(D.after, 2) + " 分";
+
+  /* 6.2 仪表下方档位条（当前所处档位高亮） */
+  const BANDS = [
+    { name: "优秀", rule: "≥ 90", color: C.green,  on: D.index >= TARGET },
+    { name: "良好", rule: "80 – 90", color: C.blue, on: D.index >= BAND_GOOD && D.index < TARGET },
+    { name: "待改进", rule: "&lt; 80", color: C.orange, on: D.index < BAND_GOOD }
+  ];
+  $("pi-bands").innerHTML =
+    '<div class="pi-band-row">' + BANDS.map((b) => (
+      '<span class="pi-band' + (b.on ? " is-on" : "") + '"><u style="background:' + b.color + '"></u>' +
+      b.name + " " + b.rule + "</span>"
+    )).join("") + "</div>" +
+    '<div class="pi-band-note">上季 <b>' + fmtDec(D.prevIndex, 2) + "</b> · 本期 <b>" + fmtDec(D.index, 2) +
+      "</b> · 环比 <em>" + signed(D.diff, 2) + "</em> · 距目标 " + TARGET + " 差 <b>" + fmtDec(D.gap, 2) + "</b> 分</div>";
+
+  /* 6.3 加权明细可追溯表：六行 + 合计行
+     ★ 逐行可验算的三件事：
+       ① 加权得分一律由 d.score * d.w 现算后 toFixed(2) 渲染，页面里没有任何写死的乘积；
+       ② 权重同时给出小数与百分数两种写法，读者拿计算器就能复核；
+       ③ 合计行 = Σ 逐行加权得分（同一个 D.index），并在下方验算条把整条算式铺开。 */
+  const tbody = $("pi-tbody");
+  tbody.innerHTML = DIMS.map((d, i) => {
+    const m = METRIC[d.key];
+    return '<li data-i="' + i + '" title="' + d.dim + "：" + m.name + " " + m.val + "　口径 " + m.how +
+        "　加权得分 = " + d.score + " × " + fmtDec(d.w, 2) + " = " + fmtDec(d.ws, 2) + '">' +
+      '<span class="pi-dim"><u style="background:' + d.color + '"></u><b>' + d.dim + "</b></span>" +
+      '<span class="pi-src"><b>' + m.name + " " + m.val + "</b><i>" + m.how + "</i></span>" +
+      "<span><b>" + fmtDec(d.score, 0) + "</b></span>" +
+      "<span>" + fmtDec(d.w, 2) + "</span>" +
+      '<span class="pi-ws">' + fmtDec(d.ws, 2) + "</span>" +
+      '<span class="pi-from">' + d.from + "</span>" +
+    "</li>";
+  }).join("") + (
+    '<li class="is-total" title="合计 = Σ 逐行加权得分 = ' + fmtDec(D.index, 2) + ' 分">' +
+      '<span class="pi-dim"><b>合计</b></span>' +
+      '<span class="pi-src"><b>研发效能指数（加权合成）</b><i>六分项收敛，展示口径保留一位小数</i></span>' +
+      "<span><b>" + fmtDec(D.avg, 1) + "</b></span>" +
+      "<span><b>" + fmtDec(D.wsum, 2) + "</b></span>" +
+      '<span class="pi-ws">' + fmtDec(D.index, 2) + "</span>" +
+      '<span class="pi-from">= 门户 P0 健康指数</span>' +
+    "</li>"
+  );
+  const tbodyRows = Array.from(tbody.children).slice(0, DIMS.length);
+
+  /* 6.4 验算算式条：把六行乘积原样铺开，读者可肉眼加一遍 */
+  $("pi-verify").innerHTML =
+    '<div class="pi-verify-l"><i>验算 ①</i>　' +
+      DIMS.map((d) => "<b>" + fmtDec(d.score, 0) + "</b>×" + fmtDec(d.w, 2)).join(" + ") + "</div>" +
+    '<div class="pi-verify-l"><i>验算 ②</i>　= ' +
+      DIMS.map((d) => fmtDec(d.ws, 2)).join(" + ") + " = <em>" + fmtDec(D.index, 2) +
+      "</em> 分　→ 展示口径 <em>" + fmtDec(D.index, 1) + "</em> 分（六维均值 " + fmtDec(D.avg, 1) + "，因权重不等而不同）</div>";
+
+  /* 6.5 改进行动追踪 */
+  $("pi-acts").innerHTML = ACTIONS.map((a, i) => {
+    const dim = DIMS.filter((d) => d.dim === a.dim)[0];
+    return '<div class="pi-act' + (a.pct >= 70 ? " is-done" : "") + '" data-i="' + i + '" title="' +
+        a.name + "：目标提升 " + a.dim + " " + signed(a.gain, 1) + " 分，折合指数 " + signed(a.lift, 3) +
+        " 分（权重 " + fmtDec(dim.w, 2) + '）">' +
+      '<div class="pi-act-top"><span class="pi-act-name">' + a.name + "</span>" +
+        '<i class="pi-act-dim" style="color:' + dim.color + ";border-color:" + dim.color + '55">' + a.dim + "</i></div>" +
+      '<div class="pi-act-bot"><span class="pi-act-owner">' + a.owner + "</span>" +
+        '<span class="pi-bar"><i style="width:' + a.pct + '%"></i></span>' +
+        '<span class="pi-gain">' + signed(a.gain, 1) + "</span>" +
+        '<span class="pi-pct">' + a.pct + "%</span></div>" +
+    "</div>";
+  }).join("");
+  const actRows = Array.from($("pi-acts").children);
+
+  /* ===== 7. 图表 ===== */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = {
+    backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  };
+
+  /* 7.1 主视觉：加权合成大仪表（60–100 三档色带 + 目标线 90 指针）
+     ★ option 里只放标量与数组，DIMS 里的对象一律不进 series（避免深拷贝遇循环引用整页全空） */
+  const G_MIN = 60, G_MAX = 100;
+  const gPos = (v) => (v - G_MIN) / (G_MAX - G_MIN);
+  const gauge = makeChart("pi-chart-gauge");
+  gauge.setOption({
+    backgroundColor: "transparent",
+    series: [
+      {
+        type: "gauge", min: G_MIN, max: G_MAX, startAngle: 208, endAngle: -28,
+        center: ["50%", "58%"], radius: "82%", splitNumber: 4,
+        axisLine: {
+          lineStyle: {
+            width: 24,
+            color: [
+              [gPos(BAND_GOOD), C.orange],
+              [gPos(TARGET), C.blue],
+              [1, C.green]
+            ]
+          }
+        },
+        progress: { show: false },
+        axisTick: { distance: -24, length: 5, lineStyle: { color: "rgba(8,18,49,.7)", width: 1.4 } },
+        splitLine: { distance: -24, length: 24, lineStyle: { color: "rgba(8,18,49,.85)", width: 2.4 } },
+        axisLabel: { distance: -50, color: C.textDim, fontSize: 11.5 },
+        pointer: {
+          icon: "path://M2.9,0.7L2.9,0.7c1.4,0,2.6,1.2,2.6,2.6v115c0,1.4-1.2,2.6-2.6,2.6l0,0c-1.4,0-2.6-1.2-2.6-2.6V3.3C0.3,1.9,1.4,0.7,2.9,0.7z",
+          width: 8, length: "62%", offsetCenter: [0, "6%"],
+          itemStyle: { color: C.amber, shadowColor: "rgba(255,194,77,.6)", shadowBlur: 12 }
+        },
+        anchor: { show: true, size: 16, showAbove: true, itemStyle: { color: C.amber, borderColor: "rgba(8,18,49,.9)", borderWidth: 3 } },
+        title: {
+          offsetCenter: [0, "80%"], color: C.textDim, fontSize: 12.5, fontWeight: 400
+        },
+        detail: {
+          valueAnimation: true, offsetCenter: [0, "44%"],
+          formatter: (v) => "{a|" + fmtDec(v, 1) + "}{b| 分}",
+          rich: {
+            a: { fontSize: 54, fontWeight: 700, color: "#eaf1ff", fontFamily: "Bahnschrift, DIN Alternate, sans-serif" },
+            b: { fontSize: 14, color: C.textDim, padding: [0, 0, 8, 4] }
+          }
+        },
+        data: [{ value: D.index, name: "本期综合 · " + D.bandName + "档" }]
+      },
+      {
+        /* 目标线 90：同轴第二支指针，只画针不画轴 */
+        type: "gauge", min: G_MIN, max: G_MAX, startAngle: 208, endAngle: -28,
+        center: ["50%", "58%"], radius: "82%", z: 6,
+        axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+        axisLabel: { show: false }, detail: { show: false }, title: { show: false }, anchor: { show: false },
+        pointer: {
+          icon: "rect", width: 4, length: "26%", offsetCenter: [0, "-62%"],
+          itemStyle: { color: C.orange, shadowColor: "rgba(255,157,92,.7)", shadowBlur: 10 }
+        },
+        data: [{ value: TARGET }],
+        silent: true
+      }
+    ]
+  });
+
+  /* 7.2 六分项能力雷达：本期得分 vs 目标线 90（与门户 P0 同源同值） */
+  const radar = makeChart("pi-chart-radar");
+  radar.setOption({
+    backgroundColor: "transparent",
+    tooltip: Object.assign({
+      trigger: "item",
+      formatter: (p) => {
+        if (!p.data || !p.data.value) return "";
+        return "<b>" + p.data.name + "</b><br/>" + DIMS.map((d, i) => (
+          d.dim + " <b style=\"color:" + d.color + "\">" + fmtDec(p.data.value[i], 0) + "</b>" +
+          "　<span style=\"color:" + C.textDim + "\">权重 " + fmtDec(d.w * 100, 0) + "% · 加权 " + fmtDec(d.ws, 2) + "</span>"
+        )).join("<br/>");
+      }
+    }, TIP),
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["本期得分", "目标线 90"]
+    },
+    radar: {
+      center: ["50%", "56%"], radius: "64%", splitNumber: 4, shape: "polygon",
+      indicator: DIMS.map((d) => ({ name: d.dim + " " + fmtDec(d.score, 0), max: 100, min: 50 })),
+      axisName: { color: "#bcd2f8", fontSize: 12, fontWeight: 700 },
+      axisLine: { lineStyle: { color: "rgba(96,140,255,.24)" } },
+      splitLine: { lineStyle: { color: "rgba(96,140,255,.18)" } },
+      splitArea: { areaStyle: { color: ["rgba(92,157,255,.04)", "transparent"] } }
+    },
+    series: [{
+      type: "radar", symbolSize: 5,
+      data: [
+        { name: "目标线 90", value: DIMS.map(() => TARGET),
+          lineStyle: { color: C.orange, width: 1.6, type: "dashed" },
+          itemStyle: { color: C.orange }, areaStyle: { color: "rgba(255,157,92,.05)" } },
+        { name: "本期得分", value: DIMS.map((d) => d.score),
+          lineStyle: { color: C.blue, width: 2.4 }, itemStyle: { color: C.blue },
+          areaStyle: { color: new echarts.graphic.RadialGradient(0.5, 0.5, 0.9, [
+            { offset: 0, color: "rgba(92,157,255,.06)" }, { offset: 1, color: "rgba(92,157,255,.34)" }]) } }
+      ]
+    }]
+  });
+
+  /* 7.3 六维环比变化：Δ = 本期 − 上季（现算），涨绿跌红，label 直接写 上季→本期 */
+  const delta = makeChart("pi-chart-delta");
+  const dimNames = DIMS.map((d) => d.dim);
+  delta.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 8, right: 96, top: 26, bottom: 4, containLabel: true },
+    tooltip: Object.assign({
+      trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: (ps) => {
+        const i = DIMS.length - 1 - ps[0].dataIndex;          /* yAxis 逆序，换回 DIMS 下标 */
+        const d = DIMS[i];
+        return "<b>" + d.dim + "</b>　上季 <b>" + fmtDec(d.prev, 0) + "</b> → 本期 <b style=\"color:" + d.color + "\">" +
+          fmtDec(d.score, 0) + "</b>　环比 <b style=\"color:" + (d.delta >= 0 ? C.green : C.red) + "\">" +
+          signed(d.delta, 0) + "</b><br/><span style=\"color:" + C.textDim + "\">权重 " + fmtDec(d.w * 100, 0) +
+          "% · 对指数贡献 " + signed(d.delta * d.w, 2) + " 分</span>";
+      }
+    }, TIP),
+    xAxis: {
+      type: "value", name: "环比 Δ（分）", nameGap: 10, nameTextStyle: { color: C.textDim, fontSize: 10 },
+      min: -2.5, max: 4.5, interval: 1,
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    yAxis: {
+      type: "category", data: dimNames.slice().reverse(), inverse: false,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: { color: "#c3d4f4", fontSize: 12.5, fontWeight: 700 }
+    },
+    series: [{
+      type: "bar", barWidth: "46%",
+      data: DIMS.slice().reverse().map((d) => ({
+        value: d.delta,
+        itemStyle: {
+          color: d.delta >= 0
+            ? new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: "rgba(111,224,154,.3)" }, { offset: 1, color: C.green }])
+            : new echarts.graphic.LinearGradient(1, 0, 0, 0, [{ offset: 0, color: "rgba(255,95,107,.3)" }, { offset: 1, color: C.red }]),
+          borderRadius: 4
+        },
+        label: {
+          show: true, position: d.delta >= 0 ? "right" : "left",
+          color: d.delta >= 0 ? C.green : C.red, fontSize: 11.5, fontWeight: 700,
+          formatter: signed(d.delta, 0) + "　" + fmtDec(d.prev, 0) + " → " + fmtDec(d.score, 0)
+        }
+      })),
+      markLine: {
+        symbol: "none", silent: true,
+        data: [{ xAxis: 0 }],
+        lineStyle: { color: "rgba(96,140,255,.5)", width: 1.4, type: "solid" },
+        label: { show: false }
+      }
+    }]
+  });
+
+  /* 7.4 指数 24 月走势：良好带 markArea + 目标线 markLine + 跃升/回落归因 markPoint
+         末值直接用 D.index（本页现算），与仪表 / 明细表合计三处收敛到同一个数。 */
+  const trend = makeChart("pi-chart-trend");
+  const lastI = D.trend.length - 1;
+  trend.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 8, right: 22, top: 46, bottom: 4, containLabel: true },
+    tooltip: Object.assign({
+      trigger: "axis", axisPointer: { type: "line", lineStyle: { color: "rgba(96,140,255,.45)" } },
+      formatter: (ps) => {
+        const i = ps[0].dataIndex;
+        const why = TREND_WHY[D.months[i]];
+        return "<b>" + D.months[i] + "</b>　指数 <b style=\"color:" + C.blue + "\">" + fmtDec(D.trend[i], 2) +
+          "</b>　环比 <b style=\"color:" + (D.mom[i] >= 0 ? C.green : C.red) + "\">" +
+          (i === 0 ? "—" : signed(D.mom[i], 2)) + "</b>" +
+          (i === lastI ? "<br/><span style=\"color:" + C.amber + "\">本期加权合成值（= 明细表合计）</span>" : "") +
+          (why ? "<br/><span style=\"color:" + C.textDim + "\">" + why + "</span>" : "");
+      }
+    }, TIP),
+    legend: {
+      show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+      textStyle: { color: C.textDim, fontSize: 11 }, data: ["效能指数"]
+    },
+    xAxis: {
+      type: "category", data: D.months, boundaryGap: false,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 2, rotate: 0, fontSize: 10.5 })
+    },
+    yAxis: {
+      type: "value", name: "分", nameTextStyle: { color: C.textDim, fontSize: 10 },
+      min: 74, max: 92, interval: 4,
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    series: [{
+      name: "效能指数", type: "line", smooth: 0.25, symbol: "circle", symbolSize: 5, z: 5,
+      data: D.trend,
+      lineStyle: { width: 2.6, color: C.blue, shadowColor: "rgba(92,157,255,.45)", shadowBlur: 10 },
+      itemStyle: { color: C.blue },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: "rgba(92,157,255,.30)" }, { offset: 1, color: "rgba(92,157,255,.02)" }]) },
+      markArea: {
+        silent: true,
+        itemStyle: { color: "rgba(92,157,255,.07)" },
+        label: { show: true, position: "insideTopLeft", color: "rgba(127,146,196,.75)", fontSize: 10.5, formatter: "良好带 80 – 90" },
+        data: [[{ yAxis: BAND_GOOD }, { yAxis: TARGET }]]
+      },
+      markLine: {
+        symbol: "none", silent: true,
+        data: [
+          { yAxis: TARGET, lineStyle: { color: C.orange, width: 1.5, type: "dashed" },
+            label: { show: true, position: "end", color: C.orange, fontSize: 10.5, formatter: "目标 90" } },
+          { yAxis: BAND_GOOD, lineStyle: { color: "rgba(255,157,92,.35)", width: 1, type: "dotted" },
+            label: { show: true, position: "end", color: "rgba(255,157,92,.7)", fontSize: 10.5, formatter: "80" } }
+        ]
+      },
+      markPoint: {
+        symbol: "circle", symbolSize: 11, z: 9,
+        itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 2 },
+        data: [
+          {
+            name: "跃升", coord: [D.upIdx, D.trend[D.upIdx]], value: "",
+            itemStyle: { color: C.green },
+            label: {
+              show: true, position: "top", distance: 10, align: "center",
+              formatter: "▲ " + D.months[D.upIdx] + "　" + signed(D.mom[D.upIdx], 1) + "\n" + D.upWhy,
+              color: "#dff7e8", fontSize: 10.5, lineHeight: 15,
+              backgroundColor: "rgba(20,64,44,.86)", borderColor: "rgba(111,224,154,.55)", borderWidth: 1,
+              borderRadius: 6, padding: [4, 8, 5, 8]
+            }
+          },
+          {
+            name: "回落", coord: [D.dnIdx, D.trend[D.dnIdx]], value: "",
+            itemStyle: { color: C.red },
+            label: {
+              show: true, position: "bottom", distance: 10, align: "center",
+              formatter: "▼ " + D.months[D.dnIdx] + "　" + signed(D.mom[D.dnIdx], 1) + "\n" + D.dnWhy,
+              color: "#ffdfe2", fontSize: 10.5, lineHeight: 15,
+              backgroundColor: "rgba(74,20,28,.86)", borderColor: "rgba(255,95,107,.5)", borderWidth: 1,
+              borderRadius: 6, padding: [4, 8, 5, 8]
+            }
+          },
+          {
+            name: "本期", coord: [lastI, D.trend[lastI]], value: "",
+            itemStyle: { color: C.amber },
+            label: {
+              show: true, position: "top", distance: 8, align: "right",
+              formatter: fmtDec(D.index, 1) + " 分",
+              color: "#ffe3b0", fontSize: 11.5, fontWeight: 700
+            }
+          }
+        ]
+      }
+    }]
+  });
+
+  /* ===== 8. 活性：明细表行 ↔ 雷达高亮联动；行动列表逐条扫描 ===== */
+  let rowIdx = 0;
+  function playRow() {
+    tbodyRows.forEach((r, i) => r.classList.toggle("is-active", i === rowIdx));
+    radar.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    radar.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: 1 });
+    delta.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    delta.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: DIMS.length - 1 - rowIdx });
+    rowIdx = (rowIdx + 1) % DIMS.length;
+  }
+  playRow();
+  setInterval(playRow, 2600);
+
+  let actIdx = 0;
+  function playAct() {
+    actRows.forEach((r, i) => r.classList.toggle("is-active", i === actIdx));
+    actIdx = (actIdx + 1) % actRows.length;
+  }
+  playAct();
+  setInterval(playAct, 2000);
+
+  let tipIdx = 0;
+  setInterval(() => {
+    const pick = [D.upIdx, D.dnIdx, lastI][tipIdx % 3];
+    trend.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: pick });
+    tipIdx += 1;
+  }, 4200);
+
+  /* ===== 9. 开发期勾稽自检：不通过时在控制台报出（不影响页面渲染） =====
+     ★ 明细表那两条是把**渲染好的 DOM 文本读回来**再比对，
+       所以「逐行可验算」不是口号：屏幕上印的数字本身参与了校验。 */
+  const cellNum = (li, nth) => parseFloat(li.children[nth].textContent.replace(/[^\d.\-]/g, ""));
+  const rowWsOk = tbodyRows.every((li, i) => Math.abs(cellNum(li, 4) - Number(fmtDec(DIMS[i].score * DIMS[i].w, 2))) < 1e-9);
+  const rowScoreOk = tbodyRows.every((li, i) => cellNum(li, 2) === AUTH_P0[i][1] && Math.abs(cellNum(li, 3) - AUTH_P0[i][2]) < 1e-9);
+  const totalLi = tbody.children[DIMS.length];
+  const totalOk = Math.abs(cellNum(totalLi, 4) - Number(fmtDec(D.index, 2))) < 1e-9;
+  /* 独立重算式：与 D.index 的求和路径完全无关，容差 1e-9 */
+  const INDEX_REDO = 86 * 0.20 + 88 * 0.20 + 81 * 0.15 + 78 * 0.15 + 83 * 0.15 + 87 * 0.15;
+
+  const checks = [
+    ["六维权重合计 = 1", Math.abs(D.wsum - 1) < 1e-9],
+    ["加权指数 = Σ(得分 × 权重)（独立重算式，容差 1e-9）", Math.abs(D.index - INDEX_REDO) < 1e-9],
+    ["加权指数展示口径（一位小数）= 契约 84.1 分", fmtDec(D.index, 1) === "84.1"],
+    ["六维 得分/权重/来源页 与门户 P0 的 HEALTH_DIMS 逐字一致",
+      DIMS.length === AUTH_P0.length && DIMS.every((d, i) =>
+        d.dim === AUTH_P0[i][0] && d.score === AUTH_P0[i][1] &&
+        Math.abs(d.w - AUTH_P0[i][2]) < 1e-12 && d.from === AUTH_P0[i][3])],
+    ["明细表逐行加权得分（读回渲染文本）= 得分 × 权重", rowWsOk],
+    ["明细表逐行 得分/权重（读回渲染文本）= 门户权威值", rowScoreOk],
+    ["明细表合计行（读回渲染文本）= 加权指数", totalOk],
+    ["走势共 24 个月，末月 = 2026-08", D.trend.length === 24 && D.months[lastI] === "2026-08"],
+    ["走势末值 = 加权指数（现算收敛，非写死）", Math.abs(D.trend[lastI] - D.index) < 1e-12],
+    ["上季指数 = 六维上季得分加权（同一套权重）", Math.abs(D.prevIndex - 82.45) < 1e-9],
+    ["上季指数 = 走势 2026 Q2 三月均值（两条口径互校）", D.q2Idx.length === 3 && Math.abs(D.q2Avg - D.prevIndex) < 1e-9],
+    ["六维环比 Δ = 本期得分 − 上季得分（逐维现算）",
+      DIMS.every((d) => d.delta === d.score - PREV_SCORE[d.dim])],
+    ["Σ(环比Δ × 权重) = 本期指数 − 上季指数", Math.abs(D.diffByDim - D.diff) < 1e-9],
+    ["跃升月 = 月度环比最大值（argmax 现算）且已给出归因",
+      D.mom[D.upIdx] === Math.max.apply(null, D.mom.slice(1)) && D.upWhy.length > 0],
+    ["回落月 = 月度环比最小值（argmin 现算）且已给出归因",
+      D.mom[D.dnIdx] === Math.min.apply(null, D.mom.slice(1)) && D.dnWhy.length > 0],
+    ["档位判定：本期指数落在「良好 80–90」档", D.bandName === "良好" && D.index >= BAND_GOOD && D.index < TARGET],
+    ["距目标 = 90 − 指数（现算）", Math.abs(D.gap - (TARGET - D.index)) < 1e-12],
+    ["改进行动潜在提升 = Σ(目标提升 × 所属维权重)（独立重算：两维提升和 × 0.15）",
+      Math.abs(D.potential - (D.gainByDim["投入产出"] + D.gainByDim["效率"]) * 0.15) < 1e-12 && ACTIONS.length === 7],
+    ["改进行动只针对最弱两维（投入产出 78 / 效率 81）",
+      ACTIONS.every((a) => a.dim === "投入产出" || a.dim === "效率") &&
+      Math.abs(D.gainByDim["投入产出"] - 6.0) < 1e-9 && Math.abs(D.gainByDim["效率"] - 4.0) < 1e-9],
+    ["原始指标现算：按期交付率 ≈ 87.2%（P2）", Math.abs(D.otd - 87.2) < 0.05],
+    ["原始指标现算：缺陷逃逸率 ≈ 2.0%（P8，发现 8,640 = 关闭 + 遗留）",
+      D.defFound === 8640 && Math.abs(D.escape - 2.0) < 0.05],
+    ["原始指标现算：DORA 部署频率 ≈ 14.2 次/日（P7）", Math.abs(D.deploy - 14.2) < 0.05],
+    ["原始指标现算：研发费率 ≈ 11.5%（P4，投入 21.4 亿）", Math.abs(D.expRate - 11.5) < 0.05],
+    ["原始指标现算：联调接口达成 ≈ 91.4%（P9）", Math.abs(D.apiRate - 91.4) < 0.05],
+    ["原始指标现算：人均产出 ≈ 5.02 点/人年（P15）", Math.abs(D.ppp - 5.02) < 0.005],
+    ["年故事点吞吐 19,396 = Σ 12 团队速率 × 26（契约 §2.3）", D.throughput === 19396],
+    ["研发人员 3,860 = 六站点之和（契约 §2.2）", D.hc === 3860]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[研发效能指数] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+<!-- carousel-js:begin -->
+<script>
+/* ===== 研发管理专题轮播导航（tools/inject_carousel_rnd.py 注入） =====
+   独立于主脚本运行：即使 echarts 加载失败，翻页仍然可用。 */
+(() => {
+  "use strict";
+
+  /* —— 可配置项 —— */
+  const SECONDS = 25;              /* ← 每页停留秒数，改这里再重跑 tools/inject_carousel_rnd.py */
+
+  /* 轮播页序 = IPD 顶层治理 → 敏捷执行 → 四域集成协同 → 组织与资产 的业务脉络 */
+  const PAGES = [
+    {
+        "f": "大屏样板间-研发产品组合与路标1920.html",
+        "t": "四线版本火车与组合四象限"
+    },
+    {
+        "f": "大屏样板间-研发IPD管道与评审1920.html",
+        "t": "六阶段管道、DCP/TR 评审与停留时长"
+    },
+    {
+        "f": "大屏样板间-研发需求全生命周期1920.html",
+        "t": "OR→IR→SR→AR 分层漏斗与来源桑基"
+    },
+    {
+        "f": "大屏样板间-研发投入与预算1920.html",
+        "t": "投入主题河流与预算达成"
+    },
+    {
+        "f": "大屏样板间-研发敏捷交付总览1920.html",
+        "t": "12 团队速率与冲刺燃尽"
+    },
+    {
+        "f": "大屏样板间-研发看板流动效率1920.html",
+        "t": "累积流图、周期时间与 WIP 违限"
+    },
+    {
+        "f": "大屏样板间-研发工程效能1920.html",
+        "t": "DORA 四指标与 XP 实践雷达"
+    },
+    {
+        "f": "大屏样板间-研发质量与缺陷1920.html",
+        "t": "缺陷收敛、拦截漏斗与逃逸率"
+    },
+    {
+        "f": "大屏样板间-研发软硬云AI集成协同1920.html",
+        "t": "集成基线列车与跨域依赖"
+    },
+    {
+        "f": "大屏样板间-研发硬件与样机1920.html",
+        "t": "EVT→PVT 试制直通与可靠性"
+    },
+    {
+        "f": "大屏样板间-研发AI模型迭代1920.html",
+        "t": "模型版本树与评测走廊"
+    },
+    {
+        "f": "大屏样板间-研发云端服务与发布1920.html",
+        "t": "发布列车、SLO 与错误预算"
+    },
+    {
+        "f": "大屏样板间-研发交付流水线数字孪生1920.html",
+        "t": "需求到运营的等距全链路流转"
+    },
+    {
+        "f": "大屏样板间-研发多中心布局1920.html",
+        "t": "六站点地图与协作网络"
+    },
+    {
+        "f": "大屏样板间-研发人才与能力1920.html",
+        "t": "职级金字塔与技能资产"
+    },
+    {
+        "f": "大屏样板间-研发技术资产与复用1920.html",
+        "t": "CBB 货架、专利与开源合规"
+    },
+    {
+        "f": "大屏样板间-研发效能指数1920.html",
+        "t": "六维加权合成与研发体检"
+    }
+];
+
+  const P = "pi";
+  const $ = (id) => document.getElementById(id);
+  const nav = $(P + "-carousel");
+  if (!nav) return;
+
+  /* 当前页在序列中的位置：按文件名匹配，允许带 ?query */
+  const here = decodeURIComponent((location.pathname.split("/").pop() || "")).trim();
+  let idx = PAGES.findIndex((x) => x.f === here);
+  if (idx < 0) idx = 16;      /* 直接从本地打开且路径取不到文件名时的兜底位次 */
+
+  $(P + "-c-cur").textContent = String(idx + 1).padStart(2, "0");
+  nav.title = (idx + 1) + " / " + PAGES.length + "　" + PAGES[idx].t;
+
+  function go(step) {
+    const n = (idx + step + PAGES.length) % PAGES.length;
+    location.href = PAGES[n].f;
+  }
+
+  /* —— 倒计时：累计已用时长，暂停时冻结在原地（不清零），继续时接着走 —— */
+  const bar = $(P + "-c-bar");
+  const playBtn = $(P + "-c-play");
+  let elapsed = 0;               /* 本页已停留毫秒 */
+  let last = Date.now();
+  let userPaused = false;        /* 用户点了暂停 */
+  /* ★ 初值必须实读 document.hidden：页面若在后台标签页加载，不会收到 visibilitychange，
+     写死 false 会让计时器在后台照走、页面无人看时自己翻页（厨电版同款潜在问题） */
+  let hidden = document.hidden;
+
+  function render() {
+    const pct = Math.min(100, elapsed / (SECONDS * 1000) * 100);
+    bar.style.width = pct.toFixed(2) + "%";
+  }
+  function tick() {
+    const now = Date.now();
+    if (!userPaused && !hidden) {
+      elapsed += now - last;
+      render();
+      if (elapsed >= SECONDS * 1000) go(1);
+    }
+    last = now;
+  }
+  const timer = setInterval(tick, 100);
+
+  function setPaused(v) {
+    userPaused = v;
+    nav.classList.toggle("is-paused", v);
+    playBtn.setAttribute("aria-pressed", v ? "true" : "false");
+    playBtn.setAttribute("aria-label", v ? "继续轮播" : "暂停轮播");
+    last = Date.now();           /* 避免把暂停这段时间补算进 elapsed */
+  }
+
+  playBtn.addEventListener("click", () => setPaused(!userPaused));
+  $(P + "-c-prev").addEventListener("click", () => go(-1));
+  $(P + "-c-next").addEventListener("click", () => go(1));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") go(-1);
+    else if (e.key === "ArrowRight") go(1);
+    else if (e.key === " " || e.code === "Space") { e.preventDefault(); setPaused(!userPaused); }
+  });
+
+  /* 切到后台时冻结计时，回到前台接着走（不重置，也不会补跳好几页） */
+  document.addEventListener("visibilitychange", () => {
+    hidden = document.hidden;
+    last = Date.now();
+  });
+  window.addEventListener("pagehide", () => clearInterval(timer));
+})();
+</script>
+<!-- carousel-js:end -->
+</body>
+</html>

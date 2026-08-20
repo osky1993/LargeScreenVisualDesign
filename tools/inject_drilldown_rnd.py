@@ -106,6 +106,13 @@ PAGES = [
             {"rows": "#ai-tbody li", "names": MODELS5, "sub": SUB_ML},
         ],
     },
+    # ---- 四期 · 组织与资产（W5）----
+    {
+        "file": "大屏样板间-研发多中心布局1920.html",
+        "targets": [
+            {"rows": "#gq-tbody li", "names": SITES6, "sub": SUB_BY},
+        ],
+    },
 ]
 
 CSS_BEGIN = "  /* drill:begin —— 由 tools/inject_drilldown_rnd.py 注入，勿手改 */"

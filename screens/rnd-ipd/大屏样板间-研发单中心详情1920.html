@@ -1,0 +1,1121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单中心详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --by-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .by-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 104px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .by-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .by-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .by-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 8px 8px;
+  }
+  .by-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .by-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .by-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .by-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .by-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .by-crumb em { font-style: normal; color: #d3e2ff; }
+  .by-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .by-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .by-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .by-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .by-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .by-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .by-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .by-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 站点切换器：六站点 tab（← → 方向键 / 16s 自动轮换 / hash 直达） */
+  .by-switcher { display: grid; grid-template-columns: repeat(3, auto); gap: 5px 6px; }
+  .by-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 86px; padding: 3px 10px 4px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .by-sw-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; }
+  .by-sw-tab span { font-size: 9.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .by-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .by-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .by-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .by-chips { display: flex; align-items: center; gap: 9px; }
+  .by-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 148px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(169, 140, 245, 0.42); background: linear-gradient(160deg, rgba(169, 140, 245, 0.16), rgba(18, 34, 78, 0.6));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .by-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: #8f7fc4; white-space: nowrap; }
+  .by-chip b { font-size: 14px; font-weight: 700; letter-spacing: 0.05em; color: #cbbcf7; white-space: nowrap; }
+  .by-chip:hover { border-color: rgba(169, 140, 245, 0.92); box-shadow: 0 0 16px -2px rgba(169, 140, 245, 0.7); }
+  .by-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .by-clock-time { font: 700 26px/1 var(--by-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .by-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（整行 5 枚，高度写死） ===== */
+  .by-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .by-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 8px 18px;
+  }
+  .by-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .by-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .by-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .by-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .by-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .by-kpi.is-good::after { background: radial-gradient(circle, rgba(111, 224, 154, 0.13), transparent 68%); }
+  .by-kpi-label { font-size: 12.5px; letter-spacing: 0.08em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .by-kpi-num { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+  .by-kpi-val { font: 700 30px/1 var(--by-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .by-kpi.is-amber .by-kpi-val { color: #ffd489; }
+  .by-kpi.is-good .by-kpi-val { color: #b8f2cf; }
+  .by-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .by-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .by-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体 ===== */
+  .by-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .by-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .by-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .by-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .by-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .by-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .by-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .by-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .by-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 中栏：本站 Scrum 团队卡片（★ 高度写死，避免 JS 填充后压矮同 flex 容器里的图表） ===== */
+  .by-teamwrap { flex: none; height: 262px; }
+  .by-teams { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 9px; overflow: hidden; }
+  .by-teams li {
+    min-height: 0; display: grid; grid-template-columns: 74px 1fr 96px; align-items: center; gap: 12px;
+    padding: 6px 14px; border-radius: 10px;
+    border: 1px solid rgba(96, 140, 255, 0.16); background: linear-gradient(120deg, rgba(20, 38, 92, 0.62), rgba(14, 26, 66, 0.5));
+  }
+  .by-team-id { display: flex; flex-direction: column; gap: 2px; }
+  .by-team-name { font-size: 17px; font-weight: 700; letter-spacing: 0.1em; color: #eaf1ff; }
+  .by-team-dom { font-size: 10.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.95); }
+  .by-team-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .by-team-t1 { font-size: 11.5px; color: #c8d6f2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .by-team-t1 b { font-weight: 700; color: #eaf1ff; }
+  .by-team-bar { height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.16); overflow: hidden; }
+  .by-team-bar u { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--rnd-blue-deep), var(--rnd-blue)); }
+  .by-team-vel { text-align: right; font-variant-numeric: tabular-nums; }
+  .by-team-vel b { display: block; font: 700 20px/1.1 var(--by-mono); color: #ffd489; }
+  .by-team-vel span { font-size: 10px; color: var(--rnd-text-dim); }
+
+  /* ===== 右栏：对标明细表（CSS grid 模拟表格，★ 高度写死） ===== */
+  .by-cmp { flex: none; height: 158px; display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .by-thead, .by-cmp li {
+    display: grid; grid-template-columns: 1.45fr 0.95fr 0.95fr 0.8fr; align-items: center; gap: 8px;
+    padding: 0 10px; font-variant-numeric: tabular-nums;
+  }
+  .by-thead {
+    flex: none; height: 24px; font-size: 11px; letter-spacing: 0.08em; color: rgba(127, 146, 196, 0.95);
+    border-bottom: 1px solid rgba(96, 140, 255, 0.22);
+  }
+  .by-cmp ul { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 3px; overflow: hidden; }
+  .by-cmp li { border-radius: 6px; font-size: 12px; color: #c8d6f2; }
+  .by-cmp li:nth-child(odd) { background: rgba(96, 140, 255, 0.06); }
+  .by-cmp li b { font-weight: 700; color: #eaf1ff; }
+  .by-cmp-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .by-cmp-name i { font-style: normal; font-size: 10px; color: rgba(169, 140, 245, 0.95); margin-left: 4px; }
+  .by-cmp-idx { text-align: right; font-weight: 700; }
+  .by-cmp-idx.is-up { color: #b8f2cf; }
+  .by-cmp-idx.is-down { color: #ffb59a; }
+
+  /* ===== 底部口径滚动条 ===== */
+  .by-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .by-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .by-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: by-blink 1.6s ease-in-out infinite; }
+  @keyframes by-blink { 50% { opacity: 0.35; } }
+  .by-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .by-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: by-ticker 62s linear infinite; will-change: transform; }
+  .by-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .by-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes by-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .by-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="by-stage" id="by-stage">
+    <!-- mockflag:begin --><div class="by-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="by-error" id="by-error" role="alert">ECharts 资源加载失败，站点 KPI、团队卡片与对标明细不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="by-header">
+      <div class="by-head-left">
+        <div class="by-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="by-crumb-up" href="大屏样板间-研发多中心布局1920.html" title="返回上级专题页（Esc）">‹ 返回 多中心布局</a><i>›</i>
+          <em id="by-crumb-obj">--</em>
+        </div>
+        <div class="by-head-title-row">
+          <div class="by-head-title" id="by-title">-- · 单中心详情</div>
+          <div class="by-head-meta">
+            <span>研发人数 <b id="by-meta-people">--</b> 人 · 团队 <b id="by-meta-team">--</b> 支</span><i>|</i>
+            <span>年吞吐 <b id="by-meta-pts">--</b> 点 · 在研 <b id="by-meta-proj">--</b> 个</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="by-head-right">
+        <div class="by-switcher" id="by-switcher" aria-label="研发站点切换"></div>
+        <div class="by-chips">
+          <a class="by-chip" id="by-chip-sis" href="大屏样板间-研发园区数字孪生1920.html" title="切到孪生视角：研发园区数字孪生"><span>姊妹页 · 孪生视角</span><b>研发园区数字孪生 ›</b></a>
+        </div>
+        <div class="by-clock" aria-label="实时时钟">
+          <span class="by-clock-time" id="by-clock-time">--:--:--</span>
+          <span class="by-clock-date" id="by-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：人数 / 团队数 / 年吞吐 / 人均产出 / 在研项目 -->
+    <section class="by-kpis" aria-label="站点核心指标">
+      <div class="by-kpi">
+        <div class="by-kpi-label">站点研发人数</div>
+        <div class="by-kpi-num"><span class="by-kpi-val" id="by-kpi-0">0</span><span class="by-kpi-unit">人</span></div>
+        <div class="by-kpi-sub" id="by-kpi-0s">--</div>
+      </div>
+      <div class="by-kpi">
+        <div class="by-kpi-label">承接 Scrum 团队</div>
+        <div class="by-kpi-num"><span class="by-kpi-val" id="by-kpi-1">0</span><span class="by-kpi-unit">支</span></div>
+        <div class="by-kpi-sub" id="by-kpi-1s">--</div>
+      </div>
+      <div class="by-kpi is-amber">
+        <div class="by-kpi-label">年故事点吞吐</div>
+        <div class="by-kpi-num"><span class="by-kpi-val" id="by-kpi-2">0</span><span class="by-kpi-unit">点</span></div>
+        <div class="by-kpi-sub" id="by-kpi-2s">--</div>
+      </div>
+      <div class="by-kpi is-good" id="by-kpi-3box">
+        <div class="by-kpi-label">人均年产出</div>
+        <div class="by-kpi-num"><span class="by-kpi-val" id="by-kpi-3">0</span><span class="by-kpi-unit">点/人</span></div>
+        <div class="by-kpi-sub" id="by-kpi-3s">--</div>
+      </div>
+      <div class="by-kpi">
+        <div class="by-kpi-label">本站在研项目</div>
+        <div class="by-kpi-num"><span class="by-kpi-val" id="by-kpi-4">0</span><span class="by-kpi-unit">个</span></div>
+        <div class="by-kpi-sub" id="by-kpi-4s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：人员结构（六职能 + 职级分布） -->
+    <div class="by-col">
+      <section class="by-panel" style="flex: 1;">
+        <div class="by-panel-head">
+          <h2>人员结构 · 六职能</h2>
+          <span class="by-panel-tag">本站 <b id="by-tag-func">--</b> 人 · 六职能之和</span>
+        </div>
+        <div class="by-chart" id="by-chart-func"></div>
+      </section>
+      <section class="by-panel" style="flex: 1;">
+        <div class="by-panel-head">
+          <h2>人员结构 · 职级分布</h2>
+          <span class="by-panel-tag" id="by-tag-rank">--</span>
+        </div>
+        <div class="by-chart" id="by-chart-rank"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：承接产品线 + 本站团队 + 站点趋势 -->
+    <div class="by-col">
+      <section class="by-panel" style="flex: 1;">
+        <div class="by-panel-head">
+          <h2>承接产品线任务占比</h2>
+          <span class="by-panel-tag" id="by-tag-line">--</span>
+        </div>
+        <div class="by-chart" id="by-chart-line"></div>
+      </section>
+      <section class="by-panel by-teamwrap">
+        <div class="by-panel-head">
+          <h2>本站 Scrum 团队</h2>
+          <span class="by-panel-tag" id="by-tag-team">--</span>
+        </div>
+        <ul class="by-teams" id="by-teams"></ul>
+      </section>
+      <section class="by-panel" style="flex: 1;">
+        <div class="by-panel-head">
+          <h2>站点趋势 · 近 12 月人数与产出</h2>
+          <span class="by-panel-tag" id="by-tag-trend">--</span>
+        </div>
+        <div class="by-chart" id="by-chart-trend"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：交付指标对标 + 主要协作对象 -->
+    <div class="by-col">
+      <section class="by-panel" style="flex: 1.12;">
+        <div class="by-panel-head">
+          <h2>交付指标对标</h2>
+          <span class="by-panel-tag">全公司 = <b>100</b> · 轴 60~130</span>
+        </div>
+        <div class="by-chart" id="by-chart-radar"></div>
+        <div class="by-cmp">
+          <div class="by-thead"><span>对标指标</span><span>本站</span><span>全公司</span><span class="by-cmp-idx">指数</span></div>
+          <ul id="by-cmp-list"></ul>
+        </div>
+      </section>
+      <section class="by-panel" style="flex: 0.88;">
+        <div class="by-panel-head">
+          <h2>主要协作对象</h2>
+          <span class="by-panel-tag" id="by-tag-collab">--</span>
+        </div>
+        <div class="by-chart" id="by-chart-collab"></div>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="by-foot" aria-label="单中心详情口径说明">
+      <div class="by-foot-label"><span class="by-foot-dot"></span>对标口径</div>
+      <div class="by-foot-viewport"><div class="by-foot-track" id="by-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("by-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+  /* ===== 1.1 ★ kiosk 状态量前置声明（必须早于任何 hold() 调用） =====
+     let 有暂时性死区：带 hash 冷启动时若先 hold() 再声明，会抛
+     ReferenceError: Cannot access 'holdUntil' before initialization —— 主脚本整段中断，
+     而页面此时已渲染完，肉眼看不出问题（契约 §8 批次四实测坑）。
+     因此 idx / timer / holdUntil / hold() / restart() 全部提到这里，
+     首次 hold() 调用在下方第 11 节（boot 段），行号严格大于本块。 */
+  let idx = 0;
+  let timer = null;
+  let holdUntil = 0;
+  let holdCalls = 0;                                           /* 供页尾自检做构造性断言 */
+  function hold() { holdCalls += 1; holdUntil = Date.now() + 20000; }
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applySite(idx + 1); }, 16000);
+  }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层：单一数据源，六站点全部视图由此派生 =====
+     勾稽到契约基准盘（docs/RndIpdThemed.md §2.2 / §2.3）：
+     · 六站点研发人数逐字：北京总部 1,240 + 上海中心 680 + 深圳中心 720 + 成都中心 480
+       + 西安中心 420 + 南京中心 320 = 3,860 人（与姊妹页「研发园区数字孪生」逐字一致）。
+     · 站点 × 职能 6×6 矩阵与姊妹页同源：行和 = 站点人数、列和 = 契约六职能
+       （软件 1,460 / 硬件 620 / 云平台 540 / AI算法 420 / 测试 520 / PM与管理 300）。
+     · 12 团队站点归属与速率引契约 §2.3 逐字；每站 3/2/2/2/2/1 支。
+     · 本站年吞吐 = Σ本站团队速率 × 26 Sprint 现算，六站 Σ = 19,396 点（契约 §2.2）。
+     · 在研项目 48 个按站点分布（二级拆分，与姊妹页同源）：14 + 8 + 9 + 6 + 6 + 5 = 48。
+     · 职级 P4–P9、产品线任务分配、12 月趋势、协作强度均为二级自编，Σ 全部由页尾自检硬校验。 */
+  const FUNCS = ["软件", "硬件", "云平台", "AI算法", "测试", "PM与管理"];
+  const FUNC_COL = [C.blue, C.amber, C.cyan, C.violet, C.green, C.blueDeep];
+  const FUNC_AUTH = [1460, 620, 540, 420, 520, 300];           /* 契约 §2.2 六职能逐字 */
+  const SITE_AUTH = "北京总部|1240;上海中心|680;深圳中心|720;成都中心|480;西安中心|420;南京中心|320";
+
+  const RANKS = ["P4 助理工程师", "P5 工程师", "P6 高级工程师", "P7 资深工程师", "P8 技术专家", "P9 资深专家"];
+  const PLINES = ["智家终端", "云平台服务", "AIoT模组", "行业方案"];   /* 契约 §2.1 四产品线 */
+  const PLINE_COL = [C.blue, C.cyan, C.violet, C.amber];
+
+  /* 站点主表：funcs 列序 = FUNCS 序；ranks 列序 = RANKS 序；plw = 产品线任务权重 */
+  const SITES = [
+    { name: "北京总部", short: "北京", people: 1240, proj: 14, role: "集团总部 · 软件与云平台主基地",
+      funcs: [520, 120, 220, 130, 150, 100], ranks: [180, 360, 330, 220, 105, 45], plw: [30, 34, 18, 18],
+      onTime: 88.8, defects: 2280, review: 26.5, auto: 78.4, grow: 86 },
+    { name: "上海中心", short: "上海", people: 680, proj: 8, role: "AI 算法与行业方案中心",
+      funcs: [260, 60, 90, 130, 90, 50], ranks: [95, 200, 185, 120, 58, 22], plw: [22, 18, 20, 40],
+      onTime: 88.1, defects: 1560, review: 24.8, auto: 74.6, grow: 54 },
+    { name: "深圳中心", short: "深圳", people: 720, proj: 9, role: "硬件与终端整机研发中心",
+      funcs: [210, 250, 80, 50, 90, 40], ranks: [110, 215, 195, 122, 56, 22], plw: [46, 10, 32, 12],
+      onTime: 84.6, defects: 1620, review: 31.2, auto: 66.2, grow: 62 },
+    { name: "成都中心", short: "成都", people: 480, proj: 6, role: "AI 推理与软件交付中心",
+      funcs: [200, 60, 60, 70, 60, 30], ranks: [82, 152, 128, 74, 32, 12], plw: [28, 22, 16, 34],
+      onTime: 86.8, defects: 1420, review: 27.6, auto: 76.8, grow: 48 },
+    { name: "西安中心", short: "西安", people: 420, proj: 6, role: "射频硬件与测试验证中心",
+      funcs: [160, 100, 40, 30, 60, 30], ranks: [76, 138, 110, 62, 25, 9], plw: [24, 14, 44, 18],
+      onTime: 85.9, defects: 1180, review: 29.4, auto: 71.5, grow: 32 },
+    { name: "南京中心", short: "南京", people: 320, proj: 5, role: "云平台与自动化测试中心",
+      funcs: [110, 30, 50, 10, 70, 50], ranks: [62, 108, 82, 44, 18, 6], plw: [16, 46, 12, 26],
+      onTime: 88.4, defects: 580, review: 23.9, auto: 82.3, grow: 40 }
+  ];
+
+  /* 12 团队（契约 §2.3 逐字：名/速率/站点/域） */
+  const TEAMS = [
+    { name: "天枢", vel: 82, site: "北京总部", dom: "软件" },
+    { name: "天璇", vel: 76, site: "北京总部", dom: "云平台" },
+    { name: "天玑", vel: 71, site: "上海中心", dom: "AI算法" },
+    { name: "天权", vel: 68, site: "深圳中心", dom: "硬件" },
+    { name: "玉衡", vel: 66, site: "上海中心", dom: "软件" },
+    { name: "开阳", vel: 63, site: "成都中心", dom: "AI算法" },
+    { name: "摇光", vel: 61, site: "成都中心", dom: "软件" },
+    { name: "青龙", vel: 58, site: "深圳中心", dom: "硬件" },
+    { name: "白虎", vel: 55, site: "西安中心", dom: "硬件" },
+    { name: "朱雀", vel: 52, site: "南京中心", dom: "云平台" },
+    { name: "玄武", vel: 49, site: "西安中心", dom: "测试" },
+    { name: "紫微", vel: 45, site: "北京总部", dom: "软件" }
+  ];
+  const TEAM_AUTH = "天枢|82|北京总部|软件;天璇|76|北京总部|云平台;天玑|71|上海中心|AI算法;" +
+    "天权|68|深圳中心|硬件;玉衡|66|上海中心|软件;开阳|63|成都中心|AI算法;摇光|61|成都中心|软件;" +
+    "青龙|58|深圳中心|硬件;白虎|55|西安中心|硬件;朱雀|52|南京中心|云平台;玄武|49|西安中心|测试;紫微|45|北京总部|软件";
+  const TEAM_CNT_AUTH = [3, 2, 2, 2, 2, 1];                    /* 每站团队数（契约 §2.3 派生） */
+
+  const PROJ_ALL = 48;                                         /* 契约 §2.2 在研项目 */
+  const PEOPLE_ALL = 3860;                                     /* 契约 §2.2 研发人员 */
+  const DEF_ALL = 8640;                                        /* 契约 §2.2 年缺陷发现 */
+  const ONTIME_ALL = 87.2;                                     /* 契约 §2.2 按期交付率 */
+  const SPRINTS = 26;                                          /* 年 Sprint 数，年吞吐 = 速率 × 26 */
+  const VEL_MAX = 82;                                          /* 全量最高速率（天枢），团队条形归一化基准 */
+
+  /* 近 12 月（截至 2026-08）与产出季节性权重：26/02 春节月为低点 */
+  const MONTHS = ["25/09", "25/10", "25/11", "25/12", "26/01", "26/02", "26/03", "26/04", "26/05", "26/06", "26/07", "26/08"];
+  const OUT_W = [88, 92, 96, 90, 86, 62, 94, 98, 96, 100, 98, 92];
+
+  /* 跨站协作强度：15 个无序站点对（事项/月 = 跨站需求交接 + 联调工单 + 联合评审），
+     与「多中心布局」页协作网络同源——对称矩阵由本表镜像生成，Σ对 = 1,542、Σ行和 = 3,084 = 2×Σ对。 */
+  const PAIRS = [
+    [0, 1, 186], [0, 2, 214], [0, 3, 152], [0, 4, 128], [0, 5, 96],
+    [1, 2, 118], [1, 3, 104], [1, 4, 62], [1, 5, 74],
+    [2, 3, 88], [2, 4, 96], [2, 5, 54],
+    [3, 4, 70], [3, 5, 58],
+    [4, 5, 42]
+  ];
+  /* 协作主题（二级自编，仅作 tooltip 文案，不参与勾稽） */
+  const PAIR_TOPIC = {
+    "0|1": "行业方案联合交付 · AI 模型接入", "0|2": "智家终端软硬联调 · 整机集成",
+    "0|3": "软件交付外协 · 推理服务对接", "0|4": "射频认证与系统测试排期",
+    "0|5": "云枢平台灰度与自动化回归", "1|2": "视觉质检模型下沉终端",
+    "1|3": "AI 训练/推理算力互备", "1|4": "车联 EMC 与整车路测",
+    "1|5": "行业方案云侧对接", "2|3": "澜芯模组固件与驱动协同",
+    "2|4": "样机可靠性与射频暗室共享", "2|5": "终端 OTA 与云端灰度",
+    "3|4": "西部双中心测试资源池", "3|5": "自动化用例库共建",
+    "4|5": "夜间全量回归接力"
+  };
+
+  /* ===== 3.1 派生量（全部 JS 现算，不复制数字） ===== */
+  const peopleSum = sum(SITES.map((s) => s.people));                          /* 3,860 */
+  const funcCol = FUNCS.map((f, j) => sum(SITES.map((s) => s.funcs[j])));     /* 六职能列和 */
+  const rankCol = RANKS.map((r, j) => sum(SITES.map((s) => s.ranks[j])));     /* 全集团职级金字塔 */
+  const projSum = sum(SITES.map((s) => s.proj));                              /* 48 */
+  const velAll = sum(TEAMS.map((t) => t.vel));                                /* 746 */
+  const throughput = velAll * SPRINTS;                                        /* 19,396 */
+  const defAll = sum(SITES.map((s) => s.defects));                            /* 8,640 */
+
+  /* 最大余数法整数分配：Σ 结果严格等于 total（产品线任务、月度产出共用） */
+  function allocate(total, weights) {
+    const wsum = sum(weights);
+    const raw = weights.map((w) => total * w / wsum);
+    const base = raw.map(Math.floor);
+    const rest = total - sum(base);
+    const order = raw.map((v, i) => [v - base[i], i]).sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+    for (let k = 0; k < rest; k += 1) base[order[k][1]] += 1;
+    return base;
+  }
+
+  SITES.forEach((s, k) => {
+    s.teams = TEAMS.filter((t) => t.site === s.name);                         /* 本站承接团队 */
+    s.velSum = sum(s.teams.map((t) => t.vel));
+    s.ptsYear = s.velSum * SPRINTS;                                           /* 本站年故事点吞吐 */
+    s.velAvg = s.velSum / s.teams.length;                                     /* 团队算术均速 */
+    s.perCap = s.ptsYear / s.people;                                          /* 人均年产出 */
+    s.density = s.defects / s.ptsYear * 1000;                                 /* 缺陷密度：个/千点 */
+    s.plPts = allocate(s.ptsYear, s.plw);                                     /* 产品线任务分配 Σ = ptsYear */
+    /* 月度产出：季节性权重 + 站点确定性相位扰动，最大余数法保证 Σ = 本站年吞吐 */
+    s.outW = OUT_W.map((w, i) => w + Math.round(Math.sin((i + 1) * (k + 2) * 0.9) * 6));
+    s.outMon = allocate(s.ptsYear, s.outW);
+    /* 月度人数：12 个月净增 grow，末月 = 契约人数（逐字锚点） */
+    s.hcMon = MONTHS.map((m, i) => (i === MONTHS.length - 1
+      ? s.people
+      : Math.round(s.people - s.grow + s.grow * Math.pow(i / (MONTHS.length - 1), 0.92))));
+  });
+
+  /* 协作对称矩阵（由 15 个无序对镜像生成，对角为 0） */
+  const COLLAB = SITES.map(() => SITES.map(() => 0));
+  PAIRS.forEach((p) => { COLLAB[p[0]][p[1]] = p[2]; COLLAB[p[1]][p[0]] = p[2]; });
+  const collabRow = COLLAB.map((r) => sum(r));
+  const pairSum = sum(PAIRS.map((p) => p[2]));
+
+  /* 全公司对标基线：四项按年吞吐加权（Σ权重 = 19,396 点），速率取团队算术均值 */
+  const wAvg = (pick) => sum(SITES.map((s) => pick(s) * s.ptsYear)) / throughput;
+  const COMP = {
+    vel: velAll / TEAMS.length,                                               /* 746 ÷ 12 = 62.2 */
+    onTime: wAvg((s) => s.onTime),                                            /* ≈ 契约 87.2% */
+    density: defAll / throughput * 1000,                                      /* 8,640 ÷ 19,396 千点 */
+    review: wAvg((s) => s.review),
+    auto: wAvg((s) => s.auto)
+  };
+  /* 五维对标定义：dir = 1 正向（本站÷全公司），dir = -1 逆向（全公司÷本站） */
+  const DIMS = [
+    { key: "vel", name: "速率", unit: " 点/Sprint", dec: 1, dir: 1, note: "团队算术均值" },
+    { key: "onTime", name: "按期交付率", unit: "%", dec: 1, dir: 1, note: "TR/DCP 按期通过" },
+    { key: "density", name: "缺陷密度", unit: " 个/千点", dec: 1, dir: -1, note: "逆向 · 越低越好" },
+    { key: "review", name: "评审时长", unit: " h/次", dec: 1, dir: -1, note: "逆向 · 越低越好" },
+    { key: "auto", name: "自动化率", unit: "%", dec: 1, dir: 1, note: "用例自动化占比" }
+  ];
+  const dimVal = (s, d) => (d.key === "vel" ? s.velAvg : s[d.key]);
+  const dimIdx = (s, d) => (d.dir === 1 ? dimVal(s, d) / COMP[d.key] : COMP[d.key] / dimVal(s, d)) * 100;
+
+  /* ===== 4. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("by-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("by-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. 站点切换器（tab 文本与契约 §6 hash 键逐字一致） ===== */
+  const switcher = $("by-switcher");
+  switcher.innerHTML = SITES.map((s, i) => (
+    '<button class="by-sw-tab" type="button" data-i="' + i + '" title="切换到' + s.name + '（← → 方向键）">' +
+      "<b>" + s.name + "</b><span>" + fmtInt(s.people) + " 人</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".by-sw-tab"));
+
+  /* ===== 6. 非图表区渲染（不依赖 echarts；★ 全部在 echarts.init 之前完成首屏填充） ===== */
+  function countUp(el, target, fmt) {
+    const t0 = performance.now(), dur = 1400;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+  function renderKpi(site) {
+    const defs = [
+      { v: site.people, f: (x) => fmtInt(x),
+        sub: "占全集团 <b>" + fmtDec(site.people / peopleSum * 100, 1) + "%</b>（÷ " + fmtInt(peopleSum) + " 人现算）" },
+      { v: site.teams.length, f: (x) => fmtInt(x),
+        sub: "<b>" + site.teams.map((t) => t.name).join("·") + "</b> · Σ速率 " + site.velSum + " 点" },
+      { v: site.ptsYear, f: (x) => fmtInt(x),
+        sub: "Σ速率 <b>" + site.velSum + "</b> × " + SPRINTS + " Sprint · 占全量 " + fmtDec(site.ptsYear / throughput * 100, 1) + "%" },
+      { v: site.perCap, f: (x) => fmtDec(x, 2),
+        sub: "年吞吐 ÷ 人数现算 · 全公司 <b>" + fmtDec(throughput / peopleSum, 2) + "</b> 点/人" },
+      { v: site.proj, f: (x) => fmtInt(x),
+        sub: "全集团 <b>" + PROJ_ALL + "</b> 个 · 占 " + fmtDec(site.proj / projSum * 100, 1) + "%" }
+    ];
+    defs.forEach((d, i) => {
+      countUp($("by-kpi-" + i), d.v, d.f);
+      $("by-kpi-" + i + "s").innerHTML = d.sub;
+    });
+    const box = $("by-kpi-3box");
+    box.classList.toggle("is-good", site.perCap >= throughput / peopleSum);
+    box.classList.toggle("is-amber", site.perCap < throughput / peopleSum);
+    $("by-tag-func").textContent = fmtInt(sum(site.funcs));
+    $("by-tag-rank").innerHTML = "P4~P9 Σ <b>" + fmtInt(sum(site.ranks)) + "</b> 人 · 高职级（P7+）占 " +
+      fmtDec((site.ranks[3] + site.ranks[4] + site.ranks[5]) / site.people * 100, 1) + "%";
+    $("by-tag-line").innerHTML = "本站年吞吐 <b>" + fmtInt(site.ptsYear) + "</b> 点 · 四产品线之和";
+    $("by-tag-trend").innerHTML = "12 月产出 Σ <b>" + fmtInt(sum(site.outMon)) + "</b> 点 · 末月人数 " + fmtInt(site.hcMon[11]);
+    $("by-tag-collab").innerHTML = "跨站协作 <b>" + fmtInt(collabRow[SITES.indexOf(site)]) + "</b> 事项/月 · 对称口径";
+  }
+  function renderTeams(site) {
+    $("by-teams").innerHTML = site.teams.map((t) => {
+      const share = t.vel / site.velSum * 100;
+      return "<li>" +
+        '<span class="by-team-id"><span class="by-team-name">' + t.name + "</span>" +
+          '<span class="by-team-dom">' + t.dom + " 域</span></span>" +
+        '<span class="by-team-main">' +
+          '<span class="by-team-t1">年吞吐 <b>' + fmtInt(t.vel * SPRINTS) + "</b> 点（速率 × " + SPRINTS +
+            " Sprint）· 占本站 " + fmtDec(share, 1) + "%</span>" +
+          '<span class="by-team-bar"><u style="width:' + fmtDec(t.vel / VEL_MAX * 100, 1) + '%"></u></span>' +
+        "</span>" +
+        '<span class="by-team-vel"><b>' + t.vel + "</b><span>点/Sprint</span></span>" +
+      "</li>";
+    }).join("");
+    $("by-tag-team").innerHTML = "<b>" + site.teams.length + "</b> 支 · Σ速率 " + site.velSum +
+      " 点 · 年吞吐 " + fmtInt(site.ptsYear) + " 点";
+  }
+  function renderCmp(site) {
+    $("by-cmp-list").innerHTML = DIMS.map((d) => {
+      const v = dimVal(site, d), c = COMP[d.key], ix = dimIdx(site, d);
+      return "<li>" +
+        '<span class="by-cmp-name">' + d.name + (d.dir === -1 ? "<i>逆</i>" : "") + "</span>" +
+        "<span><b>" + fmtDec(v, d.dec) + "</b>" + d.unit + "</span>" +
+        "<span>" + fmtDec(c, d.dec) + d.unit + "</span>" +
+        '<span class="by-cmp-idx ' + (ix >= 100 ? "is-up" : "is-down") + '">' + fmtDec(ix, 1) + "</span>" +
+      "</li>";
+    }).join("");
+  }
+
+  /* 底部口径滚动（内容与站点无关，只建一次；★ 图表 init 之前填充） */
+  (function buildFoot() {
+    const items = [
+      ["口径", C.amber, "六站点研发人数 Σ = " + fmtInt(peopleSum) + " 人（契约 §2.2 逐字，与姊妹页孪生视角同源）：" +
+        SITES.map((s) => s.name + " " + fmtInt(s.people)).join(" + ")],
+      ["口径", C.amber, "每站六职能 Σ = 本站人数；六职能列和 = " + funcCol.map(fmtInt).join(" / ") +
+        "，Σ = " + fmtInt(sum(funcCol)) + " 人（契约 §2.2）"],
+      ["口径", C.amber, "职级 P4~P9 为二级自编：每站 Σ = 本站人数，全集团列和 " + rankCol.map(fmtInt).join(" / ") +
+        "，Σ = " + fmtInt(sum(rankCol)) + " 人"],
+      ["口径", C.amber, "本站年吞吐 = Σ本站团队速率 × " + SPRINTS + " Sprint 现算；12 团队站点归属 " + TEAM_CNT_AUTH.join("/") +
+        "，六站 Σ = " + fmtInt(throughput) + " 点（契约 §2.2）；产品线任务与 12 月产出用最大余数法分配，Σ 严格回本站年吞吐"],
+      ["对标", C.violet, "对标口径：全公司均值按各站年故事点吞吐加权（Σ权重 " + fmtInt(throughput) +
+        " 点），非六站算术平均；速率为团队算术均值（746 ÷ 12 = " + fmtDec(COMP.vel, 1) +
+        " 点/Sprint）；缺陷密度 = 本站缺陷 ÷ 本站年吞吐 × 1000，全公司 = " + fmtInt(defAll) + " ÷ " + fmtInt(throughput) +
+        " × 1000 = " + fmtDec(COMP.density, 1) + " 个/千点"],
+      ["对标", C.violet, "对标指数：正向指标 = 本站 ÷ 全公司 × 100，逆向指标（缺陷密度、评审时长）= 全公司 ÷ 本站 × 100，" +
+        "全公司恒为 100；加权按期交付率 " + fmtDec(COMP.onTime, 2) + "% 回归契约 " + ONTIME_ALL + "%"],
+      ["协作", C.blue, "协作强度口径：15 个无序站点对镜像成 6×6 对称矩阵（对角 0），Σ对 = " + fmtInt(pairSum) +
+        " 事项/月、Σ行和 = " + fmtInt(sum(collabRow)) + " = 2 × Σ对，与「多中心布局」页协作网络同源"],
+      ["视角", C.blue, "本页为指标视角（人员/团队/对标/协作），孪生视角见姊妹页「研发园区数字孪生」——两页六站点数据逐字一致，可互相切换"]
+    ];
+    const html = items.map((a) => '<span class="by-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("by-foot-track").innerHTML = html + html;                 /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* ===== 7. 静态层整页重绘（不依赖 echarts） ===== */
+  function paintStatic(site) {
+    $("by-title").textContent = site.name + " · 单中心详情";
+    $("by-crumb-obj").textContent = site.name + " · " + site.role;
+    $("by-meta-people").textContent = fmtInt(site.people);
+    $("by-meta-team").textContent = site.teams.length;
+    $("by-meta-pts").textContent = fmtInt(site.ptsYear);
+    $("by-meta-proj").textContent = site.proj;
+    $("by-chip-sis").href = "大屏样板间-研发园区数字孪生1920.html#" + encodeURIComponent(site.name);
+    renderKpi(site);
+    renderTeams(site);
+    renderCmp(site);
+  }
+
+  /* hash 契约：decodeURIComponent → trim + 全角空白剔除归一 → 匹配六站点名 */
+  const HASH_ALIAS = { "北京": "北京总部", "上海": "上海中心", "深圳": "深圳中心", "成都": "成都中心", "西安": "西安中心", "南京": "南京中心" };
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    if (HASH_ALIAS[s]) s = HASH_ALIAS[s];
+    return SITES.findIndex((x) => x.name === s);
+  }
+  const bootHit = resolveHash(location.hash);
+  const bootIdx = bootHit >= 0 ? bootHit : 0;
+  paintStatic(SITES[bootIdx]);                                  /* ★ 非图表区先填充，再 init 图表 */
+  swTabs.forEach((b, k) => b.classList.toggle("is-active", k === bootIdx));
+
+  /* ===== 8. 资源守卫（KPI / 团队卡片 / 对标明细已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("by-error").classList.add("is-visible");
+
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const funcChart = hasEcharts ? echarts.init($("by-chart-func")) : null;
+  const rankChart = hasEcharts ? echarts.init($("by-chart-rank")) : null;
+  const lineChart = hasEcharts ? echarts.init($("by-chart-line")) : null;
+  const trendChart = hasEcharts ? echarts.init($("by-chart-trend")) : null;
+  const radarChart = hasEcharts ? echarts.init($("by-chart-radar")) : null;
+  const collabChart = hasEcharts ? echarts.init($("by-chart-collab")) : null;
+
+  /* ===== 9. option 构造（★ 只放标量与数组，站点/团队对象一律不进 option，避免深拷贝循环引用） ===== */
+
+  /* 9.1 六职能人数（横向条，Σ = 本站人数） */
+  function funcOption(site) {
+    const vals = site.funcs.slice();
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 96, top: 6, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.dataIndex;
+          return "<b>" + FUNCS[j] + "</b><br/>本站 <b>" + fmtInt(vals[j]) + "</b> 人 · 占本站 " +
+            fmtDec(vals[j] / site.people * 100, 1) + "%<br/>全集团该职能 " + fmtInt(funcCol[j]) +
+            " 人 · 本站占其 " + fmtDec(vals[j] / funcCol[j] * 100, 1) + "%";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max.apply(null, vals) * 1.38 },
+      yAxis: {
+        type: "category", inverse: true, data: FUNCS.slice(),
+        axisLabel: { color: C.text, fontSize: 11.5 }, axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 15,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 8 },
+        data: vals.map((v, j) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: 8,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(FUNC_COL[j], 0.4) }, { offset: 1, color: FUNC_COL[j] }])
+          }
+        })),
+        label: {
+          show: true, position: "right", fontSize: 11.5, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => fmtInt(p.value) + " 人 · " + fmtDec(p.value / site.people * 100, 1) + "%"
+        }
+      }]
+    };
+  }
+
+  /* 9.2 职级分布（漏斗做纺锤形金字塔，sort:none 保持 P4→P9 序，Σ = 本站人数） */
+  function rankOption(site) {
+    const vals = site.ranks.slice();
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.dataIndex;
+          return "<b>" + RANKS[j] + "</b><br/>本站 <b>" + fmtInt(vals[j]) + "</b> 人 · 占本站 " +
+            fmtDec(vals[j] / site.people * 100, 1) + "%<br/>全集团该职级 " + fmtInt(rankCol[j]) +
+            " 人 · 本站占其 " + fmtDec(vals[j] / rankCol[j] * 100, 1) + "%";
+        }
+      }, TIP),
+      series: [{
+        type: "funnel", sort: "none", left: "6%", right: "6%", top: 8, bottom: 6,
+        min: 0, max: Math.max.apply(null, vals), minSize: "26%", maxSize: "96%", gap: 3,
+        label: {
+          show: true, position: "inside", fontSize: 11.5, fontWeight: 700, color: "#08122f",
+          formatter: (p) => RANKS[p.dataIndex].split(" ")[0] + " " + RANKS[p.dataIndex].split(" ")[1] +
+            "  " + fmtInt(p.value) + " 人 · " + fmtDec(p.value / site.people * 100, 1) + "%"
+        },
+        itemStyle: { borderColor: "rgba(8,18,49,.85)", borderWidth: 1 },
+        data: vals.map((v, j) => ({
+          value: v,
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(PAL.series[j % PAL.series.length], 0.18) },
+              { offset: 1, color: PAL.series[j % PAL.series.length] }])
+          }
+        }))
+      }]
+    };
+  }
+
+  /* 9.3 承接产品线任务占比（环形，Σ = 本站年吞吐） */
+  function lineOption(site) {
+    const vals = site.plPts.slice();
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => "<b>" + p.name + "</b><br/>本站任务 <b>" + fmtInt(p.value) + "</b> 点 · 占本站 " +
+          fmtDec(p.value / site.ptsYear * 100, 1) + "%<br/>口径：本站年吞吐 " + fmtInt(site.ptsYear) + " 点按产品线分配"
+      }, TIP),
+      legend: {
+        top: 2, right: 4, orient: "vertical", itemWidth: 10, itemHeight: 10,
+        textStyle: { color: C.textDim, fontSize: 11 }
+      },
+      series: [{
+        type: "pie", radius: ["42%", "68%"], center: ["38%", "54%"], avoidLabelOverlap: true,
+        itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 2, borderRadius: 4 },
+        label: {
+          show: true, formatter: (p) => p.name + "\n" + fmtDec(p.percent, 1) + "%",
+          color: C.text, fontSize: 11, lineHeight: 15
+        },
+        labelLine: { length: 8, length2: 10, lineStyle: { color: "rgba(96,140,255,.4)" } },
+        data: vals.map((v, j) => ({ value: v, name: PLINES[j], itemStyle: { color: PLINE_COL[j] } }))
+      }, {
+        type: "pie", radius: ["0%", "0%"], center: ["38%", "54%"], silent: true,
+        label: {
+          show: true, position: "center", formatter: fmtInt(site.ptsYear) + "\n点/年",
+          color: "#eaf1ff", fontSize: 17, fontWeight: 700, lineHeight: 19
+        },
+        data: [{ value: 1 }]
+      }]
+    };
+  }
+
+  /* 9.4 站点趋势：近 12 月产出（柱）+ 人数（线）双轴 */
+  function trendOption(site) {
+    const out = site.outMon.slice(), hc = site.hcMon.slice();
+    const hcMin = Math.min.apply(null, hc), hcMax = Math.max.apply(null, hc);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 4, top: 30, bottom: 2, containLabel: true },
+      legend: { top: 0, right: 2, itemWidth: 12, itemHeight: 8, textStyle: { color: C.textDim, fontSize: 11 } },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>20" + MONTHS[i] + "</b><br/>月度产出 <b>" + fmtInt(out[i]) + "</b> 点<br/>在岗人数 <b>" +
+            fmtInt(hc[i]) + "</b> 人<br/>月人效 " + fmtDec(out[i] / hc[i], 2) + " 点/人";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: MONTHS.slice(),
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 10 }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: [
+        { type: "value", name: "点/月", nameTextStyle: { color: C.textDim, fontSize: 10 }, axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
+        {
+          type: "value", name: "人", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          min: Math.floor((hcMin - (hcMax - hcMin) * 0.8) / 10) * 10,
+          max: Math.ceil((hcMax + (hcMax - hcMin) * 0.3) / 10) * 10,
+          axisLabel: AXIS_LABEL, splitLine: { show: false }
+        }
+      ],
+      series: [
+        {
+          name: "月度产出", type: "bar", barWidth: "56%", yAxisIndex: 0, data: out,
+          itemStyle: {
+            borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: C.blue }, { offset: 1, color: "rgba(47,111,214,0.22)" }])
+          }
+        },
+        {
+          name: "在岗人数", type: "line", yAxisIndex: 1, data: hc, smooth: true,
+          symbol: "circle", symbolSize: 5,
+          lineStyle: { color: C.amber, width: 2 }, itemStyle: { color: C.amber },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "rgba(255,194,77,0.20)" }, { offset: 1, color: "rgba(255,194,77,0)" }])
+          },
+          markPoint: {
+            symbol: "pin", symbolSize: 30, data: [{ coord: [MONTHS.length - 1, hc[hc.length - 1]], value: fmtInt(hc[hc.length - 1]) }],
+            itemStyle: { color: "rgba(255,194,77,0.85)" }, label: { color: "#08122f", fontSize: 10, fontWeight: 700 }
+          }
+        }
+      ]
+    };
+  }
+
+  /* 9.5 交付指标对标雷达（全公司恒 100 基准环） */
+  function radarOption(site) {
+    const idxs = DIMS.map((d) => Number(fmtDec(dimIdx(site, d), 1)));
+    const raws = DIMS.map((d) => fmtDec(dimVal(site, d), d.dec) + d.unit);
+    const comps = DIMS.map((d) => fmtDec(COMP[d.key], d.dec) + d.unit);
+    return {
+      backgroundColor: "transparent",
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8,
+        data: ["本站", "全公司均值"], textStyle: { color: C.textDim, fontSize: 11 }
+      },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => "<b>" + site.name + " 对标指数</b><br/>" +
+          DIMS.map((d, j) => d.name + (d.dir === -1 ? "（逆）" : "") + " " + raws[j] + " ／ 全公司 " + comps[j] +
+            " → <b>" + fmtDec(idxs[j], 1) + "</b>").join("<br/>")
+      }, TIP),
+      radar: {
+        center: ["50%", "56%"], radius: "62%", splitNumber: 4,
+        indicator: DIMS.map((d) => ({ name: d.name + (d.dir === -1 ? "(逆)" : ""), min: 60, max: 130 })),
+        axisName: { color: C.text, fontSize: 11 },
+        axisLine: { lineStyle: { color: C.grid } },
+        splitLine: { lineStyle: { color: C.grid } },
+        splitArea: { areaStyle: { color: ["rgba(92,157,255,0.04)", "rgba(92,157,255,0.08)"] } }
+      },
+      series: [{
+        type: "radar", symbolSize: 5,
+        data: [
+          {
+            value: idxs, name: "本站",
+            lineStyle: { color: C.amber, width: 2 }, itemStyle: { color: C.amber },
+            areaStyle: { color: "rgba(255,194,77,0.22)" },
+            label: { show: true, color: "#ffd489", fontSize: 10, fontWeight: 700, formatter: (p) => fmtDec(p.value, 1) }
+          },
+          {
+            value: [100, 100, 100, 100, 100], name: "全公司均值",
+            lineStyle: { color: C.blue, width: 1.5, type: "dashed" }, itemStyle: { color: C.blue },
+            areaStyle: { color: "rgba(92,157,255,0.08)" }
+          }
+        ]
+      }]
+    };
+  }
+
+  /* 9.6 主要协作对象（与其他五站的协作强度排序条） */
+  function collabOption(cur) {
+    const rows = SITES.map((s, j) => ({ i: j, name: s.short, full: s.name, v: COLLAB[cur][j] }))
+      .filter((r) => r.i !== cur)
+      .sort((a, b) => a.v - b.v);                               /* 横向条 inverse:false → 最大在顶 */
+    const names = rows.map((r) => r.name);
+    const vals = rows.map((r) => r.v);
+    const fulls = rows.map((r) => r.full);
+    const idxs = rows.map((r) => r.i);
+    const total = collabRow[cur];
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 108, top: 6, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const k = p.dataIndex, a = Math.min(cur, idxs[k]), b = Math.max(cur, idxs[k]);
+          return "<b>" + SITES[cur].name + " ↔ " + fulls[k] + "</b><br/>协作强度 <b>" + fmtInt(vals[k]) +
+            "</b> 事项/月 · 占本站 " + fmtDec(vals[k] / total * 100, 1) + "%<br/>主线：" +
+            (PAIR_TOPIC[a + "|" + b] || "跨站协同") + "<br/>口径：对称矩阵，两端读数一致";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max.apply(null, vals) * 1.4 },
+      yAxis: {
+        type: "category", data: names,
+        axisLabel: { color: C.text, fontSize: 12, fontWeight: 700 },
+        axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 14,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 7 },
+        data: vals.map((v, k) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: 7,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(k === vals.length - 1 ? C.amber : C.blue, 0.45) },
+              { offset: 1, color: k === vals.length - 1 ? C.amber : C.blue }])
+          }
+        })),
+        label: {
+          show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => fmtInt(p.value) + " 事项 · " + fmtDec(p.value / total * 100, 1) + "%"
+        }
+      }]
+    };
+  }
+
+  /* ===== 10. 站点切换主流程：整页重绘 ===== */
+  function applySite(i) {
+    const n = SITES.length;
+    idx = ((i % n) + n) % n;
+    const site = SITES[idx];
+    paintStatic(site);
+    swTabs.forEach((b, k) => b.classList.toggle("is-active", k === idx));
+    if (hasEcharts) {
+      funcChart.setOption(funcOption(site), true);              /* 轴上限随站点变化 → notMerge */
+      rankChart.setOption(rankOption(site), true);
+      lineChart.setOption(lineOption(site), true);
+      trendChart.setOption(trendOption(site), true);
+      radarChart.setOption(radarOption(site), true);
+      collabChart.setOption(collabOption(idx), true);
+    }
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(site.name));
+  }
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 =====
+     ★ 本节只做「调用」，kiosk 状态量（idx / timer / holdUntil）与 hold() / restart()
+       已在第 1.1 节声明——声明行号严格小于此处首次 hold() 调用行号（TDZ 防护）。 */
+  const PARENT = "大屏样板间-研发多中心布局1920.html";
+
+  swTabs.forEach((b) => b.addEventListener("click", () => { applySite(Number(b.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applySite(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applySite(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  applySite(bootIdx);
+  if (bootHit >= 0) hold();                                     /* 父页下钻进来：先保持 20 秒不轮换 */
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applySite(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 16 秒切下一站点；鼠标停在切换器上时暂停 */
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const checks = [
+    ["六站点名与人数与契约 §2.2 逐字（构造性断言，与姊妹页孪生视角同源）",
+      SITES.map((s) => s.name + "|" + s.people).join(";") === SITE_AUTH],
+    ["六站点人数 Σ = 3,860 人", peopleSum === PEOPLE_ALL && peopleSum === 3860],
+    ["每站六职能 Σ = 该站总人数（矩阵行和）",
+      SITES.every((s) => sum(s.funcs) === s.people)],
+    ["六职能列和与契约逐字（1,460/620/540/420/520/300）且 Σ = 3,860",
+      funcCol.every((v, j) => v === FUNC_AUTH[j]) && sum(funcCol) === PEOPLE_ALL],
+    ["每站职级 P4~P9 Σ = 该站总人数，全集团职级 Σ = 3,860 且呈纺锤型（P5 最多、P9 最少）",
+      SITES.every((s) => sum(s.ranks) === s.people) && sum(rankCol) === PEOPLE_ALL &&
+      rankCol.indexOf(Math.max.apply(null, rankCol)) === 1 && rankCol.indexOf(Math.min.apply(null, rankCol)) === 5],
+    ["12 团队名/速率/站点/域与契约 §2.3 逐字（构造性断言）",
+      TEAMS.map((t) => [t.name, t.vel, t.site, t.dom].join("|")).join(";") === TEAM_AUTH],
+    ["每站团队数 = 3/2/2/2/2/1，Σ = 12 支、Σ速率 = 746 点",
+      SITES.every((s, i) => s.teams.length === TEAM_CNT_AUTH[i]) &&
+      sum(SITES.map((s) => s.teams.length)) === TEAMS.length && velAll === 746],
+    ["各站年吞吐 = Σ本站速率 × 26 现算，六站 Σ = 19,396 点",
+      SITES.every((s) => s.ptsYear === s.velSum * SPRINTS) &&
+      sum(SITES.map((s) => s.ptsYear)) === throughput && throughput === 19396],
+    ["每站产品线任务 Σ = 本站年吞吐，四产品线全量 Σ = 19,396 点",
+      SITES.every((s) => sum(s.plPts) === s.ptsYear && s.plPts.every((v) => v > 0)) &&
+      sum(SITES.map((s) => sum(s.plPts))) === throughput],
+    ["每站 12 月产出 Σ = 本站年吞吐；末月人数 = 契约站点人数",
+      SITES.every((s) => sum(s.outMon) === s.ptsYear && s.hcMon.length === MONTHS.length &&
+        s.hcMon[MONTHS.length - 1] === s.people && s.hcMon[0] === s.people - s.grow)],
+    ["在研项目按站点 Σ = 48 个", projSum === PROJ_ALL && projSum === 48],
+    ["各站缺陷 Σ = 8,640（契约 §2.2 年发现），缺陷密度 = 缺陷 ÷ 年吞吐 × 1000 现算",
+      defAll === DEF_ALL &&
+      SITES.every((s) => Math.abs(s.density - s.defects / s.ptsYear * 1000) < 1e-9)],
+    ["对标口径：全公司按年吞吐加权的按期交付率回归契约 87.2%（|Δ| < 0.05pp）",
+      Math.abs(COMP.onTime - ONTIME_ALL) < 0.05],
+    ["对标指数：全公司恒 100；正向 = 本站÷全公司，逆向（缺陷密度/评审时长）= 全公司÷本站",
+      DIMS.every((d) => Math.abs(COMP[d.key] / COMP[d.key] * 100 - 100) < 1e-9) &&
+      SITES.every((s) => DIMS.every((d) => {
+        const want = (d.dir === 1 ? dimVal(s, d) / COMP[d.key] : COMP[d.key] / dimVal(s, d)) * 100;
+        return Math.abs(dimIdx(s, d) - want) < 1e-9 && dimIdx(s, d) > 60 && dimIdx(s, d) < 130;
+      }))],
+    ["协作矩阵对称且对角为 0，Σ行和 = 3,084 = 2 × Σ对（1,542 事项/月）",
+      COLLAB.every((r, i) => r.every((v, j) => v === COLLAB[j][i] && (i !== j || v === 0))) &&
+      sum(collabRow) === 2 * pairSum && pairSum === 1542 && PAIRS.length === 15],
+    ["每站协作对象 = 其余五站（行和 = 五个对象之和）",
+      SITES.every((s, i) => sum(COLLAB[i].filter((v, j) => j !== i)) === collabRow[i] && COLLAB[i][i] === 0)],
+    ["hash 六站点名均可解析（构造性断言）",
+      SITES.every((s, i) => resolveHash("#" + encodeURIComponent(s.name)) === i)],
+    ["切换器 tab 数 = 6 且文本与契约 §6 hash 键逐字",
+      swTabs.length === SITES.length && swTabs.every((b, i) => b.querySelector("b").textContent === SITES[i].name)],
+    /* ★ TDZ 防护的构造性断言：holdUntil / hold() 声明在第 1.1 节（行号远小于第 11 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 holdCalls ≥ 1」即证明声明早于首次调用。 */
+    ["holdUntil 声明早于首次 hold() 调用（TDZ 防护，构造性断言）",
+      typeof holdUntil === "number" && typeof hold === "function" &&
+      (bootHit < 0 ? holdCalls === 0 : (holdCalls >= 1 && holdUntil > Date.now()))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单中心详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
