@@ -232,3 +232,26 @@ W1 起新建 `tools/inject_carousel_rnd.py`、W2 起 `tools/inject_subnav_rnd.py
 
 **导航规模变化**：轮播 4/17 页（PAGES_ALL 全序定稿、按文件存在过滤）、build_index 半接入
 （分类/count=1/FAMILY_OF/徽章色，THEME_ORDER 待 W2 全接入）、门户宫格 17 格已于 I0 写死。
+
+### 批次二 · 一期子页 3 块 + 下钻首通（W2）
+
+**立意**：hash 契约与三层导航在最小规模上先跑通，教训回写本契约后再放大并行度。
+3 块子页（dl 单产品线路标 / dj 单项目IPD / tz 需求台账）并行产出；`inject_subnav_rnd.py`
+与 `inject_drilldown_rnd.py` 首写并接线，build_index THEME_ORDER/ranks 全接入
+（组内序实测 = 门户 → 轮播序 → 子页按父页位次）。
+
+**hash 契约端到端实测**：编码中文冷启动（`#%E5%B8%82…` → 激活筛选/切换对象）、
+已开页改 hash 触发重定位、父页实点行 → 子页定位、crumb/Esc 返回上级——全部通过。
+
+**实测坑**：
+- **注入链幂等要以「整链」为单位判**：drill/carousel 都往 `</style>` 前追加，单跑某一支会与
+  mockflag 互换位次产生中途 diff；整链（drill→subnav→carousel→palette→mock_flag）跑完回到
+  固定点 `[subnav→drill→carousel→mockflag]`，判据 = 整链前后全目录校验和一致。
+- **轮播脚本 `let hidden=false` 是潜在 bug**：页面在后台标签页加载时收不到 visibilitychange，
+  计时器照走、无人看时自己翻页。rnd 版已改为 `let hidden = document.hidden`；
+  公共资金/厨电版同款问题已另立修复任务。
+- 浏览器门禁中 `computer key Escape` 可能因焦点不在页面而丢失，判 Esc 行为要用
+  `document.dispatchEvent(new KeyboardEvent(...))` 直接派发。
+
+**导航规模变化**：轮播 4/17 页、subnav 4 父页（3 有子页 + 1 无）、drilldown 3 组 16 对象、
+索引组内固定排序生效（8 块）。

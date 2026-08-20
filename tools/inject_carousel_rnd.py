@@ -166,7 +166,9 @@ JS_TPL = """
   let elapsed = 0;               /* 本页已停留毫秒 */
   let last = Date.now();
   let userPaused = false;        /* 用户点了暂停 */
-  let hidden = false;            /* 标签页被切到后台 */
+  /* ★ 初值必须实读 document.hidden：页面若在后台标签页加载，不会收到 visibilitychange，
+     写死 false 会让计时器在后台照走、页面无人看时自己翻页（厨电版同款潜在问题） */
+  let hidden = document.hidden;
 
   function render() {{
     const pct = Math.min(100, elapsed / (SECONDS * 1000) * 100);

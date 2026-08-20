@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单产品线路标详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --dl-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：特性清单台账（特性 / 所属版本 / 状态 / 故事点） */
+    --dl-tcols: 1fr 116px 86px 64px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .dl-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 560px;
+    grid-template-rows: 84px 126px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .dl-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .dl-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .dl-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .dl-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .dl-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .dl-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .dl-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .dl-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .dl-crumb em { font-style: normal; color: #d3e2ff; }
+  .dl-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .dl-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .dl-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .dl-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .dl-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .dl-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .dl-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .dl-head-right { display: flex; align-items: center; gap: 18px; flex: none; }
+
+  /* 对象切换器：四条产品线 tab（← → 方向键 / 16s 自动轮换 / hash 直达） */
+  .dl-switcher { display: flex; align-items: stretch; gap: 8px; }
+  .dl-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-width: 104px; padding: 6px 12px; border-radius: 9px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .dl-sw-tab b { font-size: 14px; font-weight: 700; letter-spacing: 0.06em; }
+  .dl-sw-tab span { font-size: 10.5px; letter-spacing: 0.08em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .dl-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .dl-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .dl-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  .dl-chips { display: flex; align-items: center; gap: 9px; }
+  .dl-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 108px; padding: 7px 14px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .dl-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .dl-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .dl-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .dl-chip.is-key b { color: var(--rnd-blue); }
+  .dl-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .dl-clock-time { font: 700 26px/1 var(--dl-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .dl-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带（6 枚单线级） ===== */
+  .dl-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .dl-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 14px 0 16px;
+  }
+  .dl-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .dl-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .dl-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-orange), transparent); }
+  .dl-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 92, 0.14), transparent 68%); }
+  .dl-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.26), rgba(70, 214, 200, 0.12));
+    border: 1px solid rgba(92, 157, 255, 0.35); box-shadow: inset 0 0 12px rgba(92, 157, 255, 0.14);
+  }
+  .dl-kpi.is-warn .dl-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 92, 0.28), rgba(255, 194, 77, 0.12));
+    border-color: rgba(255, 157, 92, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 92, 0.16);
+  }
+  .dl-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .dl-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .dl-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .dl-kpi-val { font: 700 28px/1 var(--dl-mono); color: #eaf1ff; letter-spacing: 0.02em; white-space: nowrap; }
+  .dl-kpi-val.is-text { font-size: 21px; letter-spacing: 0.04em; }
+  .dl-kpi.is-warn .dl-kpi-val { color: #ffd9b0; }
+  .dl-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .dl-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dl-kpi-sub b { font-weight: 700; color: #bcd2f8; }
+
+  /* ===== 双栏主体 ===== */
+  .dl-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .dl-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .dl-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .dl-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .dl-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .dl-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .dl-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .dl-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .dl-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== CSS grid 模拟表格：特性清单台账 ===== */
+  .dl-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .dl-thead, .dl-tbody li {
+    display: grid; grid-template-columns: var(--dl-tcols); align-items: center; gap: 8px;
+  }
+  .dl-thead {
+    flex: none; padding: 5px 10px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .dl-thead span:last-child, .dl-tbody li span:last-child { text-align: right; }
+  .dl-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .dl-tbody li {
+    padding: 0 10px; height: 30px; border-radius: 5px;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    transition: background .25s, box-shadow .25s;
+  }
+  .dl-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .dl-tbody li.is-active { background: rgba(92, 157, 255, 0.16); box-shadow: inset 0 0 0 1px rgba(92, 157, 255, 0.42); }
+  .dl-tbody li b { font-weight: 700; color: #eaf1ff; }
+  .dl-tbody li .dl-cell-feat { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dl-tbody li .dl-cell-ver { color: #9cc2ff; }
+  .dl-badge {
+    display: inline-block; padding: 1px 9px; border-radius: 999px;
+    font-size: 10.5px; letter-spacing: 0.06em; line-height: 1.6;
+    border: 1px solid rgba(96, 140, 255, 0.3); color: #a9c4f5; background: rgba(24, 44, 104, 0.4);
+  }
+  .dl-badge.is-done  { color: var(--rnd-green);  border-color: rgba(111, 224, 154, 0.45); background: rgba(24, 74, 48, 0.32); }
+  .dl-badge.is-dev   { color: var(--rnd-blue);   border-color: rgba(92, 157, 255, 0.5);   background: rgba(24, 44, 104, 0.5); }
+  .dl-badge.is-joint { color: var(--rnd-cyan);   border-color: rgba(70, 214, 200, 0.45);  background: rgba(14, 58, 62, 0.4); }
+  .dl-badge.is-design{ color: var(--rnd-violet); border-color: rgba(169, 140, 245, 0.45); background: rgba(42, 32, 80, 0.42); }
+  .dl-badge.is-wait  { color: var(--rnd-text-dim); border-color: rgba(127, 146, 196, 0.4); background: rgba(24, 34, 66, 0.4); }
+  .dl-badge.is-plan  { color: var(--rnd-amber);  border-color: rgba(255, 194, 77, 0.45);  background: rgba(84, 62, 20, 0.32); }
+
+  /* ===== 底部口径与要点滚动条 ===== */
+  .dl-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .dl-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-amber);
+  }
+  .dl-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-amber);
+    box-shadow: 0 0 10px var(--rnd-amber); animation: dl-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes dl-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .dl-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .dl-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .dl-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .dl-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .dl-foot-item b { font-weight: 700; color: #eaf1ff; }
+  .dl-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .dl-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="dl-stage" id="dl-stage">
+    <!-- mockflag:begin --><div class="dl-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="dl-error" id="dl-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容） -->
+    <header class="dl-header">
+      <div class="dl-head-left">
+        <div class="dl-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="dl-crumb-up" href="大屏样板间-研发产品组合与路标1920.html" title="返回上级专题页（Esc）">‹ 返回 产品组合与路标</a><i>›</i>
+          <em id="dl-crumb-obj">--</em>
+        </div>
+        <div class="dl-head-title-row">
+          <div class="dl-head-title" id="dl-title">-- · 路标详情</div>
+          <div class="dl-head-meta">
+            <span>版本区块 <b id="dl-meta-segs">--</b> 个</span><i>|</i>
+            <span>台账特性 <b id="dl-meta-feats">--</b> 条</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b> · 今日线 <b>2026-08-20</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="dl-head-right">
+        <div class="dl-switcher" id="dl-switcher" aria-label="产品线切换"></div>
+        <div class="dl-chips">
+          <div class="dl-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="dl-chip is-key"><span>LINE INVEST</span><b id="dl-chip-inv">--</b></div>
+        </div>
+        <div class="dl-clock" aria-label="实时时钟">
+          <span class="dl-clock-time" id="dl-clock-time">--:--:--</span>
+          <span class="dl-clock-date" id="dl-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带（随产品线切换） -->
+    <div class="dl-band" id="dl-band"></div>
+
+    <!-- 左栏：单线版本火车放大 + 特性清单台账 -->
+    <div class="dl-col">
+      <section class="dl-panel" style="flex: none; height: 362px;">
+        <div class="dl-panel-head">
+          <h2>版本火车 · 单线放大</h2>
+          <span class="dl-panel-tag">窗口 2026-01 → 2027-06 · 今日线 <b>2026-08-20</b> · 区块 <b id="dl-train-cnt">--</b> 个</span>
+        </div>
+        <div class="dl-chart" id="dl-chart-train"></div>
+      </section>
+      <section class="dl-panel" style="flex: 1;">
+        <div class="dl-panel-head">
+          <h2>特性清单台账</h2>
+          <span class="dl-panel-tag">特性 <b id="dl-tbl-cnt">--</b> 条 · Σ <b id="dl-tbl-pts">--</b> 点 ≈ 年吞吐份额 <b id="dl-tbl-share">--</b> 点 × 5% 抽样</span>
+        </div>
+        <div class="dl-table">
+          <div class="dl-thead">
+            <span>特性</span><span>所属版本</span><span>状态</span><span>故事点</span>
+          </div>
+          <ul class="dl-tbody" id="dl-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右栏：竞品对标雷达 + 投入与营收回报 -->
+    <div class="dl-col">
+      <section class="dl-panel" style="flex: 1;">
+        <div class="dl-panel-head">
+          <h2>竞品对标雷达</h2>
+          <span class="dl-panel-tag">六维自评（0–100） · 净优势 <b id="dl-radar-adv">--</b> 分</span>
+        </div>
+        <div class="dl-chart" id="dl-chart-radar"></div>
+      </section>
+      <section class="dl-panel" style="flex: 1;">
+        <div class="dl-panel-head">
+          <h2>投入与营收回报</h2>
+          <span class="dl-panel-tag">近 24 月 · 2026 投入 Σ <b id="dl-roi-inv">--</b> 亿 · 近 12 月产出比 <b id="dl-roi-ratio">--</b></span>
+        </div>
+        <div class="dl-chart" id="dl-chart-roi"></div>
+      </section>
+    </div>
+
+    <!-- 底部口径与要点 -->
+    <div class="dl-foot">
+      <div class="dl-foot-tag">口径与要点</div>
+      <div class="dl-foot-view"><div class="dl-foot-track" id="dl-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("dl-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("dl-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const ts = (str) => +new Date(str + "T00:00:00");
+  const DAY = 86400000;
+  const fmtDate = (t) => { const d = new Date(t); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  const hexA = (hex, a) => {
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    return "rgba(" + r + "," + g + "," + b + "," + a + ")";
+  };
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技）
+         口径与全系列基准盘（docs/RndIpdThemed.md §2.2/§2.3）一致：
+         四产品线在研 15 + 12 + 11 + 10 = 48 个；四产品线投入 6.8 + 5.9 + 4.6 + 4.1 = 21.4 亿元；
+         版本火车与父页 P1（产品组合与路标）同源同表；年故事点吞吐 = Σ 12 团队速率 × 26 = 19,396 点。
+         合计一律由分项求和，比率一律现算，页面上不出现任何硬编码的合计值。 ===== */
+
+  const TODAY = ts("2026-08-20");                /* 今日线（与父页路标甘特同源） */
+  const ROAD_MIN = ts("2026-01-01");             /* 路标窗口起点 */
+  const ROAD_MAX = ts("2027-06-30");             /* 路标窗口终点 */
+  const PARENT = "大屏样板间-研发产品组合与路标1920.html";
+
+  /* 4.1 四条产品线（切换器对象集，tab 文本与契约 §6 逐字）：在研项目 / 年度投入（亿元） */
+  const LINES = [
+    { name: "智家终端",   active: 15, inv: 6.8 },
+    { name: "云平台服务", active: 12, inv: 5.9 },
+    { name: "AIoT模组",   active: 11, inv: 4.6 },
+    { name: "行业方案",   active: 10, inv: 4.1 }
+  ];
+
+  /* 4.2 版本火车（与父页 P1 同源同表，勿另编）：line = LINES 下标（只用索引关联，不放对象引用）；
+         state：done 已发布 / dev 在研 / plan 规划；stage = IPD 阶段口径（契约 §2.3 八重点项目逐字）。 */
+  const SEGS = [
+    { line: 0, name: "星澜S1",      s: "2026-01-05", e: "2026-05-20", state: "done", stage: "已发布" },
+    { line: 0, name: "星澜Pro2",    s: "2026-05-25", e: "2026-10-20", state: "dev",  stage: "Verify" },
+    { line: 0, name: "星澜S3",      s: "2026-10-25", e: "2027-03-20", state: "dev",  stage: "Develop" },
+    { line: 0, name: "星澜S4",      s: "2027-03-25", e: "2027-06-20", state: "plan", stage: "规划" },
+    { line: 1, name: "云枢2.5",     s: "2026-01-10", e: "2026-04-30", state: "done", stage: "已发布" },
+    { line: 1, name: "云枢3.0",     s: "2026-05-10", e: "2026-11-30", state: "dev",  stage: "Develop" },
+    { line: 1, name: "云盾2.1",     s: "2026-12-05", e: "2027-05-31", state: "plan", stage: "Plan" },
+    { line: 2, name: "澜芯M50",     s: "2026-02-01", e: "2026-06-15", state: "done", stage: "已发布" },
+    { line: 2, name: "澜芯M60",     s: "2026-06-20", e: "2026-12-31", state: "dev",  stage: "Develop" },
+    { line: 2, name: "澜芯M80",     s: "2027-01-10", e: "2027-06-20", state: "plan", stage: "Concept" },
+    { line: 3, name: "智楼4.5",     s: "2026-01-15", e: "2026-05-31", state: "done", stage: "已发布" },
+    { line: 3, name: "智楼5.0",     s: "2026-06-10", e: "2026-09-30", state: "dev",  stage: "Launch" },
+    { line: 3, name: "车联1.0",     s: "2026-10-10", e: "2027-02-28", state: "dev",  stage: "Verify" },
+    { line: 3, name: "智慧园区6.0", s: "2027-03-10", e: "2027-06-25", state: "plan", stage: "规划" }
+  ];
+  SEGS.forEach((g) => { g.sTs = ts(g.s); g.eTs = ts(g.e); });
+  const STATE = {
+    done: { label: "已发布", color: C.green  },
+    dev:  { label: "在研",   color: C.blue   },
+    plan: { label: "规划",   color: C.violet }
+  };
+
+  /* 权威版本表（勾稽自检用：每线区块数量与名称必须与上表一致——上表即父页 P1 权威口径的克隆） */
+  const AUTH_VERSIONS = {
+    "智家终端":   ["星澜S1", "星澜Pro2", "星澜S3", "星澜S4"],
+    "云平台服务": ["云枢2.5", "云枢3.0", "云盾2.1"],
+    "AIoT模组":   ["澜芯M50", "澜芯M60", "澜芯M80"],
+    "行业方案":   ["智楼4.5", "智楼5.0", "车联1.0", "智慧园区6.0"]
+  };
+
+  /* 4.3 十二团队速率（契约 §2.3 逐字）：年故事点吞吐 = Σ 速率 × 26，用于折算各线年吞吐份额 */
+  const TEAMS = [
+    { name: "天枢", vel: 82 }, { name: "天璇", vel: 76 }, { name: "天玑", vel: 71 },
+    { name: "天权", vel: 68 }, { name: "玉衡", vel: 66 }, { name: "开阳", vel: 63 },
+    { name: "摇光", vel: 61 }, { name: "青龙", vel: 58 }, { name: "白虎", vel: 55 },
+    { name: "朱雀", vel: 52 }, { name: "玄武", vel: 49 }, { name: "紫微", vel: 45 }
+  ];
+  const SPRINTS_PER_YEAR = 26;
+
+  /* 4.4 特性清单台账（本页自编二级，估算口径页内注明）：
+         每线 8~10 条当季 Top 特性抽样，[特性, 所属版本, 状态, 故事点]；
+         各线故事点合计 ≈ 该线年吞吐份额（全集团年吞吐 × 该线投入占比）× 5%，页尾自检校验 4%~6% 区间。 */
+  const FEATURES = {
+    "智家终端": [
+      ["全屋联动场景引擎 2.0",      "星澜Pro2", "开发中", 55],
+      ["安防摄像 AI 侦测",          "星澜S3",   "设计中", 46],
+      ["端侧语音唤醒二代",          "星澜Pro2", "联调中", 42],
+      ["多协议网关 Matter 兼容",    "星澜Pro2", "开发中", 38],
+      ["低功耗待机优化",            "星澜Pro2", "已完成", 34],
+      ["分布式设备发现协议",        "星澜S3",   "待排期", 30],
+      ["家庭能耗看板",              "星澜S3",   "设计中", 28],
+      ["OTA 差分升级通道",          "星澜Pro2", "已完成", 21],
+      ["适老化交互模式",            "星澜S4",   "规划中", 14]
+    ],
+    "云平台服务": [
+      ["多租户配额隔离引擎",        "云枢3.0", "开发中", 48],
+      ["设备影子服务 v3",           "云枢3.0", "联调中", 40],
+      ["时序数据冷热分层",          "云枢3.0", "开发中", 36],
+      ["边云协同消息通道",          "云枢3.0", "开发中", 33],
+      ["零信任访问网关",            "云盾2.1", "设计中", 32],
+      ["规则引擎可视化编排",        "云枢3.0", "已完成", 30],
+      ["密钥全生命周期托管",        "云盾2.1", "待排期", 26],
+      ["合规审计报表中心",          "云盾2.1", "规划中", 12],
+      ["API 计量计费 2.0",          "云枢3.0", "已完成", 10]
+    ],
+    "AIoT模组": [
+      ["M60 双频 Wi-Fi 6 射频调优", "澜芯M60", "联调中", 38],
+      ["低功耗蓝牙 Mesh 组网",      "澜芯M60", "开发中", 34],
+      ["端侧轻量推理框架移植",      "澜芯M60", "开发中", 32],
+      ["M80 NPU 算子库预研",        "澜芯M80", "设计中", 30],
+      ["安全启动与固件签名",        "澜芯M60", "已完成", 26],
+      ["多模融合定位预研",          "澜芯M80", "待排期", 20],
+      ["模组产测自动化夹具",        "澜芯M60", "已完成", 18],
+      ["车规级温宽验证方案",        "澜芯M80", "规划中", 10]
+    ],
+    "行业方案": [
+      ["智楼 5.0 能源调度中台",     "智楼5.0",     "联调中", 36],
+      ["车联网关协议栈",            "车联1.0",     "开发中", 32],
+      ["楼宇设备接入适配层",        "智楼5.0",     "已完成", 28],
+      ["车队远程诊断服务",          "车联1.0",     "设计中", 26],
+      ["空间资产可视化底座",        "智楼5.0",     "开发中", 24],
+      ["园区一脸通行方案",          "智慧园区6.0", "待排期", 18],
+      ["园区碳排监测套件",          "智慧园区6.0", "规划中", 12],
+      ["行业交付工具链 2.0",        "智楼5.0",     "已完成", 10]
+    ]
+  };
+  const FEAT_STATUS = {
+    "已完成": "is-done", "开发中": "is-dev", "联调中": "is-joint",
+    "设计中": "is-design", "待排期": "is-wait", "规划中": "is-plan"
+  };
+  const SAMPLE_RATE = 0.05;                       /* 台账抽样口径：≈ 年吞吐份额 × 5% */
+
+  /* 4.5 竞品对标雷达（六维自编自评 0~100）：本司 vs 主要竞品均值 */
+  const RADAR_DIMS = ["性能", "生态", "成本", "智能化", "可靠性", "服务"];
+  const RADAR = {
+    "智家终端":   { own: [88, 82, 74, 86, 85, 80], rival: [84, 78, 80, 79, 82, 76] },
+    "云平台服务": { own: [85, 79, 70, 88, 90, 84], rival: [82, 84, 76, 81, 86, 78] },
+    "AIoT模组":   { own: [83, 72, 82, 78, 86, 74], rival: [86, 76, 78, 74, 84, 72] },
+    "行业方案":   { own: [80, 76, 72, 84, 83, 86], rival: [78, 80, 78, 80, 81, 79] }
+  };
+
+  /* 4.6 投入与营收回报（24 月 = 2025-01 → 2026-12）：
+         月度投入由权重归一生成，2026 年 12 月之和**恰等于**契约年度投入（6.8/5.9/4.6/4.1 亿），
+         2025 年为参考期（≈ 契约值 × 0.88）；营收回报为自编月度曲线，产出比现算。 */
+  const MONTHS = Array.from({ length: 24 }, (_, j) => {
+    const y = 2025 + Math.floor(j / 12), m = j % 12 + 1;
+    return String(y).slice(2) + "-" + pad(m);
+  });
+  const ROI_K = [2.9, 2.4, 2.1, 2.6];             /* 各线年营收 ≈ 年投入 × 回报系数（自编） */
+  function buildRoi(li) {
+    const inv = LINES[li].inv;
+    const w = Array.from({ length: 24 }, (_, j) =>
+      1 + 0.18 * Math.sin(j * 0.9 + li * 1.3) + 0.06 * Math.cos(j * 1.7 + li * 0.7));
+    const s25 = inv * 0.88 / sum(w.slice(0, 12));  /* 2025 参考期 */
+    const s26 = inv / sum(w.slice(12));            /* 2026：归一保证 Σ == 契约投入 */
+    const invM = w.map((v, j) => v * (j < 12 ? s25 : s26));
+    const revAnnual = inv * ROI_K[li];
+    const revM = Array.from({ length: 24 }, (_, j) =>
+      revAnnual / 12 * (0.72 + 0.56 * j / 23) * (1 + 0.05 * Math.sin(j * 1.3 + li * 0.8)));
+    return { invM: invM, revM: revM };
+  }
+  const ROI = LINES.map((_, li) => buildRoi(li));
+
+  /* ===== 4.7 派生量：全部现算，不复制数字 ===== */
+  const D = {};
+  D.proj = sum(LINES.map((l) => l.active));                       /* 四线在研合计（应 = 48） */
+  D.inv = sum(LINES.map((l) => l.inv));                           /* 四线投入合计（应 = 21.4） */
+  D.velSum = sum(TEAMS.map((t) => t.vel));
+  D.throughput = D.velSum * SPRINTS_PER_YEAR;                     /* 年故事点吞吐（应 = 19,396） */
+
+  LINES.forEach((l, i) => {
+    l.segIdx = SEGS.map((g, gi) => gi).filter((gi) => SEGS[gi].line === i);   /* 索引关联，无对象回指 */
+    l.feats = FEATURES[l.name];
+    l.pts = sum(l.feats.map((f) => f[3]));                        /* 台账故事点合计 = 分项之和 */
+    l.share = D.throughput * l.inv / D.inv;                       /* 该线年吞吐份额（按投入占比折算） */
+    l.sampleRatio = l.pts / l.share;                              /* 抽样占比（应落 4%~6%） */
+    /* 主力版本 = 唯一覆盖今日线的在研区块 */
+    l.mains = l.segIdx.filter((gi) => {
+      const g = SEGS[gi];
+      return g.state === "dev" && g.sTs <= TODAY && TODAY <= g.eTs;
+    });
+    l.stateCnt = { done: 0, dev: 0, plan: 0 };
+    l.segIdx.forEach((gi) => { l.stateCnt[SEGS[gi].state] += 1; });
+    const rd = RADAR[l.name];
+    l.adv = sum(rd.own.map((v, k) => v - rd.rival[k])) / RADAR_DIMS.length;   /* 竞品净优势均分 */
+    l.advBest = RADAR_DIMS.map((d, k) => [d, rd.own[k] - rd.rival[k]]).sort((a, b) => b[1] - a[1]);
+    l.inv26 = sum(ROI[i].invM.slice(12));                          /* 2026 投入 Σ（应 == 契约值） */
+    l.rev26 = sum(ROI[i].revM.slice(12));
+    l.roiRatio = l.rev26 / l.inv26;                                /* 近 12 月产出比 */
+  });
+  D.mainsOk = LINES.every((l) => l.mains.length === 1);
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("dl-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("dl-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("dl-meta-segs").textContent = fmtDec(SEGS.length, 0);
+
+  /* ===== 6. 产品线切换器（对象切换器：tab 文本与契约 §6 hash 键逐字一致） ===== */
+  const switcher = $("dl-switcher");
+  switcher.innerHTML = LINES.map((l, i) => (
+    '<button class="dl-sw-tab" type="button" data-i="' + i + '" title="切换到' + l.name + '（← → 方向键）">' +
+      "<b>" + l.name + "</b><span>在研 " + l.active + " 个 · " + fmtDec(l.inv, 1) + " 亿</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".dl-sw-tab"));
+
+  /* ===== 7. 底部口径与要点（★ 图表 init 之前填充；全部由派生量现算） ===== */
+  const FOOT_ITEMS = [
+    { tag: "口径", t: "特性台账为各线当季 Top 特性抽样：故事点合计 ≈ 该线年吞吐份额（全集团 " +
+        fmtInt(D.throughput) + " 点 × 投入占比）× " + fmtDec(SAMPLE_RATE * 100, 0) + "%，页尾自检校验 4%–6% 区间" },
+    { tag: "口径", t: "版本火车与父页 P1 产品组合与路标同源同表（" + SEGS.length + " 个区块 · 三态），今日线 " + fmtDate(TODAY) }
+  ].concat(LINES.map((l) => {
+    const m = SEGS[l.mains[0]];
+    return { tag: "要点", t: l.name + "：主力 " + m.name + "（" + m.stage + "）GA " + fmtDate(m.eTs) +
+      "（T+" + Math.round((m.eTs - TODAY) / DAY) + " 天）· 在研 " + l.active + " 个 · 台账 " + fmtInt(l.pts) +
+      " 点 / 年份额 " + fmtInt(l.share) + " 点 · 竞品净优势 " + signed(l.adv, 1) + " 分" };
+  }));
+  const track = $("dl-foot-track");
+  const footHtml = FOOT_ITEMS.map((a) => (
+    '<div class="dl-foot-item"><i style="color:' + (a.tag === "口径" ? C.amber : C.blue) + '">[' + a.tag + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = footHtml + footHtml;                          /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 8. 图表初始化 =====
+     ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = {
+    backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  };
+  const trainChart = makeChart("dl-chart-train");
+  const radarChart = makeChart("dl-chart-radar");
+  const roiChart = makeChart("dl-chart-roi");
+
+  /* 8.1 单线版本火车放大：y 轴 = 该线版本（每版本一泳道），custom 区块 + 今日线 + GA 菱形。
+     ★ series.data 只放标量数组 [泳道号, 起 ts, 止 ts, SEGS 全局下标]，区块详情经下标闭包取，不放对象引用 */
+  function trainOption(li) {
+    const l = LINES[li];
+    const laneNames = l.segIdx.map((gi) => SEGS[gi].name);
+    const data = l.segIdx.map((gi, k) => ({ name: SEGS[gi].name, value: [k, SEGS[gi].sTs, SEGS[gi].eTs, gi] }));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 28, top: 34, bottom: 6, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          if (p.seriesType === "scatter" && p.data && p.data.length === 3) {
+            const g = SEGS[p.data[2]];
+            return "<b>" + g.name + "</b> GA 里程碑<br/>计划 " + fmtDate(g.eTs) +
+              " · 距今日 <b style=\"color:" + C.amber + "\">" + Math.round((g.eTs - TODAY) / DAY) + "</b> 天";
+          }
+          if (!p.value || p.value.length < 4) return "";
+          const g = SEGS[p.value[3]];
+          const st = STATE[g.state];
+          return "<b>" + g.name + "</b>　<span style=\"color:" + st.color + "\">" + st.label +
+            (g.state === "dev" ? " · " + g.stage : "") + "</span><br/>" +
+            LINES[g.line].name + " · 窗口 " + g.s + " → " + g.e +
+            "<br/>GA 距今日 <b style=\"color:" + C.amber + "\">" + Math.round((g.eTs - TODAY) / DAY) + "</b> 天";
+        }
+      }, TIP),
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 },
+        data: [STATE.done.label, STATE.dev.label, STATE.plan.label]
+      },
+      xAxis: {
+        type: "time", min: ROAD_MIN, max: ROAD_MAX,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, {
+          formatter: (v) => { const d = new Date(v); return d.getFullYear() + "-" + pad(d.getMonth() + 1); }
+        }),
+        splitLine: SPLIT_LINE
+      },
+      yAxis: {
+        type: "category", data: laneNames, inverse: true,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: "#bcd2f8", fontSize: 13, fontWeight: 700 },
+        splitLine: { show: false }
+      },
+      series: [
+        /* 图例代理系列（空数据，只为三态图例配色） */
+        { name: STATE.done.label, type: "scatter", data: [], itemStyle: { color: STATE.done.color } },
+        { name: STATE.dev.label,  type: "scatter", data: [], itemStyle: { color: STATE.dev.color } },
+        { name: STATE.plan.label, type: "scatter", data: [], itemStyle: { color: STATE.plan.color } },
+        {
+          type: "custom", id: "dl-train", data: data, z: 4,
+          encode: { x: [1, 2], y: 0 },
+          renderItem: (params, api) => {
+            const lane = api.value(0);
+            const start = api.coord([api.value(1), lane]);
+            const end = api.coord([api.value(2), lane]);
+            const g = SEGS[api.value(3)];
+            const st = STATE[g.state];
+            const h = Math.min(44, api.size([0, 1])[1] * 0.52);
+            const rect = { x: start[0], y: start[1] - h / 2, width: Math.max(2, end[0] - start[0]), height: h };
+            const clipped = echarts.graphic.clipRectByRect(rect, {
+              x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height
+            });
+            if (!clipped) return null;
+            const label = g.name + " · " + g.stage;
+            return {
+              type: "group",
+              children: [
+                { type: "rect", shape: Object.assign({ r: 7 }, clipped),
+                  style: { fill: hexA(st.color, g.state === "plan" ? 0.16 : 0.28), stroke: st.color, lineWidth: 1.5,
+                    lineDash: g.state === "plan" ? [5, 4] : null } },
+                { type: "rect", shape: { x: clipped.x, y: clipped.y, width: 4, height: clipped.height, r: [3, 0, 0, 3] },
+                  style: { fill: st.color } },
+                { type: "text",
+                  style: { x: clipped.x + clipped.width / 2, y: clipped.y + clipped.height / 2,
+                    text: clipped.width > 96 ? label : (clipped.width > 52 ? g.name : ""),
+                    align: "center", verticalAlign: "middle",
+                    fill: "#eaf1ff", fontSize: 12, fontWeight: 700 } }
+              ]
+            };
+          },
+          markLine: {
+            silent: true, symbol: "none", z: 10,
+            lineStyle: { color: C.amber, width: 1.8, type: "solid" },
+            label: { show: true, position: "insideEndTop", color: C.amber, fontSize: 11.5, fontWeight: 700,
+              formatter: "今日 " + fmtDate(TODAY) },
+            data: [{ xAxis: TODAY }]
+          }
+        },
+        { /* GA 里程碑菱形：该线在研区块的 GA 日期（value = [ts, 泳道号, SEGS 下标]，仍是纯标量） */
+          type: "scatter", symbol: "diamond", symbolSize: 12, z: 6,
+          data: l.segIdx
+            .map((gi, k) => [gi, k])
+            .filter((x) => SEGS[x[0]].state === "dev")
+            .map((x) => [SEGS[x[0]].eTs, x[1], x[0]]),
+          itemStyle: { color: C.amber, borderColor: "#081231", borderWidth: 1.2 }
+        }
+      ]
+    };
+  }
+
+  /* 8.2 竞品对标雷达：六维自评，本司 vs 竞品均值 */
+  function radarOption(li) {
+    const l = LINES[li];
+    const rd = RADAR[l.name];
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          if (!p.data || !p.data.value) return "";
+          return "<b>" + l.name + " · " + p.data.name + "</b><br/>" + RADAR_DIMS.map((d, k) => (
+            d + " <b style=\"color:" + (p.data.name === "本司" ? C.blue : C.orange) + "\">" +
+            p.data.value[k] + "</b>"
+          )).join("<br/>");
+        }
+      }, TIP),
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: ["本司", "竞品均值"]
+      },
+      radar: {
+        center: ["50%", "56%"], radius: "66%", splitNumber: 4, shape: "polygon",
+        indicator: RADAR_DIMS.map((d) => ({ name: d, max: 100 })),
+        axisName: { color: "#bcd2f8", fontSize: 12.5, fontWeight: 700 },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.24)" } },
+        splitLine: { lineStyle: { color: "rgba(96,140,255,.18)" } },
+        splitArea: { areaStyle: { color: ["rgba(92,157,255,.04)", "transparent"] } }
+      },
+      series: [{
+        type: "radar", symbolSize: 5,
+        data: [
+          { name: "竞品均值", value: rd.rival.slice(),
+            lineStyle: { color: C.orange, width: 1.6, type: "dashed" },
+            itemStyle: { color: C.orange }, areaStyle: { color: "rgba(255,157,92,.06)" } },
+          { name: "本司", value: rd.own.slice(),
+            lineStyle: { color: C.blue, width: 2.4 }, itemStyle: { color: C.blue },
+            areaStyle: { color: new echarts.graphic.RadialGradient(0.5, 0.5, 0.9, [
+              { offset: 0, color: "rgba(92,157,255,.06)" }, { offset: 1, color: "rgba(92,157,255,.34)" }]) } }
+        ]
+      }]
+    };
+  }
+
+  /* 8.3 投入与营收回报双轴（24 月）：投入柱（2025 参考期淡色）+ 营收线 */
+  function roiOption(li) {
+    const roi = ROI[li];
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 10, top: 36, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const j = ps[0].dataIndex;
+          return "<b>20" + MONTHS[j] + "</b><br/>投入 <b style=\"color:" + C.blue + "\">" +
+            fmtDec(roi.invM[j], 2) + "</b> 亿元 · 营收 <b style=\"color:" + C.amber + "\">" +
+            fmtDec(roi.revM[j], 2) + "</b> 亿元";
+        }
+      }, TIP),
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: ["月度投入", "月度营收"]
+      },
+      xAxis: {
+        type: "category", data: MONTHS,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 1, fontSize: 10 })
+      },
+      yAxis: [
+        { type: "value", name: "投入 亿", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false } },
+        { type: "value", name: "营收 亿", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: AXIS_LABEL, splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "月度投入", type: "bar", barWidth: "52%",
+          data: roi.invM.map((v, j) => ({
+            value: v,
+            itemStyle: j < 12
+              ? { color: "rgba(92,157,255,.3)", borderRadius: [3, 3, 0, 0] }
+              : { borderRadius: [3, 3, 0, 0],
+                  color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                    { offset: 0, color: C.blue }, { offset: 1, color: "rgba(47,111,214,.35)" }]) }
+          })),
+          markArea: {
+            silent: true,
+            itemStyle: { color: "rgba(127,146,196,.06)" },
+            label: { show: true, position: "insideTop", color: C.textDim, fontSize: 10.5,
+              formatter: "2025 参考期" },
+            data: [[{ xAxis: MONTHS[0] }, { xAxis: MONTHS[11] }]]
+          } },
+        { name: "月度营收", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 5, z: 5,
+          data: roi.revM.map((v) => Number(fmtDec(v, 3))),
+          lineStyle: { width: 2.4, color: C.amber }, itemStyle: { color: C.amber },
+          areaStyle: { color: "rgba(255,194,77,.08)" } }
+      ]
+    };
+  }
+
+  /* ===== 9. KPI 带 + 特性台账（随产品线切换重绘） ===== */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+
+  const band = $("dl-band");
+  function renderKpi(li) {
+    const l = LINES[li];
+    const m = SEGS[l.mains[0]];
+    const gaDays = Math.round((m.eTs - TODAY) / DAY);
+    const defs = [
+      { icon: "◈", label: "在研项目", val: l.active, unit: "个", dec: 0, warn: false,
+        sub: "占四线 " + fmtDec(D.proj, 0) + " 个的 <b>" + fmtDec(l.active / D.proj * 100, 1) + "%</b>" },
+      { icon: "¥", label: "年度投入", val: l.inv, unit: "亿元", dec: 1, warn: false,
+        sub: "占四线 " + fmtDec(D.inv, 1) + " 亿的 <b>" + fmtDec(l.inv / D.inv * 100, 1) + "%</b>" },
+      { icon: "⚑", label: "主力版本", text: m.name, warn: gaDays <= 45,
+        sub: m.stage + " · GA " + fmtDate(m.eTs) + " · <b>T+" + gaDays + " 天</b>" },
+      { icon: "▤", label: "版本区块", val: l.segIdx.length, unit: "个", dec: 0, warn: false,
+        sub: "已发布 <b>" + l.stateCnt.done + "</b> · 在研 <b>" + l.stateCnt.dev + "</b> · 规划 <b>" + l.stateCnt.plan + "</b>" },
+      { icon: "☰", label: "台账故事点", val: l.pts, unit: "点", dec: 0, warn: false,
+        sub: "≈ 年份额 " + fmtInt(l.share) + " 点 × <b>" + fmtDec(l.sampleRatio * 100, 1) + "%</b> 抽样" },
+      { icon: "◎", label: "竞品净优势", val: l.adv, unit: "分", dec: 1, warn: l.adv < 1,
+        sub: "最强 <b>" + l.advBest[0][0] + " " + signed(l.advBest[0][1], 0) + "</b> · 最弱 <b>" +
+          l.advBest[l.advBest.length - 1][0] + " " + signed(l.advBest[l.advBest.length - 1][1], 0) + "</b>" }
+    ];
+    band.innerHTML = defs.map((k, i) => (
+      '<div class="dl-kpi' + (k.warn ? " is-warn" : "") + '">' +
+        '<div class="dl-kpi-icon">' + k.icon + "</div>" +
+        '<div class="dl-kpi-main">' +
+          '<div class="dl-kpi-label">' + k.label + "</div>" +
+          (k.text != null
+            ? '<div class="dl-kpi-num"><span class="dl-kpi-val is-text">' + k.text + "</span></div>"
+            : '<div class="dl-kpi-num"><span class="dl-kpi-val" id="dl-kpi-' + i + '">0</span><span class="dl-kpi-unit">' + k.unit + "</span></div>") +
+          '<div class="dl-kpi-sub">' + k.sub + "</div>" +
+        "</div>" +
+      "</div>"
+    )).join("");
+    defs.forEach((k, i) => { if (k.text == null) countUp($("dl-kpi-" + i), k.val, k.dec); });
+  }
+
+  const tbody = $("dl-tbody");
+  let ledgerRows = [];
+  function renderLedger(li) {
+    const l = LINES[li];
+    tbody.innerHTML = l.feats.map((f, i) => (
+      '<li data-i="' + i + '">' +
+        '<span class="dl-cell-feat"><b>' + f[0] + "</b></span>" +
+        '<span class="dl-cell-ver">' + f[1] + "</span>" +
+        '<span><span class="dl-badge ' + (FEAT_STATUS[f[2]] || "") + '">' + f[2] + "</span></span>" +
+        "<span><b>" + f[3] + "</b></span>" +
+      "</li>"
+    )).join("");
+    ledgerRows = Array.from(tbody.children);
+    $("dl-tbl-cnt").textContent = fmtDec(l.feats.length, 0);
+    $("dl-tbl-pts").textContent = fmtInt(l.pts);
+    $("dl-tbl-share").textContent = fmtInt(l.share);
+    $("dl-meta-feats").textContent = fmtDec(l.feats.length, 0);
+  }
+
+  /* ===== 10. 产品线切换主流程 ===== */
+  let idx = 0;
+  let rowIdx = 0;
+  function applyLine(i) {
+    const n = LINES.length;
+    idx = ((i % n) + n) % n;
+    const l = LINES[idx];
+
+    $("dl-title").textContent = l.name + " · 路标详情";
+    $("dl-crumb-obj").textContent = l.name;
+    $("dl-chip-inv").textContent = fmtDec(l.inv, 1) + " 亿元";
+    swTabs.forEach((t, k) => t.classList.toggle("is-active", k === idx));
+
+    renderKpi(idx);
+    renderLedger(idx);
+
+    trainChart.setOption(trainOption(idx), true);                 /* 泳道数随线变化 → notMerge */
+    radarChart.setOption(radarOption(idx), true);
+    roiChart.setOption(roiOption(idx), true);
+
+    $("dl-train-cnt").textContent = fmtDec(l.segIdx.length, 0);
+    $("dl-radar-adv").textContent = signed(l.adv, 1);
+    $("dl-roi-inv").textContent = fmtDec(l.inv26, 1);
+    $("dl-roi-ratio").textContent = fmtDec(l.roiRatio, 2) + "x";
+
+    rowIdx = 0;
+    playRow();
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(l.name));
+  }
+
+  /* 台账行轮播高亮，制造"活性" */
+  function playRow() {
+    if (!ledgerRows.length) return;
+    ledgerRows.forEach((r, i) => r.classList.toggle("is-active", i === rowIdx));
+    rowIdx = (rowIdx + 1) % ledgerRows.length;
+  }
+  setInterval(playRow, 2600);
+
+  /* 竞品雷达两序列交替高亮 */
+  let radarIdx = 0;
+  setInterval(() => {
+    radarChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    radarChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: radarIdx });
+    radarIdx = (radarIdx + 1) % 2;
+  }, 3400);
+
+  /* ROI 月度轮播提示 */
+  let monthIdx = 12;
+  setInterval(() => {
+    roiChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: monthIdx });
+    monthIdx = monthIdx + 1 >= MONTHS.length ? 12 : monthIdx + 1;   /* 只巡 2026 考核期 */
+  }, 3000);
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 ===== */
+  swTabs.forEach((t) => t.addEventListener("click", () => { applyLine(Number(t.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyLine(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyLine(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* hash 契约：decodeURIComponent(location.hash.slice(1)) → trim + 全角空白剔除归一 → 匹配四产品线名 */
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    return LINES.findIndex((l) => l.name === s);
+  }
+  const hit = resolveHash(location.hash);
+  applyLine(hit >= 0 ? hit : 0);
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applyLine(k); restart(); }
+  });
+
+  /* kiosk 常驻：每 16 秒切下一产品线；鼠标停在切换器上时暂停 */
+  let timer = null;
+  function restart() { clearInterval(timer); timer = setInterval(() => applyLine(idx + 1), 16000); }
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const EPS = 1e-6;
+  const checks = [
+    ["四线在研 Σ = 48 个", D.proj === 48],
+    ["四线投入 Σ = 21.4 亿元", Math.abs(D.inv - 21.4) < EPS],
+    ["年故事点吞吐 19,396 = Σ 12 团队速率 × 26", D.throughput === 19396],
+    ["每线版本表与权威表数量一致且名称逐字", LINES.every((l, i) => {
+      const names = SEGS.filter((g) => g.line === i).map((g) => g.name);
+      const auth = AUTH_VERSIONS[l.name];
+      return !!auth && names.length === auth.length && names.every((n, k) => n === auth[k]);
+    })],
+    ["hash 四线名均可解析（构造性断言）", LINES.every((l, i) => resolveHash("#" + encodeURIComponent(l.name)) === i)],
+    ["每线主力版本唯一且覆盖今日线", D.mainsOk],
+    ["每线特性 8~10 条", LINES.every((l) => l.feats.length >= 8 && l.feats.length <= 10)],
+    ["各线台账故事点合计 = 分项之和且占年份额 4%~6%",
+      LINES.every((l) => l.pts === sum(l.feats.map((f) => f[3])) && l.sampleRatio >= 0.04 && l.sampleRatio <= 0.06)],
+    ["特性所属版本均在该线权威版本表内",
+      LINES.every((l) => l.feats.every((f) => AUTH_VERSIONS[l.name].indexOf(f[1]) >= 0))],
+    ["各线 2026 年 12 月投入 Σ = 契约年度投入", LINES.every((l) => Math.abs(l.inv26 - l.inv) < EPS)],
+    ["竞品雷达六维齐全（本司 / 竞品两序列）",
+      LINES.every((l) => RADAR[l.name].own.length === RADAR_DIMS.length && RADAR[l.name].rival.length === RADAR_DIMS.length)],
+    ["切换器 tab 数 = 4 且文本与契约 hash 键逐字", swTabs.length === 4 &&
+      swTabs.every((t, i) => t.querySelector("b").textContent === LINES[i].name)]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单产品线路标详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

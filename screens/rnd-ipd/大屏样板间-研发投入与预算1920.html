@@ -151,6 +151,27 @@
   .ty-up { color: var(--rnd-orange); }
   .ty-note { flex: none; margin-top: 6px; font-size: 10.5px; line-height: 1.5; color: rgba(127, 146, 196, 0.75); letter-spacing: 0.02em; }
   .ty-note b { font-weight: 700; color: rgba(255, 194, 77, 0.8); }
+  /* subnav:begin —— 由 tools/inject_subnav_rnd.py 注入，勿手改 */
+  .ty-subnav {
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; flex: none;
+    min-width: 176px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(96, 140, 255, 0.34); background: rgba(18, 34, 78, 0.55);
+  }
+  .ty-subnav > span { font-size: 10.5px; letter-spacing: 0.16em; color: #7f92c4; white-space: nowrap; }
+  .ty-subnav > u { display: flex; align-items: baseline; gap: 6px; text-decoration: none; white-space: nowrap; }
+  .ty-subnav b { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; color: #a3b4dc; }
+  .ty-subnav i { font-style: normal; font-size: 10.5px; color: #7f92c4; }
+  /* 有子页：转星蓝并可点击 */
+  .ty-subnav.is-on {
+    cursor: pointer; border-color: rgba(92, 157, 255, 0.55);
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.16), rgba(18, 34, 78, 0.6));
+    box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1);
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .ty-subnav.is-on b { color: #9cc2ff; }
+  .ty-subnav.is-on i { color: #6f8ec4; }
+  .ty-subnav.is-on:hover { border-color: rgba(92, 157, 255, 0.95); box-shadow: 0 0 16px -2px rgba(92, 157, 255, 0.7); }
+  /* subnav:end */
   /* carousel:begin —— 由 tools/inject_carousel_rnd.py 注入，勿手改，改脚本后重跑 */
   .ty-carousel {
     display: flex; align-items: center; gap: 9px; flex: none;
@@ -222,11 +243,16 @@
         </div>
       </div>
       <div class="ty-head-right">
+<!-- subnav:begin -->
+<!--ORIG
         <div class="ty-chips">
           <div class="ty-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
           <div class="ty-chip is-key"><span>年度研发投入</span><b id="ty-chip-inv">--</b></div>
           <div class="ty-chip is-key"><span>研发费率</span><b id="ty-chip-rate">--</b></div>
         </div>
+ORIG-->
+        <div class="ty-subnav" title="本专题页没有二级详情子页"><span>二级子页 · SUB-PAGE</span><u><b>本页无</b><i>· 详见门户页导航</i></u></div><span id="ty-chip-inv" hidden></span><span id="ty-chip-rate" hidden></span>
+        <!-- subnav:end -->
         <div class="ty-clock" aria-label="实时时钟">
           <span class="ty-clock-time" id="ty-clock-time">--:--:--</span>
           <span class="ty-clock-date" id="ty-clock-date">----年--月--日 星期-</span>
@@ -817,7 +843,9 @@
   let elapsed = 0;               /* 本页已停留毫秒 */
   let last = Date.now();
   let userPaused = false;        /* 用户点了暂停 */
-  let hidden = false;            /* 标签页被切到后台 */
+  /* ★ 初值必须实读 document.hidden：页面若在后台标签页加载，不会收到 visibilitychange，
+     写死 false 会让计时器在后台照走、页面无人看时自己翻页（厨电版同款潜在问题） */
+  let hidden = document.hidden;
 
   function render() {
     const pct = Math.min(100, elapsed / (SECONDS * 1000) * 100);

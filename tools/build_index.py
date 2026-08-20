@@ -285,6 +285,7 @@ def scan_file(path: Path) -> dict:
 THEME_ORDER = {
     "公共资金专题": ("大屏样板间-公共资金专题总览1920.html", "inject_carousel", "inject_drilldown"),
     "厨电制造专题": ("大屏样板间-厨电经营驾驶舱1920.html", "inject_carousel_kitchen", "inject_drilldown_kitchen"),
+    "研发管理专题": ("大屏样板间-研发经营驾驶舱1920.html", "inject_carousel_rnd", "inject_drilldown_rnd"),
 }
 
 
