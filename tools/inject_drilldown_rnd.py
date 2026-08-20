@@ -46,6 +46,31 @@ SUB_JX = "大屏样板间-研发单集成基线详情1920.html"
 SUB_PC = "大屏样板间-研发单样机批次详情1920.html"
 SUB_ML = "大屏样板间-研发单模型详情1920.html"
 SUB_BY = "大屏样板间-研发单中心详情1920.html"
+SUB_QJ = "大屏样板间-研发园区数字孪生1920.html"
+# ---- 二期补齐（S12–S18）：7 个原本没有子页的专题页各配 1 个 ----
+SUB_YZ = "大屏样板间-研发单投入类别详情1920.html"
+SUB_GC = "大屏样板间-研发单仓库群工程详情1920.html"
+SUB_RZ = "大屏样板间-研发线上事件台账1920.html"
+SUB_LJ = "大屏样板间-研发单链路节点详情1920.html"
+SUB_RL = "大屏样板间-研发关键岗位与招聘台账1920.html"
+SUB_SM = "大屏样板间-研发开源合规与技术债台账1920.html"
+SUB_ZB = "大屏样板间-研发单维度追溯详情1920.html"
+
+# 二期新增的对象名词表（与 docs/RndIpdThemed.md §6 逐字一致）
+COSTS5 = ["人力", "样机物料", "云资源算力", "外协", "工具与其他"]
+REPOS5 = ["应用软件", "嵌入式", "云服务", "AI 平台", "工具链"]
+INCLV4 = ["P1", "P2", "P3", "P4"]
+NODES12 = ["需求池", "规划台", "软件集群", "硬件实验室", "云平台集群", "AI算法集群",
+           "CI 构建中心", "单测门", "集成测试台", "系统实验室", "发布列车站", "运营监控塔"]
+# ★ 行级匹配串：`markOne` 会先把元素 textContent 里的**所有空白剔除**再做子串匹配，
+#   所以对象名中带空格的（「CI 构建中心」）必须另给一份无空格的 match，否则永远匹配不上、
+#   该节点静默不可点（实测 16 个 SVG 节点里唯独 ci 漏标）。names 保持契约原文作 hash 键。
+NODES12_MATCH = [n.replace(" ", "") for n in NODES12]
+POSTS10 = ["产品经理", "数据工程", "云平台架构", "测试架构", "硬件结构",
+           "系统架构师", "SRE 站点可靠性", "算法专家", "安全架构", "射频与天线"]
+OSS10 = ["netty", "ffmpeg", "mysql-connector-j", "ghostscript-lite", "qt-embedded",
+         "mongodb-core", "openssl", "tflite-micro", "zlib", "libsass-fork"]
+DIMS6 = ["交付", "质量", "效率", "投入产出", "协同", "人才"]
 
 # ---- 父页接线配置（锚点均实测于页面源码；rows 是 CSS 选择器，names 是 §6 对象名） ----
 # 分波追加：W2 先接一期三对「表格行级」下钻，图表画布级与面板级入口视各波页面实况扩充。
@@ -111,6 +136,70 @@ PAGES = [
         "file": "大屏样板间-研发多中心布局1920.html",
         "targets": [
             {"rows": "#gq-tbody li", "names": SITES6, "sub": SUB_BY},
+        ],
+        # 园区孪生是站点明细表的姊妹视角，行锚已被单中心详情占用（同一批 li 不能挂两条
+        # target，会互相覆盖 dataset.drillSub），故走面板级入口，与行锚互不干扰。
+        "panels": [
+            {"panelTitle": "站点明细表", "label": "园区孪生", "sub": SUB_QJ},
+        ],
+    },
+    # ---- 二期补齐（S12–S18）：7 个原本没有子页的专题页 ----
+    {
+        "file": "大屏样板间-研发投入与预算1920.html",
+        "targets": [
+            {"rows": "#ty-tbody li", "names": COSTS5, "sub": SUB_YZ},
+        ],
+    },
+    {
+        # 该页无表格：走图表画布 click（覆盖率箱线，类目名即五域仓库群）+ 面板级入口兜底
+        "file": "大屏样板间-研发工程效能1920.html",
+        "charts": [
+            {"chartId": "dx-chart-coverage", "names": REPOS5, "sub": SUB_GC},
+        ],
+        "panels": [
+            {"panelTitle": "单测覆盖率箱线", "label": "仓库群详情", "sub": SUB_GC},
+        ],
+    },
+    {
+        # 事件行文本含 P1/P2/P3/P4 等级标记，按等级下钻到台账并定位该等级
+        "file": "大屏样板间-研发云端服务与发布1920.html",
+        "targets": [
+            {"rows": "#cy-list li", "names": INCLV4, "sub": SUB_RZ},
+        ],
+        "panels": [
+            {"panelTitle": "线上事件等级分布", "label": "事件台账", "sub": SUB_RZ},
+        ],
+    },
+    {
+        # 等距 SVG 的 16 个节点组带 data-node，textContent 含节点名原文（已浏览器实测）
+        "file": "大屏样板间-研发交付流水线数字孪生1920.html",
+        "targets": [
+            {"rows": "[data-node]", "names": NODES12, "match": NODES12_MATCH, "sub": SUB_LJ},
+        ],
+        "panels": [
+            {"panelTitle": "链路预警", "label": "节点详情", "sub": SUB_LJ},
+        ],
+    },
+    {
+        # 岗位只存在于图表里（rc-tbody 是六职能，不是岗位），故走画布 click + 面板入口
+        "file": "大屏样板间-研发人才与能力1920.html",
+        "charts": [
+            {"chartId": "rc-chart-post", "names": POSTS10, "sub": SUB_RL},
+        ],
+        "panels": [
+            {"panelTitle": "关键岗位饱和度", "label": "岗位台账", "sub": SUB_RL},
+        ],
+    },
+    {
+        "file": "大屏样板间-研发技术资产与复用1920.html",
+        "targets": [
+            {"rows": "#ta-tbody li", "names": OSS10, "sub": SUB_SM},
+        ],
+    },
+    {
+        "file": "大屏样板间-研发效能指数1920.html",
+        "targets": [
+            {"rows": "#pi-tbody li", "names": DIMS6, "sub": SUB_ZB},
         ],
     },
 ]

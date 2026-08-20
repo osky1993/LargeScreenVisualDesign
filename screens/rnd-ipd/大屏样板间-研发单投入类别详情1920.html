@@ -1,0 +1,1234 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单投入类别详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --yz-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .yz-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 470px 1fr 484px;
+    grid-template-rows: 84px 104px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .yz-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .yz-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .yz-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 8px 8px;
+  }
+  .yz-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .yz-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .yz-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .yz-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .yz-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .yz-crumb em { font-style: normal; color: #d3e2ff; }
+  .yz-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .yz-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .yz-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .yz-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .yz-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .yz-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .yz-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .yz-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 投入类别切换器：五类 tab（← → 方向键 / 14s 自动轮换 / hash 直达） */
+  .yz-switcher { display: flex; align-items: stretch; gap: 6px; }
+  .yz-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 92px; padding: 5px 10px 6px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .yz-sw-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; }
+  .yz-sw-tab span { font-size: 9.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .yz-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .yz-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .yz-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .yz-chips { display: flex; align-items: center; gap: 9px; }
+  .yz-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 126px; padding: 7px 14px; border-radius: 9px;
+    border: 1px solid rgba(96, 140, 255, 0.3); background: rgba(18, 34, 78, 0.55);
+  }
+  .yz-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .yz-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; color: #cfe0ff; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .yz-chip.is-key { border-color: rgba(255, 194, 77, 0.45); background: linear-gradient(160deg, rgba(255, 194, 77, 0.16), rgba(18, 34, 78, 0.6)); }
+  .yz-chip.is-key span { color: #c79a4a; }
+  .yz-chip.is-key b { color: #ffd489; }
+  .yz-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .yz-clock-time { font: 700 26px/1 var(--yz-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .yz-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（整行 6 枚，高度写死） ===== */
+  .yz-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .yz-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 8px 16px;
+  }
+  .yz-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .yz-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .yz-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .yz-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .yz-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .yz-kpi.is-good::after { background: radial-gradient(circle, rgba(111, 224, 154, 0.13), transparent 68%); }
+  .yz-kpi.is-over::before { background: linear-gradient(90deg, var(--rnd-red), transparent); }
+  .yz-kpi.is-over::after { background: radial-gradient(circle, rgba(255, 95, 107, 0.14), transparent 68%); }
+  .yz-kpi-label { font-size: 12.5px; letter-spacing: 0.08em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .yz-kpi-num { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+  .yz-kpi-val { font: 700 29px/1 var(--yz-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .yz-kpi.is-amber .yz-kpi-val { color: #ffd489; }
+  .yz-kpi.is-good .yz-kpi-val { color: #b8f2cf; }
+  .yz-kpi.is-over .yz-kpi-val { color: #ffaeb5; }
+  .yz-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .yz-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .yz-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体 ===== */
+  .yz-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .yz-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .yz-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .yz-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .yz-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .yz-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .yz-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+  .yz-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .yz-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 左栏下：偏差归因文字块（★ 高度写死，避免 JS 填充后压矮同 flex 容器里的图表） ===== */
+  .yz-note {
+    flex: none; height: 108px; min-height: 0; overflow: hidden; margin-top: 6px;
+    display: flex; flex-direction: column; gap: 5px;
+    border-top: 1px solid rgba(96, 140, 255, 0.22); padding-top: 7px;
+  }
+  .yz-note-h { display: flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: 0.08em; }
+  .yz-note-badge { padding: 1px 9px 2px; border-radius: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; }
+  .yz-note-badge.is-over { color: #ffd0d4; background: rgba(255, 95, 107, 0.2); border: 1px solid rgba(255, 95, 107, 0.5); }
+  .yz-note-badge.is-save { color: #c6f4da; background: rgba(111, 224, 154, 0.16); border: 1px solid rgba(111, 224, 154, 0.45); }
+  .yz-note-h span { color: rgba(127, 146, 196, 0.95); font-variant-numeric: tabular-nums; }
+  .yz-note-h span b { font-weight: 700; color: #eaf1ff; }
+  .yz-note-body { font-size: 11.8px; line-height: 1.55; color: #b9cdf5; }
+  .yz-note-body b { font-weight: 700; color: #eaf1ff; }
+  .yz-note-body u { text-decoration: none; color: var(--rnd-amber); font-weight: 700; }
+
+  /* ===== 右栏：Top 支出条目台账（CSS grid 模拟表格，★ 高度写死） ===== */
+  .yz-ledger { flex: none; height: 451px; display: flex; flex-direction: column; gap: 4px; }
+  .yz-thead, .yz-ledger li {
+    display: grid; grid-template-columns: 1.85fr 0.8fr 0.46fr 0.62fr 0.5fr 0.56fr; align-items: center; gap: 7px;
+    padding: 0 9px; font-variant-numeric: tabular-nums;
+  }
+  .yz-thead {
+    flex: none; height: 24px; font-size: 11px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.95);
+    border-bottom: 1px solid rgba(96, 140, 255, 0.22);
+  }
+  .yz-ledger ul { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 3px; overflow: hidden; }
+  .yz-ledger li { border-radius: 6px; font-size: 11.6px; color: #c8d6f2; }
+  .yz-ledger li:nth-child(odd) { background: rgba(96, 140, 255, 0.06); }
+  .yz-ledger li b { font-weight: 700; color: #eaf1ff; }
+  .yz-led-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .yz-led-name em { font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .yz-led-rk { flex: none; width: 17px; text-align: center; font: 700 10px/16px var(--yz-mono); border-radius: 4px; color: #9cc2ff; background: rgba(92, 157, 255, 0.16); }
+  .yz-led-amt { text-align: right; }
+  .yz-led-pct { text-align: right; color: #9cc2ff; }
+  .yz-led-yoy { text-align: right; }
+  .yz-led-yoy.is-up { color: #ffd489; }
+  .yz-led-yoy.is-down { color: #9fe6bd; }
+  .yz-badge { display: inline-block; padding: 0 6px; border-radius: 5px; font-size: 10.5px; letter-spacing: 0.04em; border: 1px solid rgba(96, 140, 255, 0.28); background: rgba(96, 140, 255, 0.1); color: #b9cdf5; }
+  .yz-ledger li.is-rest { background: rgba(169, 140, 245, 0.1); color: #cbbcf7; }
+  .yz-ledger li.is-rest b { color: #e2d8ff; }
+  .yz-ledger li.is-total { background: rgba(255, 194, 77, 0.13); color: #ffd489; font-weight: 700; }
+  .yz-ledger li.is-total b { color: #ffe3ae; }
+
+  /* ===== 底部口径滚动条 ===== */
+  .yz-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .yz-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .yz-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: yz-blink 1.6s ease-in-out infinite; }
+  @keyframes yz-blink { 50% { opacity: 0.35; } }
+  .yz-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .yz-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: yz-ticker 66s linear infinite; will-change: transform; }
+  .yz-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .yz-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes yz-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .yz-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="yz-stage" id="yz-stage">
+    <!-- mockflag:begin --><div class="yz-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="yz-error" id="yz-error" role="alert">ECharts 资源加载失败，KPI、偏差归因与支出台账不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="yz-header">
+      <div class="yz-head-left">
+        <div class="yz-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="yz-crumb-up" href="大屏样板间-研发投入与预算1920.html" title="返回上级专题页（Esc）">‹ 返回 投入与预算</a><i>›</i>
+          <em id="yz-crumb-obj">--</em>
+        </div>
+        <div class="yz-head-title-row">
+          <div class="yz-head-title" id="yz-title">-- · 单投入类别详情</div>
+          <div class="yz-head-meta">
+            <span>年度投入 <b id="yz-meta-inv">--</b> 亿元 · 占总投入 <b id="yz-meta-share">--</b></span><i>|</i>
+            <span>预算 <b id="yz-meta-bud">--</b> 亿元 · 达成 <b id="yz-meta-rate">--</b></span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b>（滚动 24 月）</span>
+          </div>
+        </div>
+      </div>
+      <div class="yz-head-right">
+        <div class="yz-switcher" id="yz-switcher" aria-label="投入类别切换"></div>
+        <div class="yz-chips">
+          <div class="yz-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="yz-chip is-key"><span>TOTAL R&amp;D</span><b id="yz-chip-all">--</b></div>
+        </div>
+        <div class="yz-clock" aria-label="实时时钟">
+          <span class="yz-clock-time" id="yz-clock-time">--:--:--</span>
+          <span class="yz-clock-date" id="yz-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：年度投入 / 占总投入比 / 预算达成率 / 同比 / 月均 / 最大单笔 -->
+    <section class="yz-kpis" aria-label="该类投入核心指标">
+      <div class="yz-kpi">
+        <div class="yz-kpi-label">该类年度投入</div>
+        <div class="yz-kpi-num"><span class="yz-kpi-val" id="yz-kpi-0">0</span><span class="yz-kpi-unit">亿元</span></div>
+        <div class="yz-kpi-sub" id="yz-kpi-0s">--</div>
+      </div>
+      <div class="yz-kpi">
+        <div class="yz-kpi-label">占总投入比</div>
+        <div class="yz-kpi-num"><span class="yz-kpi-val" id="yz-kpi-1">0</span><span class="yz-kpi-unit">%</span></div>
+        <div class="yz-kpi-sub" id="yz-kpi-1s">--</div>
+      </div>
+      <div class="yz-kpi" id="yz-kpi-2box">
+        <div class="yz-kpi-label">预算达成率</div>
+        <div class="yz-kpi-num"><span class="yz-kpi-val" id="yz-kpi-2">0</span><span class="yz-kpi-unit">%</span></div>
+        <div class="yz-kpi-sub" id="yz-kpi-2s">--</div>
+      </div>
+      <div class="yz-kpi is-amber">
+        <div class="yz-kpi-label">同比（对上年基数）</div>
+        <div class="yz-kpi-num"><span class="yz-kpi-val" id="yz-kpi-3">0</span><span class="yz-kpi-unit">%</span></div>
+        <div class="yz-kpi-sub" id="yz-kpi-3s">--</div>
+      </div>
+      <div class="yz-kpi">
+        <div class="yz-kpi-label">月均投入</div>
+        <div class="yz-kpi-num"><span class="yz-kpi-val" id="yz-kpi-4">0</span><span class="yz-kpi-unit">亿元/月</span></div>
+        <div class="yz-kpi-sub" id="yz-kpi-4s">--</div>
+      </div>
+      <div class="yz-kpi">
+        <div class="yz-kpi-label">最大单笔支出</div>
+        <div class="yz-kpi-num"><span class="yz-kpi-val" id="yz-kpi-5">0</span><span class="yz-kpi-unit">亿元</span></div>
+        <div class="yz-kpi-sub" id="yz-kpi-5s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：24 月投入曲线 + 预算执行与偏差 -->
+    <div class="yz-col">
+      <section class="yz-panel" style="flex: 1.04;">
+        <div class="yz-panel-head">
+          <h2>该类 24 月投入曲线</h2>
+          <span class="yz-panel-tag" id="yz-tag-trend">--</span>
+        </div>
+        <div class="yz-chart" id="yz-chart-trend"></div>
+      </section>
+      <section class="yz-panel" style="flex: 0.96;">
+        <div class="yz-panel-head">
+          <h2>预算执行与偏差</h2>
+          <span class="yz-panel-tag" id="yz-tag-budget">--</span>
+        </div>
+        <div class="yz-chart" id="yz-chart-budget"></div>
+        <div class="yz-note" id="yz-note"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：双维拆分（产品线 × 阶段矩阵 + 双向边际条形） -->
+    <div class="yz-col">
+      <section class="yz-panel" style="flex: 1.08;">
+        <div class="yz-panel-head">
+          <h2>双维拆分 · 四产品线 × 六阶段</h2>
+          <span class="yz-panel-tag" id="yz-tag-heat">--</span>
+        </div>
+        <div class="yz-chart" id="yz-chart-heat"></div>
+      </section>
+      <section class="yz-panel" style="flex: 0.92;">
+        <div class="yz-panel-head">
+          <h2>双维边际 · 行和 / 列和</h2>
+          <span class="yz-panel-tag" id="yz-tag-split">--</span>
+        </div>
+        <div class="yz-chart" id="yz-chart-split"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：Top 支出条目台账 + 五类横比 -->
+    <div class="yz-col">
+      <section class="yz-panel" style="flex: none; height: 500px;">
+        <div class="yz-panel-head">
+          <h2>Top 支出条目台账</h2>
+          <span class="yz-panel-tag" id="yz-tag-led">--</span>
+        </div>
+        <div class="yz-ledger">
+          <div class="yz-thead">
+            <span>支出条目</span><span>归属产品线</span><span>阶段</span>
+            <span class="yz-led-amt">金额/亿</span><span class="yz-led-pct">占比</span><span class="yz-led-yoy">同比</span>
+          </div>
+          <ul id="yz-tbody"></ul>
+        </div>
+      </section>
+      <section class="yz-panel" style="flex: 1;">
+        <div class="yz-panel-head">
+          <h2>五类投入横比</h2>
+          <span class="yz-panel-tag" id="yz-tag-peer">--</span>
+        </div>
+        <div class="yz-chart" id="yz-chart-peer"></div>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="yz-foot" aria-label="单投入类别详情口径说明">
+      <div class="yz-foot-label"><span class="yz-foot-dot"></span>投入口径</div>
+      <div class="yz-foot-viewport"><div class="yz-foot-track" id="yz-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("yz-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const yi = (v) => v / 100;                                     /* 0.01 亿 → 亿元 */
+
+  /* ===== 1.1 ★ kiosk 状态量前置声明（必须早于任何 hold() 调用） =====
+     let 有暂时性死区：带 hash 冷启动时若先 hold() 再声明，会抛
+     ReferenceError: Cannot access 'holdUntil' before initialization —— 主脚本整段中断，
+     而页面此时已渲染完，肉眼看不出问题（契约 §8 批次四实测坑）。
+     因此 idx / timer / holdUntil / hold() / restart() 全部提到这里，
+     首次 hold() 调用在下方第 12 节（boot 段），行号严格大于本块。 */
+  let idx = 0;
+  let timer = null;
+  let holdUntil = 0;
+  let holdCalls = 0;                                             /* 供页尾自检做构造性断言 */
+  function hold() { holdCalls += 1; holdUntil = Date.now() + 20000; }
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyCat(idx + 1); }, 14000);
+  }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层：单一数据源，五类投入的全部视图由此派生 =====
+     与父页「研发投入与预算」（ty）逐字同源，口径见 docs/RndIpdThemed.md §2.2 / §5.3 / §6：
+     · 年度研发投入 21.4 亿元 = 五类 人力 12.6 + 样机物料 2.8 + 云资源算力 3.1 + 外协 1.7 + 工具与其他 1.2；
+     · 月度序列 m0（上年基数 2024-09~2025-08）/ m1（本期 2025-09~2026-08）与父页主题河流的同类条带逐字一致，
+       近 12 月 Σ 恰 = 该类年度值——本页曲线即父页河流被「切」出来的单条带；
+     · 预算 13.0 / 2.6 / 2.9 / 1.8 / 1.3 亿元与父页子弹图逐字，样机物料与云资源算力两类超支；
+     · 双维矩阵为二级拆分（本页自编）：五类矩阵逐格相加 == 父页全量矩阵 PARENT_HEAT，
+       故任一类的行和 Σ / 列和 Σ 均 = 该类年度值，且跨五类聚合回四产品线 680/590/460/410
+       与六阶段 130/260/980/420/210/140（父页 §5.3 双向收敛口径）。
+     单位统一为 0.01 亿元（整数保证勾稽精确），显示时 /100 转亿元。 */
+  const LINES = ["智家终端", "云平台服务", "AIoT模组", "行业方案"];        /* 契约 §2.1 四产品线 */
+  const STAGES = ["概念", "计划", "开发", "验证", "发布", "周期"];         /* 契约 §2.1 IPD 六阶段 */
+  const LINE_COL = [C.blue, C.cyan, C.violet, C.amber];
+  /* 父页全量热力矩阵（逐字，作构造性断言的权威基准） */
+  const PARENT_HEAT = [
+    [40, 80, 310, 140, 70, 40],
+    [30, 70, 270, 110, 60, 50],
+    [40, 60, 220, 90, 40, 10],
+    [20, 50, 180, 80, 40, 40]
+  ];
+  const LINE_AUTH = [680, 590, 460, 410];                        /* 四产品线年度投入（契约 §2.2） */
+  const STAGE_AUTH = [130, 260, 980, 420, 210, 140];             /* 六阶段年度投入（父页 §5.3） */
+  const CAT_AUTH = "人力|1260;样机物料|280;云资源算力|310;外协|170;工具与其他|120";  /* 契约 §6 对象集逐字 */
+  const INV_ALL = 2140;                                          /* 年度研发投入 21.4 亿元 */
+
+  const CATS = [
+    {
+      name: "人力", color: C.blue, bud: 1300,
+      note: "六职能 3,860 人薪酬与激励",
+      shape: "全年缓升、2 月春节低谷（26-02 降至 0.99 亿），下半年随交付高峰爬坡至 1.14 亿",
+      why: "编制爬坡慢于预算：AI算法与云平台两个职能的社招到岗延后一个季度，年末在岗 3,860 人达编，" +
+        "但<b>年内平均在岗</b>低于预算假设，形成 <u>0.40 亿</u>结余；春节月 26-02 计薪工日少，是全年唯一回落点。",
+      /* 月度序列（0.01 亿/月）——与父页 CATS[0] 的 m0 / m1 逐字一致 */
+      m0: [96, 97, 97, 98, 99, 95, 100, 100, 101, 102, 104, 106],
+      m1: [100, 101, 102, 103, 104, 99, 105, 106, 107, 108, 111, 114],
+      mat: [[30, 55, 170, 69, 38, 25], [22, 50, 161, 67, 32, 30], [31, 42, 123, 45, 23, 6], [14, 34, 103, 46, 21, 23]],
+      led: [
+        ["星澜S3 整机软件与固件团队", 0, 2, 153, 6.2],
+        ["云枢3.0 平台研发团队", 1, 2, 145, 7.4],
+        ["澜芯M60 SoC 与驱动团队", 2, 2, 111, 5.1],
+        ["智楼5.0 / 车联1.0 方案开发", 3, 2, 93, 8.6],
+        ["星澜Pro2 系统测试与可靠性", 0, 3, 62, 3.4],
+        ["云枢3.0 联调压测与 SRE 值守", 1, 3, 60, 9.2],
+        ["星澜Pro2 计划阶段 PM 与架构", 0, 1, 50, 2.8],
+        ["云盾2.1 安全架构与规划", 1, 1, 45, 11.5],
+        ["车联1.0 验证阶段测试人力", 3, 3, 41, 6.7],
+        ["澜芯M80 计划阶段架构预研", 2, 1, 40, 4.3]
+      ]
+    },
+    {
+      name: "样机物料", color: C.amber, bud: 260,
+      note: "EVT / DVT / PVT 试制与物料认证",
+      shape: "随试制批次脉冲：25-10 EVT2、26-01 DVT1、26-03 DVT2、26-06 PVT1、26-08 M60-EVT1 五个尖峰，峰谷比约 4 倍",
+      why: "两处超支叠加：星澜Pro2 在 DVT2 追加一轮结构件改模与整机料，澜芯M60-EVT1 的射频认证物料涨价，" +
+        "合计 <u>0.20 亿</u>超预算；非批次月（26-02 仅 0.10 亿）已按最小库存压降，仍不足以抵消尖峰增量。",
+      m0: [12, 34, 14, 11, 36, 9, 33, 14, 12, 32, 13, 45],
+      m1: [14, 38, 16, 12, 40, 10, 36, 15, 13, 34, 14, 38],
+      mat: [[1, 8, 70, 47, 10, 3], [0, 1, 6, 4, 1, 0], [2, 7, 54, 32, 6, 1], [0, 1, 13, 10, 2, 1]],
+      led: [
+        ["星澜S3-EVT2 / DVT1 试制物料", 0, 2, 52, 9.8],
+        ["澜芯M60-EVT1 模组样片与封装", 2, 2, 40, 12.4],
+        ["星澜Pro2-DVT2 结构件与整机料", 0, 3, 35, 15.6],
+        ["澜芯M60 可靠性与射频认证物料", 2, 3, 24, 8.1],
+        ["车联1.0 车规样件与台架物料", 3, 2, 10, 6.5],
+        ["星澜S3 发布前小批量试产料", 0, 4, 8, -2.4],
+        ["智楼5.0 网关样机与外设", 3, 3, 7, 4.9],
+        ["澜芯M80 概念阶段打样", 2, 1, 6, 18.2],
+        ["星澜Pro2 计划阶段结构手板", 0, 1, 5, 3.6]
+      ]
+    },
+    {
+      name: "云资源算力", color: C.cyan, bud: 290,
+      note: "训练集群 / CI 构建 / 测试环境",
+      shape: "逐月单调爬坡，无季节回落：由 25-09 的 0.20 亿一路升至 26-08 的 0.32 亿，全年增幅 60%",
+      why: "扩容驱动的结构性超支：灵犀与慧眼两个模型的训练集群在 26 上半年两次扩卡，CI 构建量随" +
+        "部署频率 14.2 次/日同步放大，测试环境常驻规模上调，合计 <u>0.22 亿</u>超预算；" +
+        "已启动潮汐调度与竞价实例，节流效果计入下期。",
+      m0: [17, 18, 18, 19, 20, 20, 21, 22, 22, 23, 24, 26],
+      m1: [20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 32],
+      mat: [[2, 4, 30, 11, 9, 4], [4, 10, 73, 28, 18, 12], [2, 3, 19, 6, 4, 1], [2, 5, 34, 14, 8, 7]],
+      led: [
+        ["灵犀 / 慧眼 训练集群 GPU 机时", 1, 2, 62, 32.6],
+        ["云枢3.0 CI 构建与制品仓存储", 1, 3, 26, 21.4],
+        ["智家终端 OTA 灰度与压测环境", 0, 2, 26, 18.9],
+        ["行业方案边缘推理与仿真算力", 3, 2, 24, 26.3],
+        ["云盾2.1 安全靶场与渗透环境", 1, 4, 16, 15.2],
+        ["车联1.0 路测数据回灌存储", 3, 3, 14, 28.4],
+        ["御风边缘模型量化与回归算力", 2, 2, 12, 22.8],
+        ["星澜Pro2 自动化回归设备云", 0, 3, 10, 12.7],
+        ["云枢3.0 生产可观测与日志留存", 1, 5, 10, 19.5]
+      ]
+    },
+    {
+      name: "外协", color: C.violet, bud: 180,
+      note: "ODM 协同 / 外包测试 / 认证机构",
+      shape: "全年基本平稳（0.12~0.16 亿/月），仅在认证窗口（26-04、26-08）与年末结算月轻微抬升",
+      why: "结余来自替代效应：云平台外包测试用例大批量转自动化（该条目同比 −3.2%），" +
+        "整机 ODM 协同随星澜S3 转量产而收敛，合计结余 <u>0.10 亿</u>；" +
+        "车规认证与合规咨询是唯一逆势增项，随车联1.0 进入验证放量。",
+      m0: [13, 13, 14, 14, 13, 12, 14, 14, 14, 14, 15, 15],
+      m1: [13, 14, 14, 15, 13, 12, 14, 15, 15, 14, 15, 16],
+      mat: [[4, 8, 24, 8, 9, 4], [2, 4, 14, 5, 5, 3], [3, 5, 14, 4, 5, 1], [2, 7, 20, 7, 7, 5]],
+      led: [
+        ["整机 ODM 协同开发（智家终端）", 0, 2, 23, 4.1],
+        ["行业方案集成商联合开发", 3, 2, 19, 7.8],
+        ["澜芯模组固件外包开发", 2, 2, 13, 2.6],
+        ["云平台外包测试与用例外协", 1, 2, 13, -3.2],
+        ["智家终端可靠性外包试验", 0, 3, 8, -1.5],
+        ["星澜Pro2 第三方认证与检测", 0, 4, 8, 5.4],
+        ["车联1.0 车规认证与合规咨询", 3, 4, 7, 9.6],
+        ["智楼5.0 需求调研与方案外协", 3, 1, 7, 3.1],
+        ["澜芯M60 射频暗室与 EMC 外测", 2, 4, 5, 1.8],
+        ["智楼5.0 现场联调驻场服务", 3, 5, 5, 3.7]
+      ]
+    },
+    {
+      name: "工具与其他", color: C.green, bud: 130,
+      note: "研发工具链 / 实验室 / 专利维护",
+      shape: "月度在 0.09~0.11 亿之间小幅波动，26-01 因年度许可集中续费形成全年最高点",
+      why: "结余 <u>0.10 亿</u>来自集采与延后：工具链与 DevOps 平台许可走年度集采降价，" +
+        "部分专利维护年费按缴费窗口顺延到下期；仪器折旧与校准是刚性项，" +
+        "AIoT 开发板套件因教学场景收缩同比 −4.2%。",
+      m0: [9, 9, 8, 9, 9, 8, 9, 9, 9, 9, 9, 8],
+      m1: [10, 10, 9, 10, 11, 9, 10, 10, 11, 10, 10, 10],
+      mat: [[3, 5, 16, 5, 4, 4], [2, 5, 16, 6, 4, 5], [2, 3, 10, 3, 2, 1], [2, 3, 10, 3, 2, 4]],
+      led: [
+        ["研发工具链集采（IDE/静态扫描）", 0, 2, 16, 10.6],
+        ["DevOps 与制品管理平台许可", 1, 2, 16, 13.2],
+        ["硬件实验室仪器折旧与校准", 2, 2, 10, 7.4],
+        ["行业方案仿真与建模软件许可", 3, 2, 10, 16.8],
+        ["专利申请与维护年费", 1, 5, 5, 9.1],
+        ["测试自动化平台与设备农场", 0, 3, 5, 12.5],
+        ["知识与文档协作平台", 1, 1, 5, 5.8],
+        ["行业方案标准与合规订阅", 3, 5, 4, 8.3],
+        ["AIoT 开发板与教学套件", 2, 1, 3, -4.2],
+        ["智家终端概念阶段调研与咨询", 0, 0, 3, 6.9]
+      ]
+    }
+  ];
+
+  /* 24 个月标签（2024-09 起，与父页 MONTHS 同构） */
+  const MONTHS = [];
+  for (let i = 0; i < 24; i += 1) {
+    const y = 2024 + Math.floor((8 + i) / 12), m = (8 + i) % 12 + 1;
+    MONTHS.push(y + "-" + pad(m));
+  }
+  const M12 = MONTHS.slice(12);                                  /* 近 12 月（本期口径） */
+
+  /* ===== 3.1 派生量（全部现算，页面不出现硬编码合计） ===== */
+  CATS.forEach((c) => {
+    c.actual = sum(c.m1);                                        /* 年度实际（0.01 亿） */
+    c.prev = sum(c.m0);                                          /* 上年基数 */
+    c.rate = c.actual / c.bud * 100;                             /* 预算达成率 */
+    c.dev = c.actual - c.bud;                                    /* 偏差（正 = 超支） */
+    c.yoy = (c.actual / c.prev - 1) * 100;                       /* 同比 */
+    c.avg = c.actual / 12;                                       /* 月均 */
+    c.m24 = c.m0.concat(c.m1);                                   /* 24 月序列 */
+    c.rowSum = c.mat.map((r) => sum(r));                         /* 行和：四产品线 */
+    c.colSum = STAGES.map((_, j) => sum(c.mat.map((r) => r[j]))); /* 列和：六阶段 */
+    c.matTotal = sum(c.rowSum);
+    c.ledSum = sum(c.led.map((r) => r[3]));                      /* 台账 Top 条目合计 */
+    c.rest = c.actual - c.ledSum;                                /* 其余归「其他零星」 */
+    c.ledRatio = c.ledSum / c.actual * 100;
+    c.ledMax = Math.max.apply(null, c.led.map((r) => r[3]));
+  });
+  const invAll = sum(CATS.map((c) => c.actual));                 /* 2140 = 21.4 亿 */
+  const prevAll = sum(CATS.map((c) => c.prev));
+  const budAll = sum(CATS.map((c) => c.bud));
+  const overN = CATS.filter((c) => c.rate > 100).length;
+  /* 五类矩阵逐格聚合（用于与父页全量矩阵做构造性断言） */
+  const heatAgg = LINES.map((_, i) => STAGES.map((__, j) => sum(CATS.map((c) => c.mat[i][j]))));
+  const lineAgg = LINES.map((_, i) => sum(CATS.map((c) => c.rowSum[i])));
+  const stageAgg = STAGES.map((_, j) => sum(CATS.map((c) => c.colSum[j])));
+
+  /* ===== 4. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("yz-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("yz-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. 类别切换器（tab 文本与契约 §6 hash 键逐字一致） ===== */
+  const switcher = $("yz-switcher");
+  switcher.innerHTML = CATS.map((c, i) => (
+    '<button class="yz-sw-tab" type="button" data-i="' + i + '" title="切换到' + c.name + '（← → 方向键）">' +
+      "<b>" + c.name + "</b><span>" + fmtDec(yi(c.actual), 1) + " 亿</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".yz-sw-tab"));
+
+  /* ===== 6. 非图表区渲染（不依赖 echarts；★ 全部在 echarts.init 之前完成首屏填充） ===== */
+  function countUp(el, target, fmt) {
+    const t0 = performance.now(), dur = 1200;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+  $("yz-chip-all").textContent = fmtDec(yi(invAll), 1) + " 亿元";
+
+  function renderKpi(c) {
+    const defs = [
+      { v: yi(c.actual), f: (x) => fmtDec(x, 1),
+        sub: "近 12 月月度之和现算 · 上年基数 <b>" + fmtDec(yi(c.prev), 2) + "</b> 亿元" },
+      { v: c.actual / invAll * 100, f: (x) => fmtDec(x, 1),
+        sub: "÷ 全量 <b>" + fmtDec(yi(invAll), 1) + "</b> 亿元现算 · 五类 Σ = 100%" },
+      { v: c.rate, f: (x) => fmtDec(x, 1),
+        sub: "实际 " + fmtDec(yi(c.actual), 2) + " ÷ 预算 <b>" + fmtDec(yi(c.bud), 1) + "</b> 亿元现算" },
+      { v: c.yoy, f: (x) => signed(x, 1),
+        sub: "实际 ÷ 上年基数 − 1 现算 · 全量同比 <b>" + signed((invAll / prevAll - 1) * 100, 1) + "%</b>" },
+      { v: yi(c.avg), f: (x) => fmtDec(x, 2),
+        sub: "年度值 ÷ 12 现算 · 峰值月 <b>" + fmtDec(yi(Math.max.apply(null, c.m1)), 2) + "</b> 亿元" },
+      { v: yi(c.ledMax), f: (x) => fmtDec(x, 2),
+        sub: "台账首行 · 占该类 <b>" + fmtDec(c.ledMax / c.actual * 100, 1) + "%</b>" }
+    ];
+    defs.forEach((d, i) => {
+      countUp($("yz-kpi-" + i), d.v, d.f);
+      $("yz-kpi-" + i + "s").innerHTML = d.sub;
+    });
+    const box = $("yz-kpi-2box");
+    box.classList.toggle("is-over", c.rate > 100);
+    box.classList.toggle("is-good", c.rate <= 100);
+  }
+  function renderNote(c) {
+    const over = c.dev > 0;
+    $("yz-note").innerHTML =
+      '<div class="yz-note-h">' +
+        '<span class="yz-note-badge ' + (over ? "is-over" : "is-save") + '">' +
+          (over ? "超支" : "结余") + " " + fmtDec(Math.abs(yi(c.dev)), 2) + " 亿元</span>" +
+        "<span>预算 <b>" + fmtDec(yi(c.bud), 1) + "</b> · 实际 <b>" + fmtDec(yi(c.actual), 2) +
+          "</b> · 达成率 <b>" + fmtDec(c.rate, 1) + "%</b>（÷ 现算）</span>" +
+      "</div>" +
+      '<div class="yz-note-body">' + c.why + "</div>";
+  }
+  function renderLedger(c) {
+    const rows = c.led.map((r, k) => (
+      "<li>" +
+        '<span class="yz-led-name"><i class="yz-led-rk">' + (k + 1) + "</i><em title=\"" + r[0] + '">' + r[0] + "</em></span>" +
+        '<span><span class="yz-badge">' + LINES[r[1]] + "</span></span>" +
+        "<span>" + STAGES[r[2]] + "</span>" +
+        '<span class="yz-led-amt"><b>' + fmtDec(yi(r[3]), 2) + "</b></span>" +
+        '<span class="yz-led-pct">' + fmtDec(r[3] / c.actual * 100, 1) + "%</span>" +
+        '<span class="yz-led-yoy ' + (r[4] >= 0 ? "is-up" : "is-down") + '">' + signed(r[4], 1) + "%</span>" +
+      "</li>"
+    )).join("");
+    const rest =
+      '<li class="is-rest">' +
+        '<span class="yz-led-name"><i class="yz-led-rk">·</i><em>其他零星条目（未进 Top 台账）</em></span>' +
+        "<span>全产品线</span><span>全阶段</span>" +
+        '<span class="yz-led-amt"><b>' + fmtDec(yi(c.rest), 2) + "</b></span>" +
+        '<span class="yz-led-pct">' + fmtDec(c.rest / c.actual * 100, 1) + "%</span>" +
+        '<span class="yz-led-yoy">--</span>' +
+      "</li>";
+    const total =
+      '<li class="is-total">' +
+        '<span class="yz-led-name"><em>合计 = 该类年度投入</em></span>' +
+        "<span>四产品线</span><span>六阶段</span>" +
+        '<span class="yz-led-amt"><b>' + fmtDec(yi(c.ledSum + c.rest), 2) + "</b></span>" +
+        '<span class="yz-led-pct">100.0%</span>' +
+        '<span class="yz-led-yoy">' + signed(c.yoy, 1) + "%</span>" +
+      "</li>";
+    $("yz-tbody").innerHTML = rows + rest + total;
+  }
+  function renderTags(c) {
+    $("yz-tag-trend").innerHTML = "近 12 月 Σ <b>" + fmtDec(yi(c.actual), 2) + "</b> 亿 = 年度值 · 24 月柱 + 分期累计线";
+    $("yz-tag-budget").innerHTML = "预算 " + fmtDec(yi(c.bud), 1) + " · 实际 <b>" + fmtDec(yi(c.actual), 2) +
+      "</b> · 偏差 " + signed(yi(c.dev), 2) + " 亿";
+    $("yz-tag-heat").innerHTML = "行和 Σ = 列和 Σ = <b>" + fmtDec(yi(c.matTotal), 2) + "</b> 亿 = 该类年度值";
+    $("yz-tag-split").innerHTML = "四产品线 Σ / 六阶段 Σ 均 = <b>" + fmtDec(yi(c.matTotal), 2) + "</b> 亿";
+    $("yz-tag-led").innerHTML = "Top <b>" + c.led.length + "</b> 条 Σ " + fmtDec(yi(c.ledSum), 2) +
+      " 亿 · 占该类 " + fmtDec(c.ledRatio, 1) + "%（声明区间 60%~75%）";
+    $("yz-tag-peer").innerHTML = "五类 Σ <b>" + fmtDec(yi(invAll), 1) + "</b> 亿 · 本类居第 " +
+      (CATS.slice().sort((a, b) => b.actual - a.actual).findIndex((x) => x.name === c.name) + 1) + " 位";
+  }
+
+  /* 底部口径滚动（与类别无关，只建一次；★ 图表 init 之前填充） */
+  (function buildFoot() {
+    const items = [
+      ["口径", C.amber, "五类投入逐字引契约 §2.2：" + CATS.map((c) => c.name + " " + fmtDec(yi(c.actual), 1)).join(" + ") +
+        " = " + fmtDec(yi(invAll), 1) + " 亿元；各类年度值 = 该类近 12 月（" + M12[0] + " ~ " + M12[11] + "）月度之和现算"],
+      ["口径", C.amber, "24 月曲线与父页「研发投入与预算」主题河流的同类条带逐字同源——前 12 月为上年基数（Σ " +
+        fmtDec(yi(prevAll), 1) + " 亿）、后 12 月为本期口径；累计线分期归零，末点恰落在该类年度值上"],
+      ["口径", C.blue, "双维拆分为二级拆分：五类的 4×6 矩阵逐格相加 == 父页全量矩阵，故跨五类聚合回四产品线 " +
+        LINE_AUTH.map((v) => fmtDec(yi(v), 1)).join(" / ") + " 亿与六阶段 " + STAGE_AUTH.map((v) => fmtDec(yi(v), 1)).join(" / ") +
+        " 亿；单类矩阵的行和 Σ 与列和 Σ 恒等于该类年度值"],
+      ["预算", C.violet, "预算 " + CATS.map((c) => c.name + " " + fmtDec(yi(c.bud), 1)).join(" / ") + " 亿元（Σ " +
+        fmtDec(yi(budAll), 1) + " 亿，父页子弹图逐字）；达成率 = 实际 ÷ 预算现算，超支类 " + overN + " 个：" +
+        CATS.filter((c) => c.rate > 100).map((c) => c.name + " " + fmtDec(c.rate, 1) + "%").join("、")],
+      ["台账", C.green, "Top 支出条目为二级自编：每类 8~10 条，Σ 金额占该类年度值 60%~75%，其余一律计入「其他零星条目」，" +
+        "台账 Σ + 其他零星 ≡ 该类年度值；条目按（产品线, 阶段）归集，同格条目之和不超过双维矩阵对应单元格"],
+      ["下钻", C.blue, "本页为「研发投入与预算」的二级子页：父页五类明细表行点击 → 本页 #类别名；" +
+        "支持 ← → 切换、14 秒轮换、鼠标停在切换器上暂停，hash 命中后保持 20 秒不轮换，Esc 返回上级"],
+      ["说明", C.amber, "全部为模拟数据，与任何真实企业无关；金额单位统一按 0.01 亿元整数建模，显示时换算为亿元，" +
+        "页内一切合计、占比、达成率、同比均为 JS 现算，不复制数字"]
+    ];
+    const html = items.map((a) => '<span class="yz-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("yz-foot-track").innerHTML = html + html;                  /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* ===== 7. 静态层整页重绘（不依赖 echarts） ===== */
+  function paintStatic(c) {
+    $("yz-title").textContent = c.name + " · 单投入类别详情";
+    $("yz-crumb-obj").textContent = c.name + " · " + c.note;
+    $("yz-meta-inv").textContent = fmtDec(yi(c.actual), 1);
+    $("yz-meta-share").textContent = fmtDec(c.actual / invAll * 100, 1) + "%";
+    $("yz-meta-bud").textContent = fmtDec(yi(c.bud), 1);
+    $("yz-meta-rate").textContent = fmtDec(c.rate, 1) + "%";
+    renderKpi(c);
+    renderNote(c);
+    renderLedger(c);
+    renderTags(c);
+  }
+
+  /* hash 契约：decodeURIComponent → trim + 全角空白剔除归一 → 匹配五类名 */
+  const HASH_ALIAS = {
+    "云资源与算力": "云资源算力", "算力": "云资源算力", "云资源": "云资源算力",
+    "人力成本": "人力", "物料": "样机物料", "样机": "样机物料",
+    "工具": "工具与其他", "其他": "工具与其他", "外协费用": "外协"
+  };
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    if (HASH_ALIAS[s]) s = HASH_ALIAS[s];
+    return CATS.findIndex((x) => x.name === s);
+  }
+  const bootHit = resolveHash(location.hash);
+  const bootIdx = bootHit >= 0 ? bootHit : 0;
+  paintStatic(CATS[bootIdx]);                                    /* ★ 非图表区先填充，再 init 图表 */
+  swTabs.forEach((b, k) => b.classList.toggle("is-active", k === bootIdx));
+
+  /* ===== 8. 资源守卫（KPI / 归因 / 台账已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("yz-error").classList.add("is-visible");
+
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const trendChart = hasEcharts ? echarts.init($("yz-chart-trend")) : null;
+  const budgetChart = hasEcharts ? echarts.init($("yz-chart-budget")) : null;
+  const heatChart = hasEcharts ? echarts.init($("yz-chart-heat")) : null;
+  const splitChart = hasEcharts ? echarts.init($("yz-chart-split")) : null;
+  const peerChart = hasEcharts ? echarts.init($("yz-chart-peer")) : null;
+
+  /* ===== 9. option 构造（★ 只放标量与数组，CATS 对象一律不进 option，避免深拷贝循环引用） ===== */
+
+  /* 9.1 24 月投入曲线：月度柱 + 分期累计线（近 12 月累计末点 = 该类年度值） */
+  function trendOption(c) {
+    const bars = c.m24.map((v) => Number(fmtDec(yi(v), 2)));
+    const cum0 = [], cum1 = [];
+    let a = 0, b = 0;
+    for (let i = 0; i < 24; i += 1) {
+      if (i < 12) { a += c.m24[i]; cum0.push(Number(fmtDec(yi(a), 2))); cum1.push(null); }
+      else { b += c.m24[i]; cum1.push(Number(fmtDec(yi(b), 2))); cum0.push(null); }
+    }
+    const cName = c.name, cColor = c.color;
+    const monthLabels = MONTHS.slice();
+    const barMax = Math.max.apply(null, bars);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 6, top: 30, bottom: 2, containLabel: true },
+      legend: { top: 0, right: 2, itemWidth: 12, itemHeight: 8, textStyle: { color: C.textDim, fontSize: 10.5 } },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const cum = i < 12 ? cum0[i] : cum1[i];
+          return "<b>" + monthLabels[i] + "</b>（" + (i < 12 ? "上年基数" : "本期口径") + "）<br/>" +
+            cName + "月度投入 <b>" + fmtDec(bars[i], 2) + "</b> 亿元<br/>" +
+            "期内累计 <b>" + fmtDec(cum, 2) + "</b> 亿元<br/>" +
+            "占该期年度值 " + fmtDec(cum / (i < 12 ? yi(c.prev) : yi(c.actual)) * 100, 1) + "%";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: monthLabels,
+        axisLabel: Object.assign({}, AXIS_LABEL, {
+          interval: 1, fontSize: 9.5, rotate: 40,
+          formatter: (v) => String(v).slice(2)
+        }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: [
+        { type: "value", name: "亿元/月", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          max: Number(fmtDec(barMax * 1.22, 2)), axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
+        { type: "value", name: "期内累计", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: AXIS_LABEL, splitLine: { show: false } }
+      ],
+      series: [
+        {
+          name: "月度投入", type: "bar", barWidth: "62%", yAxisIndex: 0, data: bars, z: 2,
+          itemStyle: {
+            borderRadius: [3, 3, 0, 0],
+            color: (p) => (p.dataIndex < 12
+              ? "rgba(96,140,255,0.32)"
+              : new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: cColor }, { offset: 1, color: hexMix(cColor, 0.72, 8) }]))
+          },
+          markArea: {
+            silent: true, z: 0,
+            itemStyle: { color: "rgba(255,194,77,0.05)" },
+            label: { show: true, position: "insideTop", color: "rgba(255,194,77,.8)", fontSize: 10, formatter: "本期 12 月" },
+            data: [[{ xAxis: monthLabels[12] }, { xAxis: monthLabels[23] }]]
+          }
+        },
+        {
+          name: "上年累计", type: "line", yAxisIndex: 1, data: cum0, smooth: true, connectNulls: false,
+          symbol: "none", lineStyle: { color: "rgba(127,146,196,0.75)", width: 1.6, type: "dashed" },
+          itemStyle: { color: C.textDim }
+        },
+        {
+          name: "本期累计", type: "line", yAxisIndex: 1, data: cum1, smooth: true, connectNulls: false,
+          symbol: "circle", symbolSize: 4,
+          lineStyle: { color: C.amber, width: 2 }, itemStyle: { color: C.amber },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "rgba(255,194,77,0.20)" }, { offset: 1, color: "rgba(255,194,77,0)" }])
+          },
+          markPoint: {
+            symbol: "pin", symbolSize: 34, symbolOffset: [0, -2],
+            data: [{ coord: [23, cum1[23]], value: fmtDec(cum1[23], 2) }],
+            itemStyle: { color: "rgba(255,194,77,0.9)" },
+            label: { color: "#08122f", fontSize: 10, fontWeight: 700 }
+          }
+        }
+      ]
+    };
+  }
+
+  /* 9.2 预算执行与偏差：四条横向对比（上年 / 预算 / 实际 / 偏差） */
+  function budgetOption(c) {
+    const names = ["上年实际", "本年预算", "本年实际", "偏差"];
+    const vals = [yi(c.prev), yi(c.bud), yi(c.actual), yi(c.dev)].map((v) => Number(fmtDec(v, 2)));
+    const over = c.dev > 0;
+    const cols = ["rgba(127,146,196,0.55)", C.blueDeep, c.color, over ? C.red : C.green];
+    const rate = c.rate, budY = yi(c.bud);
+    const lo = Math.min(0, vals[3]) * 1.6, hi = Math.max(vals[0], vals[1], vals[2]) * 1.34;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 96, top: 8, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const k = p.dataIndex;
+          if (k === 3) {
+            return "<b>偏差 = 本年实际 − 本年预算</b><br/>" + fmtDec(vals[2], 2) + " − " + fmtDec(vals[1], 2) +
+              " = <b>" + signed(vals[3], 2) + "</b> 亿元<br/>达成率 " + fmtDec(rate, 1) + "%（" + (over ? "超支" : "结余") + "）";
+          }
+          return "<b>" + names[k] + "</b><br/><b>" + fmtDec(vals[k], 2) + "</b> 亿元" +
+            (k === 2 ? "<br/>÷ 预算 " + fmtDec(budY, 2) + " = " + fmtDec(rate, 1) + "%" : "") +
+            (k === 0 ? "<br/>同比 " + signed(c.yoy, 1) + "%" : "");
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, min: Number(fmtDec(lo, 2)), max: Number(fmtDec(hi, 2)) },
+      yAxis: {
+        type: "category", inverse: true, data: names,
+        axisLabel: { color: C.text, fontSize: 11.5 }, axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 14,
+        data: vals.map((v, k) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: 7,
+            color: k === 3 ? cols[3] : new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(cols[k], 0.45) }, { offset: 1, color: cols[k] }])
+          }
+        })),
+        markLine: {
+          silent: true, symbol: "none",
+          lineStyle: { color: "rgba(255,194,77,0.7)", type: "dashed", width: 1.4 },
+          label: { show: true, position: "end", color: C.amber, fontSize: 10, formatter: "预算线" },
+          data: [{ xAxis: Number(fmtDec(budY, 2)) }]
+        },
+        label: {
+          show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => (p.dataIndex === 3
+            ? signed(p.value, 2) + " 亿 · " + fmtDec(rate, 1) + "%"
+            : fmtDec(p.value, 2) + " 亿元")
+        }
+      }]
+    };
+  }
+
+  /* 9.3 双维矩阵热力：4 产品线 × 6 阶段（轴标签带行和 / 列和，Σ = 该类年度值） */
+  function heatOption(c) {
+    const cells = [];
+    for (let i = 0; i < LINES.length; i += 1) {
+      for (let j = 0; j < STAGES.length; j += 1) cells.push([j, i, c.mat[i][j]]);
+    }
+    const maxV = Math.max.apply(null, cells.map((x) => x[2]));
+    const rowS = c.rowSum.slice(), colS = c.colSum.slice(), tot = c.matTotal;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 12, top: 12, bottom: 42, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.data[0], i = p.data[1], v = p.data[2];
+          return "<b>" + LINES[i] + " × " + STAGES[j] + "</b><br/>投入 <b>" + fmtDec(yi(v), 2) +
+            "</b> 亿元 · 占该类 " + fmtDec(v / tot * 100, 1) + "%<br/>该行（产品线）Σ " + fmtDec(yi(rowS[i]), 2) +
+            " 亿 · 该列（阶段）Σ " + fmtDec(yi(colS[j]), 2) + " 亿<br/>口径：行和 Σ = 列和 Σ = " +
+            fmtDec(yi(tot), 2) + " 亿 = 该类年度值";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: STAGES.slice(), splitArea: { show: true, areaStyle: { color: ["rgba(96,140,255,0.03)", "transparent"] } },
+        axisLabel: { color: C.text, fontSize: 11, formatter: (v, i) => v + "\n" + fmtDec(yi(colS[i]), 2), lineHeight: 14 },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "category", inverse: true, data: LINES.slice(),
+        axisLabel: { color: C.text, fontSize: 11, formatter: (v, i) => v + "  " + fmtDec(yi(rowS[i]), 2) },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      visualMap: {
+        min: 0, max: maxV, calculable: false, orient: "horizontal", left: "center", bottom: 2,
+        itemWidth: 11, itemHeight: 96, precision: 0,
+        text: ["高", "低"], textStyle: { color: C.textDim, fontSize: 10 },
+        formatter: (v) => fmtDec(yi(v), 2) + " 亿",
+        inRange: { color: ["rgba(24,44,104,0.55)", C.blueDeep, C.blue, C.amber] }
+      },
+      series: [{
+        type: "heatmap", data: cells,
+        itemStyle: { borderColor: "rgba(8,18,49,.85)", borderWidth: 1.5, borderRadius: 3 },
+        label: {
+          show: true, fontSize: 10.5, fontWeight: 700, color: "#08122f",
+          formatter: (p) => (p.data[2] === 0 ? "—" : fmtDec(yi(p.data[2]), 2))
+        },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: "rgba(255,194,77,0.55)" } }
+      }]
+    };
+  }
+
+  /* 9.4 双维边际：左格四产品线行和、右格六阶段列和（两侧 Σ 均 = 该类年度值） */
+  function splitOption(c) {
+    const rowS = c.rowSum.map((v) => Number(fmtDec(yi(v), 2)));
+    const colS = c.colSum.map((v) => Number(fmtDec(yi(v), 2)));
+    const tot = c.matTotal, cColor = c.color;
+    return {
+      backgroundColor: "transparent",
+      title: [
+        { text: "四产品线（行和）", left: "2%", top: 0, textStyle: { color: C.textDim, fontSize: 11, fontWeight: 400 } },
+        { text: "六阶段（列和）", left: "53%", top: 0, textStyle: { color: C.textDim, fontSize: 11, fontWeight: 400 } }
+      ],
+      grid: [
+        { left: "2%", right: "53%", top: 24, bottom: 4, containLabel: true },
+        { left: "53%", right: "2%", top: 24, bottom: 4, containLabel: true }
+      ],
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const isLine = p.seriesIndex === 0;
+          const arr = isLine ? rowS : colS;
+          return "<b>" + p.name + "</b>（" + (isLine ? "产品线行和" : "阶段列和") + "）<br/>投入 <b>" +
+            fmtDec(p.value, 2) + "</b> 亿元 · 占该类 " + fmtDec(p.value / yi(tot) * 100, 1) + "%<br/>" +
+            (isLine ? "四产品线" : "六阶段") + " Σ = " + fmtDec(sum(arr), 2) + " 亿 = 该类年度值";
+        }
+      }, TIP),
+      xAxis: [
+        { gridIndex: 0, type: "value", show: false, max: Math.max.apply(null, rowS) * 1.52 },
+        { gridIndex: 1, type: "value", show: false, max: Math.max.apply(null, colS) * 1.52 }
+      ],
+      yAxis: [
+        { gridIndex: 0, type: "category", inverse: true, data: LINES.slice(),
+          axisLabel: { color: C.text, fontSize: 11 }, axisLine: { show: false }, axisTick: { show: false } },
+        { gridIndex: 1, type: "category", inverse: true, data: STAGES.slice(),
+          axisLabel: { color: C.text, fontSize: 11 }, axisLine: { show: false }, axisTick: { show: false } }
+      ],
+      series: [
+        {
+          name: "产品线", type: "bar", xAxisIndex: 0, yAxisIndex: 0, barWidth: 13,
+          showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 7 },
+          data: rowS.map((v, i) => ({
+            value: v,
+            itemStyle: {
+              borderRadius: 7,
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                { offset: 0, color: darken(LINE_COL[i], 0.45) }, { offset: 1, color: LINE_COL[i] }])
+            }
+          })),
+          label: {
+            show: true, position: "right", fontSize: 10.5, fontWeight: 700, color: "#dce8ff",
+            formatter: (p) => fmtDec(p.value, 2) + " · " + fmtDec(p.value / yi(tot) * 100, 1) + "%"
+          }
+        },
+        {
+          name: "阶段", type: "bar", xAxisIndex: 1, yAxisIndex: 1, barWidth: 11,
+          showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 6 },
+          data: colS.map((v) => ({
+            value: v,
+            itemStyle: {
+              borderRadius: 6,
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                { offset: 0, color: darken(cColor, 0.5) }, { offset: 1, color: cColor }])
+            }
+          })),
+          label: {
+            show: true, position: "right", fontSize: 10.5, fontWeight: 700, color: "#dce8ff",
+            formatter: (p) => fmtDec(p.value, 2) + " · " + fmtDec(p.value / yi(tot) * 100, 1) + "%"
+          }
+        }
+      ]
+    };
+  }
+
+  /* 9.5 五类横比：当前类高亮（Σ = 21.4 亿，回锚契约 §2.2） */
+  function peerOption(cur) {
+    const names = CATS.map((c) => c.name);
+    const vals = CATS.map((c) => Number(fmtDec(yi(c.actual), 2)));
+    const buds = CATS.map((c) => Number(fmtDec(yi(c.bud), 2)));
+    const rates = CATS.map((c) => c.rate);
+    const total = yi(invAll);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 116, top: 6, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const k = p.dataIndex;
+          return "<b>" + names[k] + "</b>" + (k === cur ? "（当前）" : "") + "<br/>年度实际 <b>" + fmtDec(vals[k], 2) +
+            "</b> 亿元 · 占总投入 " + fmtDec(vals[k] / total * 100, 1) + "%<br/>预算 " + fmtDec(buds[k], 2) +
+            " 亿 · 达成率 " + fmtDec(rates[k], 1) + "%<br/>五类 Σ = " + fmtDec(total, 1) + " 亿元（契约 §2.2）";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max.apply(null, vals) * 1.42 },
+      yAxis: {
+        type: "category", inverse: true, data: names,
+        axisLabel: {
+          color: C.text, fontSize: 11.5,
+          formatter: (v, i) => (i === cur ? "{cur|" + v + "}" : v),
+          rich: { cur: { color: "#ffd489", fontWeight: 700, fontSize: 11.5 } }
+        },
+        axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 15,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 8 },
+        data: vals.map((v, k) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: 8, opacity: k === cur ? 1 : 0.42,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(CATS[k].color, 0.5) }, { offset: 1, color: CATS[k].color }])
+          }
+        })),
+        markLine: {
+          silent: true, symbol: "none",
+          lineStyle: { color: "rgba(169,140,245,0.55)", type: "dashed", width: 1.2 },
+          label: { show: true, position: "end", color: C.violet, fontSize: 9.5, formatter: "均值" },
+          data: [{ xAxis: Number(fmtDec(total / CATS.length, 2)) }]
+        },
+        label: {
+          show: true, position: "right", fontSize: 10.5, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => fmtDec(p.value, 2) + " 亿 · " + fmtDec(p.value / total * 100, 1) + "%"
+        }
+      }]
+    };
+  }
+
+  /* ===== 10. 类别切换主流程：整页重绘 ===== */
+  function applyCat(i) {
+    const n = CATS.length;
+    idx = ((i % n) + n) % n;
+    const c = CATS[idx];
+    paintStatic(c);
+    swTabs.forEach((b, k) => b.classList.toggle("is-active", k === idx));
+    if (hasEcharts) {
+      trendChart.setOption(trendOption(c), true);                /* 轴上限随类别变化 → notMerge */
+      budgetChart.setOption(budgetOption(c), true);
+      heatChart.setOption(heatOption(c), true);
+      splitChart.setOption(splitOption(c), true);
+      peerChart.setOption(peerOption(idx), true);
+    }
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(c.name));
+  }
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 =====
+     ★ 本节只做「调用」，kiosk 状态量（idx / timer / holdUntil）与 hold() / restart()
+       已在第 1.1 节声明——声明行号严格小于此处首次 hold() 调用行号（TDZ 防护）。 */
+  const PARENT = "大屏样板间-研发投入与预算1920.html";
+
+  swTabs.forEach((b) => b.addEventListener("click", () => { applyCat(Number(b.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyCat(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyCat(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* ===== 12. boot ===== */
+  applyCat(bootIdx);
+  if (bootHit >= 0) hold();                                      /* 父页下钻进来：先保持 20 秒不轮换 */
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applyCat(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 14 秒切下一类别；鼠标停在切换器上时暂停 */
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 13. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const checks = [
+    ["五类名与年度值与契约 §2.2 / §6 逐字（构造性断言：人力 12.6 / 样机物料 2.8 / 云资源算力 3.1 / 外协 1.7 / 工具与其他 1.2）",
+      CATS.map((c) => c.name + "|" + c.actual).join(";") === CAT_AUTH],
+    ["五类年度值 Σ = 21.4 亿元（0.01 亿口径 2140）",
+      invAll === INV_ALL && Math.abs(yi(invAll) - 21.4) < 1e-9],
+    ["各类近 12 月月度 Σ = 该类年度值（容差 0.05 亿，实际为整数精确相等）",
+      CATS.every((c) => sum(c.m1) === c.actual && Math.abs(yi(sum(c.m1)) - yi(c.actual)) < 0.05)],
+    ["各类 24 月序列 = 上年 12 + 本期 12，前 12 月 Σ = 上年基数（同比分母）",
+      CATS.every((c) => c.m24.length === 24 && c.m0.length === 12 && c.m1.length === 12 &&
+        sum(c.m0) === c.prev && c.m24[12] === c.m1[0])],
+    ["季节形态：人力 26-02 春节月为近 12 月最低点；样机物料 EVT/DVT/PVT 五个批次月脉冲；云资源算力逐月单调爬坡",
+      CATS[0].m1.indexOf(Math.min.apply(null, CATS[0].m1)) === 5 &&
+      [1, 4, 6, 9, 11].every((k) => CATS[1].m1[k] > CATS[1].m1[k - 1]) &&
+      CATS[2].m1.every((v, k) => k === 0 || v >= CATS[2].m1[k - 1])],
+    ["双维矩阵：每类行和 Σ = 列和 Σ = 该类年度值",
+      CATS.every((c) => sum(c.rowSum) === c.actual && sum(c.colSum) === c.actual && c.matTotal === c.actual &&
+        c.mat.length === LINES.length && c.mat.every((r) => r.length === STAGES.length))],
+    ["五类矩阵逐格相加 == 父页全量热力矩阵（构造性断言，父页 P4 逐字内联）",
+      heatAgg.every((r, i) => r.every((v, j) => v === PARENT_HEAT[i][j]))],
+    ["跨五类聚合回四产品线 6.8 / 5.9 / 4.6 / 4.1 亿与六阶段 1.3 / 2.6 / 9.8 / 4.2 / 2.1 / 1.4 亿（父页 §5.3 双向收敛）",
+      lineAgg.every((v, i) => v === LINE_AUTH[i]) && stageAgg.every((v, j) => v === STAGE_AUTH[j]) &&
+      sum(lineAgg) === INV_ALL && sum(stageAgg) === INV_ALL],
+    ["预算与父页子弹图逐字（13.0 / 2.6 / 2.9 / 1.8 / 1.3 亿，Σ 21.6 亿）",
+      CATS.map((c) => c.bud).join("|") === "1300|260|290|180|130" && budAll === 2160],
+    ["达成率 = 实际 ÷ 预算现算；偏差 = 实际 − 预算；超支类恰 2 个（样机物料 / 云资源算力）",
+      CATS.every((c) => Math.abs(c.rate - c.actual / c.bud * 100) < 1e-9 && c.dev === c.actual - c.bud) &&
+      overN === 2 && CATS[1].rate > 100 && CATS[2].rate > 100],
+    ["同比 = 实际 ÷ 上年基数 − 1 现算（逐类复核）",
+      CATS.every((c) => Math.abs(c.yoy - (c.actual / c.prev - 1) * 100) < 1e-9)],
+    ["月均 = 年度值 ÷ 12 现算；最大单笔 = 台账最大金额",
+      CATS.every((c) => Math.abs(c.avg - c.actual / 12) < 1e-9 &&
+        c.ledMax === Math.max.apply(null, c.led.map((r) => r[3])))],
+    ["台账条目数 8~10 条，Σ 金额占该类年度值落在声明区间 60%~75%",
+      CATS.every((c) => c.led.length >= 8 && c.led.length <= 10 && c.ledRatio >= 60 && c.ledRatio <= 75)],
+    ["台账 Σ + 其他零星 ≡ 该类年度值（表内合计行现算，不复制数字）",
+      CATS.every((c) => c.ledSum + c.rest === c.actual && c.rest > 0)],
+    ["台账条目按（产品线, 阶段）归集后不超过双维矩阵对应单元格",
+      CATS.every((c) => {
+        const acc = {};
+        c.led.forEach((r) => { const k = r[1] + "|" + r[2]; acc[k] = (acc[k] || 0) + r[3]; });
+        return Object.keys(acc).every((k) => acc[k] <= c.mat[Number(k.split("|")[0])][Number(k.split("|")[1])]);
+      })],
+    ["hash 五类名均可解析（构造性断言：encodeURIComponent → resolveHash 回到本类）",
+      CATS.every((c, i) => resolveHash("#" + encodeURIComponent(c.name)) === i) &&
+      resolveHash("#" + encodeURIComponent("云资源与算力")) === 2 && resolveHash("#") === -1],
+    ["切换器 tab 数 = 5 且文本与契约 §6 对象集逐字",
+      swTabs.length === CATS.length && swTabs.every((b, i) => b.querySelector("b").textContent === CATS[i].name)],
+    ["台账表渲染行数 = 条目数 + 其他零星 + 合计（DOM 反查，非内存变量）",
+      $("yz-tbody").children.length === CATS[idx].led.length + 2 &&
+      $("yz-tbody").querySelectorAll("li.is-total").length === 1],
+    /* ★ TDZ 防护的构造性断言：holdUntil / hold() 声明在第 1.1 节（行号远小于第 12 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 holdCalls ≥ 1」即证明声明早于首次调用。 */
+    ["holdUntil 声明早于首次 hold() 调用（TDZ 防护，构造性断言）",
+      typeof holdUntil === "number" && typeof hold === "function" &&
+      (bootHit < 0 ? holdCalls === 0 : (holdCalls >= 1 && holdUntil > Date.now()))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单投入类别详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

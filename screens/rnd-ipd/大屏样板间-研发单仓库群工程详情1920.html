@@ -1,0 +1,1229 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单仓库群工程详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --gc-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .gc-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 104px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .gc-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .gc-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .gc-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 8px 8px;
+  }
+  .gc-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .gc-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .gc-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .gc-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .gc-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .gc-crumb em { font-style: normal; color: #d3e2ff; }
+  .gc-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .gc-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .gc-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .gc-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .gc-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .gc-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .gc-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .gc-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 仓库群切换器：五群 tab（← → 方向键 / 14s 自动轮换 / hash 直达） */
+  .gc-switcher { display: grid; grid-template-columns: repeat(3, auto); gap: 5px 6px; }
+  .gc-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 86px; padding: 3px 10px 4px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .gc-sw-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; }
+  .gc-sw-tab span { font-size: 9.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .gc-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .gc-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .gc-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .gc-chips { display: flex; align-items: center; gap: 9px; }
+  .gc-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 150px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(169, 140, 245, 0.42); background: linear-gradient(160deg, rgba(169, 140, 245, 0.16), rgba(18, 34, 78, 0.6));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .gc-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: #8f7fc4; white-space: nowrap; }
+  .gc-chip b { font-size: 14px; font-weight: 700; letter-spacing: 0.05em; color: #cbbcf7; white-space: nowrap; }
+  .gc-chip:hover { border-color: rgba(169, 140, 245, 0.92); box-shadow: 0 0 16px -2px rgba(169, 140, 245, 0.7); }
+  .gc-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .gc-clock-time { font: 700 26px/1 var(--gc-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .gc-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（整行 5 枚） ===== */
+  .gc-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .gc-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 8px 18px;
+  }
+  .gc-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .gc-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .gc-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .gc-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .gc-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .gc-kpi.is-good::after { background: radial-gradient(circle, rgba(111, 224, 154, 0.13), transparent 68%); }
+  .gc-kpi-label { font-size: 12.5px; letter-spacing: 0.08em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .gc-kpi-num { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+  .gc-kpi-val { font: 700 30px/1 var(--gc-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .gc-kpi.is-amber .gc-kpi-val { color: #ffd489; }
+  .gc-kpi.is-good .gc-kpi-val { color: #b8f2cf; }
+  .gc-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .gc-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gc-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体 ===== */
+  .gc-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .gc-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .gc-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .gc-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .gc-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .gc-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .gc-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .gc-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .gc-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 中栏上：仓库清单（★ 高度写死，避免 JS 填充后压矮同 flex 容器里的图表） ===== */
+  .gc-listwrap { flex: none; height: 500px; }
+  .gc-thead, .gc-tbody li {
+    display: grid; grid-template-columns: 1.55fr 0.72fr 1.15fr 0.82fr 0.92fr 0.66fr;
+    align-items: center; gap: 10px; padding: 0 10px; font-variant-numeric: tabular-nums;
+  }
+  .gc-thead {
+    flex: none; height: 26px; font-size: 11.5px; letter-spacing: 0.08em; color: rgba(127, 146, 196, 0.95);
+    border-bottom: 1px solid rgba(96, 140, 255, 0.22);
+  }
+  .gc-thead span:nth-child(n+3) { text-align: right; }
+  .gc-thead span:last-child { text-align: left; }
+  .gc-tbody {
+    flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none;
+    display: grid; grid-auto-rows: 1fr; gap: 4px; overflow: hidden;
+  }
+  .gc-tbody li { min-height: 0; border-radius: 7px; font-size: 12.5px; color: #c8d6f2; }
+  .gc-tbody li:nth-child(odd) { background: rgba(96, 140, 255, 0.06); }
+  .gc-repo { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .gc-repo b { font-size: 13px; font-weight: 700; color: #eaf1ff; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gc-repo span { font-size: 10px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gc-lang {
+    justify-self: start; padding: 2px 8px; border-radius: 5px; font-size: 10.5px; font-weight: 700;
+    border: 1px solid rgba(96, 140, 255, 0.28); background: rgba(20, 38, 92, 0.6); color: #b9cdf5; white-space: nowrap;
+  }
+  .gc-cov { display: flex; align-items: center; gap: 7px; }
+  .gc-cov u { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.16); overflow: hidden; text-decoration: none; }
+  .gc-cov u > i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--rnd-blue-deep), var(--rnd-blue)); }
+  .gc-cov u.is-low > i { background: linear-gradient(90deg, #a4562a, var(--rnd-orange)); }
+  .gc-cov em { flex: none; width: 40px; text-align: right; font-style: normal; font-weight: 700; color: #eaf1ff; }
+  .gc-cov em.is-low { color: #ffb59a; }
+  .gc-num { text-align: right; font-weight: 700; color: #dce8ff; }
+  .gc-num.is-good { color: #b8f2cf; }
+  .gc-num.is-warn { color: #ffd489; }
+  .gc-owner { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #b9cdf5; }
+
+  /* ===== 底部口径滚动条 ===== */
+  .gc-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .gc-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .gc-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: gc-blink 1.6s ease-in-out infinite; }
+  @keyframes gc-blink { 50% { opacity: 0.35; } }
+  .gc-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .gc-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: gc-ticker 68s linear infinite; will-change: transform; }
+  .gc-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .gc-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes gc-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .gc-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="gc-stage" id="gc-stage">
+    <!-- mockflag:begin --><div class="gc-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="gc-error" id="gc-error" role="alert">ECharts 资源加载失败，仓库清单与 KPI 不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="gc-header">
+      <div class="gc-head-left">
+        <div class="gc-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="gc-crumb-up" href="大屏样板间-研发工程效能1920.html" title="返回上级专题页（Esc）">‹ 返回 工程效能</a><i>›</i>
+          <em id="gc-crumb-obj">--</em>
+        </div>
+        <div class="gc-head-title-row">
+          <div class="gc-head-title" id="gc-title">-- · 单仓库群工程详情</div>
+          <div class="gc-head-meta">
+            <span>仓库 <b id="gc-meta-repos">--</b> 个 · 中位覆盖率 <b id="gc-meta-cov">--</b></span><i>|</i>
+            <span>部署 <b id="gc-meta-dep">--</b> 次/日 · 评审样本 <b id="gc-meta-mr">--</b> 条</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="gc-head-right">
+        <div class="gc-switcher" id="gc-switcher" aria-label="仓库群切换"></div>
+        <div class="gc-chips">
+          <a class="gc-chip" href="大屏样板间-研发工程效能1920.html" title="回到上级专题页看全局 DORA 四联仪表"><span>全局 DORA · 部署频率</span><b>14.2 次/日 ›</b></a>
+        </div>
+        <div class="gc-clock" aria-label="实时时钟">
+          <span class="gc-clock-time" id="gc-clock-time">--:--:--</span>
+          <span class="gc-clock-date" id="gc-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：仓库数 / 中位覆盖率 / 构建成功率 / 评审 P85 / 部署频次 -->
+    <section class="gc-kpis" aria-label="仓库群核心指标">
+      <div class="gc-kpi">
+        <div class="gc-kpi-label">群内仓库数</div>
+        <div class="gc-kpi-num"><span class="gc-kpi-val" id="gc-kpi-0">0</span><span class="gc-kpi-unit">个</span></div>
+        <div class="gc-kpi-sub" id="gc-kpi-0s">--</div>
+      </div>
+      <div class="gc-kpi" id="gc-kpi-1box">
+        <div class="gc-kpi-label">中位单测覆盖率</div>
+        <div class="gc-kpi-num"><span class="gc-kpi-val" id="gc-kpi-1">0</span><span class="gc-kpi-unit">%</span></div>
+        <div class="gc-kpi-sub" id="gc-kpi-1s">--</div>
+      </div>
+      <div class="gc-kpi is-good">
+        <div class="gc-kpi-label">流水线构建成功率</div>
+        <div class="gc-kpi-num"><span class="gc-kpi-val" id="gc-kpi-2">0</span><span class="gc-kpi-unit">%</span></div>
+        <div class="gc-kpi-sub" id="gc-kpi-2s">--</div>
+      </div>
+      <div class="gc-kpi is-amber">
+        <div class="gc-kpi-label">代码评审 P85 时长</div>
+        <div class="gc-kpi-num"><span class="gc-kpi-val" id="gc-kpi-3">0</span><span class="gc-kpi-unit">h</span></div>
+        <div class="gc-kpi-sub" id="gc-kpi-3s">--</div>
+      </div>
+      <div class="gc-kpi">
+        <div class="gc-kpi-label">部署频次（该群份额）</div>
+        <div class="gc-kpi-num"><span class="gc-kpi-val" id="gc-kpi-4">0</span><span class="gc-kpi-unit">次/日</span></div>
+        <div class="gc-kpi-sub" id="gc-kpi-4s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：覆盖率分布直方 + 评审时长分位 -->
+    <div class="gc-col">
+      <section class="gc-panel" style="flex: 1;">
+        <div class="gc-panel-head">
+          <h2>覆盖率分布直方</h2>
+          <span class="gc-panel-tag" id="gc-tag-cov">--</span>
+        </div>
+        <div class="gc-chart" id="gc-chart-cov"></div>
+      </section>
+      <section class="gc-panel" style="flex: 1;">
+        <div class="gc-panel-head">
+          <h2>评审时长分位 · P50 / P85 / P95</h2>
+          <span class="gc-panel-tag" id="gc-tag-review">--</span>
+        </div>
+        <div class="gc-chart" id="gc-chart-review"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：该群代表仓库清单 + 构建时长与成功率双轴 -->
+    <div class="gc-col">
+      <section class="gc-panel gc-listwrap">
+        <div class="gc-panel-head">
+          <h2>该群代表仓库清单</h2>
+          <span class="gc-panel-tag" id="gc-tag-list">--</span>
+        </div>
+        <div class="gc-thead">
+          <span>仓库 / 归属</span><span>语言</span><span>单测覆盖率</span><span>近 30 天提交</span><span>构建成功率</span><span>负责人</span>
+        </div>
+        <ul class="gc-tbody" id="gc-tbody"></ul>
+      </section>
+      <section class="gc-panel" style="flex: 1;">
+        <div class="gc-panel-head">
+          <h2>构建时长与成功率 · 近 24 周</h2>
+          <span class="gc-panel-tag" id="gc-tag-build">--</span>
+        </div>
+        <div class="gc-chart" id="gc-chart-build"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：XP 实践采纳雷达 + 五群覆盖率箱线 -->
+    <div class="gc-col">
+      <section class="gc-panel" style="flex: 1.08;">
+        <div class="gc-panel-head">
+          <h2>XP 实践采纳 · 六维</h2>
+          <span class="gc-panel-tag" id="gc-tag-xp">--</span>
+        </div>
+        <div class="gc-chart" id="gc-chart-xp"></div>
+      </section>
+      <section class="gc-panel" style="flex: 0.92;">
+        <div class="gc-panel-head">
+          <h2>五群覆盖率箱线 · 父页同源</h2>
+          <span class="gc-panel-tag" id="gc-tag-box">--</span>
+        </div>
+        <div class="gc-chart" id="gc-chart-box"></div>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="gc-foot" aria-label="单仓库群工程详情口径说明">
+      <div class="gc-foot-label"><span class="gc-foot-dot"></span>工程口径</div>
+      <div class="gc-foot-viewport"><div class="gc-foot-track" id="gc-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("gc-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const round1 = (n) => Math.round(n * 10) / 10;
+
+  /* ===== 1.1 ★ kiosk 状态量前置声明（必须早于任何 hold() 调用） =====
+     let 有暂时性死区：带 hash 冷启动时若先 hold() 再声明，会抛
+     ReferenceError: Cannot access 'holdUntil' before initialization —— 主脚本整段中断，
+     而页面此时已渲染完，肉眼看不出问题（契约 §8 批次四实测坑）。
+     因此 idx / timer / holdUntil / hold() / restart() 全部提到这里，
+     首次 hold() 调用在下方第 11 节（boot 段），行号严格大于本块。 */
+  let idx = 0;
+  let timer = null;
+  let holdUntil = 0;
+  let holdCalls = 0;                                           /* 供页尾自检做构造性断言 */
+  function hold() { holdCalls += 1; holdUntil = Date.now() + 20000; }
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyGroup(idx + 1); }, 14000);
+  }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层：单一数据源，五个仓库群全部视图由此派生 =====
+     与父页「研发工程效能」(dx) 逐字同源（docs/RndIpdThemed.md §2.2 / §5.3 P7 / §6 P7→S13）：
+     · 五域仓库群名与仓库数：应用软件 84 / 嵌入式 37 / 云服务 96 / AI 平台 42 / 工具链 58，Σ = 317 个。
+     · 单测覆盖率箱线五数 [min, Q1, 中位, Q3, max] 引父页 COVERAGE 逐字，目标线 80%。
+     · 评审时长五桶（<2h / 2-8h / 8-24h / 1-3d / >3d）总量 486 / 1,042 / 694 / 318 / 92 引父页
+       REVIEW_BUCKETS 逐字；本页把它按群拆成 5×5 矩阵，**列和 = 父页各桶总量**。
+     · XP 六维全局值引父页 XP_DIMS 的 cur 逐字（62/58/92/74/84/66）；本页五群值按**仓库数加权**回归该全局值。
+     · DORA 部署频率 14.2 次/日（契约 §2.2）按群拆分，Σ 五群 = 14.2 次/日。
+     · 构建成功率与父页「流水线成功率日历热力」同一发生器（种子 20260819 的 LCG）：
+       本页复刻其逐周工作日均值序列，五群成功率 = 该周全局均值 + 群偏移，且 Σ仓库数×偏移 = 0，
+       故五群按仓库数加权后精确回归全局工作日均值。 */
+
+  const GROUP_AUTH = "应用软件|84|68,76,82,87,93;嵌入式|37|52,61,68,74,82;云服务|96|72,80,85,89,95;" +
+    "AI 平台|42|58,66,73,80,88;工具链|58|63,71,78,84,91";
+  const REPO_ALL = 317;                                        /* Σ 五群仓库数 */
+  const DEPLOY_ALL_T = 142;                                    /* 部署频率 14.2 次/日，以「十分之一次」计整 */
+  const COV_TARGET = 80;                                       /* 父页 COV_TARGET 逐字 */
+  const CAL_WEEKS = 26;                                        /* 父页日历热力周数 */
+  const BUILD_WEEKS = 24;                                      /* 父页构建走势周数 */
+
+  /* 3.1 五群主表（name 与契约 §6 P7→S13 对象集逐字；box 引父页 COVERAGE 逐字） */
+  const GROUPS = [
+    { name: "应用软件", short: "应用", repos: 84, box: [68, 76, 82, 87, 93],
+      role: "智家终端 App / 场景引擎 / 端侧 SDK",
+      dep: 0.049, srOff: 0.5, bfac: 0.95,
+      mr: [140, 300, 200, 84, 16] },
+    { name: "嵌入式", short: "嵌入", repos: 37, box: [52, 61, 68, 74, 82],
+      role: "澜芯模组固件 / RTOS / 驱动与协议栈",
+      dep: 0.024, srOff: -3.4, bfac: 2.00,
+      mr: [22, 78, 88, 52, 20] },
+    { name: "云服务", short: "云服", repos: 96, box: [72, 80, 85, 89, 95],
+      role: "云枢平台 / 云盾鉴权 / 计费与租户面",
+      dep: 0.060, srOff: null, bfac: 0.70,
+      mr: [210, 360, 190, 60, 10] },
+    { name: "AI 平台", short: "AI", repos: 42, box: [58, 66, 73, 80, 88],
+      role: "灵犀/慧眼/澜音训练与推理、特征与评测",
+      dep: 0.038, srOff: -1.6, bfac: 1.30,
+      mr: [44, 124, 106, 62, 14] },
+    { name: "工具链", short: "工具", repos: 58, box: [63, 71, 78, 84, 91],
+      role: "CI Runner / 构建缓存 / 环境与镜像",
+      dep: 0.031, srOff: 0.3, bfac: null,
+      mr: [70, 180, 110, 60, 32] }
+  ];
+  const SOLVE_SR = 2;                                          /* 成功率偏移的平差项 = 云服务（仓库数最大，粒度最细） */
+  const SOLVE_BF = 4;                                          /* 构建时长因子的平差项 = 工具链 */
+  const SOLVE_XP = 2;                                          /* XP 六维的平差项 = 云服务 */
+
+  /* 3.2 评审时长五桶（父页 REVIEW_BUCKETS 逐字：名称 / 小时界 / 总量） */
+  const MR_BUCKETS = [
+    { name: "<2h",   lo: 0,  hi: 2,   n: 486 },
+    { name: "2-8h",  lo: 2,  hi: 8,   n: 1042 },
+    { name: "8-24h", lo: 8,  hi: 24,  n: 694 },
+    { name: "1-3d",  lo: 24, hi: 72,  n: 318 },
+    { name: ">3d",   lo: 72, hi: 120, n: 92 }
+  ];
+  const MR_AUTH = "486,1042,694,318,92";
+
+  /* 3.3 XP 六维（父页 XP_DIMS 的 cur / prev 逐字；free = 除平差项外四群自编值，
+         列序 = [应用软件, 嵌入式, AI 平台, 工具链]，云服务由加权回归方程解出） */
+  const XP_DIMS = [
+    { dim: "结对编程",       cur: 62, prev: 54, free: [64, 52, 58, 66] },
+    { dim: "TDD",            cur: 58, prev: 49, free: [58, 38, 48, 72] },
+    { dim: "持续集成",       cur: 92, prev: 86, free: [94, 78, 88, 96] },
+    { dim: "重构",           cur: 74, prev: 68, free: [76, 64, 68, 80] },
+    { dim: "小步发布",       cur: 84, prev: 76, free: [86, 62, 80, 84] },
+    { dim: "集体代码所有权", cur: 66, prev: 61, free: [68, 54, 62, 74] }
+  ];
+  const XP_AUTH = "结对编程|62;TDD|58;持续集成|92;重构|74;小步发布|84;集体代码所有权|66";
+
+  /* 3.4 代表仓库清单（二级自编；覆盖率有序列已按「min / Q1 / 中位 / Q3 / max 落在极值内」布点：
+         每群清单的最小值 = 该群箱线 min、中位数 = 箱线中位、最大值 = 箱线 max，页尾自检硬校验） */
+  const REPOS = {
+    "应用软件": [
+      ["yunlu-home-app",   "Kotlin",     93, 412, 96.4, "沈舟"],
+      ["yunlu-ios-home",   "Swift",      89, 268, 95.1, "崔可"],
+      ["xinglan-launcher", "Kotlin",     87, 196, 94.6, "何珩"],
+      ["scene-engine",     "Kotlin",     84, 231, 93.8, "凌岫"],
+      ["home-ui-kit",      "TypeScript", 82, 174, 93.2, "苏晏"],
+      ["app-gateway-sdk",  "Java",       81, 143, 92.7, "邵臻"],
+      ["device-pairing",   "Java",       79, 128, 92.1, "钟屿"],
+      ["app-push-center",  "Go",         91, 106, 95.8, "谷桐"],
+      ["app-analytics",    "TypeScript", 76,  92, 91.5, "章珉"],
+      ["voice-assist-app", "Kotlin",     73,  87, 90.4, "祁澜"],
+      ["ota-client",       "C++",        68,  64, 88.9, "岑野"]
+    ],
+    "嵌入式": [
+      ["lanxin-m60-fw",     "C",   82, 168, 93.6, "褚彦"],
+      ["lanxin-m80-fw",     "C",   78, 142, 92.4, "严岐"],
+      ["rtos-hal",          "C",   74, 116, 91.1, "毕澈"],
+      ["ble-mesh-stack",    "C",   71,  94, 90.2, "宁樾"],
+      ["sensor-driver",     "C",   68,  88, 89.4, "屈铭"],
+      ["motor-ctrl",        "C++", 65,  73, 88.6, "殷决"],
+      ["power-mgmt",        "C",   61,  67, 87.5, "郎沅"],
+      ["wifi-supplicant",   "C",   58,  54, 86.2, "廉序"],
+      ["bootloader-secure", "C",   52,  41, 84.8, "鲁桉"]
+    ],
+    "云服务": [
+      ["yunshu-core",          "Go",         95, 486, 97.6, "颜霁"],
+      ["yunshu-api-gw",        "Go",         93, 352, 97.1, "游筠"],
+      ["yundun-auth",          "Java",       91, 284, 96.5, "岳汀"],
+      ["device-shadow",        "Go",         89, 261, 96.0, "康偃"],
+      ["release-orchestrator", "Go",         87, 218, 95.4, "翁沂"],
+      ["rule-engine",          "Java",       85, 196, 94.9, "路旸"],
+      ["msg-broker",           "Java",       84, 173, 94.5, "武黎"],
+      ["config-center",        "Go",         83, 152, 94.1, "邢栾"],
+      ["metrics-pipeline",     "Rust",       80, 138, 93.4, "费湛"],
+      ["billing-svc",          "Go",         76, 121, 92.3, "简垣"],
+      ["tenant-console",       "TypeScript", 72,  98, 91.2, "常骐"]
+    ],
+    "AI 平台": [
+      ["lingxi-serving", "Python", 88, 274, 95.2, "赫岚"],
+      ["huiyan-train",   "Python", 84, 236, 94.1, "覃眙"],
+      ["model-registry", "Go",     80, 158, 93.0, "范柘"],
+      ["feature-store",  "Python", 76, 141, 92.2, "衡沐"],
+      ["eval-harness",   "Python", 73, 127, 91.3, "陆嵬"],
+      ["dataset-hub",    "Python", 70, 112, 90.5, "阮翀"],
+      ["lanyin-asr",     "Python", 66,  96, 89.4, "叶巳"],
+      ["zhijian-rank",   "Python", 63,  84, 88.6, "汤翊"],
+      ["yufeng-edge",    "C++",    58,  62, 87.1, "娄骞"]
+    ],
+    "工具链": [
+      ["ci-runner-agent",   "Go",         91, 224, 96.2, "季棠"],
+      ["build-cache",       "Rust",       87, 186, 95.3, "鄢冽"],
+      ["test-orchestrator", "Go",         84, 162, 94.6, "谭峋"],
+      ["artifact-mirror",   "Go",         81, 134, 93.8, "包翟"],
+      ["coverage-agg",      "Python",     78, 118, 93.0, "尉迟渊"],
+      ["codegen-cli",       "TypeScript", 75, 102, 92.2, "华骕"],
+      ["lint-ruleset",      "TypeScript", 71,  88, 91.3, "曾岍"],
+      ["env-provision",     "Go",         68,  71, 90.4, "上官砚"],
+      ["devbox-image",      "Shell",      63,  56, 89.1, "闻莘"]
+    ]
+  };
+
+  /* ===== 3.5 复刻父页流水线日历热力发生器（种子 / LCG / 公式与 dx 逐字一致），
+         得到逐周工作日成功率均值序列——本页五群成功率以此为基准线做零和偏移。 ===== */
+  let dxSeed = 20260819;
+  const rnd = () => ((dxSeed = (dxSeed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const WEEK_LABELS = [];
+  (function () {
+    const d0 = new Date(2026, 7, 17);                           /* 末周周一 2026-08-17，往前推 25 周 */
+    d0.setDate(d0.getDate() - (CAL_WEEKS - 1) * 7);
+    for (let w = 0; w < CAL_WEEKS; w += 1) {
+      const d = new Date(d0.getTime());
+      d.setDate(d0.getDate() + w * 7);
+      WEEK_LABELS.push(pad(d.getMonth() + 1) + "-" + pad(d.getDate()));
+    }
+  })();
+  const CAL_WEEK_MEAN = [];                                     /* 每周 5 个工作日格的均值 */
+  for (let w = 0; w < CAL_WEEKS; w += 1) {
+    let s = 0;
+    for (let d = 0; d < 5; d += 1) s += Math.min(100, round1(84 + w * 0.35 + rnd() * 8));
+    CAL_WEEK_MEAN.push(s / 5);
+  }
+  const CAL_AVG_26 = sum(CAL_WEEK_MEAN) / CAL_WEEKS;            /* 与父页 D.calAvg 同值 */
+  const BUILD_LABELS = WEEK_LABELS.slice(CAL_WEEKS - BUILD_WEEKS);
+  const SR_BASE = CAL_WEEK_MEAN.slice(CAL_WEEKS - BUILD_WEEKS); /* 近 24 周全局工作日成功率均值 */
+  const SR_BASE_AVG = sum(SR_BASE) / BUILD_WEEKS;
+  /* 父页构建时长全局周均值（公式与 dx BUILD_MEAN 逐字） */
+  const BUILD_BASE = [];
+  for (let i = 0; i < BUILD_WEEKS; i += 1) BUILD_BASE.push(round1(14.8 - 0.16 * i + 0.6 * Math.sin(i * 1.3)));
+  const BUILD_BASE_AVG = sum(BUILD_BASE) / BUILD_WEEKS;
+
+  /* ===== 3.6 平差：三组「按仓库数加权回归全局值」的自由度都放在一个群上，其余群自编 ===== */
+  const repoArr = GROUPS.map((g) => g.repos);
+  const repoSum = sum(repoArr);
+
+  /* (a) 成功率偏移：Σ 仓库数 × 偏移 = 0 → 加权成功率恒等于全局工作日均值 */
+  (function () {
+    let acc = 0;
+    GROUPS.forEach((g, i) => { if (i !== SOLVE_SR) acc += g.repos * g.srOff; });
+    GROUPS[SOLVE_SR].srOff = -acc / GROUPS[SOLVE_SR].repos;
+  })();
+  /* (b) 构建时长因子：Σ 仓库数 × 因子 = Σ 仓库数 → 加权构建时长恒等于全局周均值 */
+  (function () {
+    let acc = 0;
+    GROUPS.forEach((g, i) => { if (i !== SOLVE_BF) acc += g.repos * g.bfac; });
+    GROUPS[SOLVE_BF].bfac = (repoSum - acc) / GROUPS[SOLVE_BF].repos;
+  })();
+  /* (c) XP 六维：Σ 仓库数 × 群值 = Σ仓库数 × 全局值 → 加权回归父页 XP_DIMS.cur */
+  const XP_VAL = XP_DIMS.map((x) => {
+    const v = [x.free[0], x.free[1], 0, x.free[2], x.free[3]];  /* 列序 = GROUPS 序，索引 2 待解 */
+    let acc = 0;
+    for (let i = 0; i < GROUPS.length; i += 1) if (i !== SOLVE_XP) acc += repoArr[i] * v[i];
+    v[SOLVE_XP] = (repoSum * x.cur - acc) / repoArr[SOLVE_XP];
+    return v;
+  });
+
+  /* ===== 3.7 部署频次按群拆分：权重 = 仓库数 × 每仓部署强度，最大余数法分配到「十分之一次」 ===== */
+  function allocate(total, weights) {
+    const wsum = sum(weights);
+    const raw = weights.map((w) => total * w / wsum);
+    const base = raw.map(Math.floor);
+    const rest = total - sum(base);
+    const order = raw.map((v, i) => [v - base[i], i]).sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+    for (let k = 0; k < rest; k += 1) base[order[k][1]] += 1;
+    return base;
+  }
+  const DEPLOY_T = allocate(DEPLOY_ALL_T, GROUPS.map((g) => g.repos * g.dep));   /* 单位：0.1 次/日 */
+
+  /* ===== 3.8 覆盖率总体：由箱线五数做分位反演，逐仓生成后分桶（Σ = 该群仓库数） =====
+     p = (k + 0.5) / n 逐点取分位，分位函数为过 (0,min)(.25,Q1)(.5,中位)(.75,Q3)(1,max) 的分段线性。
+     故总体最小值/中位数/最大值四舍五入后精确回到箱线的 min / 中位 / max（页尾自检硬校验）。 */
+  const BINS = [[50, 60], [60, 70], [70, 80], [80, 90], [90, 101]];
+  const BIN_LABEL = ["50~60", "60~70", "70~80", "80~90", "90~100"];
+  const BIN_CENTER = [55, 65, 75, 85, 95];
+  function covQuantile(box, p) {
+    const ps = [0, 0.25, 0.5, 0.75, 1];
+    for (let j = 0; j < 4; j += 1) {
+      if (p <= ps[j + 1]) return box[j] + (p - ps[j]) / 0.25 * (box[j + 1] - box[j]);
+    }
+    return box[4];
+  }
+
+  /* ===== 3.9 逐群派生量（全部现算，不复制数字） ===== */
+  function quantileFromBuckets(counts, p) {
+    const tot = sum(counts), tgt = tot * p;
+    let cum = 0;
+    for (let i = 0; i < counts.length; i += 1) {
+      if (counts[i] > 0 && cum + counts[i] >= tgt) {
+        return MR_BUCKETS[i].lo + (tgt - cum) / counts[i] * (MR_BUCKETS[i].hi - MR_BUCKETS[i].lo);
+      }
+      cum += counts[i];
+    }
+    return MR_BUCKETS[MR_BUCKETS.length - 1].hi;
+  }
+  GROUPS.forEach((g, k) => {
+    g.list = REPOS[g.name].map((r) => ({ repo: r[0], lang: r[1], cov: r[2], commits: r[3], succ: r[4], owner: r[5] }));
+    g.listCov = g.list.map((r) => r.cov).slice().sort((a, b) => a - b);
+    g.listMed = g.listCov.length % 2
+      ? g.listCov[(g.listCov.length - 1) / 2]
+      : (g.listCov[g.listCov.length / 2 - 1] + g.listCov[g.listCov.length / 2]) / 2;
+    /* 覆盖率总体与分桶 */
+    g.pop = [];
+    for (let i = 0; i < g.repos; i += 1) g.pop.push(Math.round(covQuantile(g.box, (i + 0.5) / g.repos)));
+    g.pop.sort((a, b) => a - b);
+    g.popMed = g.repos % 2 ? g.pop[(g.repos - 1) / 2] : (g.pop[g.repos / 2 - 1] + g.pop[g.repos / 2]) / 2;
+    g.hist = BINS.map((b) => g.pop.filter((v) => v >= b[0] && v < b[1]).length);
+    g.overTarget = g.pop.filter((v) => v >= COV_TARGET).length;
+    /* 24 周构建时长 / 成功率 */
+    g.buildMean = BUILD_BASE.map((v) => v * g.bfac);
+    g.succWeek = SR_BASE.map((v) => v + g.srOff);
+    g.succAvg = sum(g.succWeek) / BUILD_WEEKS;
+    g.buildAvg = sum(g.buildMean) / BUILD_WEEKS;
+    /* 评审分位 */
+    g.mrTotal = sum(g.mr);
+    g.p50 = quantileFromBuckets(g.mr, 0.5);
+    g.p85 = quantileFromBuckets(g.mr, 0.85);
+    g.p95 = quantileFromBuckets(g.mr, 0.95);
+    /* 部署频次 */
+    g.depT = DEPLOY_T[k];
+    g.deploy = DEPLOY_T[k] / 10;
+    /* XP 六维 */
+    g.xp = XP_VAL.map((v) => v[k]);
+  });
+
+  /* 全局参照量（父页口径，现算不抄写） */
+  const MR_COL = MR_BUCKETS.map((b, j) => sum(GROUPS.map((g) => g.mr[j])));
+  const MR_TOTAL = sum(MR_COL);
+  const G50 = quantileFromBuckets(MR_COL, 0.5);
+  const G85 = quantileFromBuckets(MR_COL, 0.85);
+  const G95 = quantileFromBuckets(MR_COL, 0.95);
+  const DEPLOY_ALL = sum(DEPLOY_T) / 10;                        /* 现算，应恒等于 14.2 */
+  const SR_WAVG = sum(GROUPS.map((g) => g.repos * g.succAvg)) / repoSum;
+  const XP_WAVG = XP_DIMS.map((x, d) => sum(GROUPS.map((g) => g.repos * g.xp[d])) / repoSum);
+
+  /* ===== 4. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("gc-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("gc-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. 仓库群切换器（tab 文本与契约 §6 hash 键逐字一致） ===== */
+  const switcher = $("gc-switcher");
+  switcher.innerHTML = GROUPS.map((g, i) => (
+    '<button class="gc-sw-tab" type="button" data-i="' + i + '" title="切换到' + g.name + '（← → 方向键）">' +
+      "<b>" + g.name + "</b><span>" + g.repos + " repos</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".gc-sw-tab"));
+
+  /* ===== 6. 非图表区渲染（不依赖 echarts；★ 全部在 echarts.init 之前完成首屏填充） ===== */
+  function countUp(el, target, fmt) {
+    const t0 = performance.now(), dur = 1400;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+  function renderKpi(g) {
+    const defs = [
+      { v: g.repos, f: (x) => fmtInt(x),
+        sub: "五群 Σ <b>" + REPO_ALL + "</b> 个 · 占 " + fmtDec(g.repos / repoSum * 100, 1) + "%" },
+      { v: g.box[2], f: (x) => fmtInt(x),
+        sub: "箱线 <b>" + g.box.join(" / ") + "</b> · 目标线 " + COV_TARGET + "%（父页逐字）" },
+      { v: g.succAvg, f: (x) => fmtDec(x, 1),
+        sub: "24 周工作日口径 · 五群加权 <b>" + fmtDec(SR_WAVG, 2) + "%</b> = 全局均值" },
+      { v: g.p85, f: (x) => fmtDec(x, 1),
+        sub: "样本 <b>" + fmtInt(g.mrTotal) + "</b> 条 · 全局 P85 " + fmtDec(G85, 1) + " h" },
+      { v: g.deploy, f: (x) => fmtDec(x, 1),
+        sub: "占全局 <b>" + fmtDec(g.deploy / DEPLOY_ALL * 100, 1) + "%</b> · Σ五群 = " + fmtDec(DEPLOY_ALL, 1) + " 次/日" }
+    ];
+    defs.forEach((d, i) => {
+      countUp($("gc-kpi-" + i), d.v, d.f);
+      $("gc-kpi-" + i + "s").innerHTML = d.sub;
+    });
+    const box = $("gc-kpi-1box");
+    box.classList.toggle("is-good", g.box[2] >= COV_TARGET);
+    box.classList.toggle("is-amber", g.box[2] < COV_TARGET);
+    $("gc-tag-cov").innerHTML = "总体 <b>" + g.repos + "</b> 仓 · 达标（≥" + COV_TARGET + "%）<b>" + g.overTarget +
+      "</b> 仓 · " + fmtDec(g.overTarget / g.repos * 100, 1) + "%";
+    $("gc-tag-review").innerHTML = "样本 <b>" + fmtInt(g.mrTotal) + "</b> 条 · 五桶口径同父页 · 全局 " + fmtInt(MR_TOTAL) + " 条";
+    $("gc-tag-list").innerHTML = "代表 <b>" + g.list.length + "</b> 仓 · 覆盖率 " + g.listCov[0] + "% ~ " +
+      g.listCov[g.listCov.length - 1] + "% · 中位 " + fmtDec(g.listMed, 0) + "%";
+    $("gc-tag-build").innerHTML = "均值 <b>" + fmtDec(g.buildAvg, 1) + "</b> min · 成功率均值 " + fmtDec(g.succAvg, 1) + "%";
+    $("gc-tag-xp").innerHTML = "本群均分 <b>" + fmtDec(sum(g.xp) / g.xp.length, 1) + "</b> · 加权口径 = 仓库数加权";
+    $("gc-tag-box").innerHTML = "五数引父页 · 目标线 <b>" + COV_TARGET + "%</b>";
+  }
+  function renderList(g) {
+    $("gc-tbody").innerHTML = g.list.map((r) => {
+      const low = r.cov < COV_TARGET;
+      const succCls = r.succ >= 95 ? "is-good" : (r.succ < 90 ? "is-warn" : "");
+      return "<li>" +
+        '<span class="gc-repo"><b>' + r.repo + "</b><span>" + g.name + " · " + g.short + "群</span></span>" +
+        '<span class="gc-lang">' + r.lang + "</span>" +
+        '<span class="gc-cov"><u class="' + (low ? "is-low" : "") + '"><i style="width:' + r.cov + '%"></i></u>' +
+          '<em class="' + (low ? "is-low" : "") + '">' + r.cov + "%</em></span>" +
+        '<span class="gc-num">' + fmtInt(r.commits) + "</span>" +
+        '<span class="gc-num ' + succCls + '">' + fmtDec(r.succ, 1) + "%</span>" +
+        '<span class="gc-owner">' + r.owner + "</span>" +
+      "</li>";
+    }).join("");
+  }
+
+  /* 底部口径滚动（内容与仓库群无关，只建一次；★ 图表 init 之前填充） */
+  (function buildFoot() {
+    const items = [
+      ["口径", C.amber, "五域仓库群与仓库数引父页「研发工程效能」COVERAGE 逐字：" +
+        GROUPS.map((g) => g.name + " " + g.repos).join(" + ") + " = " + REPO_ALL + " 个仓库"],
+      ["覆盖率", C.blue, "单测覆盖率箱线五数 [min, Q1, 中位, Q3, max] 与父页逐字；直方为「按五数做分位反演」" +
+        "生成的逐仓总体（Σ = 该群仓库数），故总体最小值/中位/最大值精确回到箱线端点，目标线 " + COV_TARGET + "%"],
+      ["评审", C.violet, "评审时长五桶总量 " + MR_AUTH + "（父页 REVIEW_BUCKETS 逐字，Σ = " + fmtInt(MR_TOTAL) +
+        " 条）；本页按群拆成 5×5 矩阵，列和 = 父页各桶总量；P50/P85/P95 由累计频数在桶内线性插值现算，" +
+        "全局 P50 " + fmtDec(G50, 1) + " h / P85 " + fmtDec(G85, 1) + " h / P95 " + fmtDec(G95, 1) + " h"],
+      ["构建", C.cyan, "成功率与父页「流水线成功率日历热力」同一发生器（种子 20260819）：本页复刻其逐周工作日均值，" +
+        "五群 = 全局周均值 + 群偏移，Σ 仓库数×偏移 = 0，故加权成功率 " + fmtDec(SR_WAVG, 2) + "% ≡ 近 24 周全局均值 " +
+        fmtDec(SR_BASE_AVG, 2) + "%（26 周口径 " + fmtDec(CAL_AVG_26, 2) + "%）"],
+      ["构建", C.cyan, "构建时长同理：五群 = 全局周均值 × 群因子，Σ 仓库数×因子 = " + REPO_ALL +
+        "，故按仓库数加权的构建时长恒等于全局周均值（近 24 周 " + fmtDec(BUILD_BASE_AVG, 1) + " min）"],
+      ["XP", C.green, "XP 六维加权口径 = **仓库数加权**：Σ(仓库数 × 群得分) ÷ " + REPO_ALL +
+        " 逐维回归父页 XP_DIMS 全局值 " + XP_DIMS.map((x) => x.dim + " " + x.cur).join(" / ") +
+        "；云服务为平差项（仓库数最大、粒度最细），其余四群为自编值"],
+      ["DORA", C.orange, "部署频次按群拆分：权重 = 仓库数 × 每仓部署强度，最大余数法分配到「0.1 次/日」，" +
+        "Σ 五群 = " + GROUPS.map((g) => fmtDec(g.deploy, 1)).join(" + ") + " = " + fmtDec(DEPLOY_ALL, 1) +
+        " 次/日，与契约 §2.2 DORA 部署频率逐字一致"],
+      ["导航", C.blue, "本页为「研发工程效能」的二级子页：父页覆盖率箱线点击下钻至此，hash 键 = 仓库群名原文" +
+        "（AI 平台亦收「AI平台」无空格别名）；Esc 或左上角面包屑返回上级"]
+    ];
+    const html = items.map((a) => '<span class="gc-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("gc-foot-track").innerHTML = html + html;                 /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* ===== 7. 静态层整页重绘（不依赖 echarts） ===== */
+  function paintStatic(g) {
+    $("gc-title").textContent = g.name + " · 单仓库群工程详情";
+    $("gc-crumb-obj").textContent = g.name + " · " + g.role;
+    $("gc-meta-repos").textContent = g.repos;
+    $("gc-meta-cov").textContent = g.box[2] + "%";
+    $("gc-meta-dep").textContent = fmtDec(g.deploy, 1);
+    $("gc-meta-mr").textContent = fmtInt(g.mrTotal);
+    renderKpi(g);
+    renderList(g);
+  }
+
+  /* hash 契约：decodeURIComponent → 去空白归一化（两侧同归一，「AI 平台」不会因去空格而失配）
+     → HASH_ALIAS 收别名（含「AI平台」无空格写法） */
+  const normKey = (s) => String(s).replace(/[\s　]+/g, "");
+  const HASH_ALIAS = {
+    "AI平台": "AI 平台", "AI": "AI 平台", "AI平台仓库群": "AI 平台",
+    "应用": "应用软件", "APP": "应用软件",
+    "嵌入式软件": "嵌入式", "固件": "嵌入式",
+    "云": "云服务", "云平台": "云服务",
+    "工具": "工具链", "DevOps工具链": "工具链"
+  };
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.trim();
+    if (!s) return -1;
+    let k = normKey(s);
+    if (HASH_ALIAS[k]) k = normKey(HASH_ALIAS[k]);
+    return GROUPS.findIndex((x) => normKey(x.name) === k);
+  }
+  const bootHit = resolveHash(location.hash);
+  const bootIdx = bootHit >= 0 ? bootHit : 0;
+  paintStatic(GROUPS[bootIdx]);                                 /* ★ 非图表区先填充，再 init 图表 */
+  swTabs.forEach((b, k) => b.classList.toggle("is-active", k === bootIdx));
+
+  /* ===== 8. 资源守卫（KPI 与仓库清单已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("gc-error").classList.add("is-visible");
+
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const covChart = hasEcharts ? echarts.init($("gc-chart-cov")) : null;
+  const reviewChart = hasEcharts ? echarts.init($("gc-chart-review")) : null;
+  const buildChart = hasEcharts ? echarts.init($("gc-chart-build")) : null;
+  const xpChart = hasEcharts ? echarts.init($("gc-chart-xp")) : null;
+  const boxChart = hasEcharts ? echarts.init($("gc-chart-box")) : null;
+
+  /* ===== 9. option 构造（★ 只放标量与数组，群/仓库对象一律不进 option，避免深拷贝循环引用） ===== */
+
+  /* 9.1 覆盖率分布直方（x 为覆盖率数值轴，才能把中位线与目标线画成竖直 markLine） */
+  function covOption(k) {
+    const g = GROUPS[k];
+    const hist = g.hist.slice(), labels = BIN_LABEL.slice(), centers = BIN_CENTER.slice();
+    const med = g.box[2], repos = g.repos, gname = g.name;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 14, top: 34, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = centers.indexOf(p.value[0]);
+          return "<b>" + gname + " · 覆盖率 " + labels[j] + "%</b><br/>仓库 <b>" + hist[j] + "</b> 个 · 占该群 " +
+            fmtDec(hist[j] / repos * 100, 1) + "%<br/>口径：由箱线五数分位反演的逐仓总体，Σ = " + repos + " 仓";
+        }
+      }, TIP),
+      xAxis: {
+        type: "value", min: 50, max: 100, interval: 10,
+        name: "覆盖率 %", nameGap: 20, nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, axisLine: { lineStyle: { color: C.line } }, splitLine: { show: false }
+      },
+      yAxis: {
+        type: "value", name: "仓库数", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE
+      },
+      series: [{
+        type: "bar", barWidth: 58,
+        data: centers.map((c, j) => ({
+          value: [c, hist[j]],
+          itemStyle: {
+            borderRadius: [4, 4, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: c >= COV_TARGET ? C.green : C.blue },
+              { offset: 1, color: c >= COV_TARGET ? "rgba(111,224,154,0.18)" : "rgba(47,111,214,0.18)" }])
+          }
+        })),
+        label: {
+          show: true, position: "top", fontSize: 11, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => (p.value[1] > 0 ? p.value[1] : "")
+        },
+        markLine: {
+          symbol: ["none", "none"], animation: false,
+          label: { fontSize: 10, fontWeight: 700, formatter: (p) => p.name },
+          data: [
+            { xAxis: med, name: "中位 " + med + "%",
+              lineStyle: { color: C.amber, width: 2, type: "solid" }, label: { color: "#ffd489", position: "insideEndTop" } },
+            { xAxis: COV_TARGET, name: "目标 " + COV_TARGET + "%",
+              lineStyle: { color: C.red, width: 1.6, type: "dashed" }, label: { color: "#ffb0b7", position: "insideStartTop" } }
+          ]
+        }
+      }]
+    };
+  }
+
+  /* 9.2 评审时长分位条（本群 vs 全局；口径与父页五桶分布一致） */
+  function reviewOption(k) {
+    const g = GROUPS[k];
+    const mine = [g.p50, g.p85, g.p95].map((v) => Number(fmtDec(v, 1)));
+    const glob = [G50, G85, G95].map((v) => Number(fmtDec(v, 1)));
+    const cats = ["P50", "P85", "P95"];
+    const gname = g.name, mrTotal = g.mrTotal, mrRow = g.mr.slice();
+    const bnames = MR_BUCKETS.map((b) => b.name);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 78, top: 30, bottom: 4, containLabel: true },
+      legend: { top: 0, right: 2, itemWidth: 12, itemHeight: 8, textStyle: { color: C.textDim, fontSize: 11 } },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + gname + " · " + cats[i] + "</b><br/>本群 <b>" + fmtDec(mine[i], 1) + "</b> h ／ 全局 " +
+            fmtDec(glob[i], 1) + " h<br/>五桶分布：" + bnames.map((n, j) => n + " " + mrRow[j]).join(" · ") +
+            "<br/>样本 " + fmtInt(mrTotal) + " 条 · 桶内线性插值";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max.apply(null, mine.concat(glob)) * 1.36 },
+      yAxis: {
+        type: "category", inverse: true, data: cats,
+        axisLabel: { color: C.text, fontSize: 12, fontWeight: 700 },
+        axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [
+        {
+          name: "本群", type: "bar", barWidth: 13, barGap: "22%", data: mine,
+          itemStyle: {
+            borderRadius: 6,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(C.amber, 0.45) }, { offset: 1, color: C.amber }])
+          },
+          label: { show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#ffd489",
+            formatter: (p) => fmtDec(p.value, 1) + " h" }
+        },
+        {
+          name: "全局", type: "bar", barWidth: 9, data: glob,
+          itemStyle: { borderRadius: 5, color: "rgba(92,157,255,0.55)" },
+          label: { show: true, position: "right", fontSize: 10, color: C.textDim,
+            formatter: (p) => fmtDec(p.value, 1) + " h" }
+        }
+      ]
+    };
+  }
+
+  /* 9.3 构建时长（柱）与成功率（线）双轴，近 24 周 */
+  function buildOption(k) {
+    const g = GROUPS[k];
+    const bm = g.buildMean.map((v) => Number(fmtDec(v, 1)));
+    const sr = g.succWeek.map((v) => Number(fmtDec(v, 1)));
+    const gname = g.name, avgS = g.succAvg;
+    const srMin = Math.min.apply(null, sr), srMax = Math.max.apply(null, sr);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 6, top: 32, bottom: 2, containLabel: true },
+      legend: { top: 0, right: 2, itemWidth: 12, itemHeight: 8, textStyle: { color: C.textDim, fontSize: 11 } },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + gname + " · 周 " + BUILD_LABELS[i] + "</b><br/>构建均值时长 <b>" + fmtDec(bm[i], 1) +
+            "</b> min<br/>流水线成功率 <b>" + fmtDec(sr[i], 1) + "</b>%<br/>口径：全局周均值 × 群因子 ／ 全局周均值 + 群偏移";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: BUILD_LABELS.slice(),
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 2, fontSize: 9.5 }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: [
+        { type: "value", name: "min", nameTextStyle: { color: C.textDim, fontSize: 10 }, axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
+        {
+          type: "value", name: "%", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          min: Math.floor((srMin - (srMax - srMin) * 0.9) * 10) / 10,
+          max: Math.ceil((srMax + (srMax - srMin) * 0.3) * 10) / 10,
+          axisLabel: AXIS_LABEL, splitLine: { show: false }
+        }
+      ],
+      series: [
+        {
+          name: "构建均值时长", type: "bar", barWidth: "58%", yAxisIndex: 0, data: bm,
+          itemStyle: {
+            borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: C.blue }, { offset: 1, color: "rgba(47,111,214,0.20)" }])
+          }
+        },
+        {
+          name: "流水线成功率", type: "line", yAxisIndex: 1, data: sr, smooth: true,
+          symbol: "circle", symbolSize: 4,
+          lineStyle: { color: C.green, width: 2 }, itemStyle: { color: C.green },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "rgba(111,224,154,0.20)" }, { offset: 1, color: "rgba(111,224,154,0)" }])
+          },
+          markLine: {
+            symbol: ["none", "none"], animation: false,
+            data: [{ yAxis: Number(fmtDec(avgS, 1)), name: "24 周均值 " + fmtDec(avgS, 1) + "%" }],
+            lineStyle: { color: "rgba(255,194,77,0.8)", width: 1.4, type: "dashed" },
+            label: { color: "#ffd489", fontSize: 10, fontWeight: 700, position: "insideEndTop", formatter: (p) => p.name }
+          }
+        }
+      ]
+    };
+  }
+
+  /* 9.4 XP 实践采纳雷达（本群 vs 全局，全局 = 五群按仓库数加权的回归值） */
+  function xpOption(k) {
+    const g = GROUPS[k];
+    const mine = g.xp.map((v) => Number(fmtDec(v, 1)));
+    const glob = XP_DIMS.map((x) => x.cur);
+    const prev = XP_DIMS.map((x) => x.prev);
+    const dims = XP_DIMS.map((x) => x.dim);
+    const gname = g.name, repos = g.repos;
+    return {
+      backgroundColor: "transparent",
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8,
+        data: ["本群", "全局（仓库数加权）", "全局上季"], textStyle: { color: C.textDim, fontSize: 10.5 }
+      },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: () => "<b>" + gname + " · XP 六维（" + repos + " repos）</b><br/>" +
+          dims.map((d, j) => d + " <b>" + fmtDec(mine[j], 1) + "</b> ／ 全局 " + glob[j] +
+            "（上季 " + prev[j] + "）").join("<br/>") +
+          "<br/>加权口径：Σ(仓库数 × 群得分) ÷ " + REPO_ALL + " 逐维回归全局值"
+      }, TIP),
+      radar: {
+        center: ["50%", "58%"], radius: "60%", splitNumber: 4,
+        indicator: dims.map((d) => ({ name: d, min: 30, max: 100 })),
+        axisName: { color: C.text, fontSize: 10.5 },
+        axisLine: { lineStyle: { color: C.grid } },
+        splitLine: { lineStyle: { color: C.grid } },
+        splitArea: { areaStyle: { color: ["rgba(92,157,255,0.04)", "rgba(92,157,255,0.08)"] } }
+      },
+      series: [{
+        type: "radar", symbolSize: 4,
+        data: [
+          {
+            value: mine, name: "本群",
+            lineStyle: { color: C.amber, width: 2 }, itemStyle: { color: C.amber },
+            areaStyle: { color: "rgba(255,194,77,0.22)" },
+            label: { show: true, color: "#ffd489", fontSize: 10, fontWeight: 700, formatter: (p) => fmtDec(p.value, 1) }
+          },
+          {
+            value: glob, name: "全局（仓库数加权）",
+            lineStyle: { color: C.blue, width: 1.6, type: "dashed" }, itemStyle: { color: C.blue },
+            areaStyle: { color: "rgba(92,157,255,0.08)" }
+          },
+          {
+            value: prev, name: "全局上季",
+            lineStyle: { color: "rgba(127,146,196,0.7)", width: 1, type: "dotted" },
+            itemStyle: { color: "rgba(127,146,196,0.7)" }
+          }
+        ]
+      }]
+    };
+  }
+
+  /* 9.5 五群覆盖率箱线（父页 COVERAGE 五数逐字，当前群高亮） */
+  function boxOption(k) {
+    const names = GROUPS.map((g) => g.name);
+    const boxes = GROUPS.map((g) => g.box.slice());
+    const reposArr = GROUPS.map((g) => g.repos);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 12, top: 12, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.dataIndex;
+          return "<b>" + names[j] + "</b> · " + reposArr[j] + " repos<br/>min " + boxes[j][0] + "% · Q1 " + boxes[j][1] +
+            "% · <b>中位 " + boxes[j][2] + "%</b> · Q3 " + boxes[j][3] + "% · max " + boxes[j][4] +
+            "%<br/>口径：与父页「单测覆盖率箱线」逐字同源";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: names,
+        axisLabel: { color: C.text, fontSize: 10.5, interval: 0 },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "value", min: 45, max: 100, name: "%", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE
+      },
+      series: [{
+        type: "boxplot", boxWidth: [14, 34],
+        data: boxes.map((b, j) => ({
+          value: b,
+          itemStyle: {
+            color: j === k ? "rgba(255,194,77,0.28)" : "rgba(92,157,255,0.14)",
+            borderColor: j === k ? C.amber : C.blue,
+            borderWidth: j === k ? 2 : 1.2
+          }
+        })),
+        markLine: {
+          symbol: ["none", "none"], animation: false, silent: true,
+          data: [{ yAxis: COV_TARGET, name: "目标 " + COV_TARGET + "%" }],
+          lineStyle: { color: "rgba(255,95,107,0.75)", width: 1.4, type: "dashed" },
+          label: { color: "#ffb0b7", fontSize: 10, fontWeight: 700, position: "insideEndTop", formatter: (p) => p.name }
+        }
+      }]
+    };
+  }
+
+  /* ===== 10. 仓库群切换主流程：整页重绘 ===== */
+  function applyGroup(i) {
+    const n = GROUPS.length;
+    idx = ((i % n) + n) % n;
+    paintStatic(GROUPS[idx]);
+    swTabs.forEach((b, k) => b.classList.toggle("is-active", k === idx));
+    if (hasEcharts) {
+      covChart.setOption(covOption(idx), true);                 /* 轴上限随群变化 → notMerge */
+      reviewChart.setOption(reviewOption(idx), true);
+      buildChart.setOption(buildOption(idx), true);
+      xpChart.setOption(xpOption(idx), true);
+      boxChart.setOption(boxOption(idx), true);
+    }
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(GROUPS[idx].name));
+  }
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 =====
+     ★ 本节只做「调用」，kiosk 状态量（idx / timer / holdUntil）与 hold() / restart()
+       已在第 1.1 节声明——声明行号严格小于此处首次 hold() 调用行号（TDZ 防护）。 */
+  const PARENT = "大屏样板间-研发工程效能1920.html";
+
+  swTabs.forEach((b) => b.addEventListener("click", () => { applyGroup(Number(b.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyGroup(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyGroup(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  applyGroup(bootIdx);
+  if (bootHit >= 0) hold();                                     /* 父页下钻进来：先保持 20 秒不轮换 */
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applyGroup(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 14 秒切下一仓库群；鼠标停在切换器或清单上时暂停 */
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+  $("gc-tbody").addEventListener("mouseenter", () => clearInterval(timer));
+  $("gc-tbody").addEventListener("mouseleave", restart);
+
+  /* ===== 12. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const EPS = 1e-9;
+  const checks = [
+    ["五群名 / 仓库数 / 箱线五数与父页 COVERAGE 逐字（构造性断言）",
+      GROUPS.map((g) => g.name + "|" + g.repos + "|" + g.box.join(",")).join(";") === GROUP_AUTH],
+    ["五群仓库数 Σ = 317 个", repoSum === REPO_ALL && repoSum === 317],
+    ["每群覆盖率箱线五数严格递增（min < Q1 < 中位 < Q3 < max）",
+      GROUPS.every((g) => g.box.every((v, j) => j === 0 || v > g.box[j - 1]))],
+    ["清单覆盖率极值落在该群箱线 min / max 内：清单最小 = 箱线 min、最大 = 箱线 max、中位 = 箱线中位",
+      GROUPS.every((g) => g.listCov[0] === g.box[0] &&
+        g.listCov[g.listCov.length - 1] === g.box[4] && g.listMed === g.box[2])],
+    ["清单每群 8~12 仓且覆盖率全部落在 [箱线 min, 箱线 max] 闭区间内",
+      GROUPS.every((g) => g.list.length >= 8 && g.list.length <= 12 &&
+        g.list.every((r) => r.cov >= g.box[0] && r.cov <= g.box[4]))],
+    ["覆盖率总体由箱线五数分位反演：Σ 直方 = 该群仓库数，且总体 min / 中位 / max 精确回到箱线端点",
+      GROUPS.every((g) => sum(g.hist) === g.repos && g.pop.length === g.repos &&
+        g.pop[0] === g.box[0] && g.pop[g.repos - 1] === g.box[4] && g.popMed === g.box[2])],
+    ["覆盖率直方无越界桶：低于箱线 min 或高于箱线 max 的仓库数为 0",
+      GROUPS.every((g) => g.pop.filter((v) => v < g.box[0] || v > g.box[4]).length === 0)],
+    ["评审五桶总量与父页 REVIEW_BUCKETS 逐字（486/1,042/694/318/92），列和 = 各桶总量",
+      MR_COL.join(",") === MR_AUTH && MR_BUCKETS.every((b, j) => MR_COL[j] === b.n) && MR_TOTAL === 2632],
+    ["每群评审样本 = 本群五桶之和；五群 Σ = 全局样本 2,632 条",
+      GROUPS.every((g) => g.mrTotal === sum(g.mr)) &&
+      sum(GROUPS.map((g) => g.mrTotal)) === MR_TOTAL],
+    ["每群评审分位单调 P50 < P85 < P95，且全部落在五桶量程 [0, 120] h 内",
+      GROUPS.every((g) => g.p50 < g.p85 && g.p85 < g.p95 && g.p50 > 0 && g.p95 <= 120)],
+    ["五群部署频次 Σ = 14.2 次/日（以 0.1 次/日 计整，Σ = 142）",
+      sum(DEPLOY_T) === DEPLOY_ALL_T && Math.abs(DEPLOY_ALL - 14.2) < 1e-9 &&
+      GROUPS.every((g) => g.depT > 0)],
+    ["构建成功率零和偏移：Σ(仓库数 × 群偏移) = 0，五群按仓库数加权 ≡ 近 24 周全局工作日均值",
+      Math.abs(sum(GROUPS.map((g) => g.repos * g.srOff))) < 1e-9 &&
+      Math.abs(SR_WAVG - SR_BASE_AVG) < 1e-9 &&
+      GROUPS.every((g) => g.succWeek.every((v) => v > 80 && v <= 100))],
+    ["构建时长因子：Σ(仓库数 × 因子) = 317，逐周按仓库数加权 ≡ 全局周均值",
+      Math.abs(sum(GROUPS.map((g) => g.repos * g.bfac)) - repoSum) < 1e-6 &&
+      BUILD_BASE.every((v, i) => Math.abs(sum(GROUPS.map((g) => g.repos * g.buildMean[i])) / repoSum - v) < 1e-9) &&
+      GROUPS.every((g) => g.bfac > 0)],
+    ["XP 六维按仓库数加权回归父页 XP_DIMS 全局值（62/58/92/74/84/66）",
+      XP_DIMS.map((x) => x.dim + "|" + x.cur).join(";") === XP_AUTH &&
+      XP_WAVG.every((v, d) => Math.abs(v - XP_DIMS[d].cur) < EPS) &&
+      GROUPS.every((g) => g.xp.every((v) => v > 0 && v < 100))],
+    ["每群 XP 六维取值齐全（6 维）且平差项落在其余四群的合理区间外沿之内",
+      GROUPS.every((g) => g.xp.length === XP_DIMS.length) &&
+      XP_VAL.every((v) => v.length === GROUPS.length)],
+    ["hash 五群名（含「AI平台」无空格别名与 URL 编码）均可解析",
+      GROUPS.every((g, i) => resolveHash("#" + encodeURIComponent(g.name)) === i) &&
+      GROUPS.every((g, i) => resolveHash("#" + g.name) === i) &&
+      resolveHash("#AI平台") === 3 && resolveHash("#" + encodeURIComponent("AI平台")) === 3 &&
+      resolveHash("#  AI 平台  ") === 3 && resolveHash("#不存在的群") === -1],
+    ["切换器 tab 数 = 5 且文本与契约 §6 P7→S13 对象集逐字",
+      swTabs.length === GROUPS.length && swTabs.every((b, i) => b.querySelector("b").textContent === GROUPS[i].name)],
+    ["返回上级 crumb 与 Esc 指向父页「研发工程效能」",
+      PARENT === "大屏样板间-研发工程效能1920.html" &&
+      document.querySelector(".gc-crumb-up").getAttribute("href") === PARENT],
+    /* ★ TDZ 防护的构造性断言：holdUntil / hold() 声明在第 1.1 节（行号远小于第 11 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 holdCalls ≥ 1」即证明声明早于首次调用。 */
+    ["holdUntil 声明早于首次 hold() 调用（TDZ 防护，构造性断言）",
+      typeof holdUntil === "number" && typeof hold === "function" &&
+      (bootHit < 0 ? holdCalls === 0 : (holdCalls >= 1 && holdUntil > Date.now()))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单仓库群工程详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

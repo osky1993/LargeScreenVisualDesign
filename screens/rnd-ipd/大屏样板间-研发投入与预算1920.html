@@ -151,6 +151,36 @@
   .ty-up { color: var(--rnd-orange); }
   .ty-note { flex: none; margin-top: 6px; font-size: 10.5px; line-height: 1.5; color: rgba(127, 146, 196, 0.75); letter-spacing: 0.02em; }
   .ty-note b { font-weight: 700; color: rgba(255, 194, 77, 0.8); }
+  /* drill:begin —— 由 tools/inject_drilldown_rnd.py 注入，勿手改 */
+  .ty-drill { cursor: pointer; position: relative; }
+  .ty-drill::after {
+    content: "↗"; position: absolute; right: 6px; top: 50%; transform: translateY(-50%) translateX(-3px);
+    font-size: 11px; font-weight: 700; line-height: 1; color: #ffc24d;
+    opacity: 0; transition: opacity .2s ease, transform .2s ease; pointer-events: none; z-index: 3;
+  }
+  .ty-drill:hover::after { opacity: 0.95; transform: translateY(-50%) translateX(0); }
+  .ty-drill:hover {
+    background: rgba(92, 157, 255, 0.15) !important;
+    box-shadow: inset 0 0 0 1px rgba(92, 157, 255, 0.5), 0 0 16px -4px rgba(92, 157, 255, 0.6);
+  }
+  /* 提示 chip：挂在面板头 h2 后面。margin-right:auto 吃掉 space-between 的空档，
+     免得把面板头原有的 .xx-panel-tag 挤到中间去。 */
+  .ty-drill-hint {
+    margin-left: 8px; margin-right: auto; font-size: 10.5px; letter-spacing: 0.04em;
+    color: #7f92c4; padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+    background: rgba(18, 34, 78, 0.55); border: 1px dashed rgba(96, 140, 255, 0.45);
+  }
+  /* 面板级入口：子页是全量台账、无切换对象时用它，挂在相关面板头上 */
+  .ty-drill-entry {
+    margin-left: 10px; cursor: pointer; white-space: nowrap;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; line-height: 1;
+    padding: 4px 9px; border-radius: 999px; color: #061029;
+    background: linear-gradient(140deg, #9cc2ff, #5c9dff);
+    box-shadow: 0 0 9px -1px rgba(92, 157, 255, 0.75);
+    transition: filter .18s ease, box-shadow .18s ease;
+  }
+  .ty-drill-entry:hover { filter: brightness(1.12); box-shadow: 0 0 16px -1px rgba(92, 157, 255, 0.95); }
+  /* drill:end */
   /* subnav:begin —— 由 tools/inject_subnav_rnd.py 注入，勿手改 */
   .ty-subnav {
     display: flex; flex-direction: column; justify-content: center; gap: 3px; flex: none;
@@ -161,16 +191,24 @@
   .ty-subnav > u { display: flex; align-items: baseline; gap: 6px; text-decoration: none; white-space: nowrap; }
   .ty-subnav b { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; color: #a3b4dc; }
   .ty-subnav i { font-style: normal; font-size: 10.5px; color: #7f92c4; }
-  /* 有子页：转星蓝并可点击 */
+  /* 有子页：整枚标签转星蓝。★ 多子页时每个链接是独立 chip，故 cursor/hover 下沉到 <a>，
+     不再挂在外层——外层挂了会让「标签空白处」也显示成可点，实际点不动。 */
   .ty-subnav.is-on {
-    cursor: pointer; border-color: rgba(92, 157, 255, 0.55);
+    border-color: rgba(92, 157, 255, 0.55);
     background: linear-gradient(160deg, rgba(92, 157, 255, 0.16), rgba(18, 34, 78, 0.6));
     box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1);
-    transition: border-color .18s, box-shadow .18s;
   }
-  .ty-subnav.is-on b { color: #9cc2ff; }
-  .ty-subnav.is-on i { color: #6f8ec4; }
-  .ty-subnav.is-on:hover { border-color: rgba(92, 157, 255, 0.95); box-shadow: 0 0 16px -2px rgba(92, 157, 255, 0.7); }
+  .ty-subnav a {
+    display: inline-flex; align-items: baseline; gap: 5px; cursor: pointer;
+    text-decoration: none; border-radius: 5px; padding: 1px 5px; margin: 0 -2px;
+    transition: background .18s, box-shadow .18s;
+  }
+  .ty-subnav a b { color: #9cc2ff; }
+  .ty-subnav a i { color: #6f8ec4; }
+  .ty-subnav a:hover { background: rgba(92, 157, 255, 0.22); box-shadow: 0 0 12px -3px rgba(92, 157, 255, 0.85); }
+  .ty-subnav a:hover b { color: #dce8ff; }
+  /* 多链接之间的分隔点 */
+  .ty-subnav em { font-style: normal; color: rgba(127, 146, 196, 0.5); font-size: 12px; }
   /* subnav:end */
   /* carousel:begin —— 由 tools/inject_carousel_rnd.py 注入，勿手改，改脚本后重跑 */
   .ty-carousel {
@@ -251,7 +289,7 @@
           <div class="ty-chip is-key"><span>研发费率</span><b id="ty-chip-rate">--</b></div>
         </div>
 ORIG-->
-        <div class="ty-subnav" title="本专题页没有二级详情子页"><span>二级子页 · SUB-PAGE</span><u><b>本页无</b><i>· 详见门户页导航</i></u></div><span id="ty-chip-inv" hidden></span><span id="ty-chip-rate" hidden></span>
+        <div class="ty-subnav is-on"><span>二级子页 · SUB-PAGE</span><u><a href="大屏样板间-研发单投入类别详情1920.html" title="点击进入子页：单投入类别详情（页内入口：投入五类明细行）"><b>单投入类别详情</b><i>· 投入五类明细行</i></a></u></div><span id="ty-chip-inv" hidden></span><span id="ty-chip-rate" hidden></span>
         <!-- subnav:end -->
         <div class="ty-clock" aria-label="实时时钟">
           <span class="ty-clock-time" id="ty-clock-time">--:--:--</span>
@@ -789,6 +827,119 @@ ORIG-->
   if (failed.length) console.warn("[投入与预算] 勾稽自检未通过：", failed.map((c) => c[0]));
 })();
 </script>
+<!-- drill-js:begin -->
+<script>
+/* ===== 下钻入口（tools/inject_drilldown_rnd.py 注入） =====
+   独立于父页主脚本：父页表格/卡片由 setInterval 轮播重绘，故用 MutationObserver 持续重新标记。 */
+(() => {
+  "use strict";
+  const P = "ty";
+  /* 长名优先匹配，避免短名把含它的长名截胡（如「星澜S3」与「星澜S3-EVT2」同表出现时） */
+  const TARGETS = [{"rows": "#ty-tbody li", "names": ["人力", "样机物料", "云资源算力", "外协", "工具与其他"], "sub": "大屏样板间-研发单投入类别详情1920.html"}].map((t) => {
+    const match = t.match || t.names;
+    return Object.assign({}, t, {
+      order: match.map((m, i) => ({ m: m, n: t.names[i] })).sort((a, b) => b.m.length - a.m.length)
+    });
+  });
+  const CHARTS = [];
+  const PANELS = [];
+
+  function markOne(t) {
+    document.querySelectorAll(t.rows).forEach((el) => {
+      const txt = (el.textContent || "").replace(/\s+/g, "");
+      let hit = null;
+      for (let i = 0; i < t.order.length; i++) {
+        if (txt.indexOf(t.order[i].m) >= 0) { hit = t.order[i].n; break; }
+      }
+      if (!hit) return;
+      if (el.dataset.drill === hit && el.dataset.drillSub === t.sub) return;  /* 未变则跳过 */
+      el.dataset.drill = hit;
+      el.dataset.drillSub = t.sub;
+      el.classList.add(P + "-drill");
+      el.setAttribute("title", "点击查看「" + hit + "」二级详情");
+    });
+  }
+
+  /* 面板头提示 chip 也放进重扫循环里：父页有些 scope 是被 setInterval 重写 textContent 的，
+     一旦被冲掉，下一次 DOM 变动会把它补回来。scope 若挂在 <section class="xx-panel"> 上，
+     先在 scope 内找面板头，找到就插在 h2 后面；找不到再退回元素自身。 */
+  function chipOne(t) {
+    if (!t.scope || !t.hint) return;
+    const s = document.getElementById(t.scope);
+    if (!s) return;
+    const head = s.classList && s.classList.contains(P + "-panel-head")
+      ? s : (s.querySelector("." + P + "-panel-head") || s);
+    if (head.querySelector("." + P + "-drill-hint")) return;
+    const b = document.createElement("span");
+    b.className = P + "-drill-hint";
+    b.textContent = t.hint;
+    const h2 = head.querySelector("h2");
+    if (h2 && h2.parentNode === head) head.insertBefore(b, h2.nextSibling);
+    else head.appendChild(b);
+  }
+
+  function scan() { TARGETS.forEach(markOne); TARGETS.forEach(chipOne); }
+
+  /* 事件委托：行会被父页轮播重绘，委托到 document 上最稳 */
+  document.addEventListener("click", (e) => {
+    const row = e.target.closest ? e.target.closest("." + P + "-drill") : null;
+    if (!row || !row.dataset.drill || !row.dataset.drillSub) return;
+    location.href = row.dataset.drillSub + "#" + encodeURIComponent(row.dataset.drill);
+  });
+
+  /* ECharts 画布下钻：柱 / 扇区 / 热力格 / 地图省份不是 DOM，只能绑图表实例的 click。
+     取 params.name 或 params.data.name 去对象名列表里反查，命中即跳子页。 */
+  CHARTS.forEach((c) => {
+    if (!window.echarts) return;
+    const cm = c.match || c.names;
+    const pairs = cm.map((m, i) => ({ m: m, n: c.names[i] })).sort((a, b) => b.m.length - a.m.length);
+    const bind = () => {
+      const el = document.getElementById(c.chartId);
+      const inst = el && echarts.getInstanceByDom(el);
+      if (!inst) return false;
+      if (inst.__drillBound) return true;
+      inst.__drillBound = true;
+      el.style.cursor = "pointer";
+      inst.on("click", (pm) => {
+        const bySeries = c.by === "seriesName";
+        const raw = (pm && (bySeries
+          ? (pm.seriesName || pm.name)
+          : (pm.name || (pm.data && pm.data.name) || pm.seriesName))) || "";
+        if (!raw) return;
+        /* 精确命中优先：画布点击拿到的就是节点名本身，松匹配会把不该跳的点也跳走 */
+        const hit = pairs.filter((p) => p.m === raw)[0]
+          || pairs.filter((p) => raw.indexOf(p.m) >= 0 || p.m.indexOf(raw) >= 0)[0];
+        if (hit) location.href = c.sub + "#" + encodeURIComponent(hit.n);
+      });
+      return true;
+    };
+    /* 图表可能晚于本脚本 init，轮询几次直到拿到实例 */
+    if (!bind()) {
+      let tries = 0;
+      const iv = setInterval(() => { if (bind() || ++tries > 40) clearInterval(iv); }, 150);
+    }
+  });
+
+  /* 面板级入口：按面板标题文本定位面板头，挂一枚可点 chip（不必改父页标记） */
+  PANELS.forEach((pn) => {
+    const head = Array.prototype.slice.call(document.querySelectorAll("." + P + "-panel-head"))
+      .filter((h) => { const t = h.querySelector("h2"); return t && t.textContent.trim() === pn.panelTitle; })[0];
+    if (!head || head.querySelector("." + P + "-drill-entry")) return;
+    const b = document.createElement("span");
+    b.className = P + "-drill-entry";
+    b.textContent = pn.label + " ↗";
+    b.setAttribute("title", "查看" + pn.label + "（全量明细）");
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); location.href = pn.sub; });
+    head.appendChild(b);
+  });
+
+  if (TARGETS.length) {
+    scan();
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+<!-- drill-js:end -->
 <!-- carousel-js:begin -->
 <script>
 /* ===== 研发管理专题轮播导航（tools/inject_carousel_rnd.py 注入） =====

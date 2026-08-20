@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发关键岗位与招聘台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --rl-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：岗位 / 所属职能 / 在岗 / 编制 / 缺口 / 饱和度 / 招聘中 / 预计到岗 */
+    --rl-tcols: 200px 120px 70px 70px 70px 1fr 96px 110px;
+    /* 影响面列宽：类型 / 对象 / 说明 / 影响程度 */
+    --rl-icols: 44px 96px 1fr 36px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .rl-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 452px;
+    grid-template-rows: 84px 52px 68px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .rl-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .rl-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .rl-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .rl-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .rl-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .rl-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .rl-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .rl-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .rl-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到人才与能力，琥珀描边与本页星蓝主色区分 */
+  .rl-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .rl-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .rl-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .rl-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .rl-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .rl-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .rl-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .rl-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .rl-chips { display: flex; align-items: center; gap: 9px; }
+  .rl-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .rl-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .rl-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .rl-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .rl-chip.is-key b { color: var(--rnd-blue); }
+  .rl-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .rl-clock-time { font: 700 26px/1 var(--rl-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .rl-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 筛选条：岗位 chip（11 枚 = 全部 + 10 关键岗位，hash 契约目标） ===== */
+  .rl-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .rl-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .rl-pchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer; flex: none;
+    padding: 5px 10px 6px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 12.5px; letter-spacing: 0.04em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .rl-pchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .rl-pchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  /* 饱和度低于警戒线：琥珀描边 + 警示数字 */
+  .rl-pchip.is-warn { border-color: rgba(255, 157, 92, 0.5); }
+  .rl-pchip.is-warn i { color: var(--rnd-orange); }
+  .rl-pchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .rl-pchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .rl-pchip.is-on i { color: rgba(7, 16, 38, 0.7); }
+  .rl-pchip.is-hit { animation: rl-hit 0.9s ease-in-out 2; }
+  @keyframes rl-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--rl-cc, rgba(92, 157, 255, 0.8)); } }
+  .rl-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; padding-left: 10px; }
+  .rl-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .rl-filters-state em { font-style: normal; color: #d3e2ff; }
+  .rl-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 7px; }
+
+  /* ===== KPI 条（6 枚，数值翻牌缓动） ===== */
+  .rl-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .rl-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 3px;
+    padding: 6px 14px; border-radius: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .rl-kpi::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--rl-kc, var(--rnd-blue)); }
+  .rl-kpi span { font-size: 11.5px; letter-spacing: 0.1em; color: #7f92c4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rl-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .rl-kpi-v b { font: 700 24px/1 var(--rl-mono); color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  .rl-kpi-v b.is-txt { font-size: 19px; letter-spacing: 0.02em; }
+  .rl-kpi-v u { text-decoration: none; font-size: 11.5px; color: var(--rnd-text-dim); }
+  .rl-kpi-v em { font-style: normal; margin-left: auto; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rl-kpi.is-warn::before { background: var(--rnd-orange); }
+  .rl-kpi.is-warn .rl-kpi-v b { color: var(--rnd-orange); }
+
+  /* ===== 面板 ===== */
+  .rl-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .rl-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .rl-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .rl-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .rl-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .rl-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .rl-panel-tag { font-size: 11.5px; letter-spacing: 0.05em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rl-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .rl-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区/漏斗区写死高度（任务卡硬性）：两块之和 + gap 恰等 1fr 行高 736px，
+     且全部在 echarts.init 之前填充完毕，杜绝「兄弟块晚填压矮图表容器」的坑。 */
+  .rl-panel.is-ledger { flex: none; height: 380px; min-height: 0; overflow: hidden; }
+  .rl-panel.is-funnel { flex: none; height: 342px; min-height: 0; overflow: hidden; }
+  /* 右列：影响面 / 候选人管线 由 JS 填充，同样写死高度 */
+  .rl-panel.is-impact { flex: none; height: 260px; min-height: 0; overflow: hidden; }
+  .rl-panel.is-pipe { flex: none; height: 150px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .rl-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .rl-thead, .rl-tbody li {
+    display: grid; grid-template-columns: var(--rl-tcols); align-items: center; gap: 8px;
+  }
+  .rl-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .rl-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .rl-tbody li {
+    padding: 0 8px; height: 29px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: rl-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes rl-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .rl-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .rl-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .rl-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .rl-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rl-tbody li .rl-post { font-size: 13px; font-weight: 700; color: #dfe9ff; }
+  .rl-tbody li .rl-func { font-size: 11.5px; font-weight: 700; }
+  .rl-tbody li .rl-num { text-align: right; padding-right: 12px; }
+  .rl-tbody li .rl-gap { text-align: right; padding-right: 12px; font-weight: 700; }
+  .rl-tbody li .rl-eta { text-align: right; padding-right: 12px; color: #a9bce4; }
+  /* 饱和度：微条（含 85% 警戒刻度）+ 数值 */
+  .rl-sat { display: flex; align-items: center; gap: 9px; }
+  .rl-sat-t { position: relative; flex: 1; min-width: 0; height: 8px; border-radius: 4px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .rl-sat-t u { display: block; height: 100%; border-radius: 4px; text-decoration: none; }
+  .rl-sat-t::after { content: ""; position: absolute; left: 85%; top: -2px; bottom: -2px; width: 2px; background: rgba(255, 194, 77, 0.75); }
+  .rl-sat em { flex: none; width: 52px; text-align: right; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rl-hire { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding-right: 10px; }
+  .rl-hire b { font: 700 12.5px/1 var(--rl-mono); color: var(--rnd-cyan); }
+  .rl-hire i { font-style: normal; font-size: 10.5px; color: rgba(127, 146, 196, 0.75); }
+
+  /* ===== 左下：单岗位招聘漏斗（转化率条写死 60px，init 前填充） ===== */
+  .rl-conv { flex: none; height: 60px; min-height: 0; overflow: hidden; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 8px; }
+  .rl-convcell { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 4px 10px; border-radius: 7px; background: rgba(14, 26, 66, 0.5); border: 1px solid rgba(96, 140, 255, 0.16); }
+  .rl-convcell span { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--rnd-text-dim); letter-spacing: 0.04em; white-space: nowrap; }
+  .rl-convcell span::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--rl-vc, var(--rnd-blue)); }
+  .rl-convcell b { font: 700 17px/1 var(--rl-mono); color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  .rl-convcell b u { text-decoration: none; font-size: 11px; color: rgba(127, 146, 196, 0.85); margin-left: 4px; }
+
+  /* ===== 右上：缺口影响面 ===== */
+  .rl-implist { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .rl-imp {
+    display: grid; grid-template-columns: var(--rl-icols); align-items: center; gap: 8px;
+    padding: 5px 9px; border-radius: 7px; background: rgba(14, 26, 66, 0.5);
+    border: 1px solid rgba(96, 140, 255, 0.14); font-size: 12px;
+    animation: rl-rowin .34s ease both;
+  }
+  .rl-imp-k { font-size: 10px; text-align: center; padding: 2px 0; border-radius: 4px; color: #9cc2ff; background: rgba(24, 44, 104, 0.55); border: 1px solid rgba(96, 140, 255, 0.3); }
+  .rl-imp b { font-size: 12.5px; font-weight: 700; color: #dfe9ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rl-imp-t { font-size: 11.5px; color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rl-badge { padding: 2px 0; border-radius: 4px; text-align: center; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; }
+  .rl-badge.is-h { color: #3d060c; background: var(--rnd-red); }
+  .rl-badge.is-m { color: #3a1c05; background: var(--rnd-orange); }
+  .rl-badge.is-l { color: #041b3a; background: var(--rnd-blue); }
+
+  /* ===== 右中：候选人管线小堆叠条 ===== */
+  .rl-pipebar { flex: none; display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; background: rgba(14, 26, 66, 0.5); }
+  .rl-pipebar i { display: block; height: 100%; font-style: normal; min-width: 3px; }
+  .rl-pipebar i + i { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .rl-pipegrid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .rl-pipecell { display: flex; flex-direction: column; gap: 1px; padding: 3px 8px; border-radius: 7px; background: rgba(14, 26, 66, 0.5); border: 1px solid rgba(96, 140, 255, 0.16); }
+  .rl-pipecell span { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--rnd-text-dim); letter-spacing: 0.03em; }
+  .rl-pipecell span::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--rl-pc, var(--rnd-blue)); }
+  .rl-pipecell b { font: 700 16px/1 var(--rl-mono); color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  .rl-pipecell b u { text-decoration: none; font-size: 10.5px; color: rgba(127, 146, 196, 0.85); margin-left: 3px; }
+
+  /* ===== 底部滚动条 ===== */
+  .rl-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .rl-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange);
+  }
+  .rl-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: rl-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes rl-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .rl-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .rl-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .rl-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .rl-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .rl-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .rl-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="rl-stage" id="rl-stage">
+    <!-- mockflag:begin --><div class="rl-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="rl-error" id="rl-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="rl-header">
+      <div class="rl-head-left">
+        <div class="rl-crumb">
+          <a class="rl-crumb-up" href="大屏样板间-研发人才与能力1920.html" title="返回上级专题页（Esc）">‹ 返回 人才与能力</a>
+          <b>云麓智联科技</b><i>›</i><span>人才与能力</span><i>›</i><em>关键岗位与招聘台账</em>
+        </div>
+        <div class="rl-head-title-row">
+          <div class="rl-head-title">关键岗位与招聘台账</div>
+          <div class="rl-head-meta">
+            <span>关键岗位 <b id="rl-meta-n">--</b> 个 · 编制 <b id="rl-meta-hc">--</b> 人 · 在岗 <b id="rl-meta-on">--</b> 人</span><i>|</i>
+            <span>饱和度警戒线 <b id="rl-meta-warn">--</b></span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b>（近 12 月招聘窗口 25-09 → 26-08）</span>
+          </div>
+        </div>
+      </div>
+      <div class="rl-head-right">
+        <div class="rl-chips">
+          <div class="rl-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="rl-chip is-key"><span id="rl-chip-key">饱和度 · 全部</span><b id="rl-chip-rate">--</b></div>
+        </div>
+        <div class="rl-clock" aria-label="实时时钟">
+          <span class="rl-clock-time" id="rl-clock-time">--:--:--</span>
+          <span class="rl-clock-date" id="rl-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 岗位筛选条：11 枚 chip（全部 + 10 关键岗位，hash 契约目标） -->
+    <div class="rl-filters">
+      <span class="rl-filters-tag">岗位筛选</span>
+      <div id="rl-pchips" style="display:flex;align-items:center;gap:7px;min-width:0;"></div>
+      <div class="rl-filters-state" id="rl-filters-state">--</div>
+    </div>
+
+    <!-- KPI 条（6 枚） -->
+    <div class="rl-kpis" id="rl-kpis"></div>
+
+    <!-- 左：岗位明细台账（10 行全量）+ 单岗位招聘漏斗 -->
+    <div class="rl-col">
+      <section class="rl-panel is-ledger">
+        <div class="rl-panel-head">
+          <h2>关键岗位明细台账（10 岗 · 全量）</h2>
+          <span class="rl-panel-tag" id="rl-table-tag">--</span>
+        </div>
+        <div class="rl-table">
+          <div class="rl-thead">
+            <span>岗位</span><span>所属职能</span><span style="text-align:right;padding-right:12px;">在岗</span>
+            <span style="text-align:right;padding-right:12px;">编制</span><span style="text-align:right;padding-right:12px;">缺口</span>
+            <span>饱和度（虚线 = 85% 警戒线）</span><span style="text-align:right;padding-right:10px;">招聘中</span>
+            <span style="text-align:right;padding-right:12px;">预计到岗</span>
+          </div>
+          <ul class="rl-tbody" id="rl-tbody"></ul>
+        </div>
+      </section>
+      <section class="rl-panel is-funnel">
+        <div class="rl-panel-head">
+          <h2>单岗位招聘漏斗 · 简历 → 初筛 → 面试 → offer → 入职</h2>
+          <span class="rl-panel-tag" id="rl-funnel-tag">--</span>
+        </div>
+        <div class="rl-conv" id="rl-conv"></div>
+        <div class="rl-chart" id="rl-chart-funnel"></div>
+      </section>
+    </div>
+
+    <!-- 右：缺口影响面 + 候选人管线 + 缺口×饱和度总览 -->
+    <div class="rl-col">
+      <section class="rl-panel is-impact">
+        <div class="rl-panel-head">
+          <h2>缺口影响面</h2>
+          <span class="rl-panel-tag" id="rl-imp-tag">--</span>
+        </div>
+        <div class="rl-implist" id="rl-impact"></div>
+      </section>
+      <section class="rl-panel is-pipe">
+        <div class="rl-panel-head">
+          <h2>候选人管线</h2>
+          <span class="rl-panel-tag" id="rl-pipe-tag">--</span>
+        </div>
+        <div class="rl-pipebar" id="rl-pipebar"></div>
+        <div class="rl-pipegrid" id="rl-pipegrid"></div>
+      </section>
+      <section class="rl-panel" style="flex: 1;">
+        <div class="rl-panel-head">
+          <h2>缺口人数 × 饱和度</h2>
+          <span class="rl-panel-tag">总缺口 <b id="rl-gap-total">--</b> 人 · 警戒线下 <b id="rl-gap-warn">--</b> 岗</span>
+        </div>
+        <div class="rl-chart" id="rl-chart-gap"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="rl-foot">
+      <div class="rl-foot-tag">人才研判</div>
+      <div class="rl-foot-view"><div class="rl-foot-track" id="rl-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("rl-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("rl-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩提前声明（let 无提升，早于任何 pauseRotate 调用，避免带 hash 冷启动 TDZ 中断主脚本） */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技）
+         ★ 与父页 P15「人才与能力」严格同源（docs/RndIpdThemed.md §2.2 / §6）：
+           - 10 个关键岗位的名称、在岗 on、编制 hc 逐字照抄父页 POSTS；饱和度警戒线 85%；
+           - 六职能人数 = 研发人员 3,860（软件 1,460 + 硬件 620 + 云平台 540 + AI算法 420 + 测试 520 + PM与管理 300）；
+           - 近 12 月招聘漏斗 HIRE（简历/面试/offer/入职/离职）逐字照抄父页，年度合计由月数组现算，
+             本页「关键岗位年入职 Σ」与之比出份额，口径页内注明。
+         ★ 二级拆分（分岗位五段漏斗、招聘周期、候选人管线、缺口影响面）为本页自编，
+           全部满足 Σ ≤ 父页年度对应段、逐级递减、缺口 = 编制 − 在岗，并进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，岗位与职能之间用名称/索引关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 六职能（契约逐字，Σ = 3,860）——台账「所属职能」列取色与归属 */
+  const FUNCS = [
+    { name: "软件",     n: 1460, color: C.blue },
+    { name: "硬件",     n: 620,  color: C.amber },
+    { name: "云平台",   n: 540,  color: C.cyan },
+    { name: "AI算法",   n: 420,  color: C.violet },
+    { name: "测试",     n: 520,  color: C.green },
+    { name: "PM与管理", n: 300,  color: C.orange }
+  ];
+  const HC_REF = 3860;
+  const FUNC_OF = {};
+  FUNCS.forEach((f, i) => { FUNC_OF[f.name] = i; });
+
+  /* 4.2 关键岗位 10 个（name/on/hc 逐字同父页 POSTS；func 归属、cycle 招聘周期、
+         fun 五段漏斗 [简历,初筛,面试,offer,入职]、pipe 当前管线 [初筛,面试中,终面,offer中]、
+         imp 缺口影响面 [类型,对象名,影响程度,说明] 为本页二级拆分） */
+  const POSTS = [
+    { name: "产品经理", func: "PM与管理", on: 88, hc: 92, cycle: 62,
+      fun: [880, 286, 104, 32, 26], pipe: [12, 6, 3, 2],
+      imp: [
+        ["项目", "智楼5.0", "中", "Launch 阶段需求澄清与验收标准排期后延"],
+        ["项目", "车联1.0", "中", "Verify 阶段场景用例的业务口径待细化"],
+        ["团队", "紫微", "低", "需求澄清会暂由兼岗 PM 支撑"]
+      ] },
+    { name: "数据工程", func: "云平台", on: 92, hc: 98, cycle: 58,
+      fun: [1040, 352, 128, 42, 34], pipe: [16, 9, 4, 3],
+      imp: [
+        ["项目", "云枢3.0", "高", "数据管道重构里程碑被压缩 2 个 Sprint"],
+        ["项目", "智楼5.0", "中", "楼宇能耗指标口径落库排期紧张"],
+        ["团队", "朱雀", "中", "实时链路值守由 2 人轮转，无备份"],
+        ["团队", "天璇", "低", "离线报表需求排队积压"]
+      ] },
+    { name: "云平台架构", func: "云平台", on: 56, hc: 60, cycle: 76,
+      fun: [690, 208, 76, 23, 18], pipe: [9, 5, 3, 2],
+      imp: [
+        ["项目", "云枢3.0", "高", "多租户隔离方案评审待架构定稿"],
+        ["项目", "云盾2.1", "中", "网关限流基线设计延后"],
+        ["团队", "天璇", "中", "架构评审排期由双周拉长至三周"]
+      ] },
+    { name: "测试架构", func: "测试", on: 48, hc: 52, cycle: 68,
+      fun: [520, 160, 58, 18, 14], pipe: [8, 4, 2, 2],
+      imp: [
+        ["团队", "玄武", "高", "自动化用例设计人力缺口，回归窗口拉长"],
+        ["项目", "星澜Pro2", "中", "Verify 阶段测试策略评审排队"],
+        ["基线", "R26.6", "中", "集成测试准入门禁维护无专责"]
+      ] },
+    { name: "硬件结构", func: "硬件", on: 58, hc: 64, cycle: 82,
+      fun: [610, 182, 66, 21, 16], pipe: [11, 6, 3, 2],
+      imp: [
+        ["项目", "星澜S3", "高", "DVT1 结构件改模评审与试装并行受限"],
+        ["项目", "星澜Pro2", "中", "PVT1 装配公差复核排期后延"],
+        ["团队", "青龙", "中", "结构仿真任务排队 9 个工作日"],
+        ["团队", "白虎", "低", "可靠性试验夹具设计支援不足"]
+      ] },
+    { name: "系统架构师", func: "软件", on: 86, hc: 100, cycle: 94,
+      fun: [940, 268, 98, 29, 22], pipe: [18, 10, 5, 4],
+      imp: [
+        ["项目", "星澜S3", "高", "端云协同总体方案评审依赖单点架构师"],
+        ["项目", "云枢3.0", "高", "跨域接口契约冻结时点存在风险"],
+        ["项目", "澜芯M80", "中", "Concept 阶段总体架构方案待立项评审"],
+        ["团队", "天枢", "中", "技术方案评审窗口被压缩"],
+        ["团队", "紫微", "低", "重构提案评审排队"]
+      ] },
+    { name: "SRE 站点可靠性", func: "云平台", on: 74, hc: 86, cycle: 88,
+      fun: [860, 246, 88, 26, 20], pipe: [15, 9, 4, 3],
+      imp: [
+        ["项目", "云枢3.0", "高", "值班轮转排班紧张，MTTR 改进项排期后延"],
+        ["项目", "云盾2.1", "高", "错误预算治理与演练无专责跟进"],
+        ["基线", "R26.6", "中", "发布窗口守夜人力不足，灰度节奏受限"],
+        ["团队", "朱雀", "中", "可观测性看板治理由开发兼任"]
+      ] },
+    { name: "算法专家", func: "AI算法", on: 62, hc: 80, cycle: 106,
+      fun: [830, 232, 86, 24, 17], pipe: [14, 8, 4, 2],
+      imp: [
+        ["项目", "澜芯M60", "高", "端侧量化与蒸馏方案缺主责专家"],
+        ["项目", "澜芯M80", "高", "Concept 阶段算法可行性论证延后"],
+        ["项目", "车联1.0", "中", "感知模型验收指标复核排队"],
+        ["团队", "天玑", "高", "模型评测走廊维护人力被摊薄"],
+        ["团队", "开阳", "中", "训练任务调优支援不足"]
+      ] },
+    { name: "安全架构", func: "软件", on: 34, hc: 44, cycle: 112,
+      fun: [520, 136, 48, 13, 9], pipe: [7, 4, 2, 1],
+      imp: [
+        ["项目", "云盾2.1", "高", "安全基线与威胁建模评审为单点依赖"],
+        ["项目", "车联1.0", "中", "车规安全合规条款落地排期后延"],
+        ["基线", "R26.8", "中", "安全门禁规则规划待补齐"],
+        ["团队", "紫微", "低", "安全编码培训与代码审计排队"]
+      ] },
+    { name: "射频与天线", func: "硬件", on: 26, hc: 38, cycle: 124,
+      fun: [430, 104, 36, 9, 6], pipe: [5, 3, 1, 1],
+      imp: [
+        ["项目", "澜芯M60", "高", "射频指标调优与认证测试均为单点"],
+        ["项目", "星澜S3", "中", "整机天线净空评估排期紧张"],
+        ["项目", "澜芯M80", "中", "多频段方案预研暂缓"],
+        ["团队", "白虎", "高", "暗室排期与调试人力双紧张"]
+      ] }
+  ];
+  /* 契约锚定值：仅用于自检比对（与父页 POSTS 逐字），页面展示一律用现算值 */
+  const POST_REF = [
+    ["产品经理", 88, 92], ["数据工程", 92, 98], ["云平台架构", 56, 60], ["测试架构", 48, 52],
+    ["硬件结构", 58, 64], ["系统架构师", 86, 100], ["SRE 站点可靠性", 74, 86], ["算法专家", 62, 80],
+    ["安全架构", 34, 44], ["射频与天线", 26, 38]
+  ];
+  const POST_WARN = 85;                                     /* 饱和度警戒线（%），与父页同值 */
+
+  /* 4.3 招聘漏斗五段（本页在父页四段之间补入「初筛」一段，口径页内注明） */
+  const FUN_NAMES = ["简历", "初筛", "面试", "offer", "入职"];
+  const FUN_COLORS = [C.blue, C.cyan, C.violet, C.amber, C.green];
+  /* 4.4 候选人管线四段（当前在途，非年度累计） */
+  const PIPE_NAMES = ["初筛", "面试中", "终面", "offer 中"];
+  const PIPE_COLORS = [C.blue, C.cyan, C.violet, C.amber];
+  const LV_CLASS = { "高": "is-h", "中": "is-m", "低": "is-l" };
+  const LV_SCORE = { "高": 3, "中": 2, "低": 1 };
+
+  /* 4.5 近 12 个月全量招聘漏斗（逐字同父页 P15 HIRE；年度合计由月数组现算，不写死） */
+  const HIRE = {
+    resume:    [1480, 1260, 1090, 880, 640, 720, 1560, 1680, 1420, 1240, 1160, 1180],
+    interview: [ 402,  348,  296, 232, 172, 196,  424,  452,  386,  332,  314,  320],
+    offer:     [ 118,  101,   84,  67,  49,  58,  112,  124,  108,   93,   87,   89],
+    onboard:   [  92,   78,   64,  51,  38,  46,   88,   96,   84,   72,   68,   69],
+    leave:     [  24,   22,   27,  32,  44,  37,   29,   25,   23,   27,   28,   25]
+  };
+
+  /* 4.6 契约对象集（下钻锚点契约 §2.3：8 重点项目 / 12 团队 / 4 集成基线）——影响面对象取自此集 */
+  const OBJ_PROJ = ["星澜S3", "星澜Pro2", "云枢3.0", "云盾2.1", "澜芯M60", "澜芯M80", "智楼5.0", "车联1.0"];
+  const OBJ_TEAM = ["天枢", "天璇", "天玑", "天权", "玉衡", "开阳", "摇光", "青龙", "白虎", "朱雀", "玄武", "紫微"];
+  const OBJ_BASE = ["R26.2", "R26.4", "R26.6", "R26.8"];
+  const OBJ_ALL = OBJ_PROJ.concat(OBJ_TEAM, OBJ_BASE);
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+  POSTS.forEach((p) => {
+    p.gap = p.hc - p.on;                                    /* 缺口 = 编制 − 在岗 */
+    p.rate = p.on / p.hc * 100;                             /* 饱和度 = 在岗 ÷ 编制 */
+    p.warn = p.rate < POST_WARN;
+    p.color = FUNCS[FUNC_OF[p.func]].color;
+    p.hiring = sum(p.pipe);                                 /* 招聘中 = 管线四段之和 */
+    p.eta = p.pipe[3] + Math.round(p.pipe[2] / 2);          /* 预计到岗 = offer 中 + 终面折半 */
+    p.conv = p.fun.slice(1).map((v, i) => 100 * v / p.fun[i]);  /* 逐级转化率（现算） */
+    p.total = 100 * p.fun[4] / p.fun[0];                    /* 简历 → 入职 整体转化率 */
+  });
+  D.n = POSTS.length;
+  D.on = sum(POSTS.map((p) => p.on));
+  D.hc = sum(POSTS.map((p) => p.hc));
+  D.gap = D.hc - D.on;
+  D.rate = D.on / D.hc * 100;
+  D.warnN = POSTS.filter((p) => p.warn).length;
+  D.worst = POSTS.slice().sort((a, b) => a.rate - b.rate)[0];
+  D.gapTop = POSTS.slice().sort((a, b) => b.gap - a.gap)[0];
+  D.hiring = sum(POSTS.map((p) => p.hiring));
+  D.eta = sum(POSTS.map((p) => p.eta));
+
+  /* 5.1 关键岗位五段漏斗合计（全部视图） */
+  D.fun = FUN_NAMES.map((n, k) => sum(POSTS.map((p) => p.fun[k])));
+  D.conv = D.fun.slice(1).map((v, i) => 100 * v / D.fun[i]);
+  D.total = 100 * D.fun[4] / D.fun[0];
+  /* 5.2 平均招聘周期：按入职人数加权（Σ 周期×入职 ÷ Σ 入职） */
+  D.cycle = sum(POSTS.map((p) => p.cycle * p.fun[4])) / D.fun[4];
+  D.cycleTop = POSTS.slice().sort((a, b) => b.cycle - a.cycle)[0];
+  /* 5.3 全量招聘（父页 HIRE 年度合计，现算）与关键岗位份额 */
+  D.allResume = sum(HIRE.resume);
+  D.allInterview = sum(HIRE.interview);
+  D.allOffer = sum(HIRE.offer);
+  D.allOnboard = sum(HIRE.onboard);
+  D.allLeave = sum(HIRE.leave);
+  D.shareOnboard = 100 * D.fun[4] / D.allOnboard;           /* 关键岗位入职占全量入职 */
+  D.shareResume = 100 * D.fun[0] / D.allResume;
+  D.shareOffer = 100 * D.fun[3] / D.allOffer;
+  /* 5.4 管线合计与全盘影响面加权（对象出现次数 × 影响程度分） */
+  D.pipe = PIPE_NAMES.map((n, k) => sum(POSTS.map((p) => p.pipe[k])));
+  const impScore = {}, impCnt = {}, impKind = {};
+  POSTS.forEach((p) => p.imp.forEach((it) => {
+    impScore[it[1]] = (impScore[it[1]] || 0) + LV_SCORE[it[2]];
+    impCnt[it[1]] = (impCnt[it[1]] || 0) + 1;
+    impKind[it[1]] = it[0];
+  }));
+  D.impTop = Object.keys(impScore)
+    .sort((a, b) => impScore[b] - impScore[a] || impCnt[b] - impCnt[a])
+    .slice(0, 5)
+    .map((name) => [impKind[name], name, impScore[name] >= 6 ? "高" : impScore[name] >= 4 ? "中" : "低",
+      "受 " + impCnt[name] + " 个关键岗位缺口影响 · 加权 " + impScore[name] + " 分"]);
+  D.impN = sum(POSTS.map((p) => p.imp.length));
+  /* 5.5 职能维度：关键岗位在岗数不得超过所在职能总人数 */
+  D.byFunc = FUNCS.map((f) => sum(POSTS.filter((p) => p.func === f.name).map((q) => q.on)));
+  D.funcHc = sum(FUNCS.map((f) => f.n));
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("rl-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("rl-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("rl-meta-n").textContent = String(D.n);
+  $("rl-meta-hc").textContent = fmtInt(D.hc);
+  $("rl-meta-on").textContent = fmtInt(D.on);
+  $("rl-meta-warn").textContent = POST_WARN + "%（低于则标警示色，当前 " + D.warnN + " 岗）";
+  $("rl-gap-total").textContent = fmtInt(D.gap);
+  $("rl-gap-warn").textContent = String(D.warnN);
+
+  /* ===== 7. KPI 条（6 枚：编制 / 在岗 / 缺口 / 平均饱和度 / 平均招聘周期 / 缺口最大岗位） ===== */
+  const KPI_DEFS = [
+    { label: "关键岗位总编制", val: D.hc, unit: "人", dec: 0, color: C.blue,
+      note: D.n + " 个岗位 · 同父页 POSTS" },
+    { label: "关键岗位总在岗", val: D.on, unit: "人", dec: 0, color: C.cyan,
+      note: "占编制 " + fmtDec(D.rate, 1) + "%" },
+    { label: "关键岗位总缺口", val: D.gap, unit: "人", dec: 0, color: C.orange,
+      note: "编制 − 在岗，现算" },
+    { label: "平均饱和度", val: D.rate, unit: "%", dec: 1, color: C.green, warn: D.rate < POST_WARN + 5,
+      note: "警戒线 " + POST_WARN + "% · " + D.warnN + " 岗低于" },
+    { label: "平均招聘周期", val: D.cycle, unit: "天", dec: 1, color: C.violet,
+      note: "按入职人数加权 · 最长 " + D.cycleTop.cycle + " 天" },
+    { label: "缺口最大岗位", txt: D.gapTop.name, unit: "", color: C.red, warn: true,
+      note: "缺口 " + D.gapTop.gap + " 人 · 饱和度 " + fmtDec(D.gapTop.rate, 1) + "%" }
+  ];
+  $("rl-kpis").innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="rl-kpi' + (k.warn ? " is-warn" : "") + '" style="--rl-kc:' + k.color + '">' +
+      "<span>" + k.label + "</span>" +
+      '<div class="rl-kpi-v"><b id="rl-kpi-' + i + '"' + (k.txt ? ' class="is-txt"' : "") + ">" +
+        (k.txt ? k.txt : "0") + "</b><u>" + k.unit + "</u><em>" + k.note + "</em></div>" +
+    "</div>"
+  )).join("");
+  /* 数值 KPI 翻牌缓动：easeOutCubic，1.1 秒收敛（文本型 KPI 不参与） */
+  KPI_DEFS.forEach((k, i) => {
+    if (k.txt) return;
+    const el = $("rl-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = k.dec ? fmtDec(k.val * e, k.dec) : fmtInt(k.val * e);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = k.dec ? fmtDec(k.val, k.dec) : fmtInt(k.val);
+    })(t0);
+  });
+
+  /* ===== 8. 岗位筛选 chip（11 枚 = 全部 + 10 岗位；饱和度随 chip 显示，低于警戒线走警示色） ===== */
+  const FILTERS = [{ name: "全部", color: C.blue, rate: D.rate, warn: false }]
+    .concat(POSTS.map((p) => ({ name: p.name, color: p.color, rate: p.rate, warn: p.warn })));
+  const pbox = $("rl-pchips");
+  pbox.innerHTML = FILTERS.map((f, i) => (
+    '<button class="rl-pchip' + (f.warn ? " is-warn" : "") + '" type="button" data-i="' + i +
+      '" style="--rl-cc:' + f.color + '" title="' + f.name + " 饱和度 " + fmtDec(f.rate, 1) + '%">' +
+      "<u>" + f.name + "</u><i>" + fmtDec(f.rate, 1) + "%</i>" +
+    "</button>"
+  )).join("");
+  const pchips = Array.from(pbox.children);
+
+  /* ===== 9. hash 契约：父页下钻「子页#encodeURIComponent(岗位名)」，10 岗位名逐字匹配
+         ★「SRE 站点可靠性」含空格与英文：归一化键剔除全部空白，别名表另收 SRE 简写与无空格写法。 ===== */
+  const normKey = (s) => String(s).replace(/[\s　]+/g, "");
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[normKey(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("全量", 0); alias("关键岗位", 0);
+  POSTS.forEach((p, i) => { alias(p.name, i + 1); alias(p.name + "岗", i + 1); });
+  const SRE_I = POSTS.findIndex((p) => p.name.indexOf("SRE") === 0) + 1;
+  alias("SRE", SRE_I); alias("sre", SRE_I); alias("SRE站点可靠性", SRE_I);
+  alias("站点可靠性", SRE_I); alias("SRE工程师", SRE_I);
+  function matchKey(raw) {
+    let s = String(raw == null ? "" : raw);
+    try { s = decodeURIComponent(s); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    s = normKey(s);
+    if (!s) return -1;                                      /* 无 hash：默认全部，不触发定位高亮 */
+    let hit = HASH_ALIAS[s];
+    if (hit === undefined) hit = HASH_ALIAS[s.toUpperCase()];
+    return hit === undefined ? -1 : hit;
+  }
+  const resolveHash = () => matchKey((location.hash || "").replace(/^#/, ""));
+  let hashSuppress = false;
+  function syncHash(i) {
+    const want = "#" + encodeURIComponent(FILTERS[i].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 10. 岗位明细台账（10 行全量，行高 29px 写死、overflow hidden 不撑破） ===== */
+  const tbody = $("rl-tbody");
+  let selIdx = 0;                                           /* 0 = 全部；1..10 = 对应岗位 */
+
+  tbody.innerHTML = POSTS.map((p, k) => {
+    const cRate = p.warn ? (p.rate < 75 ? C.red : C.orange) : C.green;
+    return '<li data-i="' + (k + 1) + '" style="animation-delay:' + (k * 22) + 'ms">' +
+      '<span class="rl-post">' + p.name + "</span>" +
+      '<span class="rl-func" style="color:' + p.color + '">' + p.func + "</span>" +
+      '<span class="rl-num">' + p.on + "</span>" +
+      '<span class="rl-num">' + p.hc + "</span>" +
+      '<span class="rl-gap" style="color:' + (p.gap >= 12 ? C.red : p.gap >= 6 ? C.orange : C.textDim) + '">' + p.gap + "</span>" +
+      '<span class="rl-sat"><span class="rl-sat-t"><u style="width:' + fmtDec(clamp(p.rate, 0, 100), 1) +
+        "%;background:" + cRate + '"></u></span><em style="color:' + cRate + '">' + fmtDec(p.rate, 1) + "%</em></span>" +
+      '<span class="rl-hire"><b>' + p.hiring + "</b><i>人在途</i></span>" +
+      '<span class="rl-eta">' + p.eta + " 人</span>" +
+    "</li>";
+  }).join("");
+  Array.from(tbody.children).forEach((li) => {
+    li.addEventListener("click", () => { apply(Number(li.dataset.i), true); pauseRotate(20000); });
+  });
+  $("rl-table-tag").textContent =
+    "缺口 = 编制 − 在岗 · 饱和度 = 在岗 ÷ 编制（均现算）· Σ 在岗 " + fmtInt(D.on) + " / Σ 编制 " + fmtInt(D.hc);
+
+  /* ===== 11. 转化率条（6 格：四级转化 + 整体转化 + 平均招聘周期；init 前先填一版） ===== */
+  function renderConv(i) {
+    const p = i === 0 ? null : POSTS[i - 1];
+    const fun = p ? p.fun : D.fun;
+    const conv = p ? p.conv : D.conv;
+    const tot = p ? p.total : D.total;
+    const cyc = p ? p.cycle : D.cycle;
+    const cells = conv.map((v, k) => ({
+      label: FUN_NAMES[k] + " → " + FUN_NAMES[k + 1], color: FUN_COLORS[k + 1],
+      main: fmtDec(v, 1) + "%", sub: fmtInt(fun[k]) + "→" + fmtInt(fun[k + 1])
+    }));
+    cells.push({ label: "简历 → 入职（整体）", color: C.green, main: fmtDec(tot, 2) + "%",
+      sub: fmtInt(fun[0]) + "→" + fmtInt(fun[4]) });
+    cells.push({ label: "平均招聘周期", color: C.amber, main: fmtDec(cyc, 1),
+      sub: "天" + (p ? "" : " · 按入职加权") });
+    $("rl-conv").innerHTML = cells.map((c) => (
+      '<div class="rl-convcell" style="--rl-vc:' + c.color + '">' +
+        "<span>" + c.label + "</span><b>" + c.main + "<u>" + c.sub + "</u></b>" +
+      "</div>"
+    )).join("");
+  }
+
+  /* ===== 12. 缺口影响面（3~5 条，对象取自契约对象集；全部视图给全盘加权 TOP5） ===== */
+  function renderImpact(i) {
+    const p = i === 0 ? null : POSTS[i - 1];
+    const list = p ? p.imp : D.impTop;
+    $("rl-imp-tag").textContent = p
+      ? (p.name + " 缺口 " + p.gap + " 人 · 影响 " + list.length + " 项")
+      : ("全盘 " + D.impN + " 条影响项加权 TOP5 · 高=3 中=2 低=1");
+    $("rl-impact").innerHTML = list.map((it, k) => (
+      '<div class="rl-imp" style="animation-delay:' + (k * 40) + 'ms">' +
+        '<span class="rl-imp-k">' + it[0] + "</span>" +
+        "<b>" + it[1] + "</b>" +
+        '<span class="rl-imp-t">' + it[3] + "</span>" +
+        '<span class="rl-badge ' + LV_CLASS[it[2]] + '">' + it[2] + "</span>" +
+      "</div>"
+    )).join("");
+  }
+
+  /* ===== 13. 候选人管线小堆叠条（当前在途，四段） ===== */
+  function renderPipe(i) {
+    const p = i === 0 ? null : POSTS[i - 1];
+    const arr = p ? p.pipe : D.pipe;
+    const tot = sum(arr);
+    $("rl-pipe-tag").textContent = (p ? p.name : "全部关键岗位") + " 在途 " + fmtInt(tot) +
+      " 人 · 预计到岗 " + (p ? p.eta : D.eta) + " 人";
+    $("rl-pipebar").innerHTML = arr.map((v, k) => (
+      '<i style="flex:' + Math.max(v, 0.4) + ";background:" + PIPE_COLORS[k] + '" title="' +
+        PIPE_NAMES[k] + " " + v + ' 人"></i>'
+    )).join("");
+    $("rl-pipegrid").innerHTML = arr.map((v, k) => (
+      '<div class="rl-pipecell" style="--rl-pc:' + PIPE_COLORS[k] + '">' +
+        "<span>" + PIPE_NAMES[k] + "</span><b>" + v + "<u>占 " + fmtDec(100 * v / tot, 0) + "%</u></b>" +
+      "</div>"
+    )).join("");
+  }
+
+  /* ===== 14. 单岗位招聘漏斗（横向 funnel；宽度按 0.42 次幂压缩，末段仍可读，标签显示真实人数） ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function funnelOption(i) {
+    const p = i === 0 ? null : POSTS[i - 1];
+    const fun = p ? p.fun : D.fun;
+    const conv = p ? p.conv : D.conv;
+    const top = fun[0];
+    /* ★ 进 option 的只有标量与数组：name/value/real 全是标量，无任何对象回指 */
+    const data = fun.map((v, k) => ({
+      name: FUN_NAMES[k],
+      value: Number((Math.pow(v / top, 0.42) * 100).toFixed(2)),
+      real: v,
+      conv: k === 0 ? -1 : Number(fmtDec(conv[k - 1], 1)),
+      itemStyle: { color: FUN_COLORS[k], borderColor: "rgba(8,18,49,.9)", borderWidth: 2 }
+    }));
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (ps) => {
+          const d = ps.data;
+          return "<b>" + d.name + "</b>　" + fmtInt(d.real) + " 人" +
+            (d.conv >= 0 ? "<br/>较上一段转化 <b style=\"color:" + C.amber + "\">" + fmtDec(d.conv, 1) + "%</b>" : "") +
+            "<br/><span style=\"color:" + C.textDim + "\">占本岗简历 " +
+            fmtDec(100 * d.real / top, 2) + "%</span>";
+        }
+      }, TIP),
+      series: [{
+        type: "funnel", orient: "horizontal", funnelAlign: "center", sort: "none",
+        left: 8, right: 8, top: 6, bottom: 26, gap: 6,
+        min: 0, max: 100, minSize: "16%", maxSize: "100%",
+        label: {
+          show: true, position: "inside", color: "#071026", fontWeight: 700, fontSize: 13,
+          formatter: (ps) => ps.data.name + "\n" + fmtInt(ps.data.real) + " 人"
+        },
+        labelLine: { show: false },
+        emphasis: { label: { fontSize: 14 } },
+        data: data
+      }],
+      graphic: data.slice(1).map((d, k) => ({
+        /* 段间转化率标注：五段等分 → 分界线约在 20/40/60/80%，标注左锚点向左让 3% */
+        type: "text", left: ((k + 1) * 20 - 3) + "%", bottom: 2,
+        style: { text: "▼ " + fmtDec(d.conv, 1) + "%", fill: C.textDim, fontSize: 11.5, fontWeight: 700 }
+      }))
+    };
+  }
+
+  /* ===== 15. 缺口人数 × 饱和度（条=缺口人数，折线=饱和度%，85% 警戒线 markLine） ===== */
+  function gapOption(i) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 12, top: 30, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex, p = POSTS[k];
+          return "<b>" + p.name + "</b>　" + p.func + "<br/>在岗 <b>" + p.on + "</b> / 编制 <b>" + p.hc +
+            "</b> · 缺口 <b style=\"color:" + C.orange + "\">" + p.gap + "</b> 人<br/>饱和度 <b style=\"color:" +
+            (p.warn ? C.orange : C.green) + "\">" + fmtDec(p.rate, 1) + "%</b>（警戒线 " + POST_WARN +
+            "%）<br/><span style=\"color:" + C.textDim + "\">在途 " + p.hiring + " 人 · 预计到岗 " + p.eta +
+            " 人 · 周期 " + p.cycle + " 天</span>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: ["缺口人数", "饱和度"]
+      },
+      xAxis: [
+        { type: "value", name: "人", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10 }, axisLine: { show: false },
+          splitLine: { lineStyle: { color: C.grid, type: "dashed" } } },
+        { type: "value", min: 60, max: 100, position: "top", show: false }
+      ],
+      yAxis: {
+        type: "category", inverse: true, data: POSTS.map((p) => p.name),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: "#bcd2f8", fontSize: 11, fontWeight: 700 }
+      },
+      series: [
+        { name: "缺口人数", type: "bar", barWidth: "52%", xAxisIndex: 0,
+          label: { show: true, position: "right", color: C.textDim, fontSize: 10,
+            formatter: (ps) => ps.value + " 人" },
+          data: POSTS.map((p, j) => ({
+            value: p.gap,
+            itemStyle: {
+              color: p.warn ? C.orange : C.blueDeep,
+              opacity: (i === 0 || i - 1 === j) ? 1 : 0.26,
+              borderRadius: [0, 3, 3, 0]
+            }
+          })) },
+        { name: "饱和度", type: "line", xAxisIndex: 1, symbol: "circle", symbolSize: 7,
+          lineStyle: { width: 1.6, color: C.green, type: "dashed" },
+          itemStyle: { color: C.green },
+          data: POSTS.map((p, j) => ({
+            value: Number(fmtDec(p.rate, 1)),
+            itemStyle: { color: p.warn ? C.red : C.green, opacity: (i === 0 || i - 1 === j) ? 1 : 0.3 }
+          })),
+          markLine: {
+            silent: true, symbol: "none",
+            label: { formatter: "警戒线 " + POST_WARN + "%", color: C.amber, fontSize: 10, position: "start" },
+            lineStyle: { color: C.amber, type: "dashed", width: 1.4 },
+            data: [{ xAxis: POST_WARN }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 16. 选中主流程：一次调用刷新 chip / 表行 / 漏斗 / 转化率 / 影响面 / 管线 / 缺口图 ===== */
+  function apply(i, pushHash) {
+    selIdx = clamp(i, 0, FILTERS.length - 1);
+    pchips.forEach((el, k) => {
+      const on = k === selIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? FILTERS[k].color : "";
+      el.style.borderColor = on ? FILTERS[k].color : "";
+    });
+    Array.from(tbody.children).forEach((li, k) => li.classList.toggle("is-sel", selIdx > 0 && k === selIdx - 1));
+    const p = selIdx === 0 ? null : POSTS[selIdx - 1];
+    $("rl-chip-key").textContent = "饱和度 · " + FILTERS[selIdx].name;
+    $("rl-chip-rate").textContent = fmtDec(p ? p.rate : D.rate, 1) + "%";
+    $("rl-funnel-tag").innerHTML = p
+      ? ("本岗年简历 <b>" + fmtInt(p.fun[0]) + "</b> → 入职 <b>" + p.fun[4] + "</b> 人 · 招聘周期 <b>" +
+         p.cycle + "</b> 天 · 占关键岗位入职 " + fmtDec(100 * p.fun[4] / D.fun[4], 1) + "%")
+      : ("关键岗位年入职 <b>" + fmtInt(D.fun[4]) + "</b> 人 = 全量入职 " + fmtInt(D.allOnboard) +
+         " 人的 <b>" + fmtDec(D.shareOnboard, 1) + "%</b>（简历侧占 " + fmtDec(D.shareResume, 1) + "%）");
+    $("rl-filters-state").innerHTML =
+      "当前视图 <em>" + FILTERS[selIdx].name + "</em><i>|</i>在岗 <b>" + (p ? p.on : D.on) + "</b> / 编制 " +
+      (p ? p.hc : D.hc) + " · 缺口 <b>" + (p ? p.gap : D.gap) + "</b> 人<i>|</i>行点击或 3 秒轮巡联动漏斗与影响面";
+    renderConv(selIdx);
+    renderImpact(selIdx);
+    renderPipe(selIdx);
+    if (funnelChart) funnelChart.setOption(funnelOption(selIdx), true);
+    if (gapChart) gapChart.setOption(gapOption(selIdx), true);
+    if (pushHash) syncHash(selIdx);
+  }
+  pchips.forEach((el) => el.addEventListener("click", () => {
+    apply(Number(el.dataset.i), true); pauseRotate(20000);
+  }));
+
+  /* hash 定位：命中岗位则选中该行、闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { apply(0, false); return; }
+    apply(hit, false);
+    if (hit > 0) {
+      const chip = pchips[hit];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发人才与能力1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 17. kiosk 轮巡：3 秒逐岗位轮转，联动漏斗 / 影响面 / 管线；hash 或手动点击后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil) return;
+    apply(selIdx % POSTS.length + 1, false);                /* 全部(0) → 1 → … → 10 → 1 */
+  }, 3000);
+
+  /* ===== 18. 初始渲染：先把台账 / 转化率 / 影响面 / 管线全部填充完，再 init 图表 ===== */
+  let funnelChart = null, gapChart = null;
+  apply(0, false);                                          /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  funnelChart = echarts.init($("rl-chart-funnel"));
+  funnelChart.setOption(funnelOption(0));
+  gapChart = echarts.init($("rl-chart-gap"));
+  gapChart.setOption(gapOption(0));
+  locateByHash();                                           /* 初始解析 hash（无 hash 落全部） */
+
+  /* 缺口图 tooltip 巡检 */
+  let tipIdx = 0;
+  setInterval(() => {
+    gapChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % POSTS.length;
+  }, 4200);
+
+  /* ===== 19. 底部人才研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "「" + D.worst.name + "」饱和度 " + fmtDec(D.worst.rate, 1) + "% 全场最低（在岗 " +
+        D.worst.on + " / 编制 " + D.worst.hc + "），缺口 " + D.worst.gap + " 人，在途仅 " + D.worst.hiring +
+        " 人、预计到岗 " + D.worst.eta + " 人" },
+    { lv: "高", c: C.red, t: "「" + D.gapTop.name + "」缺口 " + D.gapTop.gap + " 人居首，招聘周期 " +
+        D.gapTop.cycle + " 天，影响 " + D.gapTop.imp.length + " 项（含 " +
+        D.gapTop.imp.filter((it) => it[2] === "高").length + " 项高影响）" },
+    { lv: "中", c: C.orange, t: D.warnN + " 个岗位饱和度低于 " + POST_WARN + "% 警戒线：" +
+        POSTS.filter((p) => p.warn).map((p) => p.name + " " + fmtDec(p.rate, 1) + "%").join(" · ") },
+    { lv: "中", c: C.orange, t: "关键岗位年入职 " + fmtInt(D.fun[4]) + " 人 = 全量入职 " + fmtInt(D.allOnboard) +
+        " 人的 " + fmtDec(D.shareOnboard, 1) + "%；简历侧 " + fmtInt(D.fun[0]) + " / " + fmtInt(D.allResume) +
+        " = " + fmtDec(D.shareResume, 1) + "%，关键岗位筛选强度显著更高" },
+    { lv: "低", c: C.amber, t: "关键岗位漏斗：简历 " + fmtInt(D.fun[0]) + " → 初筛 " + fmtInt(D.fun[1]) +
+        " → 面试 " + fmtInt(D.fun[2]) + " → offer " + fmtInt(D.fun[3]) + " → 入职 " + fmtInt(D.fun[4]) +
+        "，offer 接受率 " + fmtDec(D.conv[3], 1) + "%，整体转化 " + fmtDec(D.total, 2) + "%" },
+    { lv: "低", c: C.violet, t: "平均招聘周期 " + fmtDec(D.cycle, 1) + " 天（按入职人数加权），最长「" +
+        D.cycleTop.name + "」" + D.cycleTop.cycle + " 天；当前在途候选人 " + fmtInt(D.hiring) +
+        " 人，预计到岗合计 " + D.eta + " 人（覆盖缺口 " + fmtDec(100 * D.eta / D.gap, 1) + "%）" },
+    { lv: "低", c: C.green, t: "勾稽：Σ 在岗 " + fmtInt(D.on) + " + Σ 缺口 " + fmtInt(D.gap) + " = Σ 编制 " +
+        fmtInt(D.hc) + "，逐岗在岗/编制与父页「关键岗位饱和度」逐字同源；六职能 Σ = " + fmtInt(D.funcHc) + " 人" }
+  ];
+  const track = $("rl-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="rl-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                  /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 20. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try {
+    JSON.stringify(funnelOption(0)); JSON.stringify(funnelOption(7));
+    JSON.stringify(gapOption(0)); JSON.stringify(gapOption(3));
+  } catch (e) { optAcyclic = false; console.error("[关键岗位与招聘台账] option 存在循环引用：", e.message); }
+
+  const checks = [
+    ["10 个关键岗位名与在岗/编制逐字同父页 POSTS",
+      POSTS.length === 10 && POSTS.every((p, i) =>
+        p.name === POST_REF[i][0] && p.on === POST_REF[i][1] && p.hc === POST_REF[i][2])],
+    ["Σ 在岗 = 624 人 · Σ 编制 = 714 人（与父页 D.postOn / D.postHc 同源）",
+      D.on === 624 && D.hc === 714],
+    ["缺口 = 编制 − 在岗（逐行现算，且在岗 ≤ 编制）",
+      POSTS.every((p) => p.gap === p.hc - p.on && p.on <= p.hc && p.gap > 0)],
+    ["Σ 缺口 = Σ 编制 − Σ 在岗", D.gap === D.hc - D.on && D.gap === sum(POSTS.map((p) => p.gap))],
+    ["饱和度 = 在岗 ÷ 编制（逐行现算，落在 (0,100]）",
+      POSTS.every((p) => Math.abs(p.rate - p.on / p.hc * 100) < 1e-9 && p.rate > 0 && p.rate <= 100)],
+    ["警戒线判定 = 饱和度 < 85%，且警示岗位恰 3 个（算法专家 / 安全架构 / 射频与天线）",
+      POSTS.every((p) => p.warn === (p.rate < POST_WARN)) && D.warnN === 3 &&
+      POSTS.filter((p) => p.warn).map((p) => p.name).join(",") === "算法专家,安全架构,射频与天线"],
+    ["平均饱和度 = Σ 在岗 ÷ Σ 编制（非逐岗均值）",
+      Math.abs(D.rate - D.on / D.hc * 100) < 1e-9],
+    ["招聘漏斗五段逐岗严格递减且各段为正",
+      POSTS.every((p) => p.fun.length === 5 && p.fun.every((v) => v > 0) &&
+        p.fun.every((v, k) => k === 0 || v < p.fun[k - 1]))],
+    ["漏斗合计五段 = 逐岗之和，且合计同样逐级递减",
+      D.fun.every((v, k) => v === sum(POSTS.map((p) => p.fun[k]))) &&
+      D.fun.every((v, k) => k === 0 || v < D.fun[k - 1])],
+    ["逐级转化率现算 = 后段 ÷ 前段（逐岗，落在 (0,100)）",
+      POSTS.every((p) => p.conv.length === 4 &&
+        p.conv.every((v, k) => Math.abs(v - 100 * p.fun[k + 1] / p.fun[k]) < 1e-9 && v > 0 && v < 100))],
+    ["整体转化率 = 入职 ÷ 简历（逐岗现算）",
+      POSTS.every((p) => Math.abs(p.total - 100 * p.fun[4] / p.fun[0]) < 1e-9)],
+    ["Σ 关键岗位入职 = 182 人，且 = 各岗末段之和", D.fun[4] === 182 && D.fun[4] === sum(POSTS.map((p) => p.fun[4]))],
+    ["全量招聘年度合计由父页 HIRE 月数组现算：简历 14,310 / 面试 3,874 / offer 1,090 / 入职 846",
+      D.allResume === 14310 && D.allInterview === 3874 && D.allOffer === 1090 && D.allOnboard === 846],
+    ["份额口径自洽：关键岗位各段 ≤ 全量对应段，入职份额 = 182 ÷ 846 = 21.5%",
+      D.fun[0] <= D.allResume && D.fun[2] <= D.allInterview && D.fun[3] <= D.allOffer &&
+      D.fun[4] <= D.allOnboard && Math.abs(D.shareOnboard - 100 * 182 / 846) < 1e-9 &&
+      fmtDec(D.shareOnboard, 1) === "21.5"],
+    ["平均招聘周期 = Σ(周期 × 入职) ÷ Σ 入职（加权现算）",
+      Math.abs(D.cycle - sum(POSTS.map((p) => p.cycle * p.fun[4])) / D.fun[4]) < 1e-9 &&
+      D.cycle > Math.min.apply(null, POSTS.map((p) => p.cycle)) &&
+      D.cycle < Math.max.apply(null, POSTS.map((p) => p.cycle))],
+    ["候选人管线四段逐岗非递增，且招聘中 = 四段之和",
+      POSTS.every((p) => p.pipe.length === 4 && p.pipe.every((v) => v > 0) &&
+        p.pipe.every((v, k) => k === 0 || v <= p.pipe[k - 1]) && p.hiring === sum(p.pipe))],
+    ["预计到岗 = offer 中 + 终面折半，且不超过本岗缺口",
+      POSTS.every((p) => p.eta === p.pipe[3] + Math.round(p.pipe[2] / 2) && p.eta <= p.gap)],
+    ["管线合计四段 = 逐岗之和，Σ 招聘中 = 232 人",
+      D.pipe.every((v, k) => v === sum(POSTS.map((p) => p.pipe[k]))) && D.hiring === 232 &&
+      D.hiring === sum(D.pipe)],
+    ["缺口影响面逐岗 3~5 条，对象名均属契约对象集（8 项目 / 12 团队 / 4 基线）",
+      POSTS.every((p) => p.imp.length >= 3 && p.imp.length <= 5 &&
+        p.imp.every((it) => OBJ_ALL.indexOf(it[1]) >= 0 && LV_CLASS[it[2]] !== undefined))],
+    ["六职能人数 Σ = 3,860（契约逐字），且各职能关键岗在岗 ≤ 该职能人数",
+      D.funcHc === HC_REF && FUNCS.every((f, i) => D.byFunc[i] <= f.n) &&
+      POSTS.every((p) => FUNC_OF[p.func] !== undefined)],
+    ["hash 10 岗位名逐字均可解析（含空格英文名「SRE 站点可靠性」）",
+      POSTS.every((p, i) => matchKey(encodeURIComponent(p.name)) === i + 1)],
+    ["hash 别名可解析：SRE 简写 / 无空格写法 / 小写 / 全部",
+      matchKey("SRE") === SRE_I && matchKey("SRE站点可靠性") === SRE_I &&
+      matchKey("sre") === SRE_I && matchKey("站点可靠性") === SRE_I && matchKey("全部") === 0],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[关键岗位与招聘台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

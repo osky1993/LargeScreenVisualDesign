@@ -1,0 +1,1296 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单维度追溯详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --zb-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .zb-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 700px 1fr 430px;
+    grid-template-rows: 84px 100px 1fr 44px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .zb-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .zb-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .zb-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 8px 8px;
+  }
+  .zb-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .zb-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .zb-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .zb-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .zb-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .zb-crumb em { font-style: normal; color: #d3e2ff; }
+  .zb-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .zb-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .zb-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .zb-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .zb-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .zb-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .zb-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .zb-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 维度切换器：六维 tab（← → 方向键 / 13s 自动轮换 / hash 直达） */
+  .zb-switcher { display: grid; grid-template-columns: repeat(3, auto); gap: 5px 6px; }
+  .zb-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 84px; padding: 3px 10px 4px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .zb-sw-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; }
+  .zb-sw-tab span { font-size: 9.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .zb-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .zb-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .zb-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .zb-chips { display: flex; align-items: center; gap: 9px; }
+  .zb-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 132px; padding: 7px 13px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(169, 140, 245, 0.42); background: linear-gradient(160deg, rgba(169, 140, 245, 0.16), rgba(18, 34, 78, 0.6));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .zb-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: #8f7fc4; white-space: nowrap; }
+  .zb-chip b { font-size: 13.5px; font-weight: 700; letter-spacing: 0.05em; color: #cbbcf7; white-space: nowrap; }
+  .zb-chip:hover { border-color: rgba(169, 140, 245, 0.92); box-shadow: 0 0 16px -2px rgba(169, 140, 245, 0.7); }
+  .zb-chip.is-src { border-color: rgba(92, 157, 255, 0.42); background: linear-gradient(160deg, rgba(92, 157, 255, 0.16), rgba(18, 34, 78, 0.6)); }
+  .zb-chip.is-src span { color: #6f8ac4; }
+  .zb-chip.is-src b { color: #b6d0ff; }
+  .zb-chip.is-src:hover { border-color: rgba(92, 157, 255, 0.92); box-shadow: 0 0 16px -2px rgba(92, 157, 255, 0.7); }
+  .zb-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 18px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .zb-clock-time { font: 700 26px/1 var(--zb-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .zb-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（整行 6 枚，高度由 grid 行写死） ===== */
+  .zb-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .zb-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 8px 16px;
+  }
+  .zb-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .zb-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .zb-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .zb-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .zb-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .zb-kpi.is-good::after { background: radial-gradient(circle, rgba(111, 224, 154, 0.13), transparent 68%); }
+  .zb-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-orange), transparent); }
+  .zb-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 92, 0.14), transparent 68%); }
+  .zb-kpi-label { font-size: 12px; letter-spacing: 0.08em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .zb-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .zb-kpi-val { font: 700 29px/1 var(--zb-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .zb-kpi.is-amber .zb-kpi-val { color: #ffd489; }
+  .zb-kpi.is-good .zb-kpi-val { color: #b8f2cf; }
+  .zb-kpi.is-warn .zb-kpi-val { color: #ffc3a0; }
+  .zb-kpi-unit { font-size: 12px; color: var(--rnd-text-dim); }
+  .zb-kpi-sub { font-size: 10.5px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zb-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体 ===== */
+  .zb-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .zb-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .zb-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .zb-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .zb-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .zb-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .zb-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .zb-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .zb-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 左栏上：可追溯加权明细表（CSS grid 模拟表格，★ 整块高度写死） ===== */
+  .zb-tablewrap { flex: none; height: 356px; }
+  .zb-thead, .zb-tbody li, .zb-tfoot {
+    display: grid; grid-template-columns: 1.22fr 2.5fr 0.95fr 0.52fr 0.8fr 1.02fr;
+    align-items: center; gap: 8px; padding: 0 10px; font-variant-numeric: tabular-nums;
+  }
+  .zb-thead {
+    flex: none; height: 25px; font-size: 11px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.95);
+    border-bottom: 1px solid rgba(96, 140, 255, 0.22);
+  }
+  .zb-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 4px; overflow: hidden; }
+  .zb-tbody li { border-radius: 7px; font-size: 12px; color: #c8d6f2; min-height: 0; }
+  .zb-tbody li:nth-child(odd) { background: rgba(96, 140, 255, 0.06); }
+  .zb-td-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .zb-td-name b { font-size: 12.5px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zb-td-name i { font-style: normal; font-size: 9.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.9); }
+  .zb-td-name i.is-rev { color: #ffb59a; }
+  .zb-td-how { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 11px; }
+  .zb-td-how span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #b9cdf5; }
+  .zb-td-how span b { font-weight: 700; color: #ffd489; }
+  .zb-td-how i { font-style: normal; font-size: 9.5px; color: rgba(127, 146, 196, 0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zb-td-score { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+  .zb-td-score b { font: 700 17px/1.05 var(--zb-mono); color: #eaf1ff; }
+  .zb-td-score b.is-up { color: #b8f2cf; }
+  .zb-td-score b.is-down { color: #ffb59a; }
+  .zb-td-score i { font-style: normal; font-size: 9px; color: rgba(127, 146, 196, 0.75); white-space: nowrap; }
+  .zb-td-w { text-align: right; font-size: 12.5px; font-weight: 700; color: #cbbcf7; }
+  .zb-td-ws { text-align: right; font: 700 14px/1 var(--zb-mono); color: #ffd489; }
+  .zb-td-src { font-size: 10.5px; color: rgba(127, 146, 196, 0.95); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zb-tfoot {
+    flex: none; height: 34px; margin-top: 5px; border-radius: 7px;
+    border: 1px solid rgba(255, 194, 77, 0.4); background: rgba(255, 194, 77, 0.09);
+    font-size: 12px; color: #ffe0a8;
+  }
+  .zb-tfoot b { font-weight: 700; color: #fff2d4; }
+  .zb-tfoot .zb-td-ws { font-size: 16px; color: #ffe9bd; }
+  .zb-tfoot .zb-td-w { color: #ffe0a8; }
+
+  /* ===== 右栏下：改进行动（★ 由 JS 填充，所在面板与图表不同容器，内部自带滚动隔离） ===== */
+  .zb-acts { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 8px; overflow: hidden; }
+  .zb-acts li {
+    min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px;
+    padding: 7px 12px; border-radius: 10px;
+    border: 1px solid rgba(96, 140, 255, 0.16); background: linear-gradient(120deg, rgba(20, 38, 92, 0.62), rgba(14, 26, 66, 0.5));
+  }
+  .zb-act-t1 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .zb-act-name { font-size: 12.5px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zb-act-gain { flex: none; font: 700 14px/1 var(--zb-mono); color: #b8f2cf; }
+  .zb-act-gain i { font-style: normal; font-size: 9.5px; color: rgba(127, 146, 196, 0.9); margin-left: 3px; }
+  .zb-act-t2 { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 10.5px; color: rgba(127, 146, 196, 0.95); }
+  .zb-act-t2 b { font-weight: 700; color: #b9cdf5; }
+  .zb-act-bar { height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.16); overflow: hidden; }
+  .zb-act-bar u { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--rnd-blue-deep), var(--rnd-cyan)); }
+  .zb-empty {
+    flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    border: 1px dashed rgba(96, 140, 255, 0.28); border-radius: 10px; background: rgba(14, 26, 66, 0.32);
+  }
+  .zb-empty b { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; color: #9cc2ff; }
+  .zb-empty span { font-size: 11.5px; color: rgba(127, 146, 196, 0.95); text-align: center; line-height: 1.7; }
+
+  /* ===== 底部口径滚动条 ===== */
+  .zb-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .zb-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .zb-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: zb-blink 1.6s ease-in-out infinite; }
+  @keyframes zb-blink { 50% { opacity: 0.35; } }
+  .zb-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .zb-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: zb-ticker 70s linear infinite; will-change: transform; }
+  .zb-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .zb-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes zb-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .zb-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="zb-stage" id="zb-stage">
+    <!-- mockflag:begin --><div class="zb-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="zb-error" id="zb-error" role="alert">ECharts 资源加载失败，KPI、加权明细表与改进行动不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="zb-header">
+      <div class="zb-head-left">
+        <div class="zb-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="zb-crumb-up" href="大屏样板间-研发效能指数1920.html" title="返回上级专题页（Esc）">‹ 返回 效能指数</a><i>›</i>
+          <em id="zb-crumb-obj">--</em>
+        </div>
+        <div class="zb-head-title-row">
+          <div class="zb-head-title" id="zb-title">-- · 单维度追溯详情</div>
+          <div class="zb-head-meta">
+            <span>本维得分 <b id="zb-meta-score">--</b> · 权重 <b id="zb-meta-w">--</b></span><i>|</i>
+            <span>加权贡献 <b id="zb-meta-ws">--</b> 分 · 健康指数 <b id="zb-meta-idx">--</b></span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="zb-head-right">
+        <div class="zb-switcher" id="zb-switcher" aria-label="健康指数六维切换"></div>
+        <div class="zb-chips">
+          <a class="zb-chip is-src" id="zb-chip-src" href="大屏样板间-研发IPD管道与评审1920.html" title="跳到本维得分的主要来源专题页"><span>本维来源页</span><b>-- ›</b></a>
+          <a class="zb-chip" href="大屏样板间-研发经营驾驶舱1920.html" title="门户健康六维雷达与本页同源"><span>同源 · 六维雷达</span><b>研发经营驾驶舱 ›</b></a>
+        </div>
+        <div class="zb-clock" aria-label="实时时钟">
+          <span class="zb-clock-time" id="zb-clock-time">--:--:--</span>
+          <span class="zb-clock-date" id="zb-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：本维得分 / 权重 / 加权贡献 / 距目标差距 / 环比 / 六维排名 -->
+    <section class="zb-kpis" aria-label="本维核心指标">
+      <div class="zb-kpi" id="zb-kpi-0box">
+        <div class="zb-kpi-label">本维得分</div>
+        <div class="zb-kpi-num"><span class="zb-kpi-val" id="zb-kpi-0">0</span><span class="zb-kpi-unit">分</span></div>
+        <div class="zb-kpi-sub" id="zb-kpi-0s">--</div>
+      </div>
+      <div class="zb-kpi">
+        <div class="zb-kpi-label">维度权重</div>
+        <div class="zb-kpi-num"><span class="zb-kpi-val" id="zb-kpi-1">0</span><span class="zb-kpi-unit">%</span></div>
+        <div class="zb-kpi-sub" id="zb-kpi-1s">--</div>
+      </div>
+      <div class="zb-kpi is-amber">
+        <div class="zb-kpi-label">加权贡献</div>
+        <div class="zb-kpi-num"><span class="zb-kpi-val" id="zb-kpi-2">0</span><span class="zb-kpi-unit">分</span></div>
+        <div class="zb-kpi-sub" id="zb-kpi-2s">--</div>
+      </div>
+      <div class="zb-kpi is-warn">
+        <div class="zb-kpi-label">距目标 90 分差距</div>
+        <div class="zb-kpi-num"><span class="zb-kpi-val" id="zb-kpi-3">0</span><span class="zb-kpi-unit">分</span></div>
+        <div class="zb-kpi-sub" id="zb-kpi-3s">--</div>
+      </div>
+      <div class="zb-kpi" id="zb-kpi-4box">
+        <div class="zb-kpi-label">环比上季</div>
+        <div class="zb-kpi-num"><span class="zb-kpi-val" id="zb-kpi-4">0</span><span class="zb-kpi-unit">分</span></div>
+        <div class="zb-kpi-sub" id="zb-kpi-4s">--</div>
+      </div>
+      <div class="zb-kpi" id="zb-kpi-5box">
+        <div class="zb-kpi-label">六维排名</div>
+        <div class="zb-kpi-num"><span class="zb-kpi-val" id="zb-kpi-5">0</span><span class="zb-kpi-unit">/ 6</span></div>
+        <div class="zb-kpi-sub" id="zb-kpi-5s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：二级指标加权明细（本页核心）+ 二级得分对标 -->
+    <div class="zb-col">
+      <section class="zb-panel zb-tablewrap">
+        <div class="zb-panel-head">
+          <h2>得分构成 · 二级指标加权明细</h2>
+          <span class="zb-panel-tag" id="zb-tag-table">--</span>
+        </div>
+        <div class="zb-thead">
+          <span>二级指标</span><span>底数算式（页内现算）</span>
+          <span style="text-align:right">换算得分</span><span style="text-align:right">权重</span>
+          <span style="text-align:right">加权分</span><span>来源专题页</span>
+        </div>
+        <ul class="zb-tbody" id="zb-tbody"></ul>
+        <div class="zb-tfoot" id="zb-tfoot"></div>
+      </section>
+      <section class="zb-panel" style="flex: 1;">
+        <div class="zb-panel-head">
+          <h2>二级指标换算得分 vs 目标 90</h2>
+          <span class="zb-panel-tag" id="zb-tag-sub">--</span>
+        </div>
+        <div class="zb-chart" id="zb-chart-sub"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：24 月走势 + 差距归因瀑布 -->
+    <div class="zb-col">
+      <section class="zb-panel" style="flex: 1.04;">
+        <div class="zb-panel-head">
+          <h2>本维 24 月得分走势</h2>
+          <span class="zb-panel-tag" id="zb-tag-trend">--</span>
+        </div>
+        <div class="zb-chart" id="zb-chart-trend"></div>
+      </section>
+      <section class="zb-panel" style="flex: 0.96;">
+        <div class="zb-panel-head">
+          <h2>与目标 90 分差距归因</h2>
+          <span class="zb-panel-tag" id="zb-tag-gap">--</span>
+        </div>
+        <div class="zb-chart" id="zb-chart-gap"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：环比同比 + 本维改进行动 -->
+    <div class="zb-col">
+      <section class="zb-panel" style="flex: none; height: 252px;">
+        <div class="zb-panel-head">
+          <h2>本期 · 上季 · 去年同期</h2>
+          <span class="zb-panel-tag" id="zb-tag-qoq">--</span>
+        </div>
+        <div class="zb-chart" id="zb-chart-qoq"></div>
+      </section>
+      <section class="zb-panel" style="flex: 1;">
+        <div class="zb-panel-head">
+          <h2>本维改进行动</h2>
+          <span class="zb-panel-tag" id="zb-tag-act">--</span>
+        </div>
+        <ul class="zb-acts" id="zb-acts"></ul>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="zb-foot" aria-label="单维度追溯口径说明">
+      <div class="zb-foot-label"><span class="zb-foot-dot"></span>追溯口径</div>
+      <div class="zb-foot-viewport"><div class="zb-foot-track" id="zb-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("zb-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const signed = (v, dec) => (v >= 0 ? "+" : "−") + fmtDec(Math.abs(v), dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* 两段式定点：先抹掉 1e-13 量级的浮点毛刺，再四舍五入到 1 位小数。
+     单段 Math.round(x*10)/10 在 x = 68.875 这类 .x75 边界上会被 1ulp 噪声掀翻
+     （68.874999999 → 68.8），进而破坏「二级加权 Σ 精确等于契约得分」。 */
+  const round1 = (x) => { const y = Math.round(x * 1000) / 1000; return Math.round(y * 10) / 10; };
+
+  /* ===== 1.1 ★ kiosk 状态量前置声明（必须早于任何 hold() 调用） =====
+     let 有暂时性死区：带 hash 冷启动时若先 hold() 再声明，会抛
+     ReferenceError: Cannot access 'holdUntil' before initialization —— 主脚本整段中断，
+     而页面此时已渲染完，肉眼看不出问题（契约 §8 批次四实测坑）。
+     因此 idx / timer / holdUntil / hold() / restart() 全部提到这里，
+     首次 hold() 调用在下方第 11 节（boot 段），行号严格大于本块。 */
+  let idx = 0;
+  let timer = null;
+  let holdUntil = 0;
+  let holdCalls = 0;                                           /* 供页尾自检做构造性断言 */
+  function hold() { holdCalls += 1; holdUntil = Date.now() + 20000; }
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyDim(idx + 1); }, 13000);
+  }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层：单一数据源，六维全部视图由此派生 =====
+     一级口径逐字引 docs/RndIpdThemed.md §2.2（研发健康指数）：
+       84.1 = 交付 86×0.20 + 质量 88×0.20 + 效率 81×0.15
+            + 投入产出 78×0.15 + 协同 83×0.15 + 人才 87×0.15（权重和 = 1）
+     与父页「研发效能指数」(pi) 及门户「研发经营驾驶舱」(hq) 三处逐字同源，
+     由下方 AUTH 常量做构造性断言守住。
+
+     ★ 本页的增量：把契约只锁到一级的六维得分，**再往下拆一层**——
+       每个维度由 4 个二级指标加权而成，每个二级指标都回溯到某张专题页的 KPI **底数**，
+       页内由底数现算指标值 → 按公开锚点线性换算成 0–100 分 → 加权。
+       二级权重 Σ = 1，且 Σ(二级得分 × 二级权重) **精确等于**契约里的该维得分
+       （86 / 88 / 81 / 78 / 83 / 87），页尾逐维硬断言（1e-9 容差）。 */
+
+  const TARGET = 90;                 /* 管理层目标线（与父页同口径） */
+  const BAND_LO = 80, BAND_HI = 90;  /* 良好带；≥90 优秀，<80 待改进 */
+
+  /* 3.1 六维一级表（dim / score / w / from 四列与父页 DIMS、门户 HEALTH_DIMS 逐字一致） */
+  const DIMS = [
+    { dim: "交付",     score: 86, w: 0.20, from: "P2 IPD管道 · P5 敏捷交付",  color: C.series[0],
+      page: "大屏样板间-研发IPD管道与评审1920.html",     pageName: "IPD管道与评审" },
+    { dim: "质量",     score: 88, w: 0.20, from: "P8 质量与缺陷",             color: C.series[1],
+      page: "大屏样板间-研发质量与缺陷1920.html",         pageName: "质量与缺陷" },
+    { dim: "效率",     score: 81, w: 0.15, from: "P6 看板 · P7 工程效能",     color: C.series[2],
+      page: "大屏样板间-研发工程效能1920.html",           pageName: "工程效能" },
+    { dim: "投入产出", score: 78, w: 0.15, from: "P4 投入与预算",             color: C.series[3],
+      page: "大屏样板间-研发投入与预算1920.html",         pageName: "投入与预算" },
+    { dim: "协同",     score: 83, w: 0.15, from: "P9 集成协同 · P14 多中心",  color: C.series[4],
+      page: "大屏样板间-研发软硬云AI集成协同1920.html",   pageName: "软硬云AI集成协同" },
+    { dim: "人才",     score: 87, w: 0.15, from: "P15 人才与能力",            color: C.series[5],
+      page: "大屏样板间-研发人才与能力1920.html",         pageName: "人才与能力" }
+  ];
+
+  /* ★ 构造性断言用的权威副本：逐字转写自 docs/RndIpdThemed.md §2.2
+       与父页「研发效能指数」的 DIMS / 门户的 HEALTH_DIMS。
+       本页若与之有任何一字之差，页尾自检立刻报出——三处同源不是靠约定，是靠这条断言守住的。 */
+  const AUTH = "交付|86|0.2|P2 IPD管道 · P5 敏捷交付;质量|88|0.2|P8 质量与缺陷;" +
+    "效率|81|0.15|P6 看板 · P7 工程效能;投入产出|78|0.15|P4 投入与预算;" +
+    "协同|83|0.15|P9 集成协同 · P14 多中心;人才|87|0.15|P15 人才与能力";
+  const AUTH_INDEX = 84.15;          /* = Σ(得分×权重)，展示口径一位小数 = 84.1 */
+
+  /* 3.2 上季（2026 年 Q2）六维得分——逐字引父页 PREV_SCORE；环比由「本期 − 上季」现算 */
+  const PREV_SCORE = { "交付": 84, "质量": 86, "效率": 79, "投入产出": 79, "协同": 80, "人才": 85 };
+
+  /* 3.3 ★ 二级指标表（本页核心）：每条 = 一个可回溯的专题页 KPI
+         num / den / scale / dec  → 指标值 = num ÷ den × scale，保留 dec 位小数为**展示值**
+         exp                      → 展示值的期望字符串（构造性断言，防抄错底数）
+         a = [v0, s0, v1, s1]     → 公开换算锚点：v0 换算 s0 分、v1 换算 s1 分，之间线性
+                                    （v0 > v1 即逆向指标：值越低分越高）
+         w                        → 二级权重，逐维 Σ = 1
+         底数取自契约 §2.2 / §2.3 与对应专题页；带 ★ 的是契约逐字底数，其余为二级自编。 */
+  const SUBS = {
+    "交付": [
+      { n: "按期交付率",         num: 259,     den: 297,     scale: 100, dec: 1, unit: "%", exp: "87.2",
+        how: "TR/DCP 按期 259 ÷ 应决策 297", a: [70, 50, 90, 100], w: 0.35,
+        src: "P2 IPD管道与评审", tag: "P2 IPD管道", auth: true },
+      { n: "AR 计划达成率",      num: 19396,   den: 21500,   scale: 100, dec: 1, unit: "%", exp: "90.2",
+        how: "年完成 19,396 点 ÷ 承诺 AR 21,500", a: [75, 50, 95, 100], w: 0.25,
+        src: "P5 敏捷交付总览", tag: "P5 敏捷交付", auth: true },
+      { n: "里程碑 DCP 准时率",  num: 63,      den: 75,      scale: 100, dec: 1, unit: "%", exp: "84.0",
+        how: "DCP 按期决策 63 ÷ 应决策 75", a: [70, 50, 90, 100], w: 0.25,
+        src: "P2 IPD管道与评审", tag: "P2 IPD管道", auth: false },
+      { n: "需求前置达标率",     num: 6312,    den: 9800,    scale: 100, dec: 1, unit: "%", exp: "64.4",
+        how: "≤45 天交付 6,312 ÷ 交付 IR 9,800", a: [50, 50, 90, 100], w: 0.15,
+        src: "P3 需求全生命周期", tag: "P3 需求全周期", auth: false }
+    ],
+    "质量": [
+      { n: "缺陷逃逸率",         num: 173,     den: 8640,    scale: 100, dec: 1, unit: "%", exp: "2.0",
+        how: "现网缺陷 173 ÷ 年发现 8,640", a: [6, 50, 1, 100], w: 0.30,
+        src: "P8 质量与缺陷", tag: "P8 质量缺陷", auth: true },
+      { n: "缺陷关闭率",         num: 8210,    den: 8640,    scale: 100, dec: 1, unit: "%", exp: "95.0",
+        how: "关闭 8,210 ÷ 年发现 8,640", a: [87, 50, 97, 100], w: 0.30,
+        src: "P8 质量与缺陷", tag: "P8 质量缺陷", auth: true },
+      { n: "单测覆盖率",         num: 1465200, den: 1980000, scale: 100, dec: 1, unit: "%", exp: "74.0",
+        how: "覆盖行 1,465,200 ÷ 有效行 1,980,000", a: [50, 50, 90, 100], w: 0.15,
+        src: "P7 研发工程效能", tag: "P7 工程效能", auth: false },
+      { n: "变更失败率",         num: 310,     den: 3692,    scale: 100, dec: 1, unit: "%", exp: "8.4",
+        how: "失败变更 310 ÷ 年变更 3,692", a: [16, 50, 6, 100], w: 0.25,
+        src: "P7 研发工程效能", tag: "P7 工程效能", auth: true }
+    ],
+    "效率": [
+      { n: "DORA 部署频率",      num: 3692,    den: 260,     scale: 1,   dec: 1, unit: " 次/日", exp: "14.2",
+        how: "年生产部署 3,692 ÷ 260 工作日", a: [2, 50, 22, 100], w: 0.25,
+        src: "P7 研发工程效能", tag: "P7 工程效能", auth: true },
+      { n: "变更前置时间",       num: 95992,   den: 3692,    scale: 1,   dec: 1, unit: " h", exp: "26.0",
+        how: "Σ 前置 95,992 h ÷ 变更 3,692 次", a: [56, 50, 16, 100], w: 0.22,
+        src: "P7 研发工程效能", tag: "P7 工程效能", auth: true },
+      { n: "流动效率",           num: 3105,    den: 6900,    scale: 100, dec: 1, unit: "%", exp: "45.0",
+        how: "增值时长 3,105 h ÷ 总周期 6,900 h", a: [25, 50, 65, 100], w: 0.38,
+        src: "P6 看板流动效率", tag: "P6 看板流动", auth: false },
+      { n: "在制卡阻塞占比",     num: 109,     den: 436,     scale: 100, dec: 1, unit: "%", exp: "25.0",
+        how: "阻塞卡 109 ÷ 在制卡 436", a: [40, 50, 20, 100], w: 0.15,
+        src: "P6 看板流动效率", tag: "P6 看板流动", auth: true }
+    ],
+    "投入产出": [
+      { n: "研发费率",           num: 21.4,    den: 186.0,   scale: 100, dec: 1, unit: "%", exp: "11.5",
+        how: "研发投入 21.4 亿 ÷ 营收 186.0 亿", a: [7, 50, 17, 100], w: 0.35,
+        src: "P4 研发投入与预算", tag: "P4 投入预算", auth: true },
+      { n: "单点故事点成本",     num: 214000,  den: 19396,   scale: 1,   dec: 1, unit: " 万元/点", exp: "11.0",
+        how: "投入 214,000 万元 ÷ 19,396 点", a: [17, 50, 7, 100], w: 0.25,
+        src: "P4 研发投入与预算", tag: "P4 投入预算", auth: true },
+      { n: "CBB 复用率",         num: 136,     den: 216,     scale: 100, dec: 1, unit: "%", exp: "63.0",
+        how: "被复用 CBB 136 ÷ 货架 216", a: [35, 50, 85, 100], w: 0.25,
+        src: "P16 技术资产与复用", tag: "P16 技术资产", auth: true },
+      { n: "需求价值兑现率",     num: 6496,    den: 8120,    scale: 100, dec: 1, unit: "%", exp: "80.0",
+        how: "达成价值 6,496 ÷ 已上线 IR 8,120", a: [50, 50, 90, 100], w: 0.15,
+        src: "P1 产品组合与路标", tag: "P1 组合路标", auth: false }
+    ],
+    "协同": [
+      { n: "联调接口达成率",     num: 1234,    den: 1350,    scale: 100, dec: 1, unit: "%", exp: "91.4",
+        how: "达成 1,234 ÷ 应联调 1,350", a: [70, 50, 95, 100], w: 0.33,
+        src: "P9 软硬云AI集成协同", tag: "P9 集成协同", auth: true },
+      { n: "跨域依赖阻塞占比",   num: 38,      den: 109,     scale: 100, dec: 1, unit: "%", exp: "34.9",
+        how: "跨域依赖阻塞 38 ÷ 阻塞卡 109", a: [50, 50, 10, 100], w: 0.34,
+        src: "P6 看板流动效率", tag: "P6 看板流动", auth: true },
+      { n: "集成测试通过率",     num: 2394,    den: 2660,    scale: 100, dec: 1, unit: "%", exp: "90.0",
+        how: "通过 2,394 ÷ 执行 2,660", a: [70, 50, 95, 100], w: 0.18,
+        src: "P9 软硬云AI集成协同", tag: "P9 集成协同", auth: false },
+      { n: "跨站协作响应达标",   num: 1203,    den: 1542,    scale: 100, dec: 1, unit: "%", exp: "78.0",
+        how: "24h 内响应 1,203 ÷ 跨站 1,542", a: [50, 50, 90, 100], w: 0.15,
+        src: "P14 研发多中心布局", tag: "P14 多中心", auth: true }
+    ],
+    "人才": [
+      { n: "关键岗位饱和度",     num: 268,     den: 290,     scale: 100, dec: 1, unit: "%", exp: "92.4",
+        how: "关键岗在岗 268 ÷ 编制 290", a: [60, 50, 100, 100], w: 0.30,
+        src: "P15 研发人才与能力", tag: "P15 人才能力", auth: false },
+      { n: "核心人才保留率",     num: 1844,    den: 1920,    scale: 100, dec: 1, unit: "%", exp: "96.0",
+        how: "期末在册 1,844 ÷ 期初 1,920", a: [80, 50, 100, 100], w: 0.25,
+        src: "P15 研发人才与能力", tag: "P15 人才能力", auth: false },
+      { n: "高职级 P7+ 占比",    num: 1004,    den: 3860,    scale: 100, dec: 1, unit: "%", exp: "26.0",
+        how: "P7+ 1,004 人 ÷ 研发 3,860 人", a: [10, 50, 30, 100], w: 0.24,
+        src: "P15 研发人才与能力", tag: "P15 人才能力", auth: true },
+      { n: "人均年产出",         num: 19396,   den: 3860,    scale: 1,   dec: 1, unit: " 点/人年", exp: "5.0",
+        how: "年吞吐 19,396 点 ÷ 3,860 人", a: [3, 50, 7, 100], w: 0.21,
+        src: "P15 研发人才与能力", tag: "P15 人才能力", auth: true }
+    ]
+  };
+
+  /* 3.4 指数 24 月走势（2024-09 → 2026-08）——前 23 个月逐字引父页 TREND_HIST，
+         末值不写数字，由本页六维加权现算写入（= AUTH_INDEX）。 */
+  const TREND_HIST = [
+    76.8, 77.2, 77.9, 78.5, 78.1, 78.6, 79.4, 80.1, 80.6, 81.0, 80.7, 81.3,
+    81.9, 82.2, 84.6, 84.9, 85.1, 84.6, 83.8, 81.9, 82.4, 83.05, 83.6
+  ];
+  const TREND_START = { y: 2024, m: 9 };
+  const NT = TREND_HIST.length;                                /* = 23，末点下标 */
+  const Q2 = [19, 20, 21];                                     /* 2026-04 / 05 / 06 = 上季三个月 */
+
+  /* 3.5 改进行动追踪（逐字引父页 ACTIONS）：只有「投入产出」「效率」两维有专项行动，
+         其余四维走空态「本维暂无专项行动，保持监控」。 */
+  const ACTIONS = [
+    { name: "需求价值分级与砍单机制", dim: "投入产出", owner: "组合办 周珩",   gain: 2.0, pct: 62 },
+    { name: "云资源与算力配额闭环",   dim: "投入产出", owner: "云平台部 王衡", gain: 1.5, pct: 48 },
+    { name: "外协结构优化与单价复议", dim: "投入产出", owner: "外协组 陆铮",   gain: 1.0, pct: 35 },
+    { name: "CBB 复用率 63% → 70%",   dim: "投入产出", owner: "架构委 韩牧",   gain: 1.5, pct: 41 },
+    { name: "构建时长压降与缓存分层", dim: "效率",     owner: "工效组 陈拓",   gain: 1.8, pct: 76 },
+    { name: "跨域依赖前置拉通例会",   dim: "效率",     owner: "PMO 沈砚",      gain: 1.2, pct: 55 },
+    { name: "看板 WIP 限额与阻塞清理", dim: "效率",    owner: "教练组 贺兰",   gain: 1.0, pct: 44 }
+  ];
+
+  /* ===== 3.6 派生量（全部现算，页面上不出现任何硬编码的合计值） ===== */
+
+  /* 二级指标：底数 → 展示值 → 换算得分 → 加权分 */
+  function subValue(s) { return s.num / s.den * s.scale; }
+  function subScore(s) {
+    const v = Number(fmtDec(subValue(s), s.dec));             /* 换算以展示口径（dec 位小数）为准 */
+    const a = s.a;
+    return round1(a[1] + (v - a[0]) * (a[3] - a[1]) / (a[2] - a[0]));
+  }
+  DIMS.forEach((d) => {
+    d.subs = SUBS[d.dim];
+    d.subs.forEach((s) => {
+      s.val = subValue(s);
+      s.shown = fmtDec(s.val, s.dec);
+      s.score = subScore(s);
+      s.ws = s.score * s.w;                                    /* 逐行独立现算，表格渲染的就是这个数 */
+      s.rev = s.a[0] > s.a[2];                                 /* 锚点倒挂 = 逆向指标 */
+      s.anchor = "锚点 " + s.a[0] + s.unit + "→" + s.a[1] + " · " + s.a[2] + s.unit + "→" + s.a[3];
+    });
+    d.subWsum = sum(d.subs.map((s) => s.w));                   /* 二级权重合计，应 = 1 */
+    d.subScore = sum(d.subs.map((s) => s.ws));                 /* ★ 二级加权合成，应精确 = d.score */
+    d.wsIndex = d.score * d.w;                                 /* 该维对健康指数的加权贡献 */
+    d.prev = PREV_SCORE[d.dim];
+    d.delta = d.score - d.prev;                                /* 环比，现算 */
+    d.gap = TARGET - d.score;                                  /* 距目标差距，现算 */
+    /* 差距归因：每条二级指标距 90 分的**加权缺口** = (90 − 二级得分) × 二级权重。
+       因二级权重 Σ = 1，Σ 加权缺口 ≡ 90 − 该维得分 ≡ 该维差距——归因天然闭合，无需凑数。
+       缺口恰为 0（该二级指标已达 90 分）的条目不入图，故每维 2~4 条。 */
+    d.attr = d.subs.map((s) => ({ name: s.n, c: (TARGET - s.score) * s.w, score: s.score, w: s.w }))
+      .filter((x) => Math.abs(x.c) > 1e-9)
+      .sort((a, b) => b.c - a.c);
+    d.acts = ACTIONS.filter((a) => a.dim === d.dim);
+    d.actGain = sum(d.acts.map((a) => a.gain));                /* 行动闭环后本维潜在提升 */
+    d.actIdx = d.actGain * d.w;                                /* 折算到健康指数的提升 */
+  });
+
+  const D = {};
+  D.wsum  = sum(DIMS.map((x) => x.w));                         /* 一级权重合计 = 1 */
+  D.index = sum(DIMS.map((x) => x.wsIndex));                   /* 健康指数 = Σ 加权得分 = 84.15 */
+  D.prevIndex = sum(DIMS.map((x) => x.prev * x.w));            /* 上季指数 = 82.45 */
+  D.trend = TREND_HIST.concat([D.index]);                      /* 指数 24 月走势，末值现算 */
+  D.months = D.trend.map((_, i) => {
+    const t = (TREND_START.y * 12 + (TREND_START.m - 1)) + i;
+    return Math.floor(t / 12) + "-" + pad(t % 12 + 1);
+  });
+  /* 六维得分降序 → 名次（1 最好）；同分按契约顺序稳定排列 */
+  const order = DIMS.map((d, i) => [d.score, i]).sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+  order.forEach((o, r) => { DIMS[o[1]].rank = r + 1; });
+
+  /* ===== 3.7 每维 24 月走势的构造：三项可加分解，保证两端与合成三条约束同时成立 =====
+       series_d[t] = PT[t] + e_d·ramp1(t) + b_d·ramp2(t) + g_d(t)
+         · PT      = 父页指数 24 月走势（D.trend）
+         · ramp1(t)= t/23，ramp1(23)=1  → e_d = 本维得分 − 指数末值，锁死「末值 = 本维得分」
+         · ramp2(t)= sin(πt/23)，两端为 0 → b_d 解出「上季（Q2 三月均值）= 父页 PREV_SCORE」
+         · g_d(t)  = 逐维摆动，已按权重去均值（Σ w_d·g_d ≡ 0），且带 (1−t/23) 因子在末点归零
+       三项各自满足 Σ_d w_d·(·) = 0：
+         Σ w_d e_d = Σ w_d score_d − PT[23] = 84.15 − 84.15 = 0
+         Σ w_d b_d = (Σ w_d prev_d − PT_Q2均 − 0 − 0)/R2 = (82.45 − 82.45)/R2 = 0
+       故 **Σ_d w_d · series_d[t] ≡ PT[t] 对每个月成立**——六维走势按权重合成回归父页指数走势，
+       不是近似拟合，是恒等式。页尾对 24 个月逐月硬断言（1e-9）。 */
+  const ramp1 = (t) => t / NT;
+  const ramp2 = (t) => Math.sin(Math.PI * t / NT);
+  const WOBBLE = [1.5, 1.1, 1.7, 1.3, 1.6, 1.2];               /* 逐维摆动幅度（观感用，不参与勾稽） */
+  const hRaw = (k, t) => WOBBLE[k] * Math.sin((t + 1) * 0.62 + k * 1.13) * (1 - t / NT);
+  function gAt(k, t) {
+    let m = 0;
+    for (let j = 0; j < DIMS.length; j += 1) m += DIMS[j].w * hRaw(j, t);
+    return hRaw(k, t) - m;                                     /* 去加权均值 → Σ w_d·g_d ≡ 0 */
+  }
+  const R1 = sum(Q2.map(ramp1)) / Q2.length;
+  const R2 = sum(Q2.map(ramp2)) / Q2.length;
+  const PTQ2 = sum(Q2.map((t) => D.trend[t])) / Q2.length;     /* = 82.45 = 上季指数 */
+  DIMS.forEach((d, k) => {
+    d.e = d.score - D.trend[NT];
+    const G = sum(Q2.map((t) => gAt(k, t))) / Q2.length;
+    d.b = (d.prev - PTQ2 - d.e * R1 - G) / R2;
+    d.trend = D.trend.map((v, t) => v + d.e * ramp1(t) + d.b * ramp2(t) + gAt(k, t));
+    d.yoy = d.trend[NT - 12];                                  /* 去年同期 = 2025-08（末点前 12 月） */
+    d.yoyDelta = d.score - d.yoy;                              /* 同比，现算 */
+  });
+
+  /* ===== 4. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("zb-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("zb-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. 维度切换器（tab 文本与契约 §6 P17→S18 的 hash 键逐字一致） ===== */
+  const switcher = $("zb-switcher");
+  switcher.innerHTML = DIMS.map((d, i) => (
+    '<button class="zb-sw-tab" type="button" data-i="' + i + '" title="切换到「' + d.dim + '」维度（← → 方向键）">' +
+      "<b>" + d.dim + "</b><span>" + d.score + " 分 · " + fmtDec(d.w * 100, 0) + "%</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".zb-sw-tab"));
+
+  /* ===== 6. 非图表区渲染（不依赖 echarts；★ 全部在 echarts.init 之前完成首屏填充） ===== */
+  function countUp(el, target, fmt) {
+    const t0 = performance.now(), dur = 1400;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+  function renderKpi(d) {
+    const defs = [
+      { v: d.score, f: (x) => fmtDec(x, 0),
+        sub: "四项二级指标加权 Σ = <b>" + fmtDec(d.subScore, 3) + "</b> · 契约 §2.2 逐字" },
+      { v: d.w * 100, f: (x) => fmtDec(x, 0),
+        sub: "六维权重 Σ = <b>" + fmtDec(D.wsum, 2) + "</b> · 交付/质量各 20%，其余各 15%" },
+      { v: d.wsIndex, f: (x) => fmtDec(x, 2),
+        sub: d.score + " × " + fmtDec(d.w, 2) + " 现算 · 占指数 <b>" + fmtDec(d.wsIndex / D.index * 100, 1) + "%</b>" },
+      { v: d.gap, f: (x) => fmtDec(x, 1),
+        sub: "目标 " + TARGET + " − 本维 " + d.score + " · 归因 <b>" + d.attr.length + "</b> 条，Σ = 差距" },
+      { v: d.delta, f: (x) => signed(x, 0),
+        sub: "上季 <b>" + d.prev + "</b> 分（2026 Q2）· 同比 " + signed(d.yoyDelta, 1) + " 分" },
+      { v: d.rank, f: (x) => fmtDec(x, 0),
+        sub: "六维中第 <b>" + d.rank + "</b> 位 · 最高 " + order[0][0] + " 分 / 最低 " + order[5][0] + " 分" }
+    ];
+    defs.forEach((x, i) => {
+      countUp($("zb-kpi-" + i), x.v, x.f);
+      $("zb-kpi-" + i + "s").innerHTML = x.sub;
+    });
+    const b0 = $("zb-kpi-0box");
+    b0.classList.toggle("is-good", d.score >= BAND_HI);
+    b0.classList.toggle("is-amber", d.score >= BAND_LO && d.score < BAND_HI);
+    b0.classList.toggle("is-warn", d.score < BAND_LO);
+    const b4 = $("zb-kpi-4box");
+    b4.classList.toggle("is-good", d.delta > 0);
+    b4.classList.toggle("is-warn", d.delta < 0);
+    const b5 = $("zb-kpi-5box");
+    b5.classList.toggle("is-good", d.rank <= 2);
+    b5.classList.toggle("is-warn", d.rank >= 5);
+  }
+  /* ★ 可追溯表：每一行的「加权分」列就是 score × w 的现算结果，
+       末行合计把这一列加起来，恰好等于契约里的该维得分——逐行可验算。 */
+  function renderTable(d) {
+    $("zb-tbody").innerHTML = d.subs.map((s) => (
+      "<li>" +
+        '<span class="zb-td-name"><b title="' + s.n + '">' + s.n + "</b>" +
+          '<i class="' + (s.rev ? "is-rev" : "") + '">' + (s.rev ? "逆向 · 越低越好" : "正向 · 越高越好") + "</i></span>" +
+        '<span class="zb-td-how"><span title="' + s.how + " = " + s.shown + s.unit + '">' + s.how +
+          " = <b>" + s.shown + s.unit + "</b></span><i>" + s.anchor + "</i></span>" +
+        '<span class="zb-td-score"><b class="' + (s.score >= TARGET ? "is-up" : "is-down") + '">' +
+          fmtDec(s.score, 1) + "</b><i>" + (s.score >= TARGET ? "已达标" : signed(s.score - TARGET, 1) + " 分") + "</i></span>" +
+        '<span class="zb-td-w">' + fmtDec(s.w, 2) + "</span>" +
+        '<span class="zb-td-ws">' + fmtDec(s.ws, 3) + "</span>" +
+        '<span class="zb-td-src" title="' + s.src + (s.auth ? "（契约 §2.2 逐字底数）" : "（二级自编底数）") + '">' +
+          s.tag + (s.auth ? " ★" : "") + "</span>" +
+      "</li>"
+    )).join("");
+    $("zb-tfoot").innerHTML =
+      "<span><b>合计</b></span>" +
+      "<span>" + d.subs.length + " 项二级指标加权合成</span>" +
+      '<span class="zb-td-score" style="justify-content:center"><b style="color:#ffe9bd">' + d.score + "</b></span>" +
+      '<span class="zb-td-w"><b>' + fmtDec(d.subWsum, 2) + "</b></span>" +
+      '<span class="zb-td-ws">' + fmtDec(d.subScore, 3) + "</span>" +
+      "<span>= 契约 <b>" + d.score + "</b> 分</span>";
+    $("zb-tag-table").innerHTML = "二级权重 Σ <b>" + fmtDec(d.subWsum, 2) + "</b> · 加权 Σ <b>" +
+      fmtDec(d.subScore, 3) + "</b> = 契约 " + d.score + " 分";
+  }
+  function renderActs(d) {
+    const box = $("zb-acts");
+    if (!d.acts.length) {
+      box.style.display = "none";
+      let holder = document.getElementById("zb-empty");
+      if (!holder) {
+        holder = document.createElement("div");
+        holder.className = "zb-empty";
+        holder.id = "zb-empty";
+        box.parentNode.appendChild(holder);
+      }
+      holder.style.display = "flex";
+      holder.innerHTML = "<b>本维暂无专项行动，保持监控</b>" +
+        "<span>「" + d.dim + "」当前 " + d.score + " 分，六维中第 " + d.rank + " 位<br/>" +
+        "改进行动池仅覆盖最弱维「投入产出 78」与次弱维「效率 81」<br/>" +
+        "本维距目标 " + fmtDec(d.gap, 1) + " 分，按 " + d.attr.length + " 条归因跟踪即可</span>";
+      $("zb-tag-act").innerHTML = "行动 <b>0</b> 项 · 空态监控";
+      return;
+    }
+    const holder = document.getElementById("zb-empty");
+    if (holder) holder.style.display = "none";
+    box.style.display = "grid";
+    box.innerHTML = d.acts.map((a) => (
+      "<li>" +
+        '<span class="zb-act-t1"><span class="zb-act-name" title="' + a.name + '">' + a.name + "</span>" +
+          '<span class="zb-act-gain">+' + fmtDec(a.gain, 1) + '<i>分</i></span></span>' +
+        '<span class="zb-act-bar"><u style="width:' + a.pct + '%"></u></span>' +
+        '<span class="zb-act-t2"><span>责任人 <b>' + a.owner + "</b></span>" +
+          "<span>进度 <b>" + a.pct + "%</b> · 折指数 +" + fmtDec(a.gain * d.w, 3) + " 分</span></span>" +
+      "</li>"
+    )).join("");
+    $("zb-tag-act").innerHTML = "<b>" + d.acts.length + "</b> 项 · 潜在 +" + fmtDec(d.actGain, 1) +
+      " 分 → 指数 +" + fmtDec(d.actIdx, 3);
+  }
+
+  /* 底部口径滚动（与维度无关，只建一次；★ 图表 init 之前填充） */
+  (function buildFoot() {
+    const items = [
+      ["口径", C.amber, "研发健康指数 " + fmtDec(D.index, 1) + " = " +
+        DIMS.map((d) => d.dim + " " + d.score + "×" + fmtDec(d.w, 2)).join(" + ") +
+        "（契约 docs/RndIpdThemed.md §2.2 逐字，与父页「研发效能指数」、门户「研发经营驾驶舱」三处同源）"],
+      ["追溯", C.violet, "本页把契约只锁到一级的六维得分再下拆一层：每维 4 项二级指标，" +
+        "二级权重 Σ = 1，Σ(二级得分 × 二级权重) **精确等于**该维契约得分（" +
+        DIMS.map((d) => d.dim + " " + fmtDec(d.subScore, 3) + "=" + d.score).join("、") + "）"],
+      ["底数", C.blue, "每项二级指标都回溯到具体专题页的 KPI 底数并页内现算：按期交付率 = 259 ÷ 297 = " +
+        fmtDec(259 / 297 * 100, 1) + "%（P2）、缺陷逃逸率 = 173 ÷ 8,640 = " + fmtDec(173 / 8640 * 100, 1) +
+        "%（P8）、部署频率 = 3,692 ÷ 260 = " + fmtDec(3692 / 260, 1) + " 次/日（P7）、人均产出 = 19,396 ÷ 3,860 = " +
+        fmtDec(19396 / 3860, 1) + " 点/人年（P15）；表内带 ★ 的为契约 §2.2 逐字底数"],
+      ["换算", C.cyan, "0–100 分换算一律用**公开两锚点线性映射**（表内每行第二列小字标出），" +
+        "换算以展示口径（一位小数）的指标值为准；锚点倒挂即逆向指标（缺陷逃逸率、变更失败率、" +
+        "变更前置时间、在制卡阻塞占比、跨域依赖阻塞占比、单点故事点成本），值越低分越高"],
+      ["归因", C.orange, "差距归因 = 每项二级指标距 90 分的加权缺口 (90 − 二级得分) × 二级权重；" +
+        "因二级权重 Σ = 1，Σ 归因 ≡ 90 − 本维得分 ≡ 本维差距，天然闭合不需凑数；缺口为 0 的条目不入图"],
+      ["走势", C.blue, "本维 24 月走势 = 父页指数走势 + 末值锚（斜坡）+ 上季锚（正弦）+ 去均值摆动，" +
+        "三项各自按权重求和为 0，故 **六维走势按权重合成逐月恒等于父页指数 24 月走势**；" +
+        "末值 = 本维当前得分，2026 Q2 三月均值 = 本维上季得分（父页 PREV_SCORE 逐字）"],
+      ["行动", C.green, "改进行动逐字引父页 ACTIONS：仅最弱维「投入产出 78」（4 项，潜在 +6.0 分）与" +
+        "次弱维「效率 81」（3 项，潜在 +4.0 分）有专项行动，其余四维为空态监控；" +
+        "折算到指数的提升 = 本维潜在提升 × 本维权重"]
+    ];
+    const html = items.map((a) => '<span class="zb-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("zb-foot-track").innerHTML = html + html;                 /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* ===== 7. 静态层整页重绘（不依赖 echarts） ===== */
+  function paintStatic(d) {
+    $("zb-title").textContent = d.dim + " · 单维度追溯详情";
+    $("zb-crumb-obj").textContent = d.dim + " · " + d.from;
+    $("zb-meta-score").textContent = d.score + " 分";
+    $("zb-meta-w").textContent = fmtDec(d.w, 2);
+    $("zb-meta-ws").textContent = fmtDec(d.wsIndex, 2);
+    $("zb-meta-idx").textContent = fmtDec(D.index, 1);
+    const chip = $("zb-chip-src");
+    chip.href = d.page;
+    chip.querySelector("b").textContent = d.pageName + " ›";
+    chip.title = "跳到本维得分的主要来源专题页：" + d.pageName;
+    renderKpi(d);
+    renderTable(d);
+    renderActs(d);
+  }
+
+  /* hash 契约：decodeURIComponent → trim + 全角空白剔除归一 → 匹配六维名（契约 §6 P17→S18） */
+  const HASH_ALIAS = {
+    "交付维": "交付", "质量维": "质量", "效率维": "效率",
+    "投产": "投入产出", "投入产出比": "投入产出", "ROI": "投入产出",
+    "协同维": "协同", "人才维": "人才", "人才与能力": "人才"
+  };
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    if (HASH_ALIAS[s]) s = HASH_ALIAS[s];
+    return DIMS.findIndex((x) => x.dim === s);
+  }
+  const bootHit = resolveHash(location.hash);
+  const bootIdx = bootHit >= 0 ? bootHit : 0;
+  paintStatic(DIMS[bootIdx]);                                   /* ★ 非图表区先填充，再 init 图表 */
+  swTabs.forEach((b, k) => b.classList.toggle("is-active", k === bootIdx));
+
+  /* ===== 8. 资源守卫（KPI / 明细表 / 改进行动已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("zb-error").classList.add("is-visible");
+
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const subChart   = hasEcharts ? echarts.init($("zb-chart-sub")) : null;
+  const trendChart = hasEcharts ? echarts.init($("zb-chart-trend")) : null;
+  const gapChart   = hasEcharts ? echarts.init($("zb-chart-gap")) : null;
+  const qoqChart   = hasEcharts ? echarts.init($("zb-chart-qoq")) : null;
+
+  /* ===== 9. option 构造（★ 只放标量与数组，DIMS/SUBS 对象一律不进 option，避免深拷贝循环引用） ===== */
+
+  /* 9.1 二级指标换算得分横向条 + 目标 90 参考线 */
+  function subOption(d) {
+    const names  = d.subs.map((s) => s.n);
+    const scores = d.subs.map((s) => s.score);
+    const ws     = d.subs.map((s) => s.w);
+    const wss    = d.subs.map((s) => s.ws);
+    const showns = d.subs.map((s) => s.shown + s.unit);
+    const tags   = d.subs.map((s) => s.tag);
+    const dimName = d.dim, dimScore = d.score;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 118, top: 10, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.dataIndex;
+          return "<b>" + names[j] + "</b>（" + tags[j] + "）<br/>底数现算 <b>" + showns[j] +
+            "</b><br/>换算得分 <b>" + fmtDec(scores[j], 1) + "</b> 分 · 权重 " + fmtDec(ws[j], 2) +
+            "<br/>加权分 <b>" + fmtDec(wss[j], 3) + "</b><br/>距目标 90：" + signed(scores[j] - 90, 1) +
+            " 分（加权缺口 " + signed((90 - scores[j]) * ws[j], 3) + "）<br/>口径：本维 " + dimName +
+            " = Σ 四项加权 = " + dimScore + " 分";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, min: 50, max: 108 },
+      yAxis: {
+        type: "category", inverse: true, data: names,
+        axisLabel: { color: C.text, fontSize: 11, formatter: (v) => (v.length > 8 ? v.slice(0, 8) + "…" : v) },
+        axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 15,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 8 },
+        data: scores.map((v) => {
+          const col = v >= 90 ? C.green : (v >= 80 ? C.blue : C.orange);
+          return {
+            value: v,
+            itemStyle: {
+              borderRadius: 8,
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                { offset: 0, color: darken(col, 0.45) }, { offset: 1, color: col }])
+            }
+          };
+        }),
+        label: {
+          show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => fmtDec(p.value, 1) + " × " + fmtDec(ws[p.dataIndex], 2) + " = " + fmtDec(wss[p.dataIndex], 3)
+        },
+        markLine: {
+          silent: true, symbol: "none",
+          label: { formatter: "目标 90", color: C.amber, fontSize: 10, position: "end" },
+          lineStyle: { color: C.amber, type: "dashed", width: 1.4 },
+          data: [{ xAxis: 90 }]
+        }
+      }]
+    };
+  }
+
+  /* 9.2 本维 24 月走势：折线 + 目标线 90 + 良好带 80–90 */
+  function trendOption(d) {
+    const vals = d.trend.map((v) => Number(fmtDec(v, 2)));
+    const months = D.months.slice();
+    const idxVals = D.trend.map((v) => Number(fmtDec(v, 2)));
+    const col = d.color, dimName = d.dim, dimW = d.w;
+    const lo = Math.floor((Math.min.apply(null, vals) - 4) / 2) * 2;
+    const hi = Math.ceil((Math.max.apply(null, vals.concat([92])) + 2) / 2) * 2;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 12, top: 28, bottom: 2, containLabel: true },
+      legend: { top: 0, right: 2, itemWidth: 12, itemHeight: 8, textStyle: { color: C.textDim, fontSize: 11 } },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "line", lineStyle: { color: C.line } },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + months[i] + "</b><br/>" + dimName + " 得分 <b>" + fmtDec(vals[i], 2) +
+            "</b> 分<br/>健康指数 " + fmtDec(idxVals[i], 2) + " 分<br/>本维加权贡献 " +
+            fmtDec(vals[i] * dimW, 3) + " 分<br/>口径：六维走势按权重合成 ≡ 指数走势";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: months, boundaryGap: false,
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 2, fontSize: 9.5, rotate: 0,
+          formatter: (v) => v.slice(2) }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "value", min: lo, max: hi, name: "分", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE
+      },
+      series: [
+        {
+          name: dimName + " 得分", type: "line", data: vals, smooth: true,
+          symbol: "circle", symbolSize: 4,
+          lineStyle: { color: col, width: 2.4 }, itemStyle: { color: col },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: hexMix(col, 0.62, 8) }, { offset: 1, color: "rgba(8,18,49,0)" }])
+          },
+          markArea: {
+            silent: true,
+            itemStyle: { color: "rgba(111,224,154,0.07)" },
+            label: { show: true, position: "insideTopLeft", color: "rgba(111,224,154,0.7)", fontSize: 9.5, formatter: "良好带 80–90" },
+            data: [[{ yAxis: BAND_LO }, { yAxis: BAND_HI }]]
+          },
+          markLine: {
+            silent: true, symbol: "none",
+            label: { formatter: "目标 90", color: C.amber, fontSize: 10, position: "insideEndTop" },
+            lineStyle: { color: C.amber, type: "dashed", width: 1.4 },
+            data: [{ yAxis: TARGET }]
+          },
+          markPoint: {
+            symbol: "pin", symbolSize: 34,
+            data: [{ coord: [months.length - 1, vals[vals.length - 1]], value: fmtDec(vals[vals.length - 1], 0) }],
+            itemStyle: { color: hexMix(col, 0.15, 255) }, label: { color: "#08122f", fontSize: 11, fontWeight: 700 }
+          }
+        },
+        {
+          name: "健康指数", type: "line", data: idxVals, smooth: true,
+          symbol: "none", lineStyle: { color: "rgba(127,146,196,0.75)", width: 1.3, type: "dashed" },
+          itemStyle: { color: C.textDim }
+        }
+      ]
+    };
+  }
+
+  /* 9.3 差距归因瀑布：本维得分 → 逐条加权缺口 → 目标 90 */
+  function gapOption(d) {
+    const cats = ["本维得分"].concat(d.attr.map((x) => x.name)).concat(["目标 90"]);
+    const base = [0], val = [d.score], kind = ["start"];
+    let cum = d.score;
+    d.attr.forEach((x) => {
+      if (x.c >= 0) { base.push(cum); val.push(x.c); cum += x.c; kind.push("drag"); }
+      else { cum += x.c; base.push(cum); val.push(-x.c); kind.push("lift"); }
+    });
+    base.push(0); val.push(TARGET); kind.push("end");
+    const bottoms = base.slice(), tops = base.map((b, i) => b + val[i]);
+    const lo = Math.floor((Math.min.apply(null, [d.score, TARGET].concat(bottoms.slice(1, -1))) - 5) / 5) * 5;
+    const hi = Math.ceil((Math.max.apply(null, tops) + 3) / 5) * 5;
+    const attrScore = d.attr.map((x) => x.score), attrW = d.attr.map((x) => x.w);
+    const gap = d.gap, dimName = d.dim;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 10, top: 26, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          if (kind[i] === "start") return "<b>" + dimName + " 本维得分</b><br/><b>" + d.score + "</b> 分 · 距目标 " + fmtDec(gap, 1) + " 分";
+          if (kind[i] === "end") return "<b>目标线</b><br/><b>" + TARGET + "</b> 分<br/>= 本维得分 " + d.score + " + Σ 归因 " + fmtDec(gap, 1);
+          const j = i - 1;
+          return "<b>" + cats[i] + "</b><br/>二级得分 <b>" + fmtDec(attrScore[j], 1) + "</b> 分 · 权重 " + fmtDec(attrW[j], 2) +
+            "<br/>加权缺口 = (90 − " + fmtDec(attrScore[j], 1) + ") × " + fmtDec(attrW[j], 2) + " = <b>" +
+            signed(d.attr[j].c, 3) + "</b> 分<br/>占本维差距 " + fmtDec(d.attr[j].c / gap * 100, 1) + "%";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: cats,
+        axisLabel: Object.assign({}, AXIS_LABEL, {
+          interval: 0, fontSize: 9.5, lineHeight: 12,
+          formatter: (v) => (v.length > 6 ? v.slice(0, 6) + "\n" + v.slice(6) : v)
+        }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "value", min: lo, max: hi, name: "分", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE
+      },
+      series: [
+        { name: "占位", type: "bar", stack: "wf", silent: true, barWidth: "56%",
+          itemStyle: { color: "transparent" }, emphasis: { itemStyle: { color: "transparent" } }, data: base },
+        {
+          name: "归因", type: "bar", stack: "wf", barWidth: "56%",
+          data: val.map((v, i) => {
+            const col = kind[i] === "start" ? C.blue : (kind[i] === "end" ? C.amber : (kind[i] === "lift" ? C.green : C.orange));
+            return {
+              value: v,
+              itemStyle: {
+                borderRadius: 3,
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: col }, { offset: 1, color: darken(col, 0.42) }])
+              }
+            };
+          }),
+          label: {
+            show: true, position: "top", fontSize: 10, fontWeight: 700, color: "#dce8ff",
+            formatter: (p) => (kind[p.dataIndex] === "start" || kind[p.dataIndex] === "end"
+              ? fmtDec(p.value, 0)
+              : (kind[p.dataIndex] === "lift" ? "−" : "+") + fmtDec(p.value, 2))
+          }
+        }
+      ]
+    };
+  }
+
+  /* 9.4 本期 / 上季 / 去年同期三根条 */
+  function qoqOption(d) {
+    const names = ["去年同期", "上季 2026Q2", "本期 2026-08"];
+    const vals = [Number(fmtDec(d.yoy, 1)), d.prev, d.score];
+    const notes = [
+      "本维 24 月走势 " + D.months[NT - 12] + " 点位",
+      "父页 PREV_SCORE 逐字 · 走势 Q2 三月均值",
+      "契约 §2.2 逐字 · 二级加权 Σ = " + fmtDec(d.subScore, 3)
+    ];
+    const col = d.color;
+    const lo = Math.floor((Math.min.apply(null, vals) - 6) / 2) * 2;
+    const hi = Math.ceil((Math.max.apply(null, vals.concat([TARGET])) + 2) / 2) * 2;
+    const qoq = d.delta, yoy = d.yoyDelta;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 10, top: 24, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.dataIndex;
+          return "<b>" + names[j] + "</b><br/>得分 <b>" + fmtDec(vals[j], 1) + "</b> 分<br/>" + notes[j] +
+            "<br/>环比 " + signed(qoq, 1) + " 分 · 同比 " + signed(yoy, 1) + " 分（均现算）";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: names,
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 10 }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "value", min: lo, max: hi, name: "分", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE
+      },
+      series: [{
+        type: "bar", barWidth: "44%",
+        data: vals.map((v, j) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: [4, 4, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: j === 2 ? col : hexMix(col, 0.45, 40) },
+              { offset: 1, color: darken(j === 2 ? col : hexMix(col, 0.45, 40), 0.55) }])
+          }
+        })),
+        label: {
+          show: true, position: "top", fontSize: 12, fontWeight: 700, color: "#eaf1ff",
+          formatter: (p) => fmtDec(p.value, 1) + (p.dataIndex === 2 ? "" : "")
+        },
+        markLine: {
+          silent: true, symbol: "none",
+          label: { formatter: "目标 90", color: C.amber, fontSize: 10, position: "insideEndTop" },
+          lineStyle: { color: C.amber, type: "dashed", width: 1.3 },
+          data: [{ yAxis: TARGET }]
+        }
+      }]
+    };
+  }
+
+  /* ===== 10. 维度切换主流程：整页重绘 ===== */
+  function applyDim(i) {
+    const n = DIMS.length;
+    idx = ((i % n) + n) % n;
+    const d = DIMS[idx];
+    paintStatic(d);
+    swTabs.forEach((b, k) => b.classList.toggle("is-active", k === idx));
+    $("zb-tag-sub").innerHTML = "四项 Σ加权 <b>" + fmtDec(d.subScore, 3) + "</b> 分 · 目标线 90";
+    $("zb-tag-trend").innerHTML = "末值 <b>" + fmtDec(d.trend[NT], 1) + "</b> = 本维得分 · 六维加权 ≡ 指数走势";
+    $("zb-tag-gap").innerHTML = "Σ归因 <b>" + fmtDec(sum(d.attr.map((x) => x.c)), 1) + "</b> = 距目标 " + fmtDec(d.gap, 1) + " 分";
+    $("zb-tag-qoq").innerHTML = "环比 <b>" + signed(d.delta, 0) + "</b> · 同比 <b>" + signed(d.yoyDelta, 1) + "</b> 分";
+    if (hasEcharts) {
+      subChart.setOption(subOption(d), true);                   /* 轴与类目随维度变化 → notMerge */
+      trendChart.setOption(trendOption(d), true);
+      gapChart.setOption(gapOption(d), true);
+      qoqChart.setOption(qoqOption(d), true);
+    }
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(d.dim));
+  }
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 =====
+     ★ 本节只做「调用」，kiosk 状态量（idx / timer / holdUntil）与 hold() / restart()
+       已在第 1.1 节声明——声明行号严格小于此处首次 hold() 调用行号（TDZ 防护）。 */
+  const PARENT = "大屏样板间-研发效能指数1920.html";
+
+  swTabs.forEach((b) => b.addEventListener("click", () => { applyDim(Number(b.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyDim(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyDim(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  applyDim(bootIdx);
+  if (bootHit >= 0) hold();                                     /* 父页下钻进来：先保持 20 秒不轮换 */
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applyDim(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 13 秒切下一维度；鼠标停在切换器上时暂停 */
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const EPS = 1e-9;
+  const tdWs = Array.from(document.querySelectorAll("#zb-tbody .zb-td-ws"));
+  const domWsSum = sum(tdWs.map((el) => Number(el.textContent)));
+  const checks = [
+    ["六维名/得分/权重/来源与契约 §2.2 逐字（构造性断言，父页与门户三处同源）",
+      DIMS.map((d) => [d.dim, d.score, d.w, d.from].join("|")).join(";") === AUTH],
+    ["六维权重 Σ = 1（交付/质量各 0.20，效率/投入产出/协同/人才各 0.15）",
+      Math.abs(D.wsum - 1) < EPS && DIMS[0].w === 0.20 && DIMS[1].w === 0.20 &&
+      DIMS.slice(2).every((d) => d.w === 0.15)],
+    ["Σ(六维得分 × 权重) = 84.15，展示口径一位小数 = 84.1（契约 §2.2 健康指数）",
+      Math.abs(D.index - AUTH_INDEX) < EPS && fmtDec(D.index, 1) === "84.1"],
+    ["★ 逐维：Σ(二级得分 × 二级权重) 精确等于该维契约得分（86/88/81/78/83/87，容差 1e-9）",
+      DIMS.every((d) => Math.abs(d.subScore - d.score) < EPS) &&
+      DIMS.map((d) => d.score).join(",") === "86,88,81,78,83,87"],
+    ["逐维二级权重 Σ = 1，且每维 3~4 项二级指标、每项权重 > 0",
+      DIMS.every((d) => Math.abs(d.subWsum - 1) < EPS &&
+        d.subs.length >= 3 && d.subs.length <= 4 && d.subs.every((s) => s.w > 0))],
+    ["底数算式现算值与展示值逐条一致（如 259 ÷ 297 = 87.2%；构造性断言，防抄错底数）",
+      DIMS.every((d) => d.subs.every((s) => fmtDec(s.num / s.den * s.scale, s.dec) === s.exp &&
+        s.shown === s.exp))],
+    ["换算得分 = 两锚点线性映射的现算结果，且落在 [0,100]（逆向指标锚点倒挂）",
+      DIMS.every((d) => d.subs.every((s) => {
+        const v = Number(s.shown), a = s.a;
+        const want = round1(a[1] + (v - a[0]) * (a[3] - a[1]) / (a[2] - a[0]));
+        return Math.abs(s.score - want) < EPS && s.score >= 0 && s.score <= 100 &&
+          s.rev === (a[0] > a[2]);
+      }))],
+    ["逐行加权分 = 二级得分 × 二级权重（表内渲染的就是这个数）",
+      DIMS.every((d) => d.subs.every((s) => Math.abs(s.ws - s.score * s.w) < EPS))],
+    ["★ 屏幕可验算：当前维表内「加权分」列文本之和 = 该维得分（解析 textContent 反算）",
+      tdWs.length === DIMS[idx].subs.length &&
+      Math.abs(domWsSum - DIMS[idx].score) < 5e-4],
+    ["差距归因 Σ = 距目标 90 的差距值，且每维 2~4 条（缺口为 0 的条目已剔除）",
+      DIMS.every((d) => Math.abs(sum(d.attr.map((x) => x.c)) - d.gap) < EPS &&
+        Math.abs(d.gap - (TARGET - d.score)) < EPS &&
+        d.attr.length >= 2 && d.attr.length <= 4)],
+    ["每条归因 = (90 − 二级得分) × 二级权重（现算，非凑数）",
+      DIMS.every((d) => d.attr.every((x) => Math.abs(x.c - (TARGET - x.score) * x.w) < EPS))],
+    ["本维 24 月走势末值 = 本维当前得分（斜坡锚，ramp1(23) = 1）",
+      DIMS.every((d) => d.trend.length === 24 && Math.abs(d.trend[NT] - d.score) < EPS)],
+    ["★ 六维走势按权重合成逐月恒等于父页指数 24 月走势（24 个月逐月断言）",
+      D.trend.every((v, t) => Math.abs(sum(DIMS.map((d) => d.w * d.trend[t])) - v) < EPS)],
+    ["走势前 23 月与父页 TREND_HIST 逐字一致，末值 = 本页现算指数（不写死）",
+      TREND_HIST.length === 23 && D.trend.slice(0, 23).every((v, i) => v === TREND_HIST[i]) &&
+      D.trend[NT] === D.index],
+    ["走势 2026Q2（第 19/20/21 月）三月均值 = 该维上季得分（正弦锚，父页 PREV_SCORE 逐字）",
+      DIMS.every((d) => Math.abs(sum(Q2.map((t) => d.trend[t])) / Q2.length - d.prev) < 1e-9) &&
+      Math.abs(PTQ2 - D.prevIndex) < EPS && Math.abs(D.prevIndex - 82.45) < EPS],
+    ["环比 = 本期 − 上季、同比 = 本期 − 去年同期（走势末点前 12 月），均现算",
+      DIMS.every((d) => Math.abs(d.delta - (d.score - d.prev)) < EPS &&
+        Math.abs(d.yoyDelta - (d.score - d.trend[NT - 12])) < EPS && d.yoy === d.trend[NT - 12])],
+    ["六维排名由得分降序现算，1~6 无重复；投入产出 78 最末、质量 88 居首",
+      DIMS.map((d) => d.rank).slice().sort().join(",") === "1,2,3,4,5,6" &&
+      DIMS[3].rank === 6 && DIMS[1].rank === 1],
+    ["改进行动逐字引父页 ACTIONS：仅投入产出 4 项 / 效率 3 项，其余四维空态",
+      ACTIONS.length === 7 &&
+      DIMS.every((d) => d.acts.length === (d.dim === "投入产出" ? 4 : (d.dim === "效率" ? 3 : 0))) &&
+      DIMS.every((d) => Math.abs(d.actIdx - d.actGain * d.w) < EPS)],
+    ["hash 六维名均可解析（契约 §6 P17→S18 对象集，构造性断言）",
+      DIMS.every((d, i) => resolveHash("#" + encodeURIComponent(d.dim)) === i)],
+    ["切换器 tab 数 = 6 且文本与契约 §6 hash 键逐字",
+      swTabs.length === DIMS.length && swTabs.every((b, i) => b.querySelector("b").textContent === DIMS[i].dim)],
+    /* ★ TDZ 防护的构造性断言：holdUntil / hold() 声明在第 1.1 节（行号远小于第 11 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 holdCalls ≥ 1」即证明声明早于首次调用。 */
+    ["holdUntil 声明早于首次 hold() 调用（TDZ 防护，构造性断言）",
+      typeof holdUntil === "number" && typeof hold === "function" &&
+      (bootHit < 0 ? holdCalls === 0 : (holdCalls >= 1 && holdUntil > Date.now()))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单维度追溯详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
