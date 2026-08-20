@@ -68,6 +68,25 @@ PAGES = [
             {"rows": "#rq-tbody li", "names": SOURCES4, "sub": SUB_TZ},
         ],
     },
+    # ---- 二期 · 敏捷执行（W3）----
+    {
+        "file": "大屏样板间-研发敏捷交付总览1920.html",
+        "targets": [
+            {"rows": "#ag-tbody li", "names": TEAMS12, "sub": SUB_CQ},
+        ],
+    },
+    {
+        "file": "大屏样板间-研发看板流动效率1920.html",
+        "targets": [
+            {"rows": "#ks-tbody li", "names": BLOCKS5, "sub": SUB_BS},
+        ],
+    },
+    {
+        "file": "大屏样板间-研发质量与缺陷1920.html",
+        "targets": [
+            {"rows": "#qa-tbody li", "names": DOMAINS4, "sub": SUB_QX},
+        ],
+    },
 ]
 
 CSS_BEGIN = "  /* drill:begin —— 由 tools/inject_drilldown_rnd.py 注入，勿手改 */"
@@ -264,8 +283,18 @@ def apply(cfg, remove=False):
         if c.get("match") and len(c["match"]) != len(c["names"]):
             raise SystemExit("%s：图表 %s 的 match 与 names 长度不一致" % (cfg["file"], c["chartId"]))
 
+    # CSS 块钉死插在 subnav 块之前（退化锚点：carousel → </style>）。
+    # 若三支脚本都往 </style> 前插，每次重跑都会把自己顶到末位、彼此循环换位，
+    # 整链永远不收敛（W3 实测：drill / carousel / mock_flag 三支轮流改写同一批文件）。
+    # 钉死后波尾链序 drill→subnav→carousel→mock_flag 的固定点是
+    # [drill, subnav, carousel, mockflag]，第二轮起零改动。
     css = CSS_BEGIN + CSS_TPL.format(p=p) + CSS_END + "\n"
-    html = html.replace("</style>", css + "</style>", 1)
+    for anchor in ("  /* subnav:begin", "  /* carousel:begin"):
+        if anchor in html:
+            html = html.replace(anchor, css + anchor, 1)
+            break
+    else:
+        html = html.replace("</style>", css + "</style>", 1)
     js = JS_BEGIN + JS_TPL.format(
         p=p,
         targets=json.dumps(targets, ensure_ascii=False),

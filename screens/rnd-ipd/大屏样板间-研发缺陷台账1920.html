@@ -1,0 +1,964 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发缺陷台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --qx-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：缺陷编号 / 标题 / 域 / 模块 / 严重级 / 状态 / 发现阶段 / 累计耗时 */
+    --qx-tcols: 96px 1fr 52px 84px 60px 66px 62px 104px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .qx-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 452px;
+    grid-template-rows: 84px 52px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .qx-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .qx-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .qx-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .qx-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .qx-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .qx-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .qx-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .qx-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .qx-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到质量与缺陷，琥珀描边与本页星蓝主色区分 */
+  .qx-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .qx-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .qx-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .qx-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .qx-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .qx-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .qx-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .qx-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .qx-chips { display: flex; align-items: center; gap: 9px; }
+  .qx-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .qx-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .qx-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .qx-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .qx-chip.is-key b { color: var(--rnd-blue); }
+  .qx-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .qx-clock-time { font: 700 26px/1 var(--qx-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .qx-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 筛选条：域 chip（一级）+ 严重级 chip（二级） ===== */
+  .qx-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .qx-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .qx-dchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 6px 14px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13.5px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .qx-dchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .qx-dchip b { font: 700 14px/1 var(--qx-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .qx-dchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .qx-dchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .qx-dchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .qx-dchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .qx-dchip.is-hit { animation: qx-hit 0.9s ease-in-out 2; }
+  @keyframes qx-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--qx-cc, rgba(92, 157, 255, 0.8)); } }
+  .qx-fdiv { flex: none; width: 1px; height: 24px; margin: 0 4px; background: rgba(96, 140, 255, 0.28); }
+  .qx-schip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 4px 11px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .qx-schip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .qx-schip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .qx-schip.is-on { color: #071026; font-weight: 700; }
+  .qx-schip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  .qx-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .qx-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .qx-filters-state em { font-style: normal; color: #d3e2ff; }
+  .qx-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== 面板 ===== */
+  .qx-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .qx-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .qx-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .qx-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .qx-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .qx-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .qx-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .qx-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .qx-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：行高 28px × 20 行 + 表头，tbody overflow hidden 防撑破 */
+  .qx-panel.is-ledger { flex: none; height: 664px; min-height: 0; overflow: hidden; }
+  /* ★ 甘特块由 JS 填充（选中行联动重绘），且与两块图表同属 .qx-col 一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .qx-panel.is-gantt { flex: none; height: 306px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .qx-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .qx-thead, .qx-tbody li {
+    display: grid; grid-template-columns: var(--qx-tcols); align-items: center; gap: 8px;
+  }
+  .qx-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .qx-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .qx-tbody li {
+    padding: 0 8px; height: 28px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: qx-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes qx-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .qx-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .qx-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .qx-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .qx-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qx-tbody li .qx-no { font: 700 11.5px/1 var(--qx-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.03em; }
+  .qx-tbody li .qx-title { color: #dfe9ff; }
+  .qx-tbody li .qx-dom { font-size: 11.5px; font-weight: 700; }
+  .qx-tbody li .qx-mod { font-size: 11.5px; color: #a9bce4; }
+  .qx-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  /* 严重级四档 */
+  .qx-badge.is-s0 { color: #3d060c; background: var(--rnd-red); }
+  .qx-badge.is-s1 { color: #3a1c05; background: var(--rnd-orange); }
+  .qx-badge.is-s2 { color: #041b3a; background: var(--rnd-blue); }
+  .qx-badge.is-s3 { color: #063a25; background: var(--rnd-green); }
+  /* 状态五档 */
+  .qx-badge.is-t0 { color: #3a2a05; background: var(--rnd-amber); }
+  .qx-badge.is-t1 { color: #05332e; background: var(--rnd-cyan); }
+  .qx-badge.is-t2 { color: #21103d; background: var(--rnd-violet); }
+  .qx-badge.is-t3 { color: #041b3a; background: var(--rnd-blue); }
+  .qx-badge.is-t4 { color: #063a25; background: var(--rnd-green); }
+  .qx-stg { font: 700 11px/1 var(--qx-mono); letter-spacing: 0.06em; padding: 2px 7px; border-radius: 4px; justify-self: start; border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+  .qx-stg.is-field { border-color: rgba(255, 95, 107, 0.55); color: #ffb3b9; background: rgba(96, 26, 38, 0.4); }
+  /* 累计耗时：微条 + 数值 */
+  .qx-age { display: flex; align-items: center; gap: 8px; }
+  .qx-age-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .qx-age-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .qx-age em { flex: none; width: 44px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+
+  /* ===== 左下：发现阶段拦截分布（HTML 分段条，init 前填充完毕） ===== */
+  .qx-stagebar { flex: none; display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
+  .qx-stagebar i { display: block; height: 100%; font-style: normal; }
+  .qx-stagebar i + i { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .qx-stagegrid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .qx-stagecell { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px; border-radius: 7px; background: rgba(14, 26, 66, 0.5); border: 1px solid rgba(96, 140, 255, 0.16); }
+  .qx-stagecell span { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--rnd-text-dim); letter-spacing: 0.04em; }
+  .qx-stagecell span::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--qx-sc, var(--rnd-blue)); }
+  .qx-stagecell b { font: 700 16px/1 var(--qx-mono); color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  .qx-stagecell em { font-style: normal; font-size: 10.5px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+
+  /* ===== 右上：单缺陷流转甘特（纯 HTML/CSS） ===== */
+  .qx-gt-head { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 7px 10px 8px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 8px; min-height: 64px; }
+  .qx-gt-no { display: flex; align-items: center; gap: 9px; }
+  .qx-gt-no b { font: 700 13px/1 var(--qx-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .qx-gt-title { font-size: 13px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qx-gt-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; }
+  .qx-gt-sub b { font-weight: 700; color: #c9d8f8; }
+  .qx-gt-bar { flex: none; display: flex; height: 26px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; background: rgba(14, 26, 66, 0.5); }
+  .qx-gt-seg { position: relative; min-width: 18px; }
+  .qx-gt-seg + .qx-gt-seg { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .qx-gt-seg.is-cur {
+    background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px) !important;
+    animation: qx-breath 1.6s ease-in-out infinite;
+  }
+  @keyframes qx-breath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+  .qx-gt-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .qx-gt-row { flex: 1; display: grid; grid-template-columns: 58px 1fr 64px; align-items: center; gap: 10px; padding: 0 4px; border-radius: 5px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .qx-gt-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .qx-gt-row b { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.04em; }
+  .qx-gt-row b::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--qx-pc, var(--rnd-blue)); }
+  .qx-gt-row.is-todo b { color: rgba(127, 146, 196, 0.6); }
+  .qx-gt-row.is-todo b::before { opacity: 0.3; }
+  .qx-gt-row span { color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qx-gt-row em { font-style: normal; text-align: right; font: 700 13px/1 var(--qx-mono); color: var(--rnd-cyan); }
+  .qx-gt-row.is-cur em { color: var(--rnd-amber); }
+  .qx-gt-row.is-todo em { color: rgba(127, 146, 196, 0.5); }
+
+  /* ===== 底部滚动条 ===== */
+  .qx-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .qx-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange);
+  }
+  .qx-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: qx-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes qx-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .qx-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .qx-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .qx-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .qx-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .qx-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .qx-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="qx-stage" id="qx-stage">
+    <!-- mockflag:begin --><div class="qx-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="qx-error" id="qx-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="qx-header">
+      <div class="qx-head-left">
+        <div class="qx-crumb">
+          <a class="qx-crumb-up" href="大屏样板间-研发质量与缺陷1920.html" title="返回上级专题页（Esc）">‹ 返回 质量与缺陷</a>
+          <b>云麓智联科技</b><i>›</i><span>质量与缺陷</span><i>›</i><em>缺陷台账</em>
+        </div>
+        <div class="qx-head-title-row">
+          <div class="qx-head-title">缺陷台账</div>
+          <div class="qx-head-meta">
+            <span>年发现 <b id="qx-meta-found">--</b> 条 · 本表样例 <b id="qx-meta-n">--</b> 条（抽样展示）</span><i>|</i>
+            <span><b>4</b> 域 · <b>4</b> 档严重级 · <b>5</b> 段发现阶段</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="qx-head-right">
+        <div class="qx-chips">
+          <div class="qx-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="qx-chip is-key"><span id="qx-chip-key">关闭率 · 全部</span><b id="qx-chip-rate">--</b></div>
+        </div>
+        <div class="qx-clock" aria-label="实时时钟">
+          <span class="qx-clock-time" id="qx-clock-time">--:--:--</span>
+          <span class="qx-clock-date" id="qx-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 筛选条：域 chip（hash 契约目标）+ 严重级二级过滤 -->
+    <div class="qx-filters">
+      <span class="qx-filters-tag">域筛选</span>
+      <div id="qx-dchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="qx-fdiv"></span>
+      <span class="qx-filters-tag">严重级</span>
+      <div id="qx-schips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="qx-filters-state" id="qx-filters-state">--</div>
+    </div>
+
+    <!-- 左：缺陷台账主表（写死高度）+ 发现阶段拦截分布 -->
+    <div class="qx-col">
+      <section class="qx-panel is-ledger">
+        <div class="qx-panel-head">
+          <h2>缺陷明细台账（域 × 严重级）</h2>
+          <span class="qx-panel-tag" id="qx-table-tag">--</span>
+        </div>
+        <div class="qx-table">
+          <div class="qx-thead">
+            <span>缺陷编号</span><span>标题</span><span>域</span><span>模块</span>
+            <span>严重级</span><span>状态</span><span>发现阶段</span><span>累计耗时</span>
+          </div>
+          <ul class="qx-tbody" id="qx-tbody"></ul>
+        </div>
+      </section>
+      <section class="qx-panel" style="flex: 1;">
+        <div class="qx-panel-head">
+          <h2>发现阶段拦截分布</h2>
+          <span class="qx-panel-tag">五阶段合计 <b id="qx-stage-total">--</b> 条 · 现网逃逸率 <b id="qx-stage-escape">--</b></span>
+        </div>
+        <div class="qx-stagebar" id="qx-stagebar"></div>
+        <div class="qx-stagegrid" id="qx-stagegrid"></div>
+      </section>
+    </div>
+
+    <!-- 右：单缺陷流转甘特 + 严重级×域堆叠条 + 月度发现/关闭双轴 -->
+    <div class="qx-col">
+      <section class="qx-panel is-gantt">
+        <div class="qx-panel-head">
+          <h2>单缺陷流转甘特</h2>
+          <span class="qx-panel-tag" id="qx-gt-tag">--</span>
+        </div>
+        <div class="qx-gt-head" id="qx-gt-headbox"></div>
+        <div class="qx-gt-bar" id="qx-gt-bar"></div>
+        <div class="qx-gt-list" id="qx-gt-list"></div>
+      </section>
+      <section class="qx-panel" style="flex: 1;">
+        <div class="qx-panel-head">
+          <h2>严重级 × 域堆叠</h2>
+          <span class="qx-panel-tag">四域合计 <b id="qx-sev-total">--</b> 条</span>
+        </div>
+        <div class="qx-chart" id="qx-chart-sev"></div>
+      </section>
+      <section class="qx-panel" style="flex: 1;">
+        <div class="qx-panel-head">
+          <h2>月度发现 / 关闭 · 24 月</h2>
+          <span class="qx-panel-tag">近 12 月发现 <b id="qx-trend-found">--</b> · 关闭 <b id="qx-trend-closed">--</b></span>
+        </div>
+        <div class="qx-chart" id="qx-chart-trend"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="qx-foot">
+      <div class="qx-foot-tag">质量研判</div>
+      <div class="qx-foot-view"><div class="qx-foot-track" id="qx-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("qx-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("qx-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技）
+         ★ 与父页 P8「质量与缺陷」严格同源（docs/RndIpdThemed.md §2.2）：
+           年缺陷发现 8,640 = 关闭 8,210 + 遗留 430；
+           按域 软件 4,820 + 硬件 1,560 + 云端 1,340 + AI 920；
+           按拦截阶段 单测 3,110 + 集成 2,480 + 系统 1,890 + Beta 987 + 现网 173，逃逸率 = 173 ÷ 8,640。
+         ★ 二级拆分（严重级四档 × 域、逐域关闭/遗留、24 月曲线）为本页自编，Σ 必须收敛到上级数，
+           全部进页尾勾稽自检。台账为**抽样样例**（8,640 条不可能逐条陈列），20 条样例的
+           域分布与全盘结构大体成比例（10/4/4/2），筛选计数由样例数组现算。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，样例行与域/模块之间一律用
+           索引（dm / sev / st / stg）关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 四域基准：域年发现数由严重级四档现算（Σ==契约域值，进自检）；closed 为本页二级拆分 */
+  const DOMAINS = [
+    { name: "软件", sev: [190, 940, 2430, 1260], closed: 4590, color: C.blue,
+      mods: ["中控UI", "连接服务", "OTA升级", "场景引擎"] },
+    { name: "硬件", sev: [85, 330, 760, 385],    closed: 1482, color: C.orange,
+      mods: ["主板电源", "射频天线", "结构散热", "传感器"] },
+    { name: "云端", sev: [60, 280, 660, 340],    closed: 1272, color: C.cyan,
+      mods: ["设备接入", "规则引擎", "数据管道", "开放API"] },
+    { name: "AI",   sev: [45, 190, 450, 235],    closed: 866,  color: C.violet,
+      mods: ["语音识别", "视觉质检", "推荐引擎", "边缘推理"] }
+  ];
+  const DOM_REF = [4820, 1560, 1340, 920];
+  const FOUND_REF = 8640, CLOSED_REF = 8210, OPEN_REF = 430;
+
+  const SEV_NAMES = ["致命", "严重", "一般", "轻微"];
+  const SEV_COLORS = [C.red, C.orange, C.blue, C.green];
+
+  /* 4.2 发现阶段拦截五段（契约逐字）：现网即逃逸 */
+  const FIND_STAGES = [
+    { name: "单测", v: 3110, color: C.green },
+    { name: "集成", v: 2480, color: C.cyan },
+    { name: "系统", v: 1890, color: C.blue },
+    { name: "Beta", v: 987,  color: C.amber },
+    { name: "现网", v: 173,  color: C.red }
+  ];
+
+  /* 4.3 流转五段与状态：状态 st 与段数勾稽（段数 = st + 1；已关闭恰 5 段） */
+  const PHASES = ["发现", "定位", "修复", "验证", "关闭"];
+  const PHASE_COLORS = [C.amber, C.cyan, C.blue, C.violet, C.green];
+  const ST_NAMES = ["新发现", "定位中", "修复中", "验证中", "已关闭"];
+  const ST_BADGE = ["is-t0", "is-t1", "is-t2", "is-t3", "is-t4"];
+
+  /* 4.4 月度发现/关闭 · 24 月（2024-09 → 2026-08，与父页 P8 收敛曲线同口径）：
+         近 12 月发现 Σ = 8,640、关闭 Σ = 8,210，恰等年度盘（进自检）。 */
+  const FOUND24  = [612, 588, 605, 570, 536, 598, 648, 662, 671, 690, 702, 718,
+                    690, 660, 640, 580, 520, 640, 760, 790, 820, 830, 850, 860];
+  const CLOSED24 = [598, 580, 592, 566, 540, 586, 634, 650, 660, 676, 688, 700,
+                    640, 630, 620, 590, 540, 600, 700, 750, 790, 800, 780, 770];
+  const MONTHS = Array.from({ length: 24 }, (_, i) => {
+    const m = (8 + i) % 12 + 1, y = 2024 + Math.floor((8 + i) / 12);
+    return String(y % 100) + "-" + pad(m);
+  });
+
+  /* 4.5 台账样例 20 条（抽样展示）：dm=域索引 mod=模块名（与父页旭日「域→模块」呼应）
+         sev=严重级 st=状态 stg=发现阶段 d0=[月,日] 发现日 dw=流转各段耗时（天，最后一段进行中时为已停留）
+         累计耗时 = Σdw 现算，不复制数字。 */
+  const ROWS = [
+    { no: "DEF-3021", t: "中控屏场景卡片偶发白屏",            dm: 0, mod: "中控UI",   sev: 2, st: 4, stg: 2, d0: [5, 12], dw: [1, 2, 4, 3, 1] },
+    { no: "DEF-3084", t: "OTA 差分包校验失败率偏高",          dm: 0, mod: "OTA升级",  sev: 1, st: 3, stg: 3, d0: [7, 2],  dw: [1, 3, 6, 4] },
+    { no: "DEF-3127", t: "场景引擎定时任务跨时区错发",        dm: 0, mod: "场景引擎", sev: 1, st: 4, stg: 4, d0: [4, 18], dw: [1, 2, 5, 3, 1] },
+    { no: "DEF-3169", t: "连接服务重连风暴致消息积压",        dm: 0, mod: "连接服务", sev: 0, st: 4, stg: 4, d0: [3, 6],  dw: [1, 1, 3, 2, 1] },
+    { no: "DEF-3204", t: "中控UI 深色模式图标对比度不足",     dm: 0, mod: "中控UI",   sev: 3, st: 2, stg: 0, d0: [8, 3],  dw: [1, 2, 4] },
+    { no: "DEF-3252", t: "OTA 升级进度条回跳",                dm: 0, mod: "OTA升级",  sev: 2, st: 4, stg: 1, d0: [6, 9],  dw: [1, 1, 3, 2, 1] },
+    { no: "DEF-3288", t: "场景引擎并发执行互斥失效",          dm: 0, mod: "场景引擎", sev: 1, st: 2, stg: 2, d0: [7, 21], dw: [1, 3, 9] },
+    { no: "DEF-3315", t: "连接服务 TLS 握手超时阈值过短",     dm: 0, mod: "连接服务", sev: 2, st: 3, stg: 1, d0: [7, 28], dw: [1, 2, 5, 3] },
+    { no: "DEF-3342", t: "中控UI 多语言字串溢出裁切",         dm: 0, mod: "中控UI",   sev: 3, st: 0, stg: 0, d0: [8, 15], dw: [2] },
+    { no: "DEF-3376", t: "OTA 灰度批次名单重复下发",          dm: 0, mod: "OTA升级",  sev: 2, st: 1, stg: 3, d0: [8, 9],  dw: [1, 5] },
+    { no: "DEF-3401", t: "主板电源浪涌保护误触发重启",        dm: 1, mod: "主板电源", sev: 0, st: 4, stg: 2, d0: [2, 14], dw: [1, 3, 7, 4, 1] },
+    { no: "DEF-3428", t: "射频天线 2.4G 边缘信道灵敏度不达标", dm: 1, mod: "射频天线", sev: 1, st: 3, stg: 1, d0: [6, 25], dw: [1, 4, 12, 6] },
+    { no: "DEF-3450", t: "结构散热高温降频阈值偏保守",        dm: 1, mod: "结构散热", sev: 2, st: 4, stg: 2, d0: [5, 20], dw: [1, 2, 6, 3, 1] },
+    { no: "DEF-3473", t: "传感器温漂标定曲线漂移",            dm: 1, mod: "传感器",   sev: 3, st: 2, stg: 0, d0: [7, 30], dw: [1, 3, 8] },
+    { no: "DEF-3502", t: "设备接入网关长连接句柄泄漏",        dm: 2, mod: "设备接入", sev: 0, st: 4, stg: 4, d0: [4, 2],  dw: [1, 1, 2, 2, 1] },
+    { no: "DEF-3529", t: "规则引擎条件表达式短路求值错误",    dm: 2, mod: "规则引擎", sev: 1, st: 4, stg: 1, d0: [6, 16], dw: [1, 2, 4, 3, 1] },
+    { no: "DEF-3551", t: "数据管道乱序补偿窗口过小",          dm: 2, mod: "数据管道", sev: 2, st: 3, stg: 2, d0: [7, 15], dw: [1, 2, 6, 4] },
+    { no: "DEF-3578", t: "开放API 分页游标越界返回 500",      dm: 2, mod: "开放API",  sev: 2, st: 1, stg: 3, d0: [8, 6],  dw: [1, 6] },
+    { no: "DEF-3604", t: "语音识别方言口音误唤醒率偏高",      dm: 3, mod: "语音识别", sev: 1, st: 2, stg: 3, d0: [7, 8],  dw: [2, 4, 15] },
+    { no: "DEF-3631", t: "边缘推理模型量化后精度回退",        dm: 3, mod: "边缘推理", sev: 2, st: 4, stg: 2, d0: [5, 28], dw: [1, 3, 7, 4, 1] }
+  ];
+  ROWS.forEach((r) => { r.age = sum(r.dw); });
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+  DOMAINS.forEach((d) => {
+    d.found = sum(d.sev);                                  /* 域年发现 = 严重级四档之和 */
+    d.open = d.found - d.closed;                           /* 域遗留 = 发现 − 关闭 */
+    d.closeRate = 100 * d.closed / d.found;
+  });
+  D.found = sum(DOMAINS.map((d) => d.found));
+  D.closed = sum(DOMAINS.map((d) => d.closed));
+  D.open = sum(DOMAINS.map((d) => d.open));
+  D.closeRate = 100 * D.closed / D.found;
+  D.sevTotals = SEV_NAMES.map((n, k) => sum(DOMAINS.map((d) => d.sev[k])));
+  D.stageTotal = sum(FIND_STAGES.map((s) => s.v));
+  D.escape = 100 * FIND_STAGES[4].v / D.stageTotal;        /* 逃逸率 = 现网 ÷ 发现 */
+  D.found12 = sum(FOUND24.slice(12));
+  D.closed12 = sum(CLOSED24.slice(12));
+  D.n = ROWS.length;
+  D.rowsByDom = DOMAINS.map((d, di) => ROWS.filter((r) => r.dm === di).length);
+  D.ageMaxRow = ROWS.slice().sort((a, b) => b.age - a.age)[0];
+  D.openRows = ROWS.filter((r) => r.st !== 4);
+  D.domTop = DOMAINS.slice().sort((a, b) => b.found - a.found)[0];
+  D.openTop = DOMAINS.slice().sort((a, b) => b.open - a.open)[0];
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("qx-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("qx-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("qx-meta-found").textContent = fmtInt(D.found);
+  $("qx-meta-n").textContent = fmtInt(D.n);
+  $("qx-sev-total").textContent = fmtInt(D.found);
+  $("qx-stage-total").textContent = fmtInt(D.stageTotal);
+  $("qx-stage-escape").textContent = fmtDec(D.escape, 1) + "%";
+  $("qx-trend-found").textContent = fmtInt(D.found12);
+  $("qx-trend-closed").textContent = fmtInt(D.closed12);
+
+  /* ===== 7. 域筛选 chip（全部 + 四域，逐字契约名；年发现数翻牌缓动） ===== */
+  const DFILTERS = [{ name: "全部", color: C.blue, found: D.found, cnt: D.n }]
+    .concat(DOMAINS.map((d, di) => ({ name: d.name, color: d.color, found: d.found, cnt: D.rowsByDom[di] })));
+  const dbox = $("qx-dchips");
+  dbox.innerHTML = DFILTERS.map((f, i) => (
+    '<button class="qx-dchip" type="button" data-i="' + i + '" style="--qx-cc:' + f.color + '">' +
+      "<u>" + f.name + "</u><b id=\"qx-dnum-" + i + "\">0</b><i>条 · 样例 " + f.cnt + "</i>" +
+    "</button>"
+  )).join("");
+  const dchips = Array.from(dbox.children);
+
+  /* 年发现数翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  DFILTERS.forEach((f, i) => {
+    const el = $("qx-dnum-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtInt(f.found * e);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtInt(f.found);
+    })(t0);
+  });
+
+  /* ===== 8. 严重级二级过滤 chip（全部 + 四档；计数随域筛选联动重算） ===== */
+  const sbox = $("qx-schips");
+  const sevScopeCnt = (di, k) => (di === 0 ? D.sevTotals[k] : DOMAINS[di - 1].sev[k]);
+  function renderSChips(di, si) {
+    const total = di === 0 ? D.found : DOMAINS[di - 1].found;
+    const items = [{ name: "全部", color: C.blue, cnt: total }]
+      .concat(SEV_NAMES.map((n, k) => ({ name: n, color: SEV_COLORS[k], cnt: sevScopeCnt(di, k) })));
+    sbox.innerHTML = items.map((f, i) => (
+      '<button class="qx-schip' + (i === si ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === si ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + fmtInt(f.cnt) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(sbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(dIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 9. hash 契约：父页下钻「子页#encodeURIComponent(域名)」，四域名逐字匹配 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("全量", 0);
+  DOMAINS.forEach((d, di) => { alias(d.name, di + 1); alias(d.name + "域", di + 1); alias(d.name + "缺陷", di + 1); });
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                     /* trim + 全角空白剔除归一化 */
+    if (!raw) return -1;                                    /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(di) {
+    const want = "#" + encodeURIComponent(DFILTERS[di].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 10. 台账主表渲染（行高 28px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("qx-tbody");
+  let view = ROWS, dIdx = 0, sIdx = 0, selPos = 0;
+  const AGE_MAX = 30;                                       /* 累计耗时条：0~30 天映射条宽 */
+
+  function rowHtml(r, k) {
+    const w = clamp(r.age / AGE_MAX * 100, 5, 100);
+    const cAge = r.age > 18 ? C.red : r.age > 10 ? C.amber : C.cyan;
+    return "<li data-no=\"" + r.no + "\" style=\"animation-delay:" + (k * 14) + "ms\">" +
+      '<span class="qx-no">' + r.no + "</span>" +
+      '<span class="qx-title">' + r.t + "</span>" +
+      '<span class="qx-dom" style="color:' + DOMAINS[r.dm].color + '">' + DOMAINS[r.dm].name + "</span>" +
+      '<span class="qx-mod">' + r.mod + "</span>" +
+      '<span class="qx-badge is-s' + r.sev + '">' + SEV_NAMES[r.sev] + "</span>" +
+      '<span class="qx-badge ' + ST_BADGE[r.st] + '">' + ST_NAMES[r.st] + "</span>" +
+      '<span class="qx-stg' + (r.stg === 4 ? " is-field" : "") + '">' + FIND_STAGES[r.stg].name + "</span>" +
+      '<span class="qx-age"><span class="qx-age-t"><u style="width:' + fmtDec(w, 1) + "%;background:" + cAge + '"></u></span><em style="color:' + cAge + '">' + r.age + " 天</em></span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    /* 全盘口径条数（域 × 严重级交叉）：域内四档为本页二级拆分，交叉计数由此现算 */
+    const scope = dIdx === 0
+      ? (sIdx === 0 ? D.found : D.sevTotals[sIdx - 1])
+      : (sIdx === 0 ? DOMAINS[dIdx - 1].found : DOMAINS[dIdx - 1].sev[sIdx - 1]);
+    $("qx-table-tag").textContent =
+      "抽样口径：总盘 " + fmtInt(D.found) + " 条不逐条陈列 · 样例 " + D.n + " 条与域结构大体成比例";
+    $("qx-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 条样例 / 共 " + D.n + " 条<i>|</i>全盘该口径 <em>" + fmtInt(scope) +
+      "</em> 条<i>|</i>行点击或轮巡联动流转甘特";
+  }
+
+  /* ===== 11. 单缺陷流转甘特（纯 HTML/CSS；选中行联动，五段宽度 ∝ 耗时） ===== */
+  const dateOf = (r, addDays) => new Date(2026, r.d0[0] - 1, r.d0[1] + addDays);
+  const fmtD = (d) => pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  function renderSel() {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("qx-gt-tag").textContent = "当前筛选无样例行";
+      $("qx-gt-headbox").innerHTML = '<div class="qx-gt-sub">调整域或严重级筛选后，此处展示选中缺陷的五段流转。</div>';
+      $("qx-gt-bar").innerHTML = "";
+      $("qx-gt-list").innerHTML = "";
+      return;
+    }
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    $("qx-gt-tag").textContent = "发现→定位→修复→验证→关闭 · 各段耗时（天）";
+    $("qx-gt-headbox").innerHTML =
+      '<div class="qx-gt-no"><b>' + r.no + '</b>' +
+        '<span class="qx-badge is-s' + r.sev + '">' + SEV_NAMES[r.sev] + "</span>" +
+        '<span class="qx-badge ' + ST_BADGE[r.st] + '">' + ST_NAMES[r.st] + "</span></div>" +
+      '<div class="qx-gt-title">' + r.t + "</div>" +
+      '<div class="qx-gt-sub">' + DOMAINS[r.dm].name + " · " + r.mod + " · " + FIND_STAGES[r.stg].name +
+        "阶段发现 <b>2026-" + pad(r.d0[0]) + "-" + pad(r.d0[1]) + "</b> · 累计耗时 <b>" + r.age + "</b> 天</div>";
+    $("qx-gt-bar").innerHTML = r.dw.map((v, k) => {
+      const isCur = k === r.dw.length - 1 && r.st !== 4;
+      return '<span class="qx-gt-seg' + (isCur ? " is-cur" : "") + '" style="flex:' + v +
+        ";background:" + PHASE_COLORS[k] + '" title="' + PHASES[k] + " " + v + ' 天"></span>';
+    }).join("");
+    let acc = 0;
+    $("qx-gt-list").innerHTML = PHASES.map((name, k) => {
+      const entered = k < r.dw.length;
+      const isCur = entered && k === r.dw.length - 1 && r.st !== 4;
+      const cls = !entered ? "is-todo" : isCur ? "is-cur" : "";
+      let body;
+      if (entered) {
+        const d1 = dateOf(r, acc);
+        body = fmtD(d1) + " 进入 · " + (isCur ? "进行中，已 " + r.dw[k] + " 天" : "耗时 " + r.dw[k] + " 天");
+        acc += r.dw[k];
+      } else {
+        body = "未进入";
+      }
+      return '<div class="qx-gt-row ' + cls + '" style="--qx-pc:' + PHASE_COLORS[k] + '">' +
+        "<b>" + name + "</b><span>" + body + "</span>" +
+        "<em>" + (entered ? r.dw[k] + " 天" : "--") + "</em></div>";
+    }).join("");
+  }
+
+  /* ===== 12. 严重级 × 域堆叠条（筛选时非选中域压暗；option 只进标量与数组） ===== */
+  /* ★ 甘特块与两块图表同属 .qx-col：甘特面板已写死高度，且先填充再 init，图表高度不受挤压 */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function sevOption(di) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 40, top: 26, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex, d = DOMAINS[k];
+          return "<b>" + d.name + "</b>　年发现 <b>" + fmtInt(d.found) + "</b> 条<br/>" +
+            ps.map((p) => p.marker + p.seriesName + " <b>" + fmtInt(p.value) + "</b> 条 · " +
+              fmtDec(100 * p.value / d.found, 1) + "%").join("<br/>") +
+            "<br/><span style=\"color:" + C.textDim + "\">关闭 " + fmtInt(d.closed) +
+            " · 遗留 " + fmtInt(d.open) + " · 关闭率 " + fmtDec(d.closeRate, 1) + "%</span>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: SEV_NAMES
+      },
+      xAxis: {
+        type: "value",
+        axisLabel: { color: C.textDim, fontSize: 10 }, axisLine: { show: false },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      yAxis: {
+        type: "category", inverse: true, data: DOMAINS.map((d) => d.name),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: "#bcd2f8", fontSize: 12, fontWeight: 700 }
+      },
+      series: SEV_NAMES.map((name, k) => ({
+        name: name, type: "bar", stack: "sev", barWidth: "56%",
+        emphasis: { focus: "series" },
+        label: k === SEV_NAMES.length - 1 ? {
+          show: true, position: "right", color: C.textDim, fontSize: 10,
+          formatter: (p) => fmtInt(DOMAINS[p.dataIndex].found)
+        } : { show: false },
+        data: DOMAINS.map((d, j) => ({
+          value: d.sev[k],
+          itemStyle: { color: SEV_COLORS[k], opacity: (di === 0 || di - 1 === j) ? 1 : 0.22 }
+        }))
+      }))
+    };
+  }
+
+  /* ===== 13. 月度发现/关闭双轴小图（24 月，左轴条数、右轴关闭率%，与父页收敛曲线同口径） ===== */
+  const closeRate24 = CLOSED24.map((v, i) => 100 * v / FOUND24[i]);
+  function trendOption() {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 4, top: 26, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>20" + MONTHS[i] + "</b><br/>发现 <b style=\"color:" + C.blue + "\">" + fmtInt(FOUND24[i]) +
+            "</b> 条 · 关闭 <b style=\"color:" + C.green + "\">" + fmtInt(CLOSED24[i]) +
+            "</b> 条<br/>当月关闭率 <b style=\"color:" + C.amber + "\">" + fmtDec(closeRate24[i], 1) + "%</b>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: ["发现", "关闭", "关闭率"]
+      },
+      xAxis: {
+        type: "category", data: MONTHS,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5, interval: 2 }
+      },
+      yAxis: [
+        { type: "value", name: "条", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10 },
+          splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+        { type: "value", name: "%", min: 80, max: 105, nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10 }, splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "发现", type: "bar", barWidth: "42%", data: FOUND24.slice(),
+          itemStyle: { borderRadius: [2, 2, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: C.blue }, { offset: 1, color: "rgba(47,111,214,.3)" }]) } },
+        { name: "关闭", type: "line", smooth: true, symbol: "none",
+          data: CLOSED24.slice(),
+          lineStyle: { width: 2, color: C.green }, itemStyle: { color: C.green },
+          areaStyle: { color: "rgba(111,224,154,.10)" } },
+        { name: "关闭率", type: "line", yAxisIndex: 1, smooth: true, symbol: "none",
+          data: closeRate24.map((v) => Number(fmtDec(v, 1))),
+          lineStyle: { width: 1.6, color: C.amber, type: "dashed" }, itemStyle: { color: C.amber } }
+      ]
+    };
+  }
+
+  /* ===== 14. 发现阶段拦截分布（HTML 分段条 + 五格，init 前填充完毕，静态全盘口径） ===== */
+  $("qx-stagebar").innerHTML = FIND_STAGES.map((s) => (
+    '<i style="flex:' + s.v + ";background:" + s.color + '" title="' + s.name + " " + fmtInt(s.v) + ' 条"></i>'
+  )).join("");
+  $("qx-stagebar").style.display = "flex";
+  $("qx-stagegrid").innerHTML = FIND_STAGES.map((s) => (
+    '<div class="qx-stagecell" style="--qx-sc:' + s.color + '">' +
+      "<span>" + s.name + (s.name === "现网" ? "（逃逸）" : "") + "</span>" +
+      "<b>" + fmtInt(s.v) + "</b>" +
+      "<em>占 " + fmtDec(100 * s.v / D.stageTotal, 1) + "%</em>" +
+    "</div>"
+  )).join("");
+
+  /* ===== 15. 筛选主流程：一次调用刷新 chip / 表 / 甘特 / 堆叠图 / 页头 chip ===== */
+  function applyFilter(di, si, pushHash) {
+    dIdx = clamp(di, 0, DFILTERS.length - 1);
+    sIdx = clamp(si, 0, SEV_NAMES.length);
+    view = ROWS.filter((r) =>
+      (dIdx === 0 || r.dm === dIdx - 1) && (sIdx === 0 || r.sev === sIdx - 1));
+    selPos = 0;
+    dchips.forEach((el, i) => {
+      const on = i === dIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? DFILTERS[i].color : "";
+      el.style.borderColor = on ? DFILTERS[i].color : "";
+    });
+    renderSChips(dIdx, sIdx);
+    const d = dIdx === 0 ? null : DOMAINS[dIdx - 1];
+    $("qx-chip-key").textContent = "关闭率 · " + DFILTERS[dIdx].name;
+    $("qx-chip-rate").textContent = fmtDec(d ? d.closeRate : D.closeRate, 1) + "%";
+    renderTable();
+    renderSel();
+    if (sevChart) sevChart.setOption(sevOption(dIdx), true);
+    if (pushHash) syncHash(dIdx);
+  }
+
+  dchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), 0, true)));
+
+  /* hash 定位：命中域则激活筛选 chip、闪烁对应域 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyFilter(0, 0, false); return; }
+    applyFilter(hit, 0, false);
+    if (hit > 0) {
+      const chip = dchips[hit];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发质量与缺陷1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 16. kiosk 轮巡：台账行 3 秒逐行高亮并联动流转甘特；hash 定位后暂停 20 秒 ===== */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 17. 初始渲染：先填充全部 DOM（表 + 甘特 + 阶段条），再 init 图表 ===== */
+  let sevChart = null, trendChart = null;
+  applyFilter(0, 0, false);                                 /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  sevChart = echarts.init($("qx-chart-sev"));
+  sevChart.setOption(sevOption(0));
+  trendChart = echarts.init($("qx-chart-trend"));
+  trendChart.setOption(trendOption());
+  locateByHash();                                           /* 初始解析 hash（无 hash 落全部） */
+
+  /* 堆叠图轮播提示 */
+  let tipIdx = 0;
+  setInterval(() => {
+    sevChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % DOMAINS.length;
+  }, 4200);
+
+  /* ===== 18. 底部质量研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "现网逃逸 " + fmtInt(FIND_STAGES[4].v) + " 条，逃逸率 " + fmtDec(D.escape, 1) +
+        "%（÷ 发现 " + fmtInt(D.stageTotal) + "）；Beta 段拦截 " + fmtInt(FIND_STAGES[3].v) + " 条，拦截左移仍有空间" },
+    { lv: "高", c: C.red, t: "样例最长流转「" + D.ageMaxRow.no + "」" + D.ageMaxRow.t + "，累计 " + D.ageMaxRow.age +
+        " 天（" + PHASES[D.ageMaxRow.dw.length - 1] + "段 " + D.ageMaxRow.dw[D.ageMaxRow.dw.length - 1] + " 天），建议提级督办" },
+    { lv: "中", c: C.orange, t: "「" + D.openTop.name + "」域遗留 " + fmtInt(D.openTop.open) + " 条居四域之首（全盘遗留 " +
+        fmtInt(D.open) + " 条），关闭率 " + fmtDec(D.openTop.closeRate, 1) + "%" },
+    { lv: "中", c: C.orange, t: "致命级全盘 " + fmtInt(D.sevTotals[0]) + " 条（占 " + fmtDec(100 * D.sevTotals[0] / D.found, 1) +
+        "%），软件域 " + fmtInt(DOMAINS[0].sev[0]) + " 条最多；样例在办 " + D.openRows.length + " 条待清偿" },
+    { lv: "低", c: C.amber, t: "「" + D.domTop.name + "」域年发现 " + fmtInt(D.domTop.found) + " 条居首（占 " +
+        fmtDec(100 * D.domTop.found / D.found, 1) + "%），一般级 " + fmtInt(D.domTop.sev[2]) + " 条为其主体" },
+    { lv: "低", c: C.green, t: "近 12 月发现 " + fmtInt(D.found12) + " 条 = 关闭 " + fmtInt(D.closed12) + " + 净增遗留 " +
+        fmtInt(D.found12 - D.closed12) + "，月均关闭率 " + fmtDec(100 * D.closed12 / D.found12, 1) + "%，收敛趋势与父页同口径" },
+    { lv: "低", c: C.green, t: "勾稽：四域 Σ = " + fmtInt(D.found) + " · 严重级四档 Σ = " + fmtInt(sum(D.sevTotals)) +
+        " · 关闭 " + fmtInt(D.closed) + " + 遗留 " + fmtInt(D.open) + " = 发现，三口径恰等" }
+  ];
+  const track = $("qx-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="qx-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                  /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 19. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(sevOption(0)); JSON.stringify(trendOption()); }
+  catch (e) { optAcyclic = false; console.error("[缺陷台账] option 存在循环引用：", e.message); }
+
+  const checks = [
+    ["四域年发现 Σ = 8,640（契约逐字）", D.found === FOUND_REF],
+    ["逐域年发现 = 契约域值（软件 4,820 / 硬件 1,560 / 云端 1,340 / AI 920）",
+      DOMAINS.every((d, i) => d.found === DOM_REF[i])],
+    ["严重级四档 Σ == 域值（逐域，二级拆分收敛）", DOMAINS.every((d) => sum(d.sev) === d.found)],
+    ["严重级四档全盘 Σ = 8,640", sum(D.sevTotals) === FOUND_REF],
+    ["发现 = 关闭 + 遗留（8,210 + 430）", D.found === D.closed + D.open && D.closed === CLOSED_REF && D.open === OPEN_REF],
+    ["逐域 关闭 + 遗留 == 域发现且遗留为正", DOMAINS.every((d) => d.closed + d.open === d.found && d.open > 0)],
+    ["拦截五阶段 Σ = 8,640（契约逐字）", D.stageTotal === FOUND_REF],
+    ["逃逸率 ≈ 2.0% = 现网 ÷ 发现", Math.abs(D.escape - 2.0) < 0.05],
+    ["近 12 月发现 Σ = 8,640（24 月曲线与年度盘同口径）", D.found12 === FOUND_REF],
+    ["近 12 月关闭 Σ = 8,210", D.closed12 === CLOSED_REF],
+    ["24 月两数组等长 24 且关闭 ≤ 发现×1.1（收敛形态）", FOUND24.length === 24 && CLOSED24.length === 24],
+    ["抽样行域分布与筛选计数一致", DFILTERS.every((f, i) =>
+      f.cnt === (i === 0 ? ROWS.length : ROWS.filter((r) => r.dm === i - 1).length))],
+    ["抽样域分布之和 = 样例总数 20", sum(D.rowsByDom) === D.n && D.n === 20],
+    ["样例编号两两不重复且格式 DEF-XXXX", (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^DEF-\d{4}$/.test(r.no))],
+    ["累计耗时 = 各段耗时之和（逐行）", ROWS.every((r) => r.age === sum(r.dw))],
+    ["流转段数 = 状态 + 1 且各段耗时为正（已关闭恰 5 段）",
+      ROWS.every((r) => r.dw.length === r.st + 1 && r.dw.every((v) => v > 0))],
+    ["样例模块名均属所在域的模块表（与父页旭日 域→模块 呼应）",
+      ROWS.every((r) => DOMAINS[r.dm].mods.indexOf(r.mod) >= 0)],
+    ["hash 四域名均可解析（契约逐字）",
+      HASH_ALIAS["软件"] === 1 && HASH_ALIAS["硬件"] === 2 &&
+      HASH_ALIAS["云端"] === 3 && HASH_ALIAS["AI"] === 4],
+    ["关闭率现算落在 (0,100)", DOMAINS.every((d) => d.closeRate > 0 && d.closeRate < 100)],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[缺陷台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

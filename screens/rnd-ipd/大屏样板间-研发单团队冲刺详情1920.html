@@ -1,0 +1,1165 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单团队冲刺详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --cq-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：回顾行动项台账（行动项 / 负责人 / 状态） */
+    --cq-tcols: 1fr 96px 86px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .cq-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 560px 1fr 532px;
+    grid-template-rows: 84px 122px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .cq-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .cq-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .cq-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .cq-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .cq-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .cq-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .cq-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .cq-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .cq-crumb em { font-style: normal; color: #d3e2ff; }
+  .cq-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .cq-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .cq-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .cq-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .cq-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .cq-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .cq-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .cq-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 对象切换器：12 个 Scrum 团队 tab，2 行 × 6 列紧凑网格（← → 方向键 / 12s 自动轮换 / hash 直达） */
+  .cq-switcher { display: grid; grid-template-columns: repeat(6, auto); gap: 5px 6px; }
+  .cq-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 62px; padding: 3px 8px 4px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .cq-sw-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.08em; }
+  .cq-sw-tab span { font-size: 9.5px; letter-spacing: 0.05em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .cq-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .cq-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .cq-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  .cq-chips { display: flex; align-items: center; gap: 9px; }
+  .cq-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 104px; padding: 7px 14px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .cq-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .cq-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .cq-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .cq-chip.is-key b { color: var(--rnd-blue); }
+  .cq-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .cq-clock-time { font: 700 26px/1 var(--cq-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .cq-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带（6 枚单队级） ===== */
+  .cq-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .cq-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 14px 0 16px;
+  }
+  .cq-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .cq-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .cq-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-orange), transparent); }
+  .cq-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 92, 0.14), transparent 68%); }
+  .cq-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .cq-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.26), rgba(70, 214, 200, 0.12));
+    border: 1px solid rgba(92, 157, 255, 0.35); box-shadow: inset 0 0 12px rgba(92, 157, 255, 0.14);
+  }
+  .cq-kpi.is-warn .cq-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 92, 0.28), rgba(255, 194, 77, 0.12));
+    border-color: rgba(255, 157, 92, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 92, 0.16);
+  }
+  .cq-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .cq-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .cq-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .cq-kpi-val { font: 700 28px/1 var(--cq-mono); color: #eaf1ff; letter-spacing: 0.02em; white-space: nowrap; }
+  .cq-kpi-val.is-text { font-size: 22px; letter-spacing: 0.1em; }
+  .cq-kpi.is-warn .cq-kpi-val { color: #ffd9b0; }
+  .cq-kpi.is-good .cq-kpi-val { color: #b8f2cf; }
+  .cq-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .cq-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cq-kpi-sub b { font-weight: 700; color: #bcd2f8; }
+
+  /* ===== 三栏主体 ===== */
+  .cq-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .cq-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .cq-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .cq-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .cq-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .cq-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .cq-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cq-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .cq-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 任务墙快照（CSS grid 模拟，非 echarts；面板写死高度） ===== */
+  .cq-wall { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .cq-wcol {
+    display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid rgba(96, 140, 255, 0.16); border-radius: 9px;
+    background: rgba(10, 20, 52, 0.45); padding: 7px 8px 8px;
+  }
+  .cq-wcol-head {
+    flex: none; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    padding: 1px 3px 6px; border-bottom: 1px dashed rgba(96, 140, 255, 0.22);
+  }
+  .cq-wcol-name { font-size: 12.5px; font-weight: 700; letter-spacing: 0.08em; }
+  .cq-wcol-cnt { font: 700 15px/1 var(--cq-mono); font-variant-numeric: tabular-nums; }
+  .cq-wcol-cnt i { font-style: normal; font-size: 9.5px; font-weight: 400; color: rgba(127, 146, 196, 0.8); margin-left: 2px; }
+  .cq-wcards { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 7px; margin-top: 8px; overflow: hidden; }
+  .cq-wcard {
+    flex: none; display: flex; flex-direction: column; gap: 3px;
+    border: 1px solid rgba(96, 140, 255, 0.18); border-left: 3px solid var(--rnd-blue);
+    border-radius: 7px; background: rgba(18, 34, 78, 0.5); padding: 6px 8px 7px;
+    transition: box-shadow .25s, background .25s;
+  }
+  .cq-wcard.is-hot { background: rgba(92, 157, 255, 0.14); box-shadow: inset 0 0 0 1px rgba(92, 157, 255, 0.4); }
+  .cq-wcard-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .cq-wcard-id { font: 700 10.5px/1 var(--cq-mono); letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.9); }
+  .cq-wcard-pts {
+    font: 700 10.5px/1.5 var(--cq-mono); padding: 0 7px; border-radius: 999px;
+    color: var(--rnd-amber); border: 1px solid rgba(255, 194, 77, 0.4); background: rgba(84, 62, 20, 0.3);
+  }
+  .cq-wcard-title { font-size: 11.5px; color: #d6e2fa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cq-wcard-owner { font-size: 10.5px; color: rgba(127, 146, 196, 0.85); }
+  .cq-wcard-owner b { font-weight: 700; color: #a9c4f5; }
+
+  /* ===== CSS grid 模拟表格：回顾行动项台账 ===== */
+  .cq-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .cq-thead, .cq-tbody li {
+    display: grid; grid-template-columns: var(--cq-tcols); align-items: center; gap: 8px;
+  }
+  .cq-thead {
+    flex: none; padding: 5px 10px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .cq-thead span:last-child, .cq-tbody li span:last-child { text-align: right; }
+  .cq-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .cq-tbody li {
+    padding: 0 10px; height: 28px; border-radius: 5px;
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    transition: background .25s, box-shadow .25s;
+  }
+  .cq-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .cq-tbody li.is-active { background: rgba(92, 157, 255, 0.16); box-shadow: inset 0 0 0 1px rgba(92, 157, 255, 0.42); }
+  .cq-tbody li b { font-weight: 700; color: #eaf1ff; }
+  .cq-tbody li .cq-cell-act { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cq-badge {
+    display: inline-block; padding: 1px 9px; border-radius: 999px;
+    font-size: 10.5px; letter-spacing: 0.06em; line-height: 1.6;
+    border: 1px solid rgba(96, 140, 255, 0.3); color: #a9c4f5; background: rgba(24, 44, 104, 0.4);
+  }
+  .cq-badge.is-done  { color: var(--rnd-green); border-color: rgba(111, 224, 154, 0.45); background: rgba(24, 74, 48, 0.32); }
+  .cq-badge.is-doing { color: var(--rnd-blue);  border-color: rgba(92, 157, 255, 0.5);   background: rgba(24, 44, 104, 0.5); }
+  .cq-badge.is-todo  { color: var(--rnd-text-dim); border-color: rgba(127, 146, 196, 0.4); background: rgba(24, 34, 66, 0.4); }
+
+  /* ===== 阻塞卡五类条（右下，写死高度面板内） ===== */
+  .cq-blocks { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-evenly; gap: 4px; }
+  .cq-blk { display: grid; grid-template-columns: 78px 1fr 40px; align-items: center; gap: 10px; font-size: 12px; }
+  .cq-blk-name { color: #bcd2f8; letter-spacing: 0.04em; white-space: nowrap; }
+  .cq-blk-bar { height: 10px; border-radius: 5px; background: rgba(96, 140, 255, 0.12); overflow: hidden; }
+  .cq-blk-bar i { display: block; height: 100%; border-radius: 5px; transition: width .5s; }
+  .cq-blk-val { text-align: right; font: 700 13px/1 var(--cq-mono); color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  .cq-blk-val i { font-style: normal; font-size: 9.5px; font-weight: 400; color: rgba(127, 146, 196, 0.8); }
+  .cq-blk-note { font-size: 10.5px; color: rgba(127, 146, 196, 0.8); letter-spacing: 0.04em; padding-top: 2px; border-top: 1px dashed rgba(96, 140, 255, 0.2); }
+  .cq-blk-note b { font-weight: 700; color: var(--rnd-amber); }
+
+  /* ===== 底部口径与要点滚动条 ===== */
+  .cq-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .cq-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-amber);
+  }
+  .cq-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-amber);
+    box-shadow: 0 0 10px var(--rnd-amber); animation: cq-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes cq-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .cq-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .cq-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .cq-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .cq-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .cq-foot-item b { font-weight: 700; color: #eaf1ff; }
+  .cq-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .cq-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="cq-stage" id="cq-stage">
+    <!-- mockflag:begin --><div class="cq-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="cq-error" id="cq-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容） -->
+    <header class="cq-header">
+      <div class="cq-head-left">
+        <div class="cq-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="cq-crumb-up" href="大屏样板间-研发敏捷交付总览1920.html" title="返回上级专题页（Esc）">‹ 返回 敏捷交付总览</a><i>›</i>
+          <em id="cq-crumb-obj">--</em>
+        </div>
+        <div class="cq-head-title-row">
+          <div class="cq-head-title" id="cq-title">-- · 冲刺详情</div>
+          <div class="cq-head-meta">
+            <span>Sprint <b>2026-S17</b> · 窗口 <b>08-10 → 08-21</b></span><i>|</i>
+            <span>工作日 <b>10</b> 天 · 今天第 <b>8</b> 天</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="cq-head-right">
+        <div class="cq-switcher" id="cq-switcher" aria-label="团队切换"></div>
+        <div class="cq-chips">
+          <div class="cq-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="cq-chip is-key"><span>VELOCITY</span><b id="cq-chip-vel">--</b></div>
+        </div>
+        <div class="cq-clock" aria-label="实时时钟">
+          <span class="cq-clock-time" id="cq-clock-time">--:--:--</span>
+          <span class="cq-clock-date" id="cq-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带（随团队切换） -->
+    <div class="cq-band" id="cq-band"></div>
+
+    <!-- 左栏：燃尽图 + 燃起图（同源 scope/done 数组派生） -->
+    <div class="cq-col">
+      <section class="cq-panel" style="flex: 1;">
+        <div class="cq-panel-head">
+          <h2>Sprint 燃尽图</h2>
+          <span class="cq-panel-tag">剩余 <b id="cq-bd-rem">--</b> 点 · D8 理想剩余 <b id="cq-bd-ideal">--</b> 点</span>
+        </div>
+        <div class="cq-chart" id="cq-chart-burndown"></div>
+      </section>
+      <section class="cq-panel" style="flex: 1;">
+        <div class="cq-panel-head">
+          <h2>Sprint 燃起图</h2>
+          <span class="cq-panel-tag">当前范围 <b id="cq-bu-scope">--</b> 点 = 承诺 <b id="cq-bu-commit">--</b> + 变更 <b id="cq-bu-chg">--</b></span>
+        </div>
+        <div class="cq-chart" id="cq-chart-burnup"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：任务墙快照（写死高度）+ 回顾行动项台账 -->
+    <div class="cq-col">
+      <!-- 高度写死 486px：列头 + 代表卡 3~4 张/列不裁切；min-height:0 + overflow:hidden 防内容撑破 -->
+      <section class="cq-panel" style="flex: none; height: 486px; min-height: 0; overflow: hidden;">
+        <div class="cq-panel-head">
+          <h2>任务墙快照</h2>
+          <span class="cq-panel-tag">墙上 <b id="cq-wall-total">--</b> 张卡 · 代表卡 <b id="cq-wall-rep">--</b> 张 · D8 快照</span>
+        </div>
+        <div class="cq-wall" id="cq-wall"></div>
+      </section>
+      <section class="cq-panel" style="flex: 1;">
+        <div class="cq-panel-head">
+          <h2>回顾行动项台账</h2>
+          <span class="cq-panel-tag">上一 Sprint（2026-S16）回顾产出 <b id="cq-retro-cnt">--</b> 条 · 已完成 <b id="cq-retro-done">--</b> 条</span>
+        </div>
+        <div class="cq-table">
+          <div class="cq-thead">
+            <span>行动项</span><span>负责人</span><span>状态</span>
+          </div>
+          <ul class="cq-tbody" id="cq-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右栏：成员负载条形 + 阻塞卡五类 -->
+    <div class="cq-col">
+      <section class="cq-panel" style="flex: 1;">
+        <div class="cq-panel-head">
+          <h2>成员负载 · 分配 vs 完成</h2>
+          <span class="cq-panel-tag"><b id="cq-mb-cnt">--</b> 人 · 人均承诺 <b id="cq-mb-avg">--</b> 点 · Σ分配 = 承诺</span>
+        </div>
+        <div class="cq-chart" id="cq-chart-member"></div>
+      </section>
+      <!-- 高度写死 236px：五类条 + 口径注脚不裁切 -->
+      <section class="cq-panel" style="flex: none; height: 236px; min-height: 0; overflow: hidden;">
+        <div class="cq-panel-head">
+          <h2>阻塞卡 · 五类归因</h2>
+          <span class="cq-panel-tag">本队 <b id="cq-blk-total">--</b> 张 · 首因 <b id="cq-blk-worst">--</b></span>
+        </div>
+        <div class="cq-blocks" id="cq-blocks"></div>
+      </section>
+    </div>
+
+    <!-- 底部口径与要点 -->
+    <div class="cq-foot">
+      <div class="cq-foot-tag">口径与要点</div>
+      <div class="cq-foot-view"><div class="cq-foot-track" id="cq-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("cq-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("cq-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技）
+         口径与全系列基准盘（docs/RndIpdThemed.md §2.2/§2.3）一致：
+         12 团队名/速率/站点/域逐字引契约 §2.3（Σ速率 = 746，年吞吐 = 746 × 26 = 19,396 点）；
+         阻塞卡为看板全在制口径，12 队 Σ = 109 张，五类列和 = 契约五类逐字（38/27/21/14/9）。
+         本 Sprint 承诺 = 团队速率（燃尽起点）；范围变更中途一次；
+         燃尽剩余 = 当前范围 − 累计完成（燃尽/燃起两图同源同数组派生，不各编一套）。
+         合计一律由分项求和，比率一律现算，页面上不出现任何硬编码的合计值。 ===== */
+
+  const PARENT = "大屏样板间-研发敏捷交付总览1920.html";
+  const SPRINT = "2026-S17";
+  const SPRINT_DAYS = 10;                    /* 工作日总数 */
+  const TODAY_DAY = 8;                       /* 今天是第 8 个工作日（D8，数据截至 2026-08-19） */
+  const SPRINTS_PER_YEAR = 26;
+
+  /* 4.1 12 个 Scrum 团队（契约 §2.3 逐字：名称 / 速率 点每Sprint / 站点 / 域） */
+  const TEAMS = [
+    { name: "天枢", vel: 82, site: "北京总部", dom: "软件" },
+    { name: "天璇", vel: 76, site: "北京总部", dom: "云平台" },
+    { name: "天玑", vel: 71, site: "上海中心", dom: "AI算法" },
+    { name: "天权", vel: 68, site: "深圳中心", dom: "硬件" },
+    { name: "玉衡", vel: 66, site: "上海中心", dom: "软件" },
+    { name: "开阳", vel: 63, site: "成都中心", dom: "AI算法" },
+    { name: "摇光", vel: 61, site: "成都中心", dom: "软件" },
+    { name: "青龙", vel: 58, site: "深圳中心", dom: "硬件" },
+    { name: "白虎", vel: 55, site: "西安中心", dom: "硬件" },
+    { name: "朱雀", vel: 52, site: "南京中心", dom: "云平台" },
+    { name: "玄武", vel: 49, site: "西安中心", dom: "测试" },
+    { name: "紫微", vel: 45, site: "北京总部", dom: "软件" }
+  ];
+  /* 契约 §2.3 权威串（构造性断言用：TEAMS 逐字拼接必须与其一致，防手滑改数） */
+  const AUTH_TEAMS = "天枢|82|北京总部|软件;天璇|76|北京总部|云平台;天玑|71|上海中心|AI算法;" +
+    "天权|68|深圳中心|硬件;玉衡|66|上海中心|软件;开阳|63|成都中心|AI算法;摇光|61|成都中心|软件;" +
+    "青龙|58|深圳中心|硬件;白虎|55|西安中心|硬件;朱雀|52|南京中心|云平台;玄武|49|西安中心|测试;" +
+    "紫微|45|北京总部|软件";
+  const TEAM_CODE = ["TS", "TX", "TJ", "TQ", "YH", "KY", "YG", "QL", "BH", "ZQ", "XW", "ZW"];
+
+  /* 4.2 D8 完成进度系数（本页自编二级：done8 = round(速率 × 系数)，理想为 0.8） */
+  const RATES = [0.86, 0.79, 0.74, 0.83, 0.68, 0.81, 0.77, 0.63, 0.85, 0.72, 0.80, 0.70];
+
+  /* 4.3 阻塞卡 12 队 × 五类矩阵（本页自编二级）：
+         行和 = 各队阻塞卡（看板全在制口径，含跨 Sprint 长期项，与看板流动效率页同源）；
+         列和逐字 = 契约五类：跨域依赖 38 / 环境与资源 27 / 需求变更 21 / 外部供应 14 / 评审等待 9；总和 = 109。 */
+  const BLOCK_CATS = ["跨域依赖", "环境与资源", "需求变更", "外部供应", "评审等待"];
+  const BLOCK_AUTH = [38, 27, 21, 14, 9];
+  const BLOCK_MAT = [
+    [4, 3, 2, 1, 1],   /* 天枢 11 */
+    [4, 3, 2, 1, 1],   /* 天璇 11 */
+    [4, 2, 2, 1, 1],   /* 天玑 10 */
+    [3, 3, 2, 2, 1],   /* 天权 11 */
+    [3, 2, 2, 1, 1],   /* 玉衡  9 */
+    [4, 2, 2, 1, 1],   /* 开阳 10 */
+    [3, 2, 2, 1, 0],   /* 摇光  8 */
+    [3, 3, 2, 2, 1],   /* 青龙 11 */
+    [3, 2, 2, 2, 0],   /* 白虎  9 */
+    [3, 2, 1, 1, 1],   /* 朱雀  8 */
+    [2, 2, 1, 1, 1],   /* 玄武  7 */
+    [2, 1, 1, 0, 0]    /* 紫微  4 */
+  ];
+  const BLOCK_COLORS = [C.red, C.orange, C.amber, C.violet, C.cyan];
+
+  /* 4.4 花名册（自编人名，5~8 人/队；分配点数由确定性分配器按承诺点拆分，Σ == 承诺） */
+  const ROSTERS = [
+    ["陈昊宇", "林晚晴", "赵启铭", "沈亦凡", "周子墨", "吴思远", "郑桐", "许安然"],
+    ["韩沐辰", "苏映雪", "高翊风", "任嘉树", "罗清越", "董一鸣", "白书宁"],
+    ["何静姝", "马跃庭", "孔令仪", "袁牧之", "崔明澜", "江晚舟", "傅星阑"],
+    ["唐既白", "邓凌薇", "彭致远", "曹沐阳", "萧让", "程知微", "莫子期"],
+    ["杜衡", "叶知秋", "纪云舒", "宋别鹤", "方鸿羽", "卫昭"],
+    ["秦观澜", "柳含烟", "贺新凉", "齐司南", "章明烛", "路辞远"],
+    ["温子言", "霍青", "颜栩", "龚泽", "黎慕白", "盛望舒"],
+    ["石竞舟", "雷雨桐", "欧阳靖", "丁汉臣", "洪毅", "庄晓梦"],
+    ["田镜湖", "樊星", "廖若晨", "关山月", "涂云帆"],
+    ["祝晚宁", "鲁彦成", "金昭", "骆清风", "聂海棠"],
+    ["池慕", "严铸", "隋安", "谈骁", "蒲牧野"],
+    ["岑夜阑", "楚天阔", "单弈", "燕迟", "明鹤知"]
+  ];
+
+  /* 4.5 任务墙代表卡标题池（按域取材，每队按偏移轮转取 14 张，恰好用满一轮不重复） */
+  const WALL_POOL = {
+    "软件": [
+      "场景联动规则引擎重构", "App 首页帧率优化", "设备配网流程改版", "消息中心多端同步",
+      "灰度发布开关治理", "离线缓存一致性修复", "埋点上报链路瘦身", "多语言资源热更新",
+      "账号安全风控加固", "桌面小组件卡片", "日志分级采样策略", "推送到达率优化",
+      "蓝牙近场秒连", "固件升级断点续传"
+    ],
+    "硬件": [
+      "主板 EMC 整改验证", "射频天线匹配调优", "电源纹波抑制", "结构散热仿真复核",
+      "按键手感曲线调校", "传感器标定工装", "整机跌落测试整改", "低功耗待机电流压降",
+      "屏幕排线可靠性", "扬声器腔体调音", "产测夹具节拍优化", "物料替代认证",
+      "防水密封圈选型", "PCB 叠层阻抗复算"
+    ],
+    "云平台": [
+      "网关限流策略升级", "设备影子增量同步", "时序库冷热分层迁移", "多租户配额告警",
+      "消息队列积压治理", "API 网关灰度路由", "对象存储生命周期", "链路追踪采样优化",
+      "容器弹性伸缩策略", "证书轮转自动化", "计费对账批处理", "跨可用区容灾演练",
+      "日志检索性能优化", "配置中心权限收敛"
+    ],
+    "AI算法": [
+      "唤醒词误触率压降", "视觉质检小样本增强", "模型量化 INT8 迁移", "语音降噪模型蒸馏",
+      "推荐召回通路扩展", "边缘推理内存优化", "数据标注质检规则", "模型 A/B 分流框架",
+      "特征仓库口径统一", "端云协同推理调度", "训练任务抢占恢复", "评测集偏差修正",
+      "意图识别长尾优化", "多模态对齐预研"
+    ],
+    "测试": [
+      "回归用例集瘦身", "自动化冒烟流水线", "压测场景建模", "兼容性矩阵扩充",
+      "缺陷聚类分析脚本", "接口契约测试接入", "弱网环境模拟", "用例失败自动归因",
+      "测试环境一键重置", "覆盖率门禁调优", "UI 遍历随机测试", "性能基线看板",
+      "众测反馈分拣", "安全扫描规则升级"
+    ]
+  };
+  const WALL_PTS = [3, 5, 8, 5, 3, 8, 13, 5, 3, 5, 8, 3, 5, 2];   /* 与标题池同下标的故事点 */
+  const WALL_COLS = [
+    { key: "todo",   name: "待办",   color: "#8aa8e8" },
+    { key: "wip",    name: "进行中", color: C.blue },
+    { key: "review", name: "评审中", color: C.amber },
+    { key: "done",   name: "完成",   color: C.green }
+  ];
+  const REP_PATTERN = [4, 4, 3, 3];          /* 代表卡数按列轮转：每队恰 14 张，用满标题池一轮 */
+
+  /* 4.6 回顾行动项池（上一 Sprint 2026-S16 回顾产出，各队 4~6 条按偏移轮转取） */
+  const RETRO_POOL = [
+    "站会限时 15 分钟并前置阻塞项",
+    "联调环境申请提前至计划会当天",
+    "跨域接口冻结期提前 2 天公示",
+    "需求变更走 CCB 快速通道评审",
+    "为新人结对安排固定导师",
+    "每日构建失败 30 分钟内认领",
+    "验收标准在启动前逐条过评",
+    "技术债卡片纳入速率预留 10%",
+    "评审等待超 1 天自动升级提醒",
+    "外部供应交期风险周报同步",
+    "Sprint 中期做一次范围健康检查",
+    "缺陷修复优先级每日站会确认"
+  ];
+  const RETRO_STATES = [
+    { name: "已完成", cls: "is-done" },
+    { name: "进行中", cls: "is-doing" },
+    { name: "未开始", cls: "is-todo" }
+  ];
+
+  /* ===== 4.7 确定性整数分配器（无随机数，刷新不抖动） =====
+     distribute：按权重把 total 拆成整数数组，Σ == total（最大余数法，破平取小下标）。 */
+  function distribute(total, ws) {
+    const s = sum(ws);
+    const raw = ws.map((w) => total * w / s);
+    const base = raw.map(Math.floor);
+    let r = total - sum(base);
+    const order = raw.map((v, i) => [v - Math.floor(v), i])
+      .sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+    for (let k = 0; k < order.length && r > 0; k++) { base[order[k][1]] += 1; r -= 1; }
+    return base;
+  }
+  /* distributeCapped：同上，但逐项不超过 caps（溢出确定性地挪给有余量者）。要求 total ≤ Σcaps。 */
+  function distributeCapped(total, caps, ws) {
+    const v = distribute(total, ws);
+    for (let guard = 0; guard < 200; guard++) {
+      let over = -1;
+      for (let k = 0; k < v.length; k++) { if (v[k] > caps[k]) { over = k; break; } }
+      if (over < 0) break;
+      let slack = -1;
+      for (let k = 0; k < v.length; k++) { if (v[k] < caps[k]) { slack = k; break; } }
+      if (slack < 0) break;
+      v[over] -= 1; v[slack] += 1;
+    }
+    return v;
+  }
+
+  /* ===== 4.8 派生量：每队冲刺全量数据（燃尽/燃起/成员/墙/回顾/阻塞），全部现算 ===== */
+  const D = {};
+  D.velSum = sum(TEAMS.map((t) => t.vel));
+  D.throughput = D.velSum * SPRINTS_PER_YEAR;
+
+  TEAMS.forEach((t, i) => {
+    t.roster = ROSTERS[i];
+
+    /* —— 范围与完成（燃尽/燃起同源）：承诺 = 速率；中途一次 +范围变更 —— */
+    t.chgDay = 3 + (i % 4);                                       /* 变更发生日 D3~D6，均在今日之前 */
+    t.chg = Math.max(3, Math.round(t.vel * 0.09));                /* 变更幅度 ≈ 速率 9% */
+    t.scope = Array.from({ length: SPRINT_DAYS + 1 }, (_, d) => t.vel + (d >= t.chgDay ? t.chg : 0));
+    t.done8 = Math.round(t.vel * RATES[i]);                       /* D8 累计完成点 */
+    const dws = Array.from({ length: TODAY_DAY }, (_, d) => 1 + 0.35 * Math.sin((d + 1) * 1.7 + i * 0.9));
+    t.daily = distribute(t.done8, dws);                           /* D1~D8 逐日完成，Σ == done8 */
+    t.cum = [0];
+    t.daily.forEach((v) => t.cum.push(t.cum[t.cum.length - 1] + v));
+    t.remain = t.cum.map((c, d) => t.scope[d] - c);               /* 燃尽剩余 = 范围 − 累计完成 */
+    t.ideal = Array.from({ length: SPRINT_DAYS + 1 }, (_, d) => t.vel * (1 - d / SPRINT_DAYS));
+
+    /* —— 目标达成状态：D8 完成 vs 理想完成（承诺 × 8/10）—— */
+    t.idealDone8 = t.vel * TODAY_DAY / SPRINT_DAYS;
+    const ratio = t.done8 / t.idealDone8;
+    t.status = ratio >= 1.05 ? "超前" : (ratio <= 0.9 ? "滞后" : "按计划");
+    t.rem8 = t.remain[TODAY_DAY];
+    t.doneRate = t.done8 / t.scope[TODAY_DAY] * 100;
+
+    /* —— 成员负载：Σ分配 == 承诺（= 速率），Σ完成 == done8 且每人完成 ≤ 分配 —— */
+    const aw = t.roster.map((_, k) => 1 + 0.3 * Math.sin(k * 1.3 + i * 0.7));
+    t.alloc = distribute(t.vel, aw);
+    const dw2 = t.roster.map((_, k) => 1 + 0.25 * Math.sin(k * 2.1 + i));
+    t.mdone = distributeCapped(t.done8, t.alloc, dw2);
+
+    /* —— 阻塞卡（看板全在制口径）—— */
+    t.blocks = BLOCK_MAT[i];
+    t.blocked = sum(t.blocks);
+    t.blockWorst = BLOCK_CATS[t.blocks.indexOf(Math.max.apply(null, t.blocks))];
+
+    /* —— 任务墙：代表卡 3~4 张/列（恰 14 张用满标题池），列计数为墙上总卡数 —— */
+    const pool = WALL_POOL[t.dom];
+    t.wall = [];
+    let seq = 0;
+    WALL_COLS.forEach((col, c) => {
+      const rep = REP_PATTERN[(c + i) % 4];
+      const cards = [];
+      for (let k = 0; k < rep; k++) {
+        const ti = (i * 3 + seq) % pool.length;
+        cards.push({
+          id: TEAM_CODE[i] + "-" + (1700 + i * 20 + seq),
+          title: pool[ti], pts: WALL_PTS[ti],
+          owner: t.roster[(seq * 7 + i) % t.roster.length]
+        });
+        seq += 1;
+      }
+      t.wall.push(cards);
+    });
+    t.wallCnt = [
+      Math.max(t.wall[0].length, Math.round((t.scope[TODAY_DAY] - t.done8) / 3.4)),  /* 待办 */
+      Math.max(t.wall[1].length, t.roster.length + 1),                               /* 进行中 ≈ 人数 + 1 */
+      Math.max(t.wall[2].length, 3 + (i % 2)),                                       /* 评审中 */
+      Math.max(t.wall[3].length, Math.round(t.done8 / 3.4))                          /* 完成 */
+    ];
+    t.wallTotal = sum(t.wallCnt);
+    t.wallRep = sum(t.wall.map((c) => c.length));
+
+    /* —— 回顾行动项 4~6 条 —— */
+    const rn = 4 + (i % 3);
+    t.retro = Array.from({ length: rn }, (_, k) => {
+      const pi = (i * 2 + k) % RETRO_POOL.length;
+      return {
+        act: RETRO_POOL[pi],
+        owner: t.roster[(k * 5 + 1) % t.roster.length],
+        st: RETRO_STATES[(k + i) % 3]
+      };
+    });
+    t.retroDone = t.retro.filter((r) => r.st.name === "已完成").length;
+  });
+
+  D.blockedSum = sum(TEAMS.map((t) => t.blocked));                /* 12 队阻塞合计（应 = 109） */
+  D.blockColSum = BLOCK_CATS.map((_, c) => sum(BLOCK_MAT.map((row) => row[c])));
+  D.chgSum = sum(TEAMS.map((t) => t.chg));
+  D.ahead = TEAMS.filter((t) => t.status === "超前");
+  D.behind = TEAMS.filter((t) => t.status === "滞后");
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("cq-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("cq-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 6. 团队切换器（对象切换器：tab 文本与契约 §6 hash 键逐字一致） ===== */
+  const switcher = $("cq-switcher");
+  switcher.innerHTML = TEAMS.map((t, i) => (
+    '<button class="cq-sw-tab" type="button" data-i="' + i + '" title="切换到' + t.name + '（← → 方向键）">' +
+      "<b>" + t.name + "</b><span>" + t.vel + " 点</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".cq-sw-tab"));
+
+  /* ===== 7. 底部口径与要点（★ 图表 init 之前填充；全部由派生量现算） ===== */
+  const FOOT_ITEMS = [
+    { tag: "口径", t: "承诺 = 团队速率（燃尽起点）；Sprint " + SPRINT + " 共 " + SPRINT_DAYS +
+        " 个工作日，今天第 " + TODAY_DAY + " 天（D" + TODAY_DAY + "）；燃尽剩余 = 当前范围 − 累计完成，燃起与燃尽同源同数组" },
+    { tag: "口径", t: "阻塞卡为看板全在制口径（含跨 Sprint 长期项）：12 队 Σ = " + fmtInt(D.blockedSum) +
+        " 张 = 五类之和（" + BLOCK_CATS.map((c, k) => c + " " + D.blockColSum[k]).join(" + ") + "），与看板流动效率页同源" },
+    { tag: "口径", t: "年故事点吞吐 = Σ 12 队速率 " + fmtInt(D.velSum) + " × " + SPRINTS_PER_YEAR +
+        " 个 Sprint = " + fmtInt(D.throughput) + " 点（契约 §2.2 同源）" },
+    { tag: "要点", t: "超前（完成 ≥ 理想 105%）：" + D.ahead.map((t) => t.name).join("、") +
+        "；滞后（完成 ≤ 理想 90%）：" + D.behind.map((t) => t.name).join("、") + "，需在 D9–D10 收敛或移交范围" },
+    { tag: "要点", t: "12 队本 Sprint 各发生 1 次中途 +范围变更（D3–D6），合计 +" + fmtInt(D.chgSum) +
+        " 点；变更走 CCB 快速通道口径见回顾行动项台账" }
+  ];
+  const track = $("cq-foot-track");
+  const footHtml = FOOT_ITEMS.map((a) => (
+    '<div class="cq-foot-item"><i style="color:' + (a.tag === "口径" ? C.amber : C.blue) + '">[' + a.tag + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = footHtml + footHtml;                          /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 8. 图表初始化 =====
+     ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = {
+    backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  };
+  const bdChart = makeChart("cq-chart-burndown");
+  const buChart = makeChart("cq-chart-burnup");
+  const mbChart = makeChart("cq-chart-member");
+
+  const DAY_LABELS = Array.from({ length: SPRINT_DAYS + 1 }, (_, d) => "D" + d);
+  const TODAY_MARK = {
+    silent: true, symbol: "none", z: 10,
+    lineStyle: { color: C.amber, width: 1.6, type: "solid" },
+    label: { show: true, position: "insideEndTop", color: C.amber, fontSize: 11, fontWeight: 700, formatter: "今日 D" + TODAY_DAY },
+    data: [{ xAxis: "D" + TODAY_DAY }]
+  };
+
+  /* 8.1 燃尽图：实际剩余（D0~D8）vs 理想线（D0~D10）；起点 = 速率，D{chg} 因范围变更上跳 */
+  function burndownOption(i) {
+    const t = TEAMS[i];
+    const actual = t.remain.concat(Array.from({ length: SPRINT_DAYS - TODAY_DAY }, () => null));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 14, top: 34, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis",
+        formatter: (ps) => {
+          const d = ps[0].dataIndex;
+          let s = "<b>D" + d + "</b><br/>理想剩余 <b style=\"color:" + C.textDim + "\">" + fmtDec(t.ideal[d], 1) + "</b> 点";
+          if (d <= TODAY_DAY) {
+            s += "<br/>实际剩余 <b style=\"color:" + C.blue + "\">" + t.remain[d] + "</b> 点 · 当日完成 <b style=\"color:" +
+              C.green + "\">" + (d > 0 ? t.daily[d - 1] : 0) + "</b> 点";
+            if (d === t.chgDay) s += "<br/><span style=\"color:" + C.orange + "\">范围变更 +" + t.chg + " 点</span>";
+          }
+          return s;
+        }
+      }, TIP),
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: ["实际剩余", "理想线"]
+      },
+      xAxis: {
+        type: "category", data: DAY_LABELS, boundaryGap: false,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0 })
+      },
+      yAxis: {
+        type: "value", name: "点", max: t.vel + t.chg + 6, nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+      },
+      series: [
+        { name: "理想线", type: "line", symbol: "none", z: 3,
+          data: t.ideal.map((v) => Number(fmtDec(v, 1))),
+          lineStyle: { width: 1.6, color: C.textDim, type: "dashed" }, itemStyle: { color: C.textDim } },
+        { name: "实际剩余", type: "line", symbol: "circle", symbolSize: 5, z: 5,
+          data: actual,
+          lineStyle: { width: 2.6, color: C.blue }, itemStyle: { color: C.blue },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "rgba(92,157,255,.28)" }, { offset: 1, color: "rgba(92,157,255,.03)" }]) },
+          markLine: TODAY_MARK,
+          markPoint: {
+            symbol: "pin", symbolSize: 40, z: 8,
+            itemStyle: { color: C.orange },
+            label: { color: "#04101f", fontSize: 10, fontWeight: 700, formatter: "+" + t.chg },
+            data: [{ coord: [t.chgDay, t.remain[t.chgDay]] }]
+          } }
+      ]
+    };
+  }
+
+  /* 8.2 燃起图：范围线（阶跃，中途 +变更一次）+ 累计完成线；与燃尽同源同数组 */
+  function burnupOption(i) {
+    const t = TEAMS[i];
+    const doneLine = t.cum.concat(Array.from({ length: SPRINT_DAYS - TODAY_DAY }, () => null));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 14, top: 34, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis",
+        formatter: (ps) => {
+          const d = ps[0].dataIndex;
+          let s = "<b>D" + d + "</b><br/>范围 <b style=\"color:" + C.amber + "\">" + t.scope[d] + "</b> 点";
+          if (d >= t.chgDay) s += "（承诺 " + t.vel + " + 变更 " + t.chg + "）";
+          if (d <= TODAY_DAY) {
+            s += "<br/>累计完成 <b style=\"color:" + C.green + "\">" + t.cum[d] + "</b> 点 · 完成率 <b>" +
+              fmtDec(t.cum[d] / t.scope[d] * 100, 1) + "%</b>";
+          }
+          return s;
+        }
+      }, TIP),
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: ["范围线", "完成线"]
+      },
+      xAxis: {
+        type: "category", data: DAY_LABELS, boundaryGap: false,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0 })
+      },
+      yAxis: {
+        type: "value", name: "点", max: t.vel + t.chg + 6, nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+      },
+      series: [
+        { name: "范围线", type: "line", step: "end", symbol: "none", z: 4,
+          data: t.scope.slice(),
+          lineStyle: { width: 2, color: C.amber }, itemStyle: { color: C.amber },
+          markLine: TODAY_MARK,
+          markPoint: {
+            symbol: "pin", symbolSize: 40, z: 8,
+            itemStyle: { color: C.orange },
+            label: { color: "#04101f", fontSize: 10, fontWeight: 700, formatter: "+" + t.chg },
+            data: [{ coord: [t.chgDay, t.scope[t.chgDay]] }]
+          } },
+        { name: "完成线", type: "line", symbol: "circle", symbolSize: 5, z: 5,
+          data: doneLine,
+          lineStyle: { width: 2.6, color: C.green }, itemStyle: { color: C.green },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "rgba(111,224,154,.24)" }, { offset: 1, color: "rgba(111,224,154,.03)" }]) } }
+      ]
+    };
+  }
+
+  /* 8.3 成员负载横向条形：分配（底衬）vs 完成（叠盖），标签 = 个人完成率 */
+  function memberOption(i) {
+    const t = TEAMS[i];
+    const names = t.roster.slice();
+    const alloc = t.alloc.slice();
+    const mdone = t.mdone.slice();
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 46, top: 30, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex;
+          return "<b>" + names[k] + "</b><br/>分配 <b style=\"color:" + C.blue + "\">" + alloc[k] +
+            "</b> 点 · 完成 <b style=\"color:" + C.green + "\">" + mdone[k] + "</b> 点 · 完成率 <b>" +
+            fmtDec(mdone[k] / alloc[k] * 100, 0) + "%</b>";
+        }
+      }, TIP),
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: ["分配", "完成"]
+      },
+      xAxis: {
+        type: "value", max: Math.max.apply(null, alloc) + 2,
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+      },
+      yAxis: {
+        type: "category", data: names, inverse: true,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: "#bcd2f8", fontSize: 12, fontWeight: 700 }
+      },
+      series: [
+        { name: "分配", type: "bar", barWidth: 13, z: 2,
+          data: alloc,
+          itemStyle: { color: "rgba(92,157,255,.15)", borderColor: "rgba(92,157,255,.4)", borderWidth: 1, borderRadius: 7 } },
+        { name: "完成", type: "bar", barWidth: 13, barGap: "-100%", z: 3,
+          data: mdone,
+          itemStyle: { borderRadius: 7,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: C.blueDeep }, { offset: 1, color: C.blue }]) },
+          label: {
+            show: true, position: "right", color: C.textDim, fontSize: 10.5,
+            formatter: (p) => fmtDec(mdone[p.dataIndex] / alloc[p.dataIndex] * 100, 0) + "%"
+          } }
+      ]
+    };
+  }
+
+  /* ===== 9. KPI 带 / 任务墙 / 回顾台账 / 阻塞条（随团队切换重绘） ===== */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+
+  const band = $("cq-band");
+  function renderKpi(i) {
+    const t = TEAMS[i];
+    const defs = [
+      { icon: "⚡", label: "团队速率", val: t.vel, unit: "点/Sprint", dec: 0, cls: "",
+        sub: t.site + " · " + t.dom + "域 · 年吞吐 <b>" + fmtInt(t.vel * SPRINTS_PER_YEAR) + "</b> 点" },
+      { icon: "◫", label: "本 Sprint 承诺", val: t.vel, unit: "点", dec: 0, cls: "",
+        sub: "范围变更 <b>+" + t.chg + "</b>（D" + t.chgDay + "）→ 当前范围 <b>" + t.scope[TODAY_DAY] + "</b> 点" },
+      { icon: "✓", label: "已完成（D" + TODAY_DAY + "）", val: t.done8, unit: "点", dec: 0, cls: "",
+        sub: "完成率 <b>" + fmtDec(t.doneRate, 1) + "%</b> · 日均 <b>" + fmtDec(t.done8 / TODAY_DAY, 1) + "</b> 点" },
+      { icon: "◎", label: "目标达成状态", text: t.status,
+        cls: t.status === "滞后" ? " is-warn" : (t.status === "超前" ? " is-good" : ""),
+        sub: "剩余 <b>" + t.rem8 + "</b> 点 · 理想剩余 <b>" + fmtDec(t.ideal[TODAY_DAY], 1) + "</b> 点" },
+      { icon: "⛔", label: "阻塞卡", val: t.blocked, unit: "张", dec: 0, cls: t.blocked >= 10 ? " is-warn" : "",
+        sub: "首因 <b>" + t.blockWorst + "</b> · 全在制口径 · 五类归因见右下" },
+      { icon: "◍", label: "团队成员", val: t.roster.length, unit: "人", dec: 0, cls: "",
+        sub: "人均承诺 <b>" + fmtDec(t.vel / t.roster.length, 1) + "</b> 点 · Σ分配 = 承诺" }
+    ];
+    band.innerHTML = defs.map((k, j) => (
+      '<div class="cq-kpi' + k.cls + '">' +
+        '<div class="cq-kpi-icon">' + k.icon + "</div>" +
+        '<div class="cq-kpi-main">' +
+          '<div class="cq-kpi-label">' + k.label + "</div>" +
+          (k.text != null
+            ? '<div class="cq-kpi-num"><span class="cq-kpi-val is-text">' + k.text + "</span></div>"
+            : '<div class="cq-kpi-num"><span class="cq-kpi-val" id="cq-kpi-' + j + '">0</span><span class="cq-kpi-unit">' + k.unit + "</span></div>") +
+          '<div class="cq-kpi-sub">' + k.sub + "</div>" +
+        "</div>" +
+      "</div>"
+    )).join("");
+    defs.forEach((k, j) => { if (k.text == null) countUp($("cq-kpi-" + j), k.val, k.dec); });
+  }
+
+  const wallBox = $("cq-wall");
+  let wallCards = [];
+  function renderWall(i) {
+    const t = TEAMS[i];
+    wallBox.innerHTML = WALL_COLS.map((col, c) => (
+      '<div class="cq-wcol" style="border-top: 2px solid ' + col.color + ';">' +
+        '<div class="cq-wcol-head">' +
+          '<span class="cq-wcol-name" style="color:' + col.color + '">' + col.name + "</span>" +
+          '<span class="cq-wcol-cnt" style="color:' + col.color + '">' + t.wallCnt[c] + "<i>张</i></span>" +
+        "</div>" +
+        '<div class="cq-wcards">' +
+          t.wall[c].map((card) => (
+            '<div class="cq-wcard" style="border-left-color:' + col.color + '">' +
+              '<div class="cq-wcard-top"><span class="cq-wcard-id">' + card.id + '</span><span class="cq-wcard-pts">' + card.pts + " 点</span></div>" +
+              '<div class="cq-wcard-title">' + card.title + "</div>" +
+              '<div class="cq-wcard-owner">负责人 <b>' + card.owner + "</b></div>" +
+            "</div>"
+          )).join("") +
+        "</div>" +
+      "</div>"
+    )).join("");
+    wallCards = Array.from(wallBox.querySelectorAll(".cq-wcard"));
+    $("cq-wall-total").textContent = fmtDec(t.wallTotal, 0);
+    $("cq-wall-rep").textContent = fmtDec(t.wallRep, 0);
+  }
+
+  const tbody = $("cq-tbody");
+  let retroRows = [];
+  function renderRetro(i) {
+    const t = TEAMS[i];
+    tbody.innerHTML = t.retro.map((r, k) => (
+      '<li data-i="' + k + '">' +
+        '<span class="cq-cell-act"><b>' + r.act + "</b></span>" +
+        "<span>" + r.owner + "</span>" +
+        '<span><span class="cq-badge ' + r.st.cls + '">' + r.st.name + "</span></span>" +
+      "</li>"
+    )).join("");
+    retroRows = Array.from(tbody.children);
+    $("cq-retro-cnt").textContent = fmtDec(t.retro.length, 0);
+    $("cq-retro-done").textContent = fmtDec(t.retroDone, 0);
+  }
+
+  const blocksBox = $("cq-blocks");
+  function renderBlocks(i) {
+    const t = TEAMS[i];
+    const mx = Math.max.apply(null, t.blocks) || 1;
+    blocksBox.innerHTML = BLOCK_CATS.map((c, k) => (
+      '<div class="cq-blk">' +
+        '<span class="cq-blk-name">' + c + "</span>" +
+        '<span class="cq-blk-bar"><i style="width:' + fmtDec(t.blocks[k] / mx * 100, 1) + "%; background: linear-gradient(90deg, " +
+          BLOCK_COLORS[k] + ", rgba(92,157,255,.25));\"></i></span>" +
+        '<span class="cq-blk-val">' + t.blocks[k] + "<i> 张</i></span>" +
+      "</div>"
+    )).join("") + (
+      '<div class="cq-blk-note">全在制口径 · 12 队合计 <b>' + fmtInt(D.blockedSum) + "</b> 张 = 契约五类之和（与看板流动效率页同源）</div>"
+    );
+    $("cq-blk-total").textContent = fmtDec(t.blocked, 0);
+    $("cq-blk-worst").textContent = t.blockWorst;
+  }
+
+  /* ===== 10. 团队切换主流程 ===== */
+  let idx = 0;
+  let rowIdx = 0;
+  let cardIdx = 0;
+  function applyTeam(i) {
+    const n = TEAMS.length;
+    idx = ((i % n) + n) % n;
+    const t = TEAMS[idx];
+
+    $("cq-title").textContent = t.name + " · 冲刺详情";
+    $("cq-crumb-obj").textContent = t.name + "（" + t.site + " · " + t.dom + "）";
+    $("cq-chip-vel").textContent = t.vel + " 点";
+    swTabs.forEach((b, k) => b.classList.toggle("is-active", k === idx));
+
+    renderKpi(idx);
+    renderWall(idx);
+    renderRetro(idx);
+    renderBlocks(idx);
+
+    bdChart.setOption(burndownOption(idx), true);                 /* y 轴上限随队变化 → notMerge */
+    buChart.setOption(burnupOption(idx), true);
+    mbChart.setOption(memberOption(idx), true);                   /* 成员数随队变化 → notMerge */
+
+    $("cq-bd-rem").textContent = fmtDec(t.rem8, 0);
+    $("cq-bd-ideal").textContent = fmtDec(t.ideal[TODAY_DAY], 1);
+    $("cq-bu-scope").textContent = fmtDec(t.scope[TODAY_DAY], 0);
+    $("cq-bu-commit").textContent = fmtDec(t.vel, 0);
+    $("cq-bu-chg").textContent = "+" + t.chg;
+    $("cq-mb-cnt").textContent = fmtDec(t.roster.length, 0);
+    $("cq-mb-avg").textContent = fmtDec(t.vel / t.roster.length, 1);
+
+    rowIdx = 0;
+    cardIdx = 0;
+    playRow();
+    playCard();
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(t.name));
+  }
+
+  /* 台账行 / 任务墙卡轮播高亮，制造"活性" */
+  function playRow() {
+    if (!retroRows.length) return;
+    retroRows.forEach((r, k) => r.classList.toggle("is-active", k === rowIdx));
+    rowIdx = (rowIdx + 1) % retroRows.length;
+  }
+  setInterval(playRow, 2600);
+
+  function playCard() {
+    if (!wallCards.length) return;
+    wallCards.forEach((c, k) => c.classList.toggle("is-hot", k === cardIdx));
+    cardIdx = (cardIdx + 1) % wallCards.length;
+  }
+  setInterval(playCard, 1700);
+
+  /* 成员负载逐人轮播提示 */
+  let mbIdx = 0;
+  setInterval(() => {
+    const n = TEAMS[idx].roster.length;
+    mbIdx = mbIdx % n;
+    mbChart.dispatchAction({ type: "showTip", seriesIndex: 1, dataIndex: mbIdx });
+    mbIdx = (mbIdx + 1) % n;
+  }, 3000);
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 ===== */
+  swTabs.forEach((b) => b.addEventListener("click", () => { applyTeam(Number(b.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyTeam(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyTeam(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* hash 契约：decodeURIComponent(location.hash.slice(1)) → trim + 全角空白剔除归一 → 匹配 12 团队名 */
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    return TEAMS.findIndex((t) => t.name === s);
+  }
+  const hit = resolveHash(location.hash);
+  applyTeam(hit >= 0 ? hit : 0);
+  if (hit >= 0) hold();
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applyTeam(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 12 秒切下一团队；鼠标停在切换器上时暂停。
+     从父页下钻进来（hash 命中）时先保持 20 秒不轮换，否则读者还没看清这一队就被切走。 */
+  let timer = null;
+  let holdUntil = 0;
+  function hold() { holdUntil = Date.now() + 20000; }
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyTeam(idx + 1); }, 12000);
+  }
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const checks = [
+    ["12 团队名/速率/站点/域与契约 §2.3 逐字（构造性断言）",
+      TEAMS.map((t) => [t.name, t.vel, t.site, t.dom].join("|")).join(";") === AUTH_TEAMS],
+    ["Σ 12 队速率 = 746，年吞吐 = 746 × 26 = 19,396 点", D.velSum === 746 && D.throughput === 19396],
+    ["hash 12 团队名均可解析（构造性断言）",
+      TEAMS.every((t, i) => resolveHash("#" + encodeURIComponent(t.name)) === i)],
+    ["切换器 tab 数 = 12 且文本与契约 hash 键逐字", swTabs.length === 12 &&
+      swTabs.every((b, i) => b.querySelector("b").textContent === TEAMS[i].name)],
+    ["每队燃尽起点 = 速率（承诺 = 速率）", TEAMS.every((t) => t.remain[0] === t.vel && t.scope[0] === t.vel)],
+    ["每队每日燃尽剩余 = 当前范围 − 累计完成（燃尽/燃起同源）",
+      TEAMS.every((t) => t.remain.every((v, d) => v === t.scope[d] - t.cum[d]))],
+    ["每队范围变更恰一次且在今日之前（D3–D6）", TEAMS.every((t) => {
+      let jumps = 0;
+      for (let d = 1; d <= SPRINT_DAYS; d++) { if (t.scope[d] !== t.scope[d - 1]) jumps += 1; }
+      return jumps === 1 && t.chgDay >= 1 && t.chgDay <= TODAY_DAY;
+    })],
+    ["每队逐日完成 Σ = 累计完成（D8），且完成 ≤ 当前范围",
+      TEAMS.every((t) => sum(t.daily) === t.done8 && t.cum[TODAY_DAY] === t.done8 && t.done8 <= t.scope[TODAY_DAY])],
+    ["每队成员分配 Σ = 承诺点（= 速率）", TEAMS.every((t) => sum(t.alloc) === t.vel)],
+    ["每队成员完成 Σ = 已完成点，且每人完成 ≤ 分配", TEAMS.every((t) =>
+      sum(t.mdone) === t.done8 && t.mdone.every((v, k) => v >= 0 && v <= t.alloc[k]))],
+    ["每队成员 5~8 人", TEAMS.every((t) => t.roster.length >= 5 && t.roster.length <= 8)],
+    ["阻塞矩阵行和 = 各队阻塞卡，12 队 Σ = 109", TEAMS.every((t) => sum(t.blocks) === t.blocked) && D.blockedSum === 109],
+    ["阻塞矩阵五类列和与契约逐字（38/27/21/14/9）",
+      D.blockColSum.length === BLOCK_AUTH.length && D.blockColSum.every((v, k) => v === BLOCK_AUTH[k])],
+    ["任务墙每列代表卡 3~4 张且列计数 ≥ 代表卡数", TEAMS.every((t) =>
+      t.wall.every((cards, c) => cards.length >= 3 && cards.length <= 4 && t.wallCnt[c] >= cards.length))],
+    ["任务墙代表卡负责人皆在本队花名册", TEAMS.every((t) =>
+      t.wall.every((cards) => cards.every((card) => t.roster.indexOf(card.owner) >= 0)))],
+    ["回顾行动项 4~6 条且负责人皆在本队花名册", TEAMS.every((t) =>
+      t.retro.length >= 4 && t.retro.length <= 6 && t.retro.every((r) => t.roster.indexOf(r.owner) >= 0))],
+    ["目标达成状态覆盖三态（超前/按计划/滞后各至少一队）",
+      ["超前", "按计划", "滞后"].every((s) => TEAMS.some((t) => t.status === s))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单团队冲刺详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
