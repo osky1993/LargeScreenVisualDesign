@@ -18,7 +18,8 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 成品屏所在目录（各目录只取本层）
 SCREEN_DIRS = ["screens", os.path.join("screens", "public-funds"),
-               os.path.join("screens", "kitchen-appliance")]
+               os.path.join("screens", "kitchen-appliance"),
+               os.path.join("screens", "rnd-ipd")]
 
 CSS_BEGIN = "  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */"
 CSS_END = "  /* mockflag:end */"
