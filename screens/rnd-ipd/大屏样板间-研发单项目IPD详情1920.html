@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单项目IPD详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --dj-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 评审记录表列宽：评审点 / 类型说明 / 计划日期 / 实际日期 / 结论 / 遗留项 */
+    --dj-tcols: 92px 1fr 94px 94px 76px 56px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .dj-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 460px 1fr 450px;
+    grid-template-rows: 84px 108px 46px 1fr;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .dj-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .dj-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .dj-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .dj-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .dj-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .dj-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .dj-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .dj-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .dj-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：本页是「IPD 管道与评审」的二级下钻页 */
+  .dj-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px 3px; border-radius: 7px;
+    color: #a9c4f2; text-decoration: none; letter-spacing: 0.06em;
+    border: 1px solid rgba(96, 140, 255, 0.32); background: rgba(20, 38, 92, 0.55);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .dj-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .dj-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .dj-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .dj-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .dj-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .dj-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .dj-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .dj-chips { display: flex; align-items: center; gap: 9px; }
+  .dj-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .dj-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .dj-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .dj-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .dj-chip.is-key b { color: var(--rnd-blue); }
+  .dj-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .dj-clock-time { font: 700 26px/1 var(--dj-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .dj-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带（5 枚，随项目切换重算） ===== */
+  .dj-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .dj-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 14px 0 16px;
+  }
+  .dj-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .dj-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .dj-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-orange), transparent); }
+  .dj-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 92, 0.14), transparent 68%); }
+  .dj-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.26), rgba(70, 214, 200, 0.12));
+    border: 1px solid rgba(92, 157, 255, 0.35); box-shadow: inset 0 0 12px rgba(92, 157, 255, 0.14);
+  }
+  .dj-kpi.is-warn .dj-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 92, 0.28), rgba(255, 194, 77, 0.12));
+    border-color: rgba(255, 157, 92, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 92, 0.16);
+  }
+  .dj-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .dj-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .dj-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .dj-kpi-val { font: 700 28px/1 var(--dj-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .dj-kpi.is-warn .dj-kpi-val { color: #ffd9b0; }
+  .dj-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .dj-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dj-kpi-sub b { font-weight: 700; color: #cfdcff; }
+
+  /* ===== 项目切换器（8 个重点项目，对象名与契约逐字一致） ===== */
+  .dj-swbar {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .dj-swbar-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .dj-switcher { flex: 1; min-width: 0; display: flex; align-items: stretch; gap: 8px; }
+  .dj-sw {
+    flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: center; gap: 7px;
+    padding: 4px 8px 5px; border-radius: 8px; cursor: pointer; user-select: none; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.24); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; white-space: nowrap; overflow: hidden;
+    transition: color .18s, border-color .18s, background .18s, box-shadow .18s;
+  }
+  .dj-sw b { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
+  .dj-sw i { font-style: normal; font-size: 10.5px; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .dj-sw:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.6); }
+  .dj-sw.is-on { color: #05102b; border-color: transparent; box-shadow: 0 0 15px rgba(0, 0, 0, 0.3); }
+  .dj-sw.is-on i { color: rgba(5, 16, 43, 0.72); }
+  .dj-swbar-state { flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .dj-swbar-state b { font-weight: 700; color: var(--rnd-blue); }
+  .dj-swbar-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 7px; }
+
+  /* ===== 面板骨架 ===== */
+  .dj-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .dj-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .dj-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .dj-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .dj-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .dj-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .dj-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .dj-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .dj-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 徽章 ===== */
+  .dj-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .dj-badge.is-pass { color: #063a25; background: var(--rnd-green); }
+  .dj-badge.is-cond { color: #3a2405; background: var(--rnd-amber); }
+  .dj-badge.is-veto { color: #3d0a10; background: var(--rnd-red); }
+  .dj-badge.is-stage { color: #05102b; background: var(--rnd-blue); }
+
+  /* ===== 项目档案卡（左栏上，两列字段网格） ===== */
+  .dj-dossier { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dj-df {
+    min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px;
+    padding: 5px 11px; border-radius: 8px;
+    border: 1px solid rgba(96, 140, 255, 0.16); background: rgba(14, 26, 66, 0.5);
+  }
+  .dj-df span { font-size: 10.5px; letter-spacing: 0.12em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .dj-df b { font-size: 14.5px; font-weight: 700; letter-spacing: 0.03em; color: #dfe9ff; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dj-df b em { font-style: normal; font-size: 11px; color: var(--rnd-text-dim); font-weight: 400; }
+
+  /* ===== 需求-交付勾稽块（左栏中） ===== */
+  .dj-ar { flex: 1; min-height: 0; display: flex; align-items: center; gap: 16px; }
+  .dj-ar-rate { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 8px; }
+  .dj-ar-rate b { font: 700 40px/1 var(--dj-mono); color: var(--rnd-cyan); font-variant-numeric: tabular-nums; text-shadow: 0 0 16px rgba(70, 214, 200, 0.4); }
+  .dj-ar-rate span { font-size: 11px; letter-spacing: 0.14em; color: var(--rnd-text-dim); }
+  .dj-ar-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+  .dj-ar-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums; }
+  .dj-ar-row b { font: 700 15px/1 var(--dj-mono); color: #eaf1ff; }
+  .dj-ar-bar { height: 9px; border-radius: 5px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .dj-ar-bar i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--rnd-blue-deep), var(--rnd-cyan)); transition: width .6s ease; }
+  .dj-ar-note { font-size: 10.5px; line-height: 1.5; color: rgba(127, 146, 196, 0.85); }
+  .dj-ar-note b { font-weight: 700; color: #cfdcff; }
+
+  /* ===== 风险与依赖清单（左栏下） ===== */
+  .dj-risks { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .dj-risk {
+    flex: 1; min-height: 0; display: flex; align-items: center; gap: 9px; padding: 3px 10px;
+    border-radius: 8px; border: 1px solid rgba(96, 140, 255, 0.16); background: rgba(14, 26, 66, 0.5);
+  }
+  .dj-risk-lv { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+  .dj-risk-cls {
+    flex: none; padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em;
+    color: #9cc2ff; background: rgba(92, 157, 255, 0.14); border: 1px solid rgba(92, 157, 255, 0.28); white-space: nowrap;
+  }
+  .dj-risk-txt { flex: 1; min-width: 0; font-size: 12px; color: #c9d8f8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dj-risk-own { flex: none; font-size: 10.5px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; }
+
+  /* ===== IPD 阶段甘特（中栏上，DOM 实现：已过实色 / 当前呼吸 / 未来虚线） ===== */
+  .dj-gantt { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; padding: 4px 6px 0; }
+  .dj-g-marks { flex: none; position: relative; height: 74px; }
+  .dj-g-mk { position: absolute; top: 0; bottom: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+  .dj-g-mk-dot {
+    position: absolute; bottom: 6px; width: 11px; height: 11px; border-radius: 50%;
+    border: 2px solid; background: var(--rnd-stage);
+  }
+  .dj-g-mk.is-ok .dj-g-mk-dot { border-color: var(--rnd-green); background: var(--rnd-green); box-shadow: 0 0 8px rgba(111, 224, 154, 0.6); }
+  .dj-g-mk.is-late .dj-g-mk-dot { border-color: var(--rnd-orange); background: var(--rnd-orange); box-shadow: 0 0 8px rgba(255, 157, 92, 0.6); }
+  .dj-g-mk.is-todo .dj-g-mk-dot { border-color: rgba(127, 146, 196, 0.6); }
+  .dj-g-mk-lb { position: absolute; font-size: 10px; letter-spacing: 0.04em; color: #aec2ee; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: center; line-height: 1.35; }
+  .dj-g-mk-lb i { font-style: normal; display: block; color: rgba(127, 146, 196, 0.8); font-size: 9.5px; }
+  .dj-g-mk.is-todo .dj-g-mk-lb { color: rgba(127, 146, 196, 0.65); }
+  .dj-g-mk-lb.row-a { bottom: 24px; }
+  .dj-g-mk-lb.row-b { bottom: 47px; }
+  .dj-g-band { flex: none; position: relative; height: 52px; }
+  .dj-g-seg {
+    position: absolute; top: 4px; bottom: 4px; border-radius: 7px; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  }
+  .dj-g-seg b { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; white-space: nowrap; }
+  .dj-g-seg i { font-style: normal; font-size: 9.5px; opacity: 0.85; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .dj-g-seg.is-done { color: #05102b; }
+  .dj-g-seg.is-now { color: #eaf1ff; border: 1px solid; animation: dj-breathe 2.2s ease-in-out infinite; }
+  .dj-g-seg.is-todo { color: rgba(170, 190, 235, 0.85); border: 1.5px dashed rgba(127, 146, 196, 0.55); background: rgba(14, 26, 66, 0.35); }
+  @keyframes dj-breathe {
+    0%, 100% { box-shadow: 0 0 6px rgba(92, 157, 255, 0.25), inset 0 0 10px rgba(92, 157, 255, 0.18); }
+    50% { box-shadow: 0 0 22px rgba(92, 157, 255, 0.75), inset 0 0 22px rgba(92, 157, 255, 0.4); }
+  }
+  .dj-g-axis { flex: none; position: relative; height: 22px; border-top: 1px solid rgba(96, 140, 255, 0.3); margin-top: 2px; }
+  .dj-g-tick { position: absolute; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .dj-g-tick::before { content: ""; width: 1px; height: 5px; background: rgba(96, 140, 255, 0.5); }
+  .dj-g-tick span { font-size: 9.5px; color: rgba(127, 146, 196, 0.8); font-variant-numeric: tabular-nums; letter-spacing: 0.03em; }
+  .dj-g-today { position: absolute; top: 0; bottom: 22px; width: 0; border-left: 1.5px dashed var(--rnd-red); z-index: 5; }
+  .dj-g-today em {
+    position: absolute; top: -2px; left: 4px; font-style: normal; font-size: 10px; font-weight: 700;
+    color: var(--rnd-red); letter-spacing: 0.06em; white-space: nowrap;
+  }
+  .dj-g-legend { flex: none; display: flex; align-items: center; gap: 16px; padding: 7px 2px 0; font-size: 10.5px; color: var(--rnd-text-dim); }
+  .dj-g-legend i { font-style: normal; display: inline-flex; align-items: center; gap: 5px; }
+  .dj-g-legend u { text-decoration: none; width: 14px; height: 8px; border-radius: 3px; display: inline-block; }
+
+  /* ===== CSS grid 模拟表格：评审记录（中栏下，非 <table>） ===== */
+  .dj-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .dj-thead, .dj-tbody li { display: grid; grid-template-columns: var(--dj-tcols); align-items: center; gap: 7px; }
+  .dj-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .dj-thead span:nth-child(n+3), .dj-tbody li span:nth-child(n+3) { text-align: right; }
+  .dj-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .dj-tbody li { padding: 0 8px; height: 27px; border-radius: 5px; font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums; }
+  .dj-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .dj-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dj-tbody li b { font-weight: 700; color: #eaf1ff; }
+  .dj-tbody li .dj-rv-no { font: 700 12px/1 var(--dj-mono); color: #9cc2ff; letter-spacing: 0.04em; }
+  .dj-tbody li .dj-badge { justify-self: end; }
+  .dj-tbody li.is-empty { display: flex; align-items: center; justify-content: center; color: var(--rnd-text-dim); background: transparent; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .dj-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="dj-stage" id="dj-stage">
+    <!-- mockflag:begin --><div class="dj-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="dj-error" id="dj-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（页头正中留空给 mockflag） -->
+    <header class="dj-header">
+      <div class="dj-head-left">
+        <div class="dj-crumb">
+          <a class="dj-crumb-up" href="大屏样板间-研发IPD管道与评审1920.html" title="返回上级专题页（Esc）">‹ 返回 IPD管道与评审</a><i>›</i>
+          <b>云麓智联科技</b><i>›</i><span>IPD 管道与评审</span><i>›</i><em id="dj-crumb-obj">--</em>
+        </div>
+        <div class="dj-head-title-row">
+          <div class="dj-head-title">单项目 IPD 详情</div>
+          <div class="dj-head-meta">
+            <span><b>8</b> 个重点项目 · 六阶段 / TR·DCP 全记录</span><i>|</i>
+            <span>轮换 <b>14s</b> · ← → 切换 · Esc 返回</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="dj-head-right">
+        <div class="dj-chips">
+          <div class="dj-chip"><span>DATA AS OF</span><b>2026-08-20</b></div>
+          <div class="dj-chip is-key"><span>PROJECT BUDGET</span><b id="dj-chip-bud">--</b></div>
+        </div>
+        <div class="dj-clock" aria-label="实时时钟">
+          <span class="dj-clock-time" id="dj-clock-time">--:--:--</span>
+          <span class="dj-clock-date" id="dj-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带（随项目切换重算） -->
+    <div class="dj-band" id="dj-band"></div>
+
+    <!-- 项目切换器（八重点项目，名称与契约 §2.3 逐字一致） -->
+    <div class="dj-swbar">
+      <span class="dj-swbar-tag">项目切换</span>
+      <div class="dj-switcher" id="dj-switcher" aria-label="重点项目切换"></div>
+      <div class="dj-swbar-state" id="dj-sw-state">--</div>
+    </div>
+
+    <!-- 左栏：项目档案 + 需求-交付勾稽 + 风险与依赖 -->
+    <div class="dj-col">
+      <section class="dj-panel" style="flex: none; height: 288px;">
+        <div class="dj-panel-head">
+          <h2>项目档案</h2>
+          <span class="dj-panel-tag" id="dj-dossier-tag">--</span>
+        </div>
+        <div class="dj-dossier" id="dj-dossier"></div>
+      </section>
+      <section class="dj-panel" style="flex: none; height: 186px;">
+        <div class="dj-panel-head">
+          <h2>需求-交付勾稽</h2>
+          <span class="dj-panel-tag" id="dj-ar-tag">--</span>
+        </div>
+        <div class="dj-ar">
+          <div class="dj-ar-rate"><b id="dj-ar-rate">--</b><span>AR 完成率</span></div>
+          <div class="dj-ar-body">
+            <div class="dj-ar-row"><span>AR 点当量 <b id="dj-ar-total">--</b> 点</span><span>已完成 <b id="dj-ar-done">--</b> · 剩余 <b id="dj-ar-left">--</b></span></div>
+            <div class="dj-ar-bar"><i id="dj-ar-bar" style="width:0%"></i></div>
+            <div class="dj-ar-note" id="dj-ar-note">--</div>
+          </div>
+        </div>
+      </section>
+      <section class="dj-panel" style="flex: 1;">
+        <div class="dj-panel-head">
+          <h2>风险与依赖清单</h2>
+          <span class="dj-panel-tag" id="dj-risk-tag">--</span>
+        </div>
+        <div class="dj-risks" id="dj-risks"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：IPD 阶段甘特 + 评审记录表 -->
+    <div class="dj-col">
+      <section class="dj-panel" style="flex: none; height: 300px;">
+        <div class="dj-panel-head">
+          <h2>IPD 阶段甘特 · Concept → LCM</h2>
+          <span class="dj-panel-tag" id="dj-gantt-tag">--</span>
+        </div>
+        <div class="dj-gantt" id="dj-gantt"></div>
+      </section>
+      <section class="dj-panel" style="flex: 1;">
+        <div class="dj-panel-head">
+          <h2>TR / DCP 评审记录</h2>
+          <span class="dj-panel-tag" id="dj-rv-tag">--</span>
+        </div>
+        <div class="dj-table">
+          <div class="dj-thead">
+            <span>评审点</span><span>类型说明</span><span>计划日期</span><span>实际日期</span><span>结论</span><span>遗留项</span>
+          </div>
+          <ul class="dj-tbody" id="dj-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右栏：预算执行五类 + 八项目 AR 对比 -->
+    <div class="dj-col">
+      <section class="dj-panel" style="flex: 1;">
+        <div class="dj-panel-head">
+          <h2>预算执行 · 五类分解</h2>
+          <span class="dj-panel-tag" id="dj-bud-tag">--</span>
+        </div>
+        <div class="dj-chart" id="dj-chart-budget" role="img" aria-label="选中项目按五类研发投入分解的预算与已用对比条形图"></div>
+      </section>
+      <section class="dj-panel" style="flex: 1;">
+        <div class="dj-panel-head">
+          <h2>八项目 AR 交付对比</h2>
+          <span class="dj-panel-tag" id="dj-arall-tag">--</span>
+        </div>
+        <div class="dj-chart" id="dj-chart-ar" role="img" aria-label="八个重点项目 AR 点当量与已完成点数对比条形图，选中项目高亮"></div>
+      </section>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("dj-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("dj-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  /* kiosk 轮换保持窗：从父页下钻进来（hash 命中）时先保持 20 秒不轮换。
+     ★ 声明必须早于任何 hold() 调用——初始 hash 解析就会调它，
+     若把 let 留在页尾的 kiosk 段，会因 TDZ 抛 ReferenceError 打断后续脚本。 */
+  let holdUntil = 0;
+  function hold() { holdUntil = Date.now() + 20000; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技）
+         口径与全系列基准盘（docs/RndIpdThemed.md §2.2/§2.3）一致：
+         · 八个重点项目名称 / 产品线 / 当前阶段与契约逐字；
+         · 项目预算为「项目直接预算」口径（重点项目子集），八项目 Σ = 10.60 亿 ≤ 全盘 21.4 亿；
+         · AR 点当量为「重点项目 AR 子集」口径，八项目 Σ = 9,980 点 ≤ 全盘 21,500 点当量；
+         · 完成率 / 执行率 / 按期率一律现算，页面不出现硬编码比率。 ===== */
+
+  const MS_D = 86400000;
+  const TODAY = new Date(2026, 7, 20);                 /* 业务口径日：与 DATA AS OF 一致 */
+  const parseD = (s) => { const a = s.split("-"); return new Date(+a[0], +a[1] - 1, +a[2]); };
+  const dFmt = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const dFmtS = (d) => String(d.getFullYear()).slice(2) + "." + pad(d.getMonth() + 1);
+  /* 加 mFloat 个月（整数月走月历加法，小数部分按 30 天折算） */
+  const dAdd = (t0, mFloat) => {
+    const mi = Math.floor(mFloat), fr = mFloat - mi;
+    const d = new Date(t0.getFullYear(), t0.getMonth() + mi, t0.getDate());
+    return new Date(d.getTime() + Math.round(fr * 30 * MS_D));
+  };
+
+  /* 4.1 IPD 六阶段定义（与契约 §2.1 一致） */
+  const STAGE_KEYS = ["Concept", "Plan", "Develop", "Verify", "Launch", "LCM"];
+  const STAGE_CN = ["概念", "计划", "开发", "验证", "发布", "周期"];
+  const STAGE_COLOR = ["#a98cf5", "#46d6c8", "#5c9dff", "#ffc24d", "#6fe09a", "#7f92c4"];
+  /* 管道盘：六阶段在研项目数（契约 §2.2，本页八项目按阶段计数不得超过它） */
+  const PIPE_CAP = { Concept: 6, Plan: 8, Develop: 17, Verify: 9, Launch: 5, LCM: 3 };
+
+  /* 4.2 八个重点项目（名称 / 产品线 / 当前阶段与契约 §2.3 逐字；其余为本页自编二级数据）
+       dur = 六阶段计划时长（月，LCM 为展示窗 6 个月）；bud/used 单位亿元；ar/done 单位点。
+       rvAdj = 评审记录修饰（late 逾期天数 / res 结论 / left 遗留项数），未列出的评审默认按期通过 0 项遗留。 */
+  const PROJECTS = [
+    { name: "星澜S3",   line: "智家终端",   stage: "Develop", t0: "2025-11-10", dur: [2, 3, 8, 4, 2, 6],
+      pm: "沈亦舟", team: 86, bud: 1.85, used: 1.12, ar: 1860, done: 1190,
+      rvAdj: { CDCP: { left: 1 }, TR2: { late: 9, res: "有条件", left: 5 } },
+      risks: [
+        { cls: "跨域依赖", lv: "高", txt: "AI 语音唤醒模型（灵犀）交付延后，联调窗口被压缩 2 周", own: "AI算法" },
+        { cls: "外部供应", lv: "中", txt: "主控 SoC 二供认证未完成，单一供应链风险", own: "硬件" },
+        { cls: "需求变更", lv: "中", txt: "全屋互联场景新增 3 条 SR，TR3 前需完成拆分评审", own: "PM与管理" },
+        { cls: "环境与资源", lv: "低", txt: "整机老化实验室 9 月档期紧张，需提前锁定台位", own: "测试" }
+      ] },
+    { name: "星澜Pro2",  line: "智家终端",   stage: "Verify",  t0: "2025-03-18", dur: [2, 3, 9, 4, 2, 6],
+      pm: "骆清野", team: 74, bud: 1.42, used: 1.18, ar: 1420, done: 1240,
+      rvAdj: { TR4: { late: 8, res: "有条件", left: 4 }, TR5: { left: 3 } },
+      risks: [
+        { cls: "评审等待", lv: "高", txt: "ADCP 定于 09-18，TR5 遗留 3 项须在评审前闭环", own: "PM与管理" },
+        { cls: "环境与资源", lv: "中", txt: "可靠性温循试验排队，DVT2 样机到位后立即插单", own: "测试" },
+        { cls: "跨域依赖", lv: "低", txt: "云端 OTA 通道依赖云枢3.0 灰度环境，已约定联调窗口", own: "云平台" }
+      ] },
+    { name: "云枢3.0",   line: "云平台服务", stage: "Develop", t0: "2025-12-08", dur: [2, 2, 7, 3, 1, 6],
+      pm: "顾之澜", team: 92, bud: 1.68, used: 0.95, ar: 1650, done: 980,
+      rvAdj: { TR2: { late: 5, left: 1 }, TR3: { left: 2 } },
+      risks: [
+        { cls: "环境与资源", lv: "高", txt: "多集群压测算力缺口 15%，需与 AI 训练错峰调度", own: "云平台" },
+        { cls: "跨域依赖", lv: "中", txt: "设备影子服务依赖澜芯M60 新协议栈冻结时间", own: "AIoT模组" },
+        { cls: "需求变更", lv: "中", txt: "多租户计费口径变更 1 条 IR，影响 4 个微服务", own: "软件" },
+        { cls: "评审等待", lv: "低", txt: "安全渗透复测报告待第三方出具，TR4 输入项", own: "测试" }
+      ] },
+    { name: "云盾2.1",   line: "云平台服务", stage: "Plan",    t0: "2026-04-15", dur: [2, 3, 6, 3, 1, 6],
+      pm: "白望舒", team: 58, bud: 1.24, used: 0.31, ar: 1080, done: 260,
+      rvAdj: { TR1: { res: "有条件", left: 3 } },
+      risks: [
+        { cls: "需求变更", lv: "高", txt: "等保合规新规落地，SR 基线需在 PDCP 前重排", own: "PM与管理" },
+        { cls: "跨域依赖", lv: "中", txt: "威胁情报接口依赖云枢3.0 网关版本，需对齐路标", own: "云平台" },
+        { cls: "环境与资源", lv: "低", txt: "攻防演练靶场环境 10 月才可交付，计划已预留", own: "测试" }
+      ] },
+    { name: "澜芯M60",   line: "AIoT模组",   stage: "Develop", t0: "2026-01-20", dur: [2, 2, 6, 3, 1, 6],
+      pm: "祁明远", team: 46, bud: 1.05, used: 0.62, ar: 960, done: 540,
+      rvAdj: { PDCP: { late: 9, res: "有条件", left: 4 } },
+      risks: [
+        { cls: "外部供应", lv: "高", txt: "射频前端物料交期 14 周，EVT1 备料需下达安全库存", own: "硬件" },
+        { cls: "跨域依赖", lv: "中", txt: "边缘推理框架（御风）适配包晚于计划 3 周", own: "AI算法" },
+        { cls: "需求变更", lv: "中", txt: "新增车规温宽需求待裁决，影响封装选型", own: "PM与管理" },
+        { cls: "环境与资源", lv: "低", txt: "电磁兼容暗室档期与星澜S3 冲突，已错峰", own: "测试" }
+      ] },
+    { name: "澜芯M80",   line: "AIoT模组",   stage: "Concept", t0: "2026-07-06", dur: [3, 3, 7, 3, 1, 6],
+      pm: "江叙白", team: 32, bud: 0.86, used: 0.12, ar: 620, done: 90,
+      rvAdj: {},
+      risks: [
+        { cls: "需求变更", lv: "中", txt: "目标市场双频段需求未收敛，CDCP 前需完成客户访谈", own: "PM与管理" },
+        { cls: "外部供应", lv: "中", txt: "新制程基带候选供应商仅 1 家通过初审", own: "硬件" },
+        { cls: "评审等待", lv: "低", txt: "概念阶段技术可行性报告排入 9 月专家评审队列", own: "软件" }
+      ] },
+    { name: "智楼5.0",   line: "行业方案",   stage: "Launch",  t0: "2025-05-12", dur: [2, 2, 8, 3, 2, 6],
+      pm: "陆则鸣", team: 64, bud: 1.32, used: 1.21, ar: 1240, done: 1180,
+      rvAdj: { TR4: { late: 6, res: "有条件", left: 3 }, ADCP: { left: 1 } },
+      risks: [
+        { cls: "评审等待", lv: "中", txt: "TR6 发布评审定于 09-12，首批 3 个灯塔局点验收是输入项", own: "PM与管理" },
+        { cls: "跨域依赖", lv: "中", txt: "楼宇边缘网关固件依赖澜芯M60 补丁列车", own: "AIoT模组" },
+        { cls: "环境与资源", lv: "低", txt: "交付工程师北方区排期饱和，10 月起补充 6 人", own: "PM与管理" }
+      ] },
+    { name: "车联1.0",   line: "行业方案",   stage: "Verify",  t0: "2025-08-25", dur: [2, 3, 6, 3, 1, 6],
+      pm: "韩既明", team: 52, bud: 1.18, used: 0.94, ar: 1150, done: 940,
+      rvAdj: { TR3: { left: 2 }, TR4: { late: 15, res: "否决", left: 8 } },
+      rvExtra: [{ name: "TR4·复审", off: 10.8, res: "通过", left: 2, note: "样机与集成 · 复审" }],
+      risks: [
+        { cls: "跨域依赖", lv: "高", txt: "车规功能安全认证依赖硬件域 FMEA 复核，路径上无冗余", own: "硬件" },
+        { cls: "外部供应", lv: "高", txt: "T-Box 定位模组批次一致性问题，TR4 否决主因已整改", own: "硬件" },
+        { cls: "需求变更", lv: "中", txt: "整车厂新增远程诊断 2 条 SR，验证计划需扩项", own: "PM与管理" },
+        { cls: "环境与资源", lv: "中", txt: "实车路测车队 9 月档期与竞品对标共用，需错峰", own: "测试" },
+        { cls: "评审等待", lv: "低", txt: "TR5 系统验证评审材料基线 09-01 冻结", own: "软件" }
+      ] }
+    ];
+
+  /* 4.3 产品线主题色（切换器 / 甘特 / 图表共用） */
+  const LINE_COLOR = { "智家终端": C.blue, "云平台服务": C.cyan, "AIoT模组": C.violet, "行业方案": C.green };
+
+  /* 4.4 五类投入拆分权重（按产品线特征自编；行内 Σ=1，拆分金额运行时现算并残差归位） */
+  const CAT_NAMES = ["人力", "样机物料", "云资源与算力", "外协", "工具与其他"];
+  const LINE_W = {
+    "智家终端":   [0.46, 0.24, 0.08, 0.14, 0.08],
+    "云平台服务": [0.58, 0.03, 0.24, 0.08, 0.07],
+    "AIoT模组":   [0.44, 0.22, 0.12, 0.14, 0.08],
+    "行业方案":   [0.52, 0.10, 0.16, 0.14, 0.08]
+  };
+
+  /* 4.5 TR/DCP 评审点模板（相对立项的月偏移由各阶段计划时长推出） */
+  const RV_NOTE = {
+    "Charter": "立项决策", "CDCP": "概念决策评审", "TR1": "需求与规格评审", "PDCP": "计划决策评审",
+    "TR2": "概要设计评审", "TR3": "详细设计评审", "TR4": "样机与集成评审", "TR5": "系统验证评审",
+    "ADCP": "可获得性决策", "TR6": "发布评审"
+  };
+
+  /* ===== 5. 派生量：全部现算，不复制数字 ===== */
+  PROJECTS.forEach((p) => {
+    p.t0d = parseD(p.t0);
+    /* 阶段边界日期：bounds[i] = 第 i 阶段结束日（i=0..5，LCM 取 6 个月展示窗） */
+    let acc = 0;
+    p.bounds = p.dur.map((m) => { acc += m; return dAdd(p.t0d, acc); });
+    p.stageIdx = STAGE_KEYS.indexOf(p.stage);
+    p.stageStart = p.stageIdx === 0 ? p.t0d : p.bounds[p.stageIdx - 1];
+    p.stageEnd = p.bounds[p.stageIdx];
+    p.ga = p.bounds[3];                                   /* 目标 GA = 验证阶段结束 = 发布阶段起点 */
+    p.gaGapM = (p.ga.getTime() - TODAY.getTime()) / (30 * MS_D);
+
+    /* 评审点：模板 + 修饰；实际日 = 计划日 + 逾期天数；实际日 ≤ 口径日者视为已完成 */
+    const c = p.dur[0], pl = p.dur[1], dv = p.dur[2], vf = p.dur[3], lc = p.dur[4];
+    const cum1 = c, cum2 = c + pl, cum3 = cum2 + dv, cum4 = cum3 + vf;
+    const defs = [
+      ["Charter", 0], ["CDCP", cum1], ["TR1", cum1 + pl * 0.5], ["PDCP", cum2],
+      ["TR2", cum2 + dv * 0.25], ["TR3", cum2 + dv * 0.55], ["TR4", cum2 + dv * 0.85],
+      ["TR5", cum3 + vf * 0.5], ["ADCP", cum4], ["TR6", cum4 + lc * 0.5]
+    ];
+    p.reviews = defs.map((d) => {
+      const adj = p.rvAdj[d[0]] || {};
+      const plan = dAdd(p.t0d, d[1]);
+      const late = adj.late || 0;
+      const act = new Date(plan.getTime() + late * MS_D);
+      return { name: d[0], note: RV_NOTE[d[0]], plan, act, late, done: act.getTime() <= TODAY.getTime(),
+               res: adj.res || "通过", left: adj.left || 0 };
+    });
+    (p.rvExtra || []).forEach((e) => {
+      const plan = dAdd(p.t0d, e.off);
+      p.reviews.push({ name: e.name, note: e.note, plan, act: plan, late: 0,
+                       done: plan.getTime() <= TODAY.getTime(), res: e.res, left: e.left });
+    });
+    p.reviews.sort((a, b) => a.plan.getTime() - b.plan.getTime());
+    p.rvDone = p.reviews.filter((r) => r.done);
+    p.rvOntime = p.rvDone.filter((r) => r.late === 0).length;
+    p.rvPass = p.rvDone.filter((r) => r.res === "通过").length;
+    p.rvCond = p.rvDone.filter((r) => r.res === "有条件").length;
+    p.rvVeto = p.rvDone.filter((r) => r.res === "否决").length;
+    p.rvLeft = sum(p.rvDone.map((r) => r.left));
+
+    /* 预算五类拆分（万元）：前四类四舍五入、末类取残差，保证 Σ 严格等于总额 */
+    p.budWan = Math.round(p.bud * 10000);
+    p.usedWan = Math.round(p.used * 10000);
+    const w = LINE_W[p.line];
+    p.budCat = w.slice(0, 4).map((k) => Math.round(p.budWan * k));
+    p.budCat.push(p.budWan - sum(p.budCat));
+    const r = p.usedWan / p.budWan;
+    p.usedCat = p.budCat.slice(0, 4).map((b) => Math.round(b * r));
+    p.usedCat.push(p.usedWan - sum(p.usedCat));
+
+    p.execRate = p.used / p.bud * 100;
+    p.arRate = p.done / p.ar * 100;
+  });
+
+  const D = {};
+  D.budSum = sum(PROJECTS.map((p) => p.bud));
+  D.usedSum = sum(PROJECTS.map((p) => p.used));
+  D.arSum = sum(PROJECTS.map((p) => p.ar));
+  D.doneSum = sum(PROJECTS.map((p) => p.done));
+  D.stageCnt = {};
+  STAGE_KEYS.forEach((k) => { D.stageCnt[k] = PROJECTS.filter((p) => p.stage === k).length; });
+
+  /* ===== 6. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("dj-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("dj-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 7. hash 契约：#<encodeURIComponent(项目名)> 定位，未命中落第 0 个 ===== */
+  const PARENT = "大屏样板间-研发IPD管道与评审1920.html";
+  const norm = (s) => String(s).replace(/[\s　]+/g, "").toUpperCase();
+  const HASH_ALIAS = {};
+  PROJECTS.forEach((p, i) => {
+    [p.name, p.name + " " + p.line, p.line + p.name].forEach((k) => {
+      const kk = norm(k);
+      if (HASH_ALIAS[kk] === undefined) HASH_ALIAS[kk] = i;
+    });
+  });
+  function resolveHash() {
+    let h = "";
+    try { h = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim(); }
+    catch (e) { h = (location.hash || "").replace(/^#/, "").trim(); }          /* 坏码兜底：按原文匹配 */
+    if (!h) return -1;
+    const hit = HASH_ALIAS[norm(h)];
+    return hit === undefined ? -1 : hit;
+  }
+  let idx = Math.max(0, resolveHash());
+
+  /* ===== 8. 静态骨架（★ 与图表同属 flex 容器的兄弟块先填满 / 或已写死高度，init 后重填不压图） ===== */
+
+  /* 8.1 KPI 带骨架（5 枚，数值由 renderKpi 翻牌） */
+  const KPI_META = [
+    { icon: "¥", label: "项目预算",   unit: "亿元", dec: 2 },
+    { icon: "◔", label: "已用投入",   unit: "亿元", dec: 2 },
+    { icon: "⇄", label: "AR 完成率",  unit: "%",    dec: 1 },
+    { icon: "✓", label: "评审按期率", unit: "%",    dec: 1 },
+    { icon: "⏱", label: "距目标 GA",  unit: "个月", dec: 1 }
+  ];
+  $("dj-band").innerHTML = KPI_META.map((k, i) => (
+    '<div class="dj-kpi" id="dj-kpicard-' + i + '">' +
+      '<div class="dj-kpi-icon">' + k.icon + "</div>" +
+      '<div class="dj-kpi-main">' +
+        '<div class="dj-kpi-label">' + k.label + "</div>" +
+        '<div class="dj-kpi-num"><span class="dj-kpi-val" id="dj-kpi-' + i + '">0</span><span class="dj-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="dj-kpi-sub" id="dj-kpisub-' + i + '">—</div>' +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，0.9 秒收敛；每次切项目换一代 token，旧动画自动作废 */
+  const kpiGen = KPI_META.map(() => 0);
+  function countUp(i, target, dec) {
+    const el = $("dj-kpi-" + i), g = ++kpiGen[i];
+    const from = parseFloat(String(el.textContent).replace(/,/g, "")) || 0;
+    const dur = 900, t0 = performance.now();
+    (function step(now) {
+      if (kpiGen[i] !== g) return;
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = fmtDec(from + (target - from) * e, dec);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+
+  /* 8.2 项目切换器（tab 文本与契约对象集逐字一致） */
+  $("dj-switcher").innerHTML = PROJECTS.map((p, i) => (
+    '<button class="dj-sw" type="button" data-i="' + i + '" title="' + p.name + " · " + p.line + " · " + STAGE_CN[p.stageIdx] + '">' +
+      "<b>" + p.name + "</b><i>" + STAGE_CN[p.stageIdx] + "</i>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from($("dj-switcher").children);
+
+  /* ===== 9. 渲染函数（切项目时整组重绘；相关面板高度均已由 CSS 固定） ===== */
+
+  function renderKpi(p) {
+    countUp(0, p.bud, 2);
+    $("dj-kpisub-0").innerHTML = "口径 项目直接预算 · 八项目合计 <b>" + fmtDec(D.budSum, 2) + "</b> 亿";
+    countUp(1, p.used, 2);
+    $("dj-kpisub-1").innerHTML = "执行率 <b>" + fmtDec(p.execRate, 1) + "%</b> · 余 " + fmtDec(p.bud - p.used, 2) + " 亿";
+    countUp(2, p.arRate, 1);
+    $("dj-kpisub-2").innerHTML = "完成 <b>" + fmtInt(p.done) + "</b> ÷ 当量 <b>" + fmtInt(p.ar) + "</b> 点";
+    const otRate = p.rvOntime / p.rvDone.length * 100;
+    countUp(3, otRate, 1);
+    $("dj-kpisub-3").innerHTML = "按期 <b>" + p.rvOntime + "</b> ÷ 已完成 <b>" + p.rvDone.length + "</b> · 逾期 " + (p.rvDone.length - p.rvOntime);
+    const gaCard = $("dj-kpicard-4");
+    if (p.gaGapM <= 0) {
+      countUp(4, 0, 1);
+      $("dj-kpisub-4").innerHTML = "已于 <b>" + dFmt(p.ga) + "</b> GA · 处发布期";
+      gaCard.classList.remove("is-warn");
+    } else {
+      countUp(4, p.gaGapM, 1);
+      $("dj-kpisub-4").innerHTML = "目标 GA <b>" + dFmt(p.ga) + "</b>";
+      gaCard.classList.toggle("is-warn", p.gaGapM < 2);
+    }
+  }
+
+  function renderDossier(p) {
+    const F = [
+      ["产品线", "<em style=\"color:" + LINE_COLOR[p.line] + "\">●</em> " + p.line],
+      ["当前 IPD 阶段", '<span class="dj-badge is-stage">' + p.stage + " · " + STAGE_CN[p.stageIdx] + "</span>"],
+      ["立项日期", p.t0],
+      ["目标 GA", dFmt(p.ga)],
+      ["项目经理", p.pm],
+      ["核心团队", p.team + " <em>人</em>"],
+      ["项目预算", fmtDec(p.bud, 2) + " <em>亿元</em>"],
+      ["已用 / 执行率", fmtDec(p.used, 2) + " 亿 <em>/ " + fmtDec(p.execRate, 1) + "%</em>"]
+    ];
+    $("dj-dossier").innerHTML = F.map((f) => (
+      '<div class="dj-df"><span>' + f[0] + "</span><b>" + f[1] + "</b></div>"
+    )).join("");
+    $("dj-dossier-tag").innerHTML = "口径 项目直接预算 · 八项目 Σ <b>" + fmtDec(D.budSum, 2) + "</b> 亿 ≤ 全盘 21.4 亿";
+  }
+
+  function renderAr(p) {
+    $("dj-ar-rate").textContent = fmtDec(p.arRate, 1) + "%";
+    $("dj-ar-total").textContent = fmtInt(p.ar);
+    $("dj-ar-done").textContent = fmtInt(p.done);
+    $("dj-ar-left").textContent = fmtInt(p.ar - p.done);
+    $("dj-ar-bar").style.width = fmtDec(p.arRate, 1) + "%";
+    $("dj-ar-note").innerHTML = "口径：重点项目 AR 子集 · 八项目 AR 合计 <b>" + fmtInt(D.arSum) +
+      "</b> 点 ≤ 全盘 21,500 点当量；完成率 = 已完成 ÷ AR 当量现算。";
+    $("dj-ar-tag").innerHTML = "八项目已完成 Σ <b>" + fmtInt(D.doneSum) + "</b> 点";
+  }
+
+  const LV_COLOR = { "高": C.red, "中": C.orange, "低": C.green };
+  function renderRisks(p) {
+    $("dj-risks").innerHTML = p.risks.map((r) => (
+      '<div class="dj-risk" title="' + r.txt + '">' +
+        '<span class="dj-risk-lv" style="background:' + LV_COLOR[r.lv] + ";box-shadow:0 0 8px " + LV_COLOR[r.lv] + '"></span>' +
+        '<span class="dj-risk-cls">' + r.cls + "</span>" +
+        '<span class="dj-risk-txt">' + r.txt + "</span>" +
+        '<span class="dj-risk-own">' + r.own + "</span>" +
+      "</div>"
+    )).join("");
+    const hi = p.risks.filter((r) => r.lv === "高").length;
+    $("dj-risk-tag").innerHTML = "共 <b>" + p.risks.length + "</b> 条 · 高 <b>" + hi + "</b> · 类别与阻塞五类同口径";
+  }
+
+  /* IPD 阶段甘特（DOM）：时间轴 = 立项 → LCM 展示窗末；已过实色 / 当前呼吸 / 未来虚线 */
+  function renderGantt(p) {
+    const t0 = p.t0d.getTime(), t1 = p.bounds[5].getTime(), span = t1 - t0;
+    const px = (t) => Math.max(0, Math.min(100, (t - t0) / span * 100));
+
+    /* 阶段横条（六段） */
+    const segs = STAGE_KEYS.map((k, i) => {
+      const s = i === 0 ? t0 : p.bounds[i - 1].getTime();
+      const e = p.bounds[i].getTime();
+      const st = i < p.stageIdx ? "done" : i === p.stageIdx ? "now" : "todo";
+      const col = STAGE_COLOR[i];
+      const style = st === "done"
+        ? "background:linear-gradient(180deg," + col + "," + col + "cc);"
+        : st === "now"
+          ? "background:rgba(92,157,255,.16);border-color:" + col + ";"
+          : "";
+      const dateTxt = i === 5 ? "→ 生命周期管理" : dFmtS(new Date(s)) + " – " + dFmtS(new Date(e));
+      return '<div class="dj-g-seg is-' + st + '" style="left:' + fmtDec(px(s), 2) + "%;width:" +
+        fmtDec(px(e) - px(s), 2) + "%;" + style + '" title="' + STAGE_CN[i] + " " + k + '">' +
+        "<b>" + STAGE_CN[i] + " " + k + "</b><i>" + dateTxt + "</i></div>";
+    }).join("");
+
+    /* 评审点标记：按期绿 / 逾期橙 / 未到期空心，标签上下两排错开防重叠 */
+    const marks = p.reviews.map((r, i) => {
+      const cls = r.done ? (r.late > 0 ? "is-late" : "is-ok") : "is-todo";
+      const row = i % 2 === 0 ? "row-a" : "row-b";
+      return '<div class="dj-g-mk ' + cls + '" style="left:' + fmtDec(px(r.act.getTime()), 2) + '%" title="' +
+        r.name + " · 计划 " + dFmt(r.plan) + (r.late ? " · 逾期 " + r.late + " 天" : "") + '">' +
+        '<span class="dj-g-mk-dot"></span>' +
+        '<span class="dj-g-mk-lb ' + row + '">' + r.name + "<i>" + dFmtS(r.act) + "</i></span>" +
+      "</div>";
+    }).join("");
+
+    /* 季度刻度 */
+    let ticks = "";
+    for (let m = 0; ; m += 3) {
+      const d = dAdd(p.t0d, m);
+      if (d.getTime() > t1) break;
+      ticks += '<div class="dj-g-tick" style="left:' + fmtDec(px(d.getTime()), 2) + '%"><span>' + dFmtS(d) + "</span></div>";
+    }
+
+    $("dj-gantt").innerHTML =
+      '<div class="dj-g-marks">' + marks + "</div>" +
+      '<div class="dj-g-band">' + segs + "</div>" +
+      '<div class="dj-g-axis">' + ticks + "</div>" +
+      '<div class="dj-g-today" style="left:' + fmtDec(px(TODAY.getTime()), 2) + '%"><em>今日 ' + pad(TODAY.getMonth() + 1) + "-" + pad(TODAY.getDate()) + "</em></div>" +
+      '<div class="dj-g-legend">' +
+        "<i><u style=\"background:" + STAGE_COLOR[2] + '"></u>已过阶段（实色）</i>' +
+        "<i><u style=\"background:rgba(92,157,255,.16);border:1px solid " + C.blue + '"></u>当前阶段（呼吸）</i>' +
+        '<i><u style="border:1.5px dashed rgba(127,146,196,.55)"></u>未来阶段（虚线）</i>' +
+        "<i><u style=\"background:" + C.green + ';border-radius:50%;width:9px;height:9px"></u>评审按期</i>' +
+        "<i><u style=\"background:" + C.orange + ';border-radius:50%;width:9px;height:9px"></u>评审逾期</i>' +
+      "</div>";
+    $("dj-gantt-tag").innerHTML = "当前 <b>" + STAGE_CN[p.stageIdx] + " " + p.stage + "</b> · " +
+      dFmt(p.stageStart) + " → " + dFmt(p.stageEnd) + " · 立项 " + p.t0;
+  }
+
+  /* 评审记录表（grid 表 ul#dj-tbody）：只列已完成的 TR/DCP */
+  const RES_BADGE = { "通过": "is-pass", "有条件": "is-cond", "否决": "is-veto" };
+  function renderReviews(p) {
+    const rows = p.rvDone;
+    $("dj-tbody").innerHTML = rows.length ? rows.map((r) => (
+      "<li>" +
+        '<span class="dj-rv-no">' + r.name + "</span>" +
+        "<span>" + r.note + (r.late ? '　<em style="font-style:normal;color:' + C.orange + '">逾期 ' + r.late + " 天</em>" : "") + "</span>" +
+        "<span>" + dFmt(r.plan) + "</span>" +
+        "<span>" + dFmt(r.act) + "</span>" +
+        '<span class="dj-badge ' + RES_BADGE[r.res] + '">' + r.res + "</span>" +
+        "<span>" + (r.left ? "<b>" + r.left + "</b> 项" : "0 项") + "</span>" +
+      "</li>"
+    )).join("") : '<li class="is-empty">概念期项目，除 Charter 外暂无已完成评审</li>';
+    $("dj-rv-tag").innerHTML = "已完成 <b>" + rows.length + "</b> 场 · 通过 " + p.rvPass +
+      " · 有条件 " + p.rvCond + " · 否决 " + p.rvVeto + " · 遗留 <b>" + p.rvLeft + "</b> 项";
+  }
+
+  /* ===== 10. 图表（★ 进 option 的只有标量与数组，无对象回指） ===== */
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+
+  /* 10.1 预算执行五类：预算（描边空心）vs 已用（实色），单位万元 */
+  function budgetOption(p) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 46, top: 30, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex;
+          return "<b>" + CAT_NAMES[k] + "</b><br/>预算 <b style=\"color:" + C.blue + "\">" + fmtInt(p.budCat[k]) +
+            "</b> 万 · 已用 <b style=\"color:" + C.cyan + "\">" + fmtInt(p.usedCat[k]) + "</b> 万<br/>执行率 <b>" +
+            fmtDec(p.usedCat[k] / p.budCat[k] * 100, 1) + "%</b>";
+        }
+      }, TIP),
+      legend: { top: 0, right: 2, itemWidth: 14, itemHeight: 8, textStyle: { color: C.textDim, fontSize: 11 }, data: ["预算", "已用"] },
+      xAxis: { type: "value", axisLabel: Object.assign({}, AXIS_LABEL, { formatter: (v) => fmtInt(v) }), splitLine: SPLIT_LINE, axisLine: { show: false } },
+      yAxis: {
+        type: "category", inverse: true, data: CAT_NAMES,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 12 })
+      },
+      series: [
+        { name: "预算", type: "bar", barWidth: 9, barGap: "45%", data: p.budCat.slice(),
+          itemStyle: { color: "rgba(92,157,255,.2)", borderColor: C.blue, borderWidth: 1, borderRadius: 4 } },
+        { name: "已用", type: "bar", barWidth: 9, data: p.usedCat.slice(),
+          label: { show: true, position: "right", color: "#cfdcff", fontSize: 10.5,
+            formatter: (q) => fmtDec(p.usedCat[q.dataIndex] / p.budCat[q.dataIndex] * 100, 0) + "%" },
+          itemStyle: { borderRadius: 4,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: C.blueDeep }, { offset: 1, color: C.cyan }]) } }
+      ]
+    };
+  }
+
+  /* 10.2 八项目 AR 对比：当量（底条）+ 已完成（实条），选中项目琥珀高亮 */
+  function arOption(sel) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 52, top: 30, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex, q = PROJECTS[k];
+          return "<b>" + q.name + "</b>（" + q.line + " · " + STAGE_CN[q.stageIdx] + "）<br/>AR 当量 <b>" + fmtInt(q.ar) +
+            "</b> 点 · 已完成 <b style=\"color:" + C.cyan + "\">" + fmtInt(q.done) + "</b> 点<br/>完成率 <b>" + fmtDec(q.arRate, 1) + "%</b>";
+        }
+      }, TIP),
+      legend: { top: 0, right: 2, itemWidth: 14, itemHeight: 8, textStyle: { color: C.textDim, fontSize: 11 }, data: ["AR 当量", "已完成"] },
+      xAxis: { type: "value", axisLabel: Object.assign({}, AXIS_LABEL, { formatter: (v) => fmtInt(v) }), splitLine: SPLIT_LINE, axisLine: { show: false } },
+      yAxis: {
+        type: "category", inverse: true, data: PROJECTS.map((q) => q.name),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: {
+          fontSize: 12, interval: 0,
+          color: (v, i) => (i === sel ? C.amber : C.textDim),
+          fontWeight: (v, i) => (i === sel ? 700 : 400)
+        }
+      },
+      series: [
+        { name: "AR 当量", type: "bar", barWidth: 13, barGap: "-100%", z: 1, data: PROJECTS.map((q) => q.ar),
+          itemStyle: { color: "rgba(96,140,255,.14)", borderRadius: 6 }, silent: true },
+        { name: "已完成", type: "bar", barWidth: 13, z: 2,
+          data: PROJECTS.map((q, i) => ({
+            value: q.done,
+            itemStyle: { borderRadius: 6, color: i === sel ? C.amber : LINE_COLOR[q.line] }
+          })),
+          label: { show: true, position: "right", color: "#cfdcff", fontSize: 10.5,
+            formatter: (q2) => fmtDec(PROJECTS[q2.dataIndex].arRate, 0) + "%" }
+        }
+      ]
+    };
+  }
+
+  const budChart = echarts.init($("dj-chart-budget"));
+  const arChart = echarts.init($("dj-chart-ar"));
+  $("dj-arall-tag").innerHTML = "口径 重点项目 AR 子集 · Σ 当量 <b>" + fmtInt(D.arSum) + "</b> 点 · Σ 完成 " + fmtInt(D.doneSum) + " 点";
+
+  /* ===== 11. 项目切换（含 hash 回写） ===== */
+  function applyProject(i, pushHash) {
+    const n = PROJECTS.length;
+    idx = ((i % n) + n) % n;
+    const p = PROJECTS[idx];
+
+    $("dj-crumb-obj").textContent = p.name;
+    $("dj-chip-bud").textContent = fmtDec(p.bud, 2) + " 亿";
+    swTabs.forEach((el, k) => {
+      const on = k === idx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? LINE_COLOR[PROJECTS[k].line] : "";
+      el.style.borderColor = on ? LINE_COLOR[PROJECTS[k].line] : "";
+    });
+    $("dj-sw-state").innerHTML = "当前 <b>" + p.name + "</b><i>|</i>" + p.line + " · " + STAGE_CN[p.stageIdx] + " " + p.stage +
+      "<i>|</i>PM " + p.pm + "<i>|</i>" + (idx + 1) + " / " + n;
+
+    renderKpi(p);
+    renderDossier(p);
+    renderAr(p);
+    renderRisks(p);
+    renderGantt(p);
+    renderReviews(p);
+
+    /* 两图：数据结构随项目变 → notMerge 全量重设 */
+    budChart.setOption(budgetOption(p), true);
+    $("dj-bud-tag").innerHTML = "预算 <b>" + fmtInt(p.budWan) + "</b> 万 · 已用 " + fmtInt(p.usedWan) + " 万 · 执行 <b>" + fmtDec(p.execRate, 1) + "%</b>";
+    arChart.setOption(arOption(idx), true);
+
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    if (pushHash) {
+      try { history.replaceState(null, "", "#" + encodeURIComponent(p.name)); }
+      catch (e) { /* file:// 下部分浏览器禁止 replaceState，忽略即可 */ }
+    }
+  }
+  applyProject(idx, true);
+
+  /* ===== 12. 交互：切换器 / ← → / Esc 返回上级 / hashchange / kiosk 14s 轮换（悬停切换器暂停） ===== */
+  swTabs.forEach((el) => el.addEventListener("click", () => { applyProject(Number(el.dataset.i), true); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyProject(idx - 1, true); restart(); }
+    else if (e.key === "ArrowRight") { applyProject(idx + 1, true); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+  /* 父页可多次下钻同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash();
+    if (k >= 0 && k !== idx) { applyProject(k, false); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 14 秒切下一项目；鼠标停在切换器上时暂停。
+     从父页下钻进来（hash 命中）时先保持 20 秒不轮换，否则读者还没看清这个项目就被切走。 */
+  let timer = null;
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyProject(idx + 1, true); }, 14000);
+  }
+  restart();
+  if (resolveHash() >= 0) hold();
+  const swArea = $("dj-switcher");
+  swArea.addEventListener("mouseenter", () => clearInterval(timer));
+  swArea.addEventListener("mouseleave", restart);
+
+  /* ===== 13. 活性：预算图执行率巡检 + 风险行游标（kiosk 常驻，不做 teardown） ===== */
+  let budIdx = 0;
+  setInterval(() => {
+    budChart.dispatchAction({ type: "showTip", seriesIndex: 1, dataIndex: budIdx });
+    budIdx = (budIdx + 1) % CAT_NAMES.length;
+  }, 2600);
+
+  let arIdx = 0;
+  setInterval(() => {
+    arChart.dispatchAction({ type: "downplay", seriesIndex: 1 });
+    arChart.dispatchAction({ type: "highlight", seriesIndex: 1, dataIndex: arIdx });
+    arIdx = (arIdx + 1) % PROJECTS.length;
+  }, 2200);
+
+  /* ===== 14. 开发期自检：勾稽关系 + option 环检测（不影响页面渲染） =====
+       ★ 环检测必须对每一个 option 跑 JSON.stringify —— setOption 的深拷贝遇环即
+         RangeError，而 node 打桩测不出（桩的 setOption 是空函数，不走深拷贝）。 */
+  let optAcyclic = true;
+  try { PROJECTS.forEach((p, i) => { JSON.stringify(budgetOption(p)); JSON.stringify(arOption(i)); }); }
+  catch (e) { optAcyclic = false; console.error("[单项目IPD详情] option 存在循环引用：", e.message); }
+
+  const eq = (a, b, tol) => Math.abs(a - b) < (tol == null ? 1e-6 : tol);
+  const CONTRACT = [
+    ["星澜S3", "智家终端", "Develop"], ["星澜Pro2", "智家终端", "Verify"],
+    ["云枢3.0", "云平台服务", "Develop"], ["云盾2.1", "云平台服务", "Plan"],
+    ["澜芯M60", "AIoT模组", "Develop"], ["澜芯M80", "AIoT模组", "Concept"],
+    ["智楼5.0", "行业方案", "Launch"], ["车联1.0", "行业方案", "Verify"]
+  ];
+  const checks = [
+    ["八项目名与契约 §2.3 逐字一致", PROJECTS.length === 8 && PROJECTS.every((p, i) => p.name === CONTRACT[i][0])],
+    ["八项目产品线 / 当前阶段与契约 §2.3 逐字一致", PROJECTS.every((p, i) => p.line === CONTRACT[i][1] && p.stage === CONTRACT[i][2])],
+    ["各项目 已用 ≤ 预算", PROJECTS.every((p) => p.used <= p.bud)],
+    ["八项目预算 Σ = 10.60 亿 ≤ 全盘 21.4 亿（项目直接预算口径）", eq(D.budSum, 10.60, 1e-9) && D.budSum <= 21.4],
+    ["八项目 AR 合计 = 9,980 点 ≤ 21,500 点当量（重点项目子集口径）", D.arSum === 9980 && D.arSum <= 21500],
+    ["各项目 已完成 ≤ AR 当量（完成率 = 已完成 ÷ AR 现算）", PROJECTS.every((p) => p.done <= p.ar && eq(p.arRate, p.done / p.ar * 100, 1e-9))],
+    ["按阶段计数不超过管道盘：Concept≤6 Plan≤8 Develop≤17 Verify≤9 Launch≤5 LCM≤3",
+      STAGE_KEYS.every((k) => D.stageCnt[k] <= PIPE_CAP[k])],
+    ["口径日 2026-08-20 落在各项目当前阶段窗口内", PROJECTS.every((p) =>
+      p.stageStart.getTime() <= TODAY.getTime() && TODAY.getTime() < p.stageEnd.getTime())],
+    ["评审记录按计划日升序且 实际日 ≥ 计划日", PROJECTS.every((p) =>
+      p.reviews.every((r, k) => (k === 0 || r.plan.getTime() >= p.reviews[k - 1].plan.getTime()) && r.act.getTime() >= r.plan.getTime()))],
+    ["已完成评审 = 通过 + 有条件 + 否决", PROJECTS.every((p) => p.rvPass + p.rvCond + p.rvVeto === p.rvDone.length)],
+    ["五类预算拆分 Σ = 项目预算 且 已用拆分 Σ = 项目已用", PROJECTS.every((p) =>
+      sum(p.budCat) === p.budWan && sum(p.usedCat) === p.usedWan)],
+    ["五类拆分逐类 已用 ≤ 预算", PROJECTS.every((p) => p.usedCat.every((u, k) => u >= 0 && u <= p.budCat[k]))],
+    ["目标 GA = 立项 + 前四阶段计划时长（发布阶段起点）", PROJECTS.every((p) => p.ga.getTime() === p.bounds[3].getTime())],
+    ["hash 归一化后八个项目名均可命中", PROJECTS.every((p, i) => HASH_ALIAS[norm(p.name)] === i)],
+    ["两张图的 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单项目IPD详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

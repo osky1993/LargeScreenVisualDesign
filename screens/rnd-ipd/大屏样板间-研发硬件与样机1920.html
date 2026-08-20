@@ -1,0 +1,1406 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发硬件与样机</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --hj-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：样机批次（批次 / 机型 / 阶段 / 投产台数 / 直通率 / 状态） */
+    --hj-tcols: 112px 62px 46px 1fr 1fr 68px;
+    /* 物料认证进度行：物料 / 四阶段进度条 / 综合进度 */
+    --hj-mcols: 152px 1fr 50px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 =====
+     行高预算：12(上内边距) + 84(顶栏) + 14 + 104(KPI) + 14 + 504(主区) + 14 + 318(底区) + 16 = 1080
+     列宽预算：18 + 520 + 14 + 816 + 14 + 520 + 18 = 1920 ===== */
+  .hj-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 520px 1fr 520px;
+    grid-template-rows: 84px 104px 1fr 318px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .hj-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .hj-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 注入） ===== */
+  .hj-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .hj-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .hj-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .hj-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .hj-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .hj-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .hj-crumb em { font-style: normal; color: #d3e2ff; }
+  .hj-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .hj-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .hj-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .hj-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .hj-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .hj-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .hj-chips { display: flex; align-items: center; gap: 9px; }
+  .hj-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .hj-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .hj-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .hj-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .hj-chip.is-key b { color: var(--rnd-blue); }
+  .hj-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .hj-clock-time { font: 700 26px/1 var(--hj-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .hj-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带（6 枚硬件试制口径） ===== */
+  .hj-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .hj-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 14px 0 16px;
+  }
+  .hj-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .hj-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .hj-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-orange), transparent); }
+  .hj-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 92, 0.14), transparent 68%); }
+  .hj-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.26), rgba(70, 214, 200, 0.12));
+    border: 1px solid rgba(92, 157, 255, 0.35); box-shadow: inset 0 0 12px rgba(92, 157, 255, 0.14);
+  }
+  .hj-kpi.is-warn .hj-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 92, 0.28), rgba(255, 194, 77, 0.12));
+    border-color: rgba(255, 157, 92, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 92, 0.16);
+  }
+  .hj-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .hj-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .hj-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .hj-kpi-val { font: 700 29px/1 var(--hj-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .hj-kpi.is-warn .hj-kpi-val { color: #ffd9b0; }
+  .hj-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .hj-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hj-kpi-sub b { font-weight: 700; color: #cfdcff; }
+  .hj-up { color: var(--rnd-green); }
+  .hj-down { color: var(--rnd-red); }
+
+  /* ===== 面板通用 ===== */
+  .hj-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .hj-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .hj-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .hj-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .hj-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .hj-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .hj-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .hj-chart { flex: 1; min-height: 0; width: 100%; }
+  .hj-note { flex: none; margin-top: 6px; font-size: 10.5px; letter-spacing: 0.03em; color: rgba(127, 146, 196, 0.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hj-note b { font-weight: 700; color: #a9bfec; }
+
+  /* ===== 漏斗面板顶部的四阶段小卡（高度写死；init 之前已填充，不会压矮图表） ===== */
+  .hj-sc { flex: none; height: 74px; margin-bottom: 8px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .hj-sc-cell {
+    position: relative; overflow: hidden; min-width: 0;
+    border: 1px solid rgba(96, 140, 255, 0.18); border-radius: 10px; background: rgba(14, 26, 66, 0.5);
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 13px;
+    transition: border-color .3s, background .3s, box-shadow .3s;
+  }
+  .hj-sc-cell::after {
+    content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--w, 0%);
+    background: linear-gradient(90deg, var(--rnd-blue-deep), var(--rnd-blue)); transition: width .5s ease;
+  }
+  .hj-sc-cell.is-on { border-color: rgba(92, 157, 255, 0.6); background: rgba(26, 46, 110, 0.55); box-shadow: inset 0 0 16px rgba(92, 157, 255, 0.14); }
+  .hj-sc-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .hj-sc-top span { font-size: 11px; letter-spacing: 0.08em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .hj-sc-top i { font-style: normal; font: 700 12px/1 var(--hj-mono); letter-spacing: 0.12em; color: rgba(127, 146, 196, 0.65); }
+  .hj-sc-num { display: flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
+  .hj-sc-num b { font: 700 22px/1 var(--hj-mono); color: #eaf1ff; }
+  .hj-sc-num u { text-decoration: none; font-size: 11px; color: var(--rnd-text-dim); }
+  .hj-sc-num em { font-style: normal; margin-left: auto; font-size: 12px; font-weight: 700; color: var(--rnd-green); font-variant-numeric: tabular-nums; }
+  .hj-sc-sub { font-size: 10.5px; color: rgba(127, 146, 196, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 物料认证进度（DOM 四阶段进度条，非 ECharts） ===== */
+  .hj-mt { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .hj-mt-head, .hj-mt-list li {
+    display: grid; grid-template-columns: var(--hj-mcols); align-items: center; gap: 8px;
+  }
+  .hj-mt-head {
+    flex: none; padding: 5px 10px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .hj-mt-head .hj-mt-stages { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; }
+  .hj-mt-head .hj-mt-stages i { font-style: normal; }
+  .hj-mt-head > span:last-child { text-align: right; }
+  .hj-mt-list { flex: 1; min-height: 0; margin: 5px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .hj-mt-list li { padding: 0 10px; height: 38px; border-radius: 6px; transition: background .25s; }
+  .hj-mt-list li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .hj-mt-list li.is-on { background: rgba(92, 157, 255, 0.16); }
+  .hj-mt-name { font-size: 12px; color: #dfe9ff; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hj-mt-name i { font-style: normal; font-weight: 400; color: rgba(127, 146, 196, 0.85); font-size: 10.5px; margin-left: 4px; }
+  .hj-mt-bars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .hj-mt-seg { position: relative; height: 13px; border-radius: 3px; background: rgba(96, 140, 255, 0.12); overflow: hidden; }
+  .hj-mt-seg u { display: block; height: 100%; text-decoration: none; border-radius: 3px; }
+  .hj-mt-seg u.is-full { background: linear-gradient(90deg, rgba(111, 224, 154, 0.5), var(--rnd-green)); }
+  .hj-mt-seg u.is-run { background: linear-gradient(90deg, rgba(47, 111, 214, 0.55), var(--rnd-blue)); }
+  .hj-mt-seg u.is-hold { background: linear-gradient(90deg, rgba(255, 157, 92, 0.45), var(--rnd-orange)); }
+  .hj-mt-seg b {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 9.5px; font-weight: 700; color: rgba(232, 240, 255, 0.9); font-variant-numeric: tabular-nums;
+  }
+  .hj-mt-pct { text-align: right; font: 700 12.5px/1 var(--hj-mono); color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  .hj-mt-pct.is-low { color: var(--rnd-orange); }
+
+  /* ===== CSS grid 模拟表格：样机批次 ===== */
+  .hj-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .hj-thead, .hj-tbody li {
+    display: grid; grid-template-columns: var(--hj-tcols); align-items: center; gap: 6px;
+  }
+  .hj-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.06em; color: #8aa8e8;
+  }
+  /* 用 > 限定直接子级：批次列内部还嵌了副行 span，别被列对齐规则误伤 */
+  .hj-thead > span:nth-child(n+4), .hj-tbody li > span:nth-child(n+4) { text-align: right; }
+  .hj-thead > span:last-child, .hj-tbody li > span:last-child { text-align: center; }
+  .hj-tbody { flex: 1; min-height: 0; margin: 5px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .hj-tbody li {
+    padding: 0 8px; height: 42px; border-radius: 6px;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    transition: background .25s;
+  }
+  .hj-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .hj-tbody li.is-active { background: rgba(92, 157, 255, 0.16); }
+  .hj-tbody li b { font-weight: 700; color: #eaf1ff; }
+  .hj-tbody li .hj-bat { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #dfe9ff; white-space: nowrap; }
+  .hj-tbody li .hj-bat::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--dot, var(--rnd-blue)); box-shadow: 0 0 8px var(--dot, var(--rnd-blue)); }
+  .hj-tbody li .hj-sub { display: block; font-size: 10px; font-weight: 400; color: rgba(127, 146, 196, 0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hj-badge {
+    display: inline-block; min-width: 54px; padding: 2px 7px; border-radius: 5px; text-align: center;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  }
+  .hj-badge.is-good { color: #9df0bd; background: rgba(111, 224, 154, 0.14); border: 1px solid rgba(111, 224, 154, 0.35); }
+  .hj-badge.is-run { color: #b7d3ff; background: rgba(92, 157, 255, 0.14); border: 1px solid rgba(92, 157, 255, 0.38); }
+  .hj-badge.is-warn { color: #ffd9b0; background: rgba(255, 157, 92, 0.14); border: 1px solid rgba(255, 157, 92, 0.38); }
+
+  /* ===== BOM 瀑布面板底部的结论条 ===== */
+  .hj-bom { flex: none; height: 34px; margin-top: 6px; display: flex; align-items: center; gap: 14px; }
+  .hj-bom-cell { display: flex; align-items: baseline; gap: 6px; font-size: 11px; color: var(--rnd-text-dim); white-space: nowrap; }
+  .hj-bom-cell b { font: 700 16px/1 var(--hj-mono); color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  .hj-bom-cell.is-cut b { color: var(--rnd-green); }
+  .hj-bom-cell.is-gap b { color: var(--rnd-orange); }
+  /* drill:begin —— 由 tools/inject_drilldown_rnd.py 注入，勿手改 */
+  .hj-drill { cursor: pointer; position: relative; }
+  .hj-drill::after {
+    content: "↗"; position: absolute; right: 6px; top: 50%; transform: translateY(-50%) translateX(-3px);
+    font-size: 11px; font-weight: 700; line-height: 1; color: #ffc24d;
+    opacity: 0; transition: opacity .2s ease, transform .2s ease; pointer-events: none; z-index: 3;
+  }
+  .hj-drill:hover::after { opacity: 0.95; transform: translateY(-50%) translateX(0); }
+  .hj-drill:hover {
+    background: rgba(92, 157, 255, 0.15) !important;
+    box-shadow: inset 0 0 0 1px rgba(92, 157, 255, 0.5), 0 0 16px -4px rgba(92, 157, 255, 0.6);
+  }
+  /* 提示 chip：挂在面板头 h2 后面。margin-right:auto 吃掉 space-between 的空档，
+     免得把面板头原有的 .xx-panel-tag 挤到中间去。 */
+  .hj-drill-hint {
+    margin-left: 8px; margin-right: auto; font-size: 10.5px; letter-spacing: 0.04em;
+    color: #7f92c4; padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+    background: rgba(18, 34, 78, 0.55); border: 1px dashed rgba(96, 140, 255, 0.45);
+  }
+  /* 面板级入口：子页是全量台账、无切换对象时用它，挂在相关面板头上 */
+  .hj-drill-entry {
+    margin-left: 10px; cursor: pointer; white-space: nowrap;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; line-height: 1;
+    padding: 4px 9px; border-radius: 999px; color: #061029;
+    background: linear-gradient(140deg, #9cc2ff, #5c9dff);
+    box-shadow: 0 0 9px -1px rgba(92, 157, 255, 0.75);
+    transition: filter .18s ease, box-shadow .18s ease;
+  }
+  .hj-drill-entry:hover { filter: brightness(1.12); box-shadow: 0 0 16px -1px rgba(92, 157, 255, 0.95); }
+  /* drill:end */
+  /* subnav:begin —— 由 tools/inject_subnav_rnd.py 注入，勿手改 */
+  .hj-subnav {
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; flex: none;
+    min-width: 176px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(96, 140, 255, 0.34); background: rgba(18, 34, 78, 0.55);
+  }
+  .hj-subnav > span { font-size: 10.5px; letter-spacing: 0.16em; color: #7f92c4; white-space: nowrap; }
+  .hj-subnav > u { display: flex; align-items: baseline; gap: 6px; text-decoration: none; white-space: nowrap; }
+  .hj-subnav b { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; color: #a3b4dc; }
+  .hj-subnav i { font-style: normal; font-size: 10.5px; color: #7f92c4; }
+  /* 有子页：转星蓝并可点击 */
+  .hj-subnav.is-on {
+    cursor: pointer; border-color: rgba(92, 157, 255, 0.55);
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.16), rgba(18, 34, 78, 0.6));
+    box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1);
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .hj-subnav.is-on b { color: #9cc2ff; }
+  .hj-subnav.is-on i { color: #6f8ec4; }
+  .hj-subnav.is-on:hover { border-color: rgba(92, 157, 255, 0.95); box-shadow: 0 0 16px -2px rgba(92, 157, 255, 0.7); }
+  /* subnav:end */
+  /* carousel:begin —— 由 tools/inject_carousel_rnd.py 注入，勿手改，改脚本后重跑 */
+  .hj-carousel {
+    display: flex; align-items: center; gap: 9px; flex: none;
+    padding-left: 18px; margin-left: 2px;
+    border-left: 1px solid rgba(96, 140, 255, 0.28);
+  }
+  .hj-cbtn {
+    width: 36px; height: 36px; flex: none; padding: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px; font-family: inherit;
+    border: 1px solid rgba(255, 194, 77, 0.36);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.18), rgba(18, 34, 78, 0.6));
+    color: #ffd489;
+    transition: border-color .18s, box-shadow .18s, color .18s, transform .18s;
+  }
+  .hj-cbtn svg { width: 18px; height: 18px; display: block; }
+  .hj-cbtn:hover {
+    color: #ffe9c2; border-color: rgba(255, 194, 77, 0.88);
+    box-shadow: 0 0 14px rgba(255, 194, 77, 0.42), inset 0 0 12px rgba(255, 194, 77, 0.14);
+  }
+  .hj-cbtn:active { transform: scale(0.93); }
+  .hj-cmeta { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 62px; }
+  .hj-cidx { font: 700 15px/1 var(--hj-mono); color: #ffd489; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+  .hj-cidx i { font-style: normal; font-size: 11px; font-weight: 400; color: #7f92c4; margin-left: 1px; }
+  .hj-cbar { width: 58px; height: 3px; border-radius: 2px; background: rgba(96, 140, 255, 0.26); overflow: hidden; }
+  .hj-cbar u {
+    display: block; height: 100%; width: 0; border-radius: 2px;
+    background: linear-gradient(90deg, #c98f22, #ffc24d);
+    box-shadow: 0 0 8px rgba(255, 194, 77, 0.55);
+  }
+  /* 暂停态：进度条停在原地并转灰蓝，播放键换成三角、按钮描边转星蓝，一眼可辨 */
+  .hj-carousel.is-paused .hj-cbar u { background: linear-gradient(90deg, #3d517a, #7f92c4); box-shadow: none; }
+  .hj-cplay .hj-ic-play { display: none; }
+  .hj-carousel.is-paused .hj-cplay .hj-ic-pause { display: none; }
+  .hj-carousel.is-paused .hj-cplay .hj-ic-play { display: block; }
+  .hj-carousel.is-paused .hj-cplay {
+    color: #9cc2ff; border-color: rgba(92, 157, 255, 0.62);
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.2), rgba(18, 34, 78, 0.6));
+    box-shadow: 0 0 12px rgba(92, 157, 255, 0.34);
+  }
+  /* carousel:end */
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .hj-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="hj-stage" id="hj-stage">
+    <!-- mockflag:begin --><div class="hj-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="hj-error" id="hj-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 注入） -->
+    <header class="hj-header">
+      <div class="hj-head-left">
+        <div class="hj-crumb"><b>云麓智联科技</b><i>›</i><em>四域 · 集成协同</em><i>›</i><em>硬件与样机</em></div>
+        <div class="hj-head-title-row">
+          <div class="hj-head-title">研发硬件与样机</div>
+          <div class="hj-head-meta">
+            <span><b>4</b> 段试制（EVT→DVT→PVT→MP）· <b>5</b> 个样机批次 · <b>3</b> 款机型</span><i>|</i>
+            <span><b>10</b> 项关键物料认证 · <b>7</b> 类可靠性试验</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="hj-head-right">
+<!-- subnav:begin -->
+<!--ORIG
+        <div class="hj-chips">
+          <div class="hj-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="hj-chip is-key"><span>试制直通率</span><b id="hj-chip-fpy">--</b></div>
+          <div class="hj-chip is-key"><span>当前 BOM</span><b id="hj-chip-bom">--</b></div>
+        </div>
+ORIG-->
+        <a class="hj-subnav is-on" href="大屏样板间-研发单样机批次详情1920.html" title="点击进入子页：单样机批次详情（页内入口：样机批次表行）"><span>二级子页 · SUB-PAGE</span><u><b>单样机批次详情</b><i>· 样机批次表行</i></u></a><span id="hj-chip-fpy" hidden></span><span id="hj-chip-bom" hidden></span>
+        <!-- subnav:end -->
+        <div class="hj-clock" aria-label="实时时钟">
+          <span class="hj-clock-time" id="hj-clock-time">--:--:--</span>
+          <span class="hj-clock-date" id="hj-clock-date">----年--月--日 星期-</span>
+        </div>
+<!-- carousel:begin -->
+        <nav class="hj-carousel" id="hj-carousel" aria-label="专题轮播导航">
+          <button class="hj-cbtn" id="hj-c-prev" type="button" aria-label="上一页" title="上一页（← 方向键）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 L7 12 L15 20"/></svg>
+          </button>
+          <div class="hj-cmeta">
+            <span class="hj-cidx"><b id="hj-c-cur">--</b><i>/ 17</i></span>
+            <span class="hj-cbar" aria-hidden="true"><u id="hj-c-bar"></u></span>
+          </div>
+          <button class="hj-cbtn" id="hj-c-next" type="button" aria-label="下一页" title="下一页（→ 方向键）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 L17 12 L9 20"/></svg>
+          </button>
+          <button class="hj-cbtn hj-cplay" id="hj-c-play" type="button" aria-label="暂停轮播" aria-pressed="false" title="暂停 / 继续（空格键）">
+            <svg class="hj-ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.4"/><rect x="13.5" y="5" width="4" height="14" rx="1.4"/></svg>
+            <svg class="hj-ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2 L19 12 L8 18.8 Z"/></svg>
+          </button>
+        </nav>
+        <!-- carousel:end -->
+      </div>
+    </header>
+
+    <!-- KPI 带 -->
+    <div class="hj-band" id="hj-band"></div>
+
+    <!-- 主区左：试制直通率走势 -->
+    <section class="hj-panel">
+      <div class="hj-panel-head">
+        <h2>试制直通率走势</h2>
+        <span class="hj-panel-tag">近 <b>24</b> 周 · 当前 <b id="hj-fpy-cur">--</b> · 峰值 <b id="hj-fpy-best">--</b> · 目标 <b id="hj-fpy-target">--</b></span>
+      </div>
+      <div class="hj-chart" id="hj-chart-fpy"></div>
+      <div class="hj-note">口径：直通率 = 当周一次试制通过台数 ÷ 当周投产台数；<b>目标线 95.0%</b> 为量产准入门槛，缺口按周滚动复盘。</div>
+    </section>
+
+    <!-- 主区中（主视觉）：EVT→DVT→PVT→MP 阶段漏斗 -->
+    <section class="hj-panel">
+      <div class="hj-panel-head">
+        <h2>EVT → DVT → PVT → MP 阶段漏斗</h2>
+        <span class="hj-panel-tag">外层投产 Σ <b id="hj-fun-units">--</b> 台 · 内层一次通过 Σ <b id="hj-fun-pass">--</b> 台 · 逐级收敛</span>
+      </div>
+      <div class="hj-sc" id="hj-sc"></div>
+      <div class="hj-chart" id="hj-chart-funnel"></div>
+    </section>
+
+    <!-- 主区右：关键物料认证进度 -->
+    <section class="hj-panel">
+      <div class="hj-panel-head">
+        <h2>关键物料认证进度</h2>
+        <span class="hj-panel-tag">10 项 · 综合 <b id="hj-mt-avg">--</b> · 全通 <b id="hj-mt-done">--</b> 项 · 最慢 <b id="hj-mt-worst">--</b></span>
+      </div>
+      <div class="hj-mt">
+        <div class="hj-mt-head">
+          <span>关键物料</span>
+          <span class="hj-mt-stages"><i>送样</i><i>测试</i><i>认证</i><i>量产准入</i></span>
+          <span>综合</span>
+        </div>
+        <ul class="hj-mt-list" id="hj-mt-list"></ul>
+      </div>
+      <div class="hj-note">口径：四阶段各占 <b>25%</b>，综合进度 = 四阶段进度均值；进度<b>逐阶段不增</b>（前段未闭环则后段不启动）。</div>
+    </section>
+
+    <!-- 底区左：BOM 成本下降瀑布 -->
+    <section class="hj-panel">
+      <div class="hj-panel-head">
+        <h2>BOM 成本下降瀑布</h2>
+        <span class="hj-panel-tag">星澜S3 整机 · 元/台 · 降本 <b id="hj-bom-cut">--</b> 元</span>
+      </div>
+      <div class="hj-chart" id="hj-chart-bom"></div>
+      <div class="hj-bom" id="hj-bom-strip"></div>
+    </section>
+
+    <!-- 底区中：可靠性试验矩阵 -->
+    <section class="hj-panel">
+      <div class="hj-panel-head">
+        <h2>可靠性试验矩阵</h2>
+        <span class="hj-panel-tag">7 试验项 × 5 批次 = <b id="hj-rel-cells">--</b> 格 · 通过 <b id="hj-rel-pass">--</b> · 失败 <b id="hj-rel-fail">--</b> · 未开始 <b id="hj-rel-todo">--</b></span>
+      </div>
+      <div class="hj-chart" id="hj-chart-rel"></div>
+    </section>
+
+    <!-- 底区右：样机批次表（行首含批次名原文，为「单样机批次详情」子页下钻锚点） -->
+    <section class="hj-panel">
+      <div class="hj-panel-head">
+        <h2>样机批次台账</h2>
+        <span class="hj-panel-tag">Σ 投产 <b id="hj-tab-units">--</b> 台 · Σ 通过 <b id="hj-tab-pass">--</b> 台</span>
+      </div>
+      <div class="hj-table">
+        <div class="hj-thead">
+          <span>批次</span><span>机型</span><span>阶段</span><span>投产台数</span><span>直通率</span><span>状态</span>
+        </div>
+        <ul class="hj-tbody" id="hj-tbody"></ul>
+        <div class="hj-note">口径：直通率 = 批次一次通过台数 ÷ 投产台数；阶段投产台数逐阶段汇总即上方漏斗的 EVT/DVT/PVT 三档。</div>
+      </div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("hj-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("hj-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* =====================================================================
+     4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 硬件试制体系）
+     口径与 docs/RndIpdThemed.md §2.3 / §5.3 P10 一致：五个样机批次名逐字，
+     试制直通率当前值 93.6%（与门户快照同源）。
+     页面上所有合计、比率、瀑布余额一律由分项现算，不硬编码。
+     ===================================================================== */
+
+  /* 4.1 五个样机批次（契约 §2.3 逐字；表格行首 textContent 含批次名原文 → 下钻锚点） */
+  const BATCHES = [
+    { name: "星澜S3-EVT2",   short: "S3-EVT2",   model: "星澜S3",   stage: "EVT",
+      units: 260, pass: 220, state: "复测中", tone: "warn", dot: C.orange, note: "跌落 / ESD 两项失败，复测排期中" },
+    { name: "星澜S3-DVT1",   short: "S3-DVT1",   model: "星澜S3",   stage: "DVT",
+      units: 180, pass: 164, state: "试制中", tone: "run",  dot: C.blue,   note: "寿命循环首轮失败，二轮进行中" },
+    { name: "星澜Pro2-DVT2", short: "Pro2-DVT2", model: "星澜Pro2", stage: "DVT",
+      units: 156, pass: 140, state: "试制中", tone: "run",  dot: C.blue,   note: "振动项待复测，结构件已改模" },
+    { name: "星澜Pro2-PVT1", short: "Pro2-PVT1", model: "星澜Pro2", stage: "PVT",
+      units: 208, pass: 197, state: "待准入", tone: "good", dot: C.green,  note: "七项可靠性全通，量产准入评审排期" },
+    { name: "澜芯M60-EVT1",  short: "M60-EVT1",  model: "澜芯M60",  stage: "EVT",
+      units: 160, pass: 140, state: "试制中", tone: "run",  dot: C.blue,   note: "低温启动失败；跌落 / 湿热 / ESD / 寿命循环尚未开机" }
+  ];
+
+  /* 4.2 试制四阶段：EVT / DVT / PVT 由批次汇总现算；MP（量产导入）为爬坡首批签样，无独立样机批次 */
+  const STAGE_DEF = [
+    { key: "EVT", name: "工程验证 EVT", desc: "功能打样 · 原理验证" },
+    { key: "DVT", name: "设计验证 DVT", desc: "设计定型 · 全项可靠性" },
+    { key: "PVT", name: "生产验证 PVT", desc: "工装夹具 · 良率爬坡" }
+  ];
+  const MP = { key: "MP", name: "量产导入 MP", desc: "首批签样 · 量产准入", units: 96, pass: 93 };
+
+  /* 4.3 试制直通率走势：近 24 周（%）。末点 93.6 = 门户 P10 快照同源；目标线 95.0 */
+  const FPY_WEEKS = [
+    86.4, 87.1, 86.5, 88.0, 87.6, 88.9, 89.4, 88.7, 90.2, 89.6, 90.8, 91.3,
+    90.5, 91.8, 92.2, 91.4, 92.6, 92.1, 93.0, 92.4, 93.3, 92.8, 93.9, 93.6
+  ];
+  const FPY_TARGET = 95.0;
+
+  /* 4.4 BOM 成本下降瀑布（星澜S3 整机，元/台）：初版 → 四项降本措施 → 当前 */
+  const BOM_BASE = 1286;
+  const BOM_CUTS = [
+    { name: "器件替代", v: 128, note: "主控 SoC 与电源 IC 二供导入" },
+    { name: "结构简化", v: 74,  note: "中框一体成型，紧固件减 11 颗" },
+    { name: "规模议价", v: 96,  note: "年采量上台阶，屏与存储重议价" },
+    { name: "工艺优化", v: 52,  note: "贴片一次通过率提升，返修工时下降" }
+  ];
+  const BOM_TARGET = 900;
+
+  /* 4.5 关键物料认证进度：四阶段（送样 / 测试 / 认证 / 量产准入）各 0–100%，逐阶段不增 */
+  const CERT_STAGES = ["送样", "测试", "认证", "量产准入"];
+  const MATERIALS = [
+    { name: "主控 SoC",     code: "LX-9820",  p: [100, 100, 100, 72] },
+    { name: "电源管理 IC",  code: "PM-3308",  p: [100, 100, 88, 40] },
+    { name: "温度传感器",   code: "TS-77",    p: [100, 100, 100, 100] },
+    { name: "毫米波雷达",   code: "RD-24G",   p: [100, 86, 42, 0] },
+    { name: "无线通信模组", code: "WM-6E",    p: [100, 100, 95, 55] },
+    { name: "快充协议芯片", code: "CH-65W",   p: [100, 100, 100, 86] },
+    { name: "镁铝中框",     code: "MA-21",    p: [100, 92, 60, 0] },
+    { name: "触控显示屏",   code: "TP-58",    p: [100, 100, 74, 20] },
+    { name: "存储器",       code: "NAND-256", p: [100, 78, 30, 0] },
+    { name: "声学器件",     code: "SPK-08",   p: [100, 100, 100, 64] }
+  ];
+
+  /* 4.6 可靠性试验矩阵：7 试验项 × 5 批次（列序 = BATCHES 顺序），三态 2=通过 / 1=失败 / 0=未开始 */
+  const REL_TESTS = ["高温老化", "低温启动", "跌落", "振动", "湿热", "ESD", "寿命循环"];
+  const REL_MATRIX = [
+    /* 高温老化 */ [2, 2, 2, 2, 2],
+    /* 低温启动 */ [2, 2, 2, 2, 1],
+    /* 跌落     */ [1, 2, 2, 2, 0],
+    /* 振动     */ [2, 2, 1, 2, 2],
+    /* 湿热     */ [2, 2, 2, 2, 0],
+    /* ESD      */ [1, 2, 2, 2, 0],
+    /* 寿命循环 */ [0, 1, 2, 2, 0]
+  ];
+  const REL_STATE = [
+    { v: 0, label: "未开始", color: "rgba(96,140,255,.16)", mark: "·" },
+    { v: 1, label: "失败",   color: "rgba(255,95,107,.82)", mark: "✕" },
+    { v: 2, label: "通过",   color: "rgba(111,224,154,.82)", mark: "✓" }
+  ];
+
+  /* ===== 4.7 派生量：全部现算，不复制数字 ===== */
+  const D = {};
+
+  /* 批次层：直通率 = 通过 ÷ 投产 */
+  BATCHES.forEach((b) => { b.fpy = b.pass / b.units * 100; });
+  D.batUnits = sum(BATCHES.map((b) => b.units));
+  D.batPass = sum(BATCHES.map((b) => b.pass));
+  D.models = BATCHES.map((b) => b.model).filter((m, i, a) => a.indexOf(m) === i);
+
+  /* 阶段层：EVT/DVT/PVT 由批次汇总，MP 独立；漏斗 = 三阶段 + MP */
+  const FUNNEL = STAGE_DEF.map((s) => {
+    const list = BATCHES.filter((b) => b.stage === s.key);
+    const units = sum(list.map((b) => b.units));
+    const pass = sum(list.map((b) => b.pass));
+    return { key: s.key, name: s.name, desc: s.desc, units: units, pass: pass,
+             rate: pass / units * 100, batches: list.map((b) => b.name).join(" / ") };
+  }).concat([{ key: MP.key, name: MP.name, desc: MP.desc, units: MP.units, pass: MP.pass,
+               rate: MP.pass / MP.units * 100, batches: "量产爬坡首批签样（无独立样机批次）" }]);
+
+  D.funUnits = sum(FUNNEL.map((f) => f.units));
+  D.funPass = sum(FUNNEL.map((f) => f.pass));
+  D.funMax = Math.max.apply(null, FUNNEL.map((f) => f.units));
+  D.unitsDesc = FUNNEL.every((f, i) => i === 0 || FUNNEL[i - 1].units > f.units);
+  D.passDesc = FUNNEL.every((f, i) => i === 0 || FUNNEL[i - 1].pass > f.pass);
+  D.rateAsc = FUNNEL.every((f, i) => i === 0 || FUNNEL[i - 1].rate < f.rate);
+  /* 三阶段（EVT+DVT+PVT）投产之和应等于五批次投产之和——批次表与漏斗的接缝 */
+  D.stage3Units = sum(FUNNEL.slice(0, 3).map((f) => f.units));
+  D.stageMatch = FUNNEL.slice(0, 3).every((f) =>
+    f.units === sum(BATCHES.filter((b) => b.stage === f.key).map((b) => b.units)));
+
+  /* 直通率走势 */
+  D.fpyCur = FPY_WEEKS[FPY_WEEKS.length - 1];
+  D.fpyFirst = FPY_WEEKS[0];
+  D.fpyAvg = sum(FPY_WEEKS) / FPY_WEEKS.length;
+  D.fpyGain = D.fpyCur - D.fpyFirst;
+  D.fpyGap = FPY_TARGET - D.fpyCur;
+  D.fpyBest = Math.max.apply(null, FPY_WEEKS);
+
+  /* BOM 瀑布：末柱 = 首柱 − Σ降本（现算恒等，页面不写死当前成本） */
+  D.bomCut = sum(BOM_CUTS.map((c) => c.v));
+  D.bomNow = BOM_BASE - D.bomCut;
+  D.bomCutPct = D.bomCut / BOM_BASE * 100;
+  D.bomGap = D.bomNow - BOM_TARGET;
+  /* 瀑布的透明托底 + 可见段：逐项累减，托底恒非负 */
+  const BOM_BARS = [];
+  let bomRun = BOM_BASE;
+  BOM_BARS.push({ name: "初版 BOM", base: 0, val: BOM_BASE, kind: "start", note: "首版工程 BOM，EVT1 批次核价" });
+  BOM_CUTS.forEach((c) => {
+    bomRun -= c.v;
+    BOM_BARS.push({ name: c.name, base: bomRun, val: c.v, kind: "cut", note: c.note });
+  });
+  BOM_BARS.push({ name: "当前 BOM", base: 0, val: bomRun, kind: "end", note: "PVT1 批次核价，目标 " + BOM_TARGET + " 元/台" });
+  D.bomChainOk = Math.abs(bomRun - D.bomNow) < 1e-9 && BOM_BARS.every((b) => b.base >= 0);
+
+  /* 物料认证：综合进度 = 四阶段均值；单调性校验 */
+  MATERIALS.forEach((m) => {
+    m.avg = sum(m.p) / m.p.length;
+    m.mono = m.p.every((v, i) => i === 0 || m.p[i - 1] >= v);
+    m.doneStages = m.p.filter((v) => v >= 100).length;
+  });
+  D.certAvg = sum(MATERIALS.map((m) => m.avg)) / MATERIALS.length;
+  D.certDone = MATERIALS.filter((m) => m.avg >= 100).length;          /* 四阶段全通 = 已量产准入 */
+  D.certCertified = MATERIALS.filter((m) => m.p[2] >= 100).length;    /* 认证阶段已闭环 */
+  D.certMono = MATERIALS.every((m) => m.mono);
+  D.certWorst = MATERIALS.slice().sort((a, b) => a.avg - b.avg)[0];
+
+  /* 可靠性矩阵：三态计数，Σ 必须 = 试验项 × 批次数 */
+  D.relCells = REL_TESTS.length * BATCHES.length;
+  D.relPass = 0; D.relFail = 0; D.relTodo = 0;
+  REL_MATRIX.forEach((row) => row.forEach((v) => {
+    if (v === 2) D.relPass++; else if (v === 1) D.relFail++; else D.relTodo++;
+  }));
+  D.relStarted = D.relPass + D.relFail;
+  D.relRate = D.relStarted ? D.relPass / D.relStarted * 100 : 0;
+  D.relSumOk = (D.relPass + D.relFail + D.relTodo) === D.relCells;
+  /* 每批次的可靠性完成度（列向统计，供表格副行与轮播提示用） */
+  const REL_BY_BATCH = BATCHES.map((b, ci) => {
+    let p = 0, f = 0, t = 0;
+    REL_MATRIX.forEach((row) => { if (row[ci] === 2) p++; else if (row[ci] === 1) f++; else t++; });
+    return { name: b.name, pass: p, fail: f, todo: t };
+  });
+  D.relColSumOk = REL_BY_BATCH.every((c) => c.pass + c.fail + c.todo === REL_TESTS.length);
+
+  /* ===== 5. 顶部时钟 + 顶栏 chip ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("hj-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("hj-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("hj-chip-fpy").textContent = fmtDec(D.fpyCur, 1) + "%";
+  $("hj-chip-bom").textContent = fmtInt(D.bomNow) + " 元";
+
+  /* ===== 6. KPI 带（6 枚，数值翻牌缓动） ===== */
+  const KPI_DEFS = [
+    { icon: "⛭", label: "在制样机批次", val: BATCHES.length, unit: "个", dec: 0, warn: false,
+      sub: () => "覆盖 <b>" + D.models.length + "</b> 款机型 · EVT <b>" +
+        BATCHES.filter((b) => b.stage === "EVT").length + "</b> · DVT <b>" +
+        BATCHES.filter((b) => b.stage === "DVT").length + "</b> · PVT <b>" +
+        BATCHES.filter((b) => b.stage === "PVT").length + "</b>" },
+    { icon: "▤", label: "累计投产样机", val: D.batUnits, unit: "台", dec: 0, warn: false,
+      sub: () => "五批次之和 · 一次通过 <b>" + fmtInt(D.batPass) + "</b> 台" },
+    { icon: "↗", label: "试制直通率", val: D.fpyCur, unit: "%", dec: 1, warn: D.fpyCur < FPY_TARGET,
+      sub: () => "24 周 <b class=\"hj-up\">+" + fmtDec(D.fpyGain, 1) + "pp</b> · 距目标 <b>" + fmtDec(D.fpyGap, 1) + "pp</b>" },
+    { icon: "¥", label: "当前 BOM 成本", val: D.bomNow, unit: "元/台", dec: 0, warn: D.bomNow > BOM_TARGET,
+      sub: () => "较初版 <b class=\"hj-up\">−" + fmtInt(D.bomCut) + " 元</b>（" + fmtDec(D.bomCutPct, 1) + "%）" },
+    { icon: "◈", label: "物料认证达成", val: D.certAvg, unit: "%", dec: 1, warn: false,
+      sub: () => "10 项均值 · 全通 <b>" + D.certDone + "</b> 项 · 认证闭环 <b>" + D.certCertified + "</b> 项" },
+    { icon: "✓", label: "可靠性通过率", val: D.relRate, unit: "%", dec: 1, warn: D.relFail > 0,
+      sub: () => "通过 <b>" + D.relPass + "</b> ÷ 已开展 <b>" + D.relStarted + "</b> · 失败 <b class=\"hj-down\">" + D.relFail + "</b> 待复测" }
+  ];
+  $("hj-band").innerHTML = KPI_DEFS.map((k, i) => (
+    '<div class="hj-kpi' + (k.warn ? " is-warn" : "") + '">' +
+      '<div class="hj-kpi-icon">' + k.icon + "</div>" +
+      '<div class="hj-kpi-main">' +
+        '<div class="hj-kpi-label">' + k.label + "</div>" +
+        '<div class="hj-kpi-num"><span class="hj-kpi-val" id="hj-kpi-' + i + '">0</span><span class="hj-kpi-unit">' + k.unit + "</span></div>" +
+        '<div class="hj-kpi-sub">' + k.sub() + "</div>" +
+      "</div>" +
+    "</div>"
+  )).join("");
+
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛到目标值 */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = dec === 0 ? fmtInt(target * e) : fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = dec === 0 ? fmtInt(target) : fmtDec(target, dec);
+    })(t0);
+  }
+  KPI_DEFS.forEach((k, i) => countUp($("hj-kpi-" + i), k.val, k.dec));
+
+  /* ===== 7. 先填 DOM，再 init 图表 =====
+     ★ 与图表同属 flex 容器的兄弟块（阶段小卡 / BOM 结论条）必须在 echarts.init 之前填好，
+       否则 init 时读到的容器高度是旧值，图表会被随后填充的兄弟块压矮。
+       这两块另外都写死了高度，双保险。 ===== */
+
+  /* 7.1 漏斗面板顶部四阶段小卡 */
+  $("hj-sc").innerHTML = FUNNEL.map((f, i) => (
+    '<div class="hj-sc-cell' + (i === 0 ? " is-on" : "") + '" data-i="' + i + '" style="--w:' + fmtDec(f.rate, 1) + '%">' +
+      '<div class="hj-sc-top"><span>' + f.name.replace(/ .*/, "") + "</span><i>" + f.key + "</i></div>" +
+      '<div class="hj-sc-num"><b>' + fmtInt(f.units) + "</b><u>台投产</u><em>" + fmtDec(f.rate, 1) + "%</em></div>" +
+      '<div class="hj-sc-sub">通过 ' + fmtInt(f.pass) + " 台 · " + f.desc + "</div>" +
+    "</div>"
+  )).join("");
+  const scCells = Array.from($("hj-sc").children);
+  $("hj-fun-units").textContent = fmtInt(D.funUnits);
+  $("hj-fun-pass").textContent = fmtInt(D.funPass);
+
+  /* 7.2 BOM 结论条 */
+  $("hj-bom-strip").innerHTML =
+    '<div class="hj-bom-cell">初版 <b>' + fmtInt(BOM_BASE) + "</b> 元</div>" +
+    '<div class="hj-bom-cell is-cut">累计降本 <b>−' + fmtInt(D.bomCut) + "</b> 元（" + fmtDec(D.bomCutPct, 1) + "%）</div>" +
+    '<div class="hj-bom-cell">当前 <b>' + fmtInt(D.bomNow) + "</b> 元</div>" +
+    '<div class="hj-bom-cell is-gap">距目标 ' + fmtInt(BOM_TARGET) + " 元还差 <b>" + fmtInt(D.bomGap) + "</b> 元</div>";
+  $("hj-bom-cut").textContent = fmtInt(D.bomCut);
+
+  /* 7.3 物料认证进度列表 */
+  function segClass(v, i, arr) {
+    if (v >= 100) return "is-full";
+    if (v <= 0) return "";
+    return (i > 0 && arr[i - 1] < 100) ? "is-hold" : "is-run";
+  }
+  $("hj-mt-list").innerHTML = MATERIALS.map((m, i) => (
+    '<li data-i="' + i + '" title="' + m.name + " " + m.code + " · 综合 " + fmtDec(m.avg, 1) + '%">' +
+      '<span class="hj-mt-name">' + m.name + "<i>" + m.code + "</i></span>" +
+      '<span class="hj-mt-bars">' +
+        m.p.map((v, j) => (
+          '<span class="hj-mt-seg" title="' + CERT_STAGES[j] + " " + fmtDec(v, 0) + '%">' +
+            '<u class="' + segClass(v, j, m.p) + '" style="width:' + fmtDec(v, 0) + '%"></u>' +
+            "<b>" + fmtDec(v, 0) + "</b>" +
+          "</span>"
+        )).join("") +
+      "</span>" +
+      '<span class="hj-mt-pct' + (m.avg < 60 ? " is-low" : "") + '">' + fmtDec(m.avg, 0) + "%</span>" +
+    "</li>"
+  )).join("");
+  const mtRows = Array.from($("hj-mt-list").children);
+  $("hj-mt-avg").textContent = fmtDec(D.certAvg, 1) + "%";
+  $("hj-mt-done").textContent = String(D.certDone);
+  $("hj-mt-worst").textContent = D.certWorst.name + " " + fmtDec(D.certWorst.avg, 0) + "%";
+
+  /* 7.4 样机批次台账（行首 span 的 textContent 含批次名原文 → 下钻锚点） */
+  $("hj-tbody").innerHTML = BATCHES.map((b, i) => {
+    const rel = REL_BY_BATCH[i];
+    return '<li data-i="' + i + '" title="' + b.name + " · " + b.state + " · " + b.note + '">' +
+      '<span><em class="hj-bat" style="--dot:' + b.dot + '">' + b.name + "</em>" +
+        '<span class="hj-sub">可靠性 ' + rel.pass + "/" + REL_TESTS.length + " 通过</span></span>" +
+      "<span>" + b.model + "</span>" +
+      "<span>" + b.stage + "</span>" +
+      "<span><b>" + fmtInt(b.units) + "</b></span>" +
+      "<span>" + fmtDec(b.fpy, 1) + "%</span>" +
+      '<span><i class="hj-badge is-' + b.tone + '" style="font-style:normal">' + b.state + "</i></span>" +
+    "</li>";
+  }).join("");
+  const tbodyRows = Array.from($("hj-tbody").children);
+  $("hj-tab-units").textContent = fmtInt(D.batUnits);
+  $("hj-tab-pass").textContent = fmtInt(D.batPass);
+
+  $("hj-fpy-cur").textContent = fmtDec(D.fpyCur, 1) + "%";
+  $("hj-fpy-best").textContent = fmtDec(D.fpyBest, 1) + "%";
+  $("hj-fpy-target").textContent = fmtDec(FPY_TARGET, 1) + "%";
+  $("hj-rel-cells").textContent = String(D.relCells);
+  $("hj-rel-pass").textContent = String(D.relPass);
+  $("hj-rel-fail").textContent = String(D.relFail);
+  $("hj-rel-todo").textContent = String(D.relTodo);
+
+  /* ===== 8. 图表 =====
+     ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize()
+     ★ 进 option 的数据只放标量与数组，业务对象之间用索引 / 名称关联，绝不塞对象引用 ===== */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = {
+    backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  };
+
+  /* 8.1 试制直通率走势：24 周折线 + 目标线 + 均值线 + 面积渐变 */
+  const fpy = makeChart("hj-chart-fpy");
+  fpy.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 6, right: 16, top: 28, bottom: 4, containLabel: true },
+    tooltip: Object.assign({
+      trigger: "axis",
+      formatter: (ps) => {
+        const i = ps[0].dataIndex, v = FPY_WEEKS[i];
+        const dv = i === 0 ? 0 : v - FPY_WEEKS[i - 1];
+        return "<b>第 W" + (i + 1) + " 周</b>　直通率 <b style=\"color:" + C.blue + "\">" + fmtDec(v, 1) + "%</b><br/>" +
+          "环比 <b style=\"color:" + (dv >= 0 ? C.green : C.red) + "\">" + (dv >= 0 ? "+" : "") + fmtDec(dv, 1) + "pp</b>" +
+          "　距目标 <b style=\"color:" + C.orange + "\">" + fmtDec(FPY_TARGET - v, 1) + "pp</b>";
+      }
+    }, TIP),
+    xAxis: {
+      type: "category", boundaryGap: false, data: FPY_WEEKS.map((_, i) => "W" + (i + 1)),
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 2, fontSize: 10.5 })
+    },
+    yAxis: {
+      type: "value", min: 84, max: 96, interval: 3, name: "%",
+      nameTextStyle: { color: C.textDim, fontSize: 10 },
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    series: [{
+      name: "试制直通率", type: "line", smooth: true, symbol: "circle", symbolSize: 5, z: 4,
+      data: FPY_WEEKS,
+      lineStyle: { width: 2.6, color: C.blue },
+      itemStyle: { color: C.blue, borderColor: "rgba(8,18,49,.9)", borderWidth: 1 },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: "rgba(92,157,255,.34)" }, { offset: 1, color: "rgba(92,157,255,.02)" }])
+      },
+      markPoint: {
+        symbolSize: 48, data: [{ coord: [FPY_WEEKS.length - 1, D.fpyCur], value: fmtDec(D.fpyCur, 1) + "%" }],
+        itemStyle: { color: "rgba(255,194,77,.9)" },
+        label: { color: "#2a1b06", fontSize: 11, fontWeight: 700 }
+      },
+      markLine: {
+        symbol: "none", silent: true,
+        data: [
+          { yAxis: FPY_TARGET, name: "目标",
+            lineStyle: { color: C.orange, width: 1.6, type: "dashed" },
+            label: { formatter: "目标 " + fmtDec(FPY_TARGET, 1) + "%", color: C.orange, fontSize: 10.5, position: "insideEndTop" } },
+          { yAxis: D.fpyAvg, name: "均值",
+            lineStyle: { color: "rgba(70,214,200,.6)", width: 1.2, type: "dotted" },
+            label: { formatter: "24 周均值 " + fmtDec(D.fpyAvg, 1) + "%", color: C.cyan, fontSize: 10.5, position: "insideStartTop" } }
+        ]
+      }
+    }]
+  });
+
+  /* 8.2 主视觉：EVT→DVT→PVT→MP 阶段漏斗（外层=投产台数，内层=一次通过台数） */
+  const funnel = makeChart("hj-chart-funnel");
+  const FUN_COLORS = [C.blue, C.cyan, C.violet, C.amber];
+  funnel.setOption({
+    backgroundColor: "transparent",
+    tooltip: Object.assign({
+      trigger: "item",
+      formatter: (p) => {
+        const f = FUNNEL[p.dataIndex];
+        if (!f) return "";
+        return "<b>" + f.name + "</b><br/>" +
+          "投产 <b style=\"color:" + C.blue + "\">" + fmtInt(f.units) + "</b> 台 · 一次通过 <b style=\"color:" + C.green + "\">" +
+          fmtInt(f.pass) + "</b> 台<br/>阶段通过率 <b style=\"color:" + C.amber + "\">" + fmtDec(f.rate, 1) + "%</b>" +
+          "　流失 <b style=\"color:" + C.red + "\">" + fmtInt(f.units - f.pass) + "</b> 台<br/>" +
+          "<span style=\"color:" + C.textDim + "\">" + f.batches + "</span>";
+      }
+    }, TIP),
+    /* ★ funnel 的 legend 按「数据项名」而非系列名选中，两条系列的数据名都是阶段名，
+       挂 legend 只会得到两枚点不动的灰条——图例改用面板头文案表达，这里不设 legend。 */
+    graphic: [{
+      type: "text", right: 6, top: 4, silent: true,
+      style: { text: "外层 = 投产台数　内层 = 一次通过台数", fill: C.textDim, fontSize: 11 }
+    }],
+    series: [
+      {
+        name: "投产台数", type: "funnel", sort: "none", gap: 8,
+        left: "2%", width: "58%", top: 30, bottom: 8,
+        min: 0, max: D.funMax, minSize: "26%", maxSize: "100%",
+        itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 2, opacity: 0.9 },
+        label: {
+          show: true, position: "right", color: "#d9e6ff", fontSize: 12,
+          formatter: (p) => {
+            const f = FUNNEL[p.dataIndex];
+            return "{n|" + f.name + "}\n{v|" + fmtInt(f.units) + "} {u|台投产} {r|通过率 " + fmtDec(f.rate, 1) + "%}\n{d|" + f.desc + "}";
+          },
+          rich: {
+            n: { fontSize: 13.5, fontWeight: 700, color: "#e6efff", lineHeight: 19 },
+            v: { fontSize: 17, fontWeight: 700, color: "#eaf1ff", lineHeight: 22 },
+            u: { fontSize: 11, color: C.textDim },
+            r: { fontSize: 11.5, fontWeight: 700, color: C.amber },
+            d: { fontSize: 10.5, color: "rgba(127,146,196,.85)", lineHeight: 16 }
+          }
+        },
+        labelLine: { length: 18, lineStyle: { color: "rgba(96,140,255,.45)", width: 1 } },
+        emphasis: { label: { show: true } },
+        data: FUNNEL.map((f, i) => ({
+          name: f.name, value: f.units, itemStyle: { color: FUN_COLORS[i % FUN_COLORS.length] }
+        }))
+      },
+      {
+        name: "一次通过", type: "funnel", sort: "none", gap: 8, z: 5,
+        left: "2%", width: "58%", top: 30, bottom: 8,
+        min: 0, max: D.funMax, minSize: "26%", maxSize: "100%",
+        itemStyle: { borderColor: "rgba(8,18,49,.75)", borderWidth: 1, opacity: 0.96 },
+        label: {
+          show: true, position: "inside", color: "#08122e", fontSize: 12, fontWeight: 700,
+          formatter: (p) => fmtInt(FUNNEL[p.dataIndex].pass) + " 台通过"
+        },
+        emphasis: { label: { show: true } },
+        data: FUNNEL.map((f) => ({
+          name: f.name, value: f.pass,
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: "rgba(111,224,154,.75)" }, { offset: 1, color: "rgba(70,214,200,.85)" }])
+          }
+        }))
+      }
+    ]
+  });
+
+  /* 8.3 BOM 成本下降瀑布：透明托底 + 可见段；末柱由首柱减去各项降本现算 */
+  const bom = makeChart("hj-chart-bom");
+  bom.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 4, right: 10, top: 26, bottom: 2, containLabel: true },
+    tooltip: Object.assign({
+      trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: (ps) => {
+        const b = BOM_BARS[ps[0].dataIndex];
+        const head = "<b>" + b.name + "</b>　" +
+          (b.kind === "cut" ? "降本 <b style=\"color:" + C.green + "\">−" + fmtInt(b.val) + "</b> 元/台，降至 <b>" + fmtInt(b.base) + "</b> 元"
+                            : "成本 <b style=\"color:" + C.blue + "\">" + fmtInt(b.val) + "</b> 元/台");
+        return head + "<br/><span style=\"color:" + C.textDim + "\">" + b.note + "</span>";
+      }
+    }, TIP),
+    xAxis: {
+      type: "category", data: BOM_BARS.map((b) => b.name),
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 10.5 })
+    },
+    yAxis: {
+      type: "value", min: 0, max: Math.ceil(BOM_BASE / 200) * 200, name: "元/台",
+      nameTextStyle: { color: C.textDim, fontSize: 10 },
+      axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+    },
+    series: [
+      { name: "托底", type: "bar", stack: "bom", silent: true,
+        itemStyle: { color: "transparent" }, emphasis: { itemStyle: { color: "transparent" } },
+        data: BOM_BARS.map((b) => b.base) },
+      { name: "BOM 成本", type: "bar", stack: "bom", barWidth: "52%",
+        label: { show: true, position: "top", fontSize: 11, fontWeight: 700 },
+        itemStyle: { borderRadius: [3, 3, 0, 0] },
+        markLine: {
+          symbol: "none", silent: true,
+          data: [{ yAxis: BOM_TARGET,
+            lineStyle: { color: C.orange, width: 1.4, type: "dashed" },
+            label: { formatter: "目标 " + fmtInt(BOM_TARGET), color: C.orange, fontSize: 10.5, position: "insideEndTop" } }]
+        },
+        /* 逐柱下发颜色与标签（只放标量，不把 BOM_BARS 的对象塞进 option） */
+        data: BOM_BARS.map((b) => ({
+          value: b.val,
+          label: { color: b.kind === "cut" ? "#9df0bd" : "#eaf1ff",
+                   formatter: (b.kind === "cut" ? "−" : "") + fmtInt(b.val) },
+          itemStyle: {
+            color: b.kind === "start" ? C.blue
+                 : b.kind === "end" ? C.amber
+                 : new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                     { offset: 0, color: "rgba(111,224,154,.95)" }, { offset: 1, color: "rgba(111,224,154,.35)" }])
+          }
+        })) }
+    ]
+  });
+
+  /* 8.4 可靠性试验矩阵：7 试验项 × 5 批次热力（三态：通过 / 失败 / 未开始） */
+  const rel = makeChart("hj-chart-rel");
+  /* 每格只放标量三元组 [列, 行, 三态值] + 该格自己的标签样式，绝不塞业务对象 */
+  const REL_DATA = [];
+  REL_MATRIX.forEach((row, ri) => row.forEach((v, ci) => REL_DATA.push({
+    value: [ci, ri, v],
+    label: { color: v === 0 ? "rgba(127,146,196,.7)" : "#08122e", formatter: REL_STATE[v].mark }
+  })));
+  rel.setOption({
+    backgroundColor: "transparent",
+    grid: { left: 6, right: 12, top: 34, bottom: 2, containLabel: true },
+    tooltip: Object.assign({
+      trigger: "item",
+      formatter: (p) => {
+        const ci = p.value[0], ri = p.value[1], v = p.value[2];
+        const st = REL_STATE[v];
+        const col = REL_BY_BATCH[ci];
+        return "<b>" + BATCHES[ci].name + "</b>　" + REL_TESTS[ri] + "<br/>" +
+          "结论 <b style=\"color:" + (v === 2 ? C.green : v === 1 ? C.red : C.textDim) + "\">" + st.label + "</b><br/>" +
+          "<span style=\"color:" + C.textDim + "\">该批次 7 项：通过 " + col.pass + " · 失败 " + col.fail + " · 未开始 " + col.todo + "</span>";
+      }
+    }, TIP),
+    visualMap: {
+      type: "piecewise", show: true, orient: "horizontal", right: 8, top: 0,
+      itemWidth: 13, itemHeight: 10, itemGap: 10,
+      showLabel: true,                    /* ★ piecewise 一旦设 text 会吞掉分档 label，这里显式打开 */
+      textStyle: { color: C.textDim, fontSize: 11 },
+      pieces: REL_STATE.slice().reverse().map((s) => ({ value: s.v, label: s.label, color: s.color }))
+    },
+    xAxis: {
+      type: "category", data: BATCHES.map((b) => b.short), splitArea: { show: true, areaStyle: { color: ["rgba(92,157,255,.03)", "transparent"] } },
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 11.5, fontWeight: 700, color: "#a9c2f0" })
+    },
+    yAxis: {
+      type: "category", data: REL_TESTS, inverse: true,
+      axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+      splitArea: { show: false },
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 11.5 })
+    },
+    series: [{
+      name: "可靠性结论", type: "heatmap", data: REL_DATA,
+      itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 2, borderRadius: 4 },
+      label: { show: true, fontSize: 13, fontWeight: 700 },
+      emphasis: { itemStyle: { shadowBlur: 12, shadowColor: "rgba(92,157,255,.6)" } }
+    }]
+  });
+
+  /* ===== 9. 活性：阶段小卡 ↔ 漏斗联动、批次行轮播、物料行扫描、矩阵格点名 ===== */
+  let funIdx = 0;
+  function playFunnel() {
+    scCells.forEach((c, i) => c.classList.toggle("is-on", i === funIdx));
+    funnel.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    funnel.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: funIdx });
+    funnel.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: funIdx });
+    funIdx = (funIdx + 1) % FUNNEL.length;
+  }
+  playFunnel();
+  setInterval(playFunnel, 3000);
+
+  let batIdx = 0;
+  function playBatch() {
+    tbodyRows.forEach((r, i) => r.classList.toggle("is-active", i === batIdx));
+    batIdx = (batIdx + 1) % tbodyRows.length;
+  }
+  playBatch();
+  setInterval(playBatch, 2600);
+
+  let mtIdx = 0;
+  setInterval(() => {
+    mtRows.forEach((r, i) => r.classList.toggle("is-on", i === mtIdx));
+    mtIdx = (mtIdx + 1) % mtRows.length;
+  }, 1500);
+
+  let relIdx = 0;
+  setInterval(() => {
+    rel.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    rel.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: relIdx });
+    relIdx = (relIdx + 1) % REL_DATA.length;
+  }, 900);
+
+  let bomIdx = 0;
+  setInterval(() => {
+    bom.dispatchAction({ type: "downplay", seriesIndex: 1 });
+    bom.dispatchAction({ type: "highlight", seriesIndex: 1, dataIndex: bomIdx });
+    bomIdx = (bomIdx + 1) % BOM_BARS.length;
+  }, 2200);
+
+  /* ===== 10. 开发期勾稽自检：不成立时在控制台报出（不影响页面渲染） ===== */
+  const BATCH_NAMES = ["星澜S3-EVT2", "星澜S3-DVT1", "星澜Pro2-DVT2", "星澜Pro2-PVT1", "澜芯M60-EVT1"];
+  const rowsText = tbodyRows.map((r) => r.textContent);
+  const checks = [
+    ["五个样机批次名与契约 §2.3 逐字一致", BATCHES.map((b) => b.name).join("|") === BATCH_NAMES.join("|")],
+    ["批次表五行行首含批次名原文（下钻锚点）",
+      BATCH_NAMES.every((n, i) => rowsText[i] && rowsText[i].indexOf(n) >= 0)],
+    ["漏斗四段投产台数逐级递减", D.unitsDesc],
+    ["漏斗四段一次通过台数逐级递减", D.passDesc],
+    ["漏斗阶段通过率逐级抬升（成熟度收敛）", D.rateAsc],
+    ["EVT/DVT/PVT 投产台数 = 同阶段批次投产之和", D.stageMatch],
+    ["五批次投产之和 = 前三阶段投产之和", D.batUnits === D.stage3Units],
+    ["批次直通率 = 一次通过 ÷ 投产（逐行现算）",
+      BATCHES.every((b) => Math.abs(b.fpy - b.pass / b.units * 100) < 1e-9)],
+    ["试制直通率走势 24 个数据点", FPY_WEEKS.length === 24],
+    ["当前试制直通率 ≈ 93.6%（与门户 P10 快照同源）", Math.abs(D.fpyCur - 93.6) < 0.05],
+    ["直通率走势各点落在 [80, 100] 区间", FPY_WEEKS.every((v) => v >= 80 && v <= 100)],
+    ["瀑布恒等：初版 BOM − Σ降本 = 当前 BOM",
+      Math.abs((BOM_BASE - D.bomCut) - D.bomNow) < 1e-9],
+    ["瀑布末柱 = 逐项累减的终值，且托底段恒非负", D.bomChainOk],
+    ["Σ 四项降本 = 累计降本额", Math.abs(sum(BOM_CUTS.map((c) => c.v)) - D.bomCut) < 1e-9],
+    ["降本幅度 = Σ降本 ÷ 初版（现算）", Math.abs(D.bomCutPct - D.bomCut / BOM_BASE * 100) < 1e-9],
+    ["关键物料 10 项，四阶段进度逐阶段不增", MATERIALS.length === 10 && D.certMono],
+    ["物料综合进度 = 四阶段均值（逐行现算）",
+      MATERIALS.every((m) => Math.abs(m.avg - sum(m.p) / 4) < 1e-9)],
+    ["物料认证达成率 = 10 项综合进度均值",
+      Math.abs(D.certAvg - sum(MATERIALS.map((m) => m.avg)) / MATERIALS.length) < 1e-9],
+    ["可靠性矩阵三态计数 Σ = 试验项 × 批次数（7×5=35）", D.relSumOk && D.relCells === 35],
+    ["可靠性矩阵逐列三态 Σ = 7 项", D.relColSumOk],
+    ["可靠性通过率 = 通过 ÷ 已开展（现算）",
+      Math.abs(D.relRate - D.relPass / (D.relPass + D.relFail) * 100) < 1e-9],
+    ["矩阵格数 = 热力数据点数", REL_DATA.length === D.relCells],
+    ["KPI 累计投产 = 五批次投产之和", D.batUnits === sum(BATCHES.map((b) => b.units))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[硬件与样机] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+<!-- drill-js:begin -->
+<script>
+/* ===== 下钻入口（tools/inject_drilldown_rnd.py 注入） =====
+   独立于父页主脚本：父页表格/卡片由 setInterval 轮播重绘，故用 MutationObserver 持续重新标记。 */
+(() => {
+  "use strict";
+  const P = "hj";
+  /* 长名优先匹配，避免短名把含它的长名截胡（如「星澜S3」与「星澜S3-EVT2」同表出现时） */
+  const TARGETS = [{"rows": "#hj-tbody li", "names": ["星澜S3-EVT2", "星澜S3-DVT1", "星澜Pro2-DVT2", "星澜Pro2-PVT1", "澜芯M60-EVT1"], "sub": "大屏样板间-研发单样机批次详情1920.html"}].map((t) => {
+    const match = t.match || t.names;
+    return Object.assign({}, t, {
+      order: match.map((m, i) => ({ m: m, n: t.names[i] })).sort((a, b) => b.m.length - a.m.length)
+    });
+  });
+  const CHARTS = [];
+  const PANELS = [];
+
+  function markOne(t) {
+    document.querySelectorAll(t.rows).forEach((el) => {
+      const txt = (el.textContent || "").replace(/\s+/g, "");
+      let hit = null;
+      for (let i = 0; i < t.order.length; i++) {
+        if (txt.indexOf(t.order[i].m) >= 0) { hit = t.order[i].n; break; }
+      }
+      if (!hit) return;
+      if (el.dataset.drill === hit && el.dataset.drillSub === t.sub) return;  /* 未变则跳过 */
+      el.dataset.drill = hit;
+      el.dataset.drillSub = t.sub;
+      el.classList.add(P + "-drill");
+      el.setAttribute("title", "点击查看「" + hit + "」二级详情");
+    });
+  }
+
+  /* 面板头提示 chip 也放进重扫循环里：父页有些 scope 是被 setInterval 重写 textContent 的，
+     一旦被冲掉，下一次 DOM 变动会把它补回来。scope 若挂在 <section class="xx-panel"> 上，
+     先在 scope 内找面板头，找到就插在 h2 后面；找不到再退回元素自身。 */
+  function chipOne(t) {
+    if (!t.scope || !t.hint) return;
+    const s = document.getElementById(t.scope);
+    if (!s) return;
+    const head = s.classList && s.classList.contains(P + "-panel-head")
+      ? s : (s.querySelector("." + P + "-panel-head") || s);
+    if (head.querySelector("." + P + "-drill-hint")) return;
+    const b = document.createElement("span");
+    b.className = P + "-drill-hint";
+    b.textContent = t.hint;
+    const h2 = head.querySelector("h2");
+    if (h2 && h2.parentNode === head) head.insertBefore(b, h2.nextSibling);
+    else head.appendChild(b);
+  }
+
+  function scan() { TARGETS.forEach(markOne); TARGETS.forEach(chipOne); }
+
+  /* 事件委托：行会被父页轮播重绘，委托到 document 上最稳 */
+  document.addEventListener("click", (e) => {
+    const row = e.target.closest ? e.target.closest("." + P + "-drill") : null;
+    if (!row || !row.dataset.drill || !row.dataset.drillSub) return;
+    location.href = row.dataset.drillSub + "#" + encodeURIComponent(row.dataset.drill);
+  });
+
+  /* ECharts 画布下钻：柱 / 扇区 / 热力格 / 地图省份不是 DOM，只能绑图表实例的 click。
+     取 params.name 或 params.data.name 去对象名列表里反查，命中即跳子页。 */
+  CHARTS.forEach((c) => {
+    if (!window.echarts) return;
+    const cm = c.match || c.names;
+    const pairs = cm.map((m, i) => ({ m: m, n: c.names[i] })).sort((a, b) => b.m.length - a.m.length);
+    const bind = () => {
+      const el = document.getElementById(c.chartId);
+      const inst = el && echarts.getInstanceByDom(el);
+      if (!inst) return false;
+      if (inst.__drillBound) return true;
+      inst.__drillBound = true;
+      el.style.cursor = "pointer";
+      inst.on("click", (pm) => {
+        const bySeries = c.by === "seriesName";
+        const raw = (pm && (bySeries
+          ? (pm.seriesName || pm.name)
+          : (pm.name || (pm.data && pm.data.name) || pm.seriesName))) || "";
+        if (!raw) return;
+        /* 精确命中优先：画布点击拿到的就是节点名本身，松匹配会把不该跳的点也跳走 */
+        const hit = pairs.filter((p) => p.m === raw)[0]
+          || pairs.filter((p) => raw.indexOf(p.m) >= 0 || p.m.indexOf(raw) >= 0)[0];
+        if (hit) location.href = c.sub + "#" + encodeURIComponent(hit.n);
+      });
+      return true;
+    };
+    /* 图表可能晚于本脚本 init，轮询几次直到拿到实例 */
+    if (!bind()) {
+      let tries = 0;
+      const iv = setInterval(() => { if (bind() || ++tries > 40) clearInterval(iv); }, 150);
+    }
+  });
+
+  /* 面板级入口：按面板标题文本定位面板头，挂一枚可点 chip（不必改父页标记） */
+  PANELS.forEach((pn) => {
+    const head = Array.prototype.slice.call(document.querySelectorAll("." + P + "-panel-head"))
+      .filter((h) => { const t = h.querySelector("h2"); return t && t.textContent.trim() === pn.panelTitle; })[0];
+    if (!head || head.querySelector("." + P + "-drill-entry")) return;
+    const b = document.createElement("span");
+    b.className = P + "-drill-entry";
+    b.textContent = pn.label + " ↗";
+    b.setAttribute("title", "查看" + pn.label + "（全量明细）");
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); location.href = pn.sub; });
+    head.appendChild(b);
+  });
+
+  if (TARGETS.length) {
+    scan();
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+<!-- drill-js:end -->
+<!-- carousel-js:begin -->
+<script>
+/* ===== 研发管理专题轮播导航（tools/inject_carousel_rnd.py 注入） =====
+   独立于主脚本运行：即使 echarts 加载失败，翻页仍然可用。 */
+(() => {
+  "use strict";
+
+  /* —— 可配置项 —— */
+  const SECONDS = 25;              /* ← 每页停留秒数，改这里再重跑 tools/inject_carousel_rnd.py */
+
+  /* 轮播页序 = IPD 顶层治理 → 敏捷执行 → 四域集成协同 → 组织与资产 的业务脉络 */
+  const PAGES = [
+    {
+        "f": "大屏样板间-研发产品组合与路标1920.html",
+        "t": "四线版本火车与组合四象限"
+    },
+    {
+        "f": "大屏样板间-研发IPD管道与评审1920.html",
+        "t": "六阶段管道、DCP/TR 评审与停留时长"
+    },
+    {
+        "f": "大屏样板间-研发需求全生命周期1920.html",
+        "t": "OR→IR→SR→AR 分层漏斗与来源桑基"
+    },
+    {
+        "f": "大屏样板间-研发投入与预算1920.html",
+        "t": "投入主题河流与预算达成"
+    },
+    {
+        "f": "大屏样板间-研发敏捷交付总览1920.html",
+        "t": "12 团队速率与冲刺燃尽"
+    },
+    {
+        "f": "大屏样板间-研发看板流动效率1920.html",
+        "t": "累积流图、周期时间与 WIP 违限"
+    },
+    {
+        "f": "大屏样板间-研发工程效能1920.html",
+        "t": "DORA 四指标与 XP 实践雷达"
+    },
+    {
+        "f": "大屏样板间-研发质量与缺陷1920.html",
+        "t": "缺陷收敛、拦截漏斗与逃逸率"
+    },
+    {
+        "f": "大屏样板间-研发软硬云AI集成协同1920.html",
+        "t": "集成基线列车与跨域依赖"
+    },
+    {
+        "f": "大屏样板间-研发硬件与样机1920.html",
+        "t": "EVT→PVT 试制直通与可靠性"
+    },
+    {
+        "f": "大屏样板间-研发AI模型迭代1920.html",
+        "t": "模型版本树与评测走廊"
+    },
+    {
+        "f": "大屏样板间-研发云端服务与发布1920.html",
+        "t": "发布列车、SLO 与错误预算"
+    },
+    {
+        "f": "大屏样板间-研发交付流水线数字孪生1920.html",
+        "t": "需求到运营的等距全链路流转"
+    },
+    {
+        "f": "大屏样板间-研发多中心布局1920.html",
+        "t": "六站点地图与协作网络"
+    },
+    {
+        "f": "大屏样板间-研发人才与能力1920.html",
+        "t": "职级金字塔与技能资产"
+    },
+    {
+        "f": "大屏样板间-研发技术资产与复用1920.html",
+        "t": "CBB 货架、专利与开源合规"
+    },
+    {
+        "f": "大屏样板间-研发效能指数1920.html",
+        "t": "六维加权合成与研发体检"
+    }
+];
+
+  const P = "hj";
+  const $ = (id) => document.getElementById(id);
+  const nav = $(P + "-carousel");
+  if (!nav) return;
+
+  /* 当前页在序列中的位置：按文件名匹配，允许带 ?query */
+  const here = decodeURIComponent((location.pathname.split("/").pop() || "")).trim();
+  let idx = PAGES.findIndex((x) => x.f === here);
+  if (idx < 0) idx = 9;      /* 直接从本地打开且路径取不到文件名时的兜底位次 */
+
+  $(P + "-c-cur").textContent = String(idx + 1).padStart(2, "0");
+  nav.title = (idx + 1) + " / " + PAGES.length + "　" + PAGES[idx].t;
+
+  function go(step) {
+    const n = (idx + step + PAGES.length) % PAGES.length;
+    location.href = PAGES[n].f;
+  }
+
+  /* —— 倒计时：累计已用时长，暂停时冻结在原地（不清零），继续时接着走 —— */
+  const bar = $(P + "-c-bar");
+  const playBtn = $(P + "-c-play");
+  let elapsed = 0;               /* 本页已停留毫秒 */
+  let last = Date.now();
+  let userPaused = false;        /* 用户点了暂停 */
+  /* ★ 初值必须实读 document.hidden：页面若在后台标签页加载，不会收到 visibilitychange，
+     写死 false 会让计时器在后台照走、页面无人看时自己翻页（厨电版同款潜在问题） */
+  let hidden = document.hidden;
+
+  function render() {
+    const pct = Math.min(100, elapsed / (SECONDS * 1000) * 100);
+    bar.style.width = pct.toFixed(2) + "%";
+  }
+  function tick() {
+    const now = Date.now();
+    if (!userPaused && !hidden) {
+      elapsed += now - last;
+      render();
+      if (elapsed >= SECONDS * 1000) go(1);
+    }
+    last = now;
+  }
+  const timer = setInterval(tick, 100);
+
+  function setPaused(v) {
+    userPaused = v;
+    nav.classList.toggle("is-paused", v);
+    playBtn.setAttribute("aria-pressed", v ? "true" : "false");
+    playBtn.setAttribute("aria-label", v ? "继续轮播" : "暂停轮播");
+    last = Date.now();           /* 避免把暂停这段时间补算进 elapsed */
+  }
+
+  playBtn.addEventListener("click", () => setPaused(!userPaused));
+  $(P + "-c-prev").addEventListener("click", () => go(-1));
+  $(P + "-c-next").addEventListener("click", () => go(1));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") go(-1);
+    else if (e.key === "ArrowRight") go(1);
+    else if (e.key === " " || e.code === "Space") { e.preventDefault(); setPaused(!userPaused); }
+  });
+
+  /* 切到后台时冻结计时，回到前台接着走（不重置，也不会补跳好几页） */
+  document.addEventListener("visibilitychange", () => {
+    hidden = document.hidden;
+    last = Date.now();
+  });
+  window.addEventListener("pagehide", () => clearInterval(timer));
+})();
+</script>
+<!-- carousel-js:end -->
+</body>
+</html>

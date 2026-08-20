@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发园区数字孪生</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --qj-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .qj-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .qj-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .qj-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .qj-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 8px 8px;
+  }
+  .qj-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .qj-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .qj-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .qj-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .qj-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .qj-crumb em { font-style: normal; color: #d3e2ff; }
+  .qj-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .qj-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .qj-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .qj-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .qj-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .qj-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .qj-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .qj-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 站点切换器：六站点 tab（← → 方向键 / 16s 自动轮换 / hash 直达） */
+  .qj-switcher { display: grid; grid-template-columns: repeat(3, auto); gap: 5px 6px; }
+  .qj-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 86px; padding: 3px 10px 4px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .qj-sw-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; }
+  .qj-sw-tab span { font-size: 9.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .qj-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .qj-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .qj-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .qj-chips { display: flex; align-items: center; gap: 9px; }
+  .qj-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 132px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(169, 140, 245, 0.42); background: linear-gradient(160deg, rgba(169, 140, 245, 0.16), rgba(18, 34, 78, 0.6));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .qj-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: #8f7fc4; white-space: nowrap; }
+  .qj-chip b { font-size: 14px; font-weight: 700; letter-spacing: 0.05em; color: #cbbcf7; white-space: nowrap; }
+  .qj-chip:hover { border-color: rgba(169, 140, 245, 0.92); box-shadow: 0 0 16px -2px rgba(169, 140, 245, 0.7); }
+  .qj-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .qj-clock-time { font: 700 26px/1 var(--qj-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .qj-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 三栏主体 ===== */
+  .qj-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .qj-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .qj-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .qj-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .qj-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .qj-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .qj-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .qj-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .qj-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 左栏顶部：4 枚站点 KPI（2×2，高度写死避免图表被压） ===== */
+  .qj-kpis { flex: none; height: 176px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; }
+  .qj-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 8px 14px;
+  }
+  .qj-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .qj-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 110px; height: 110px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .qj-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-orange), transparent); }
+  .qj-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 92, 0.14), transparent 68%); }
+  .qj-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .qj-kpi-label { font-size: 12px; letter-spacing: 0.08em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .qj-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .qj-kpi-val { font: 700 25px/1 var(--qj-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .qj-kpi.is-warn .qj-kpi-val { color: #ffd9b0; }
+  .qj-kpi.is-good .qj-kpi-val { color: #b8f2cf; }
+  .qj-kpi-unit { font-size: 12px; color: var(--rnd-text-dim); }
+  .qj-kpi-sub { font-size: 10.5px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qj-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 中央等距园区舞台 ===== */
+  .qj-isowrap { flex: 1; min-height: 0; min-width: 0; position: relative; }
+  .qj-isowrap svg { width: 100%; height: 100%; display: block; }
+  .qj-iso-zone { font-size: 11.5px; letter-spacing: 0.24em; fill: rgba(127, 146, 196, 0.8); }
+  .qj-iso-fence { fill: rgba(12, 24, 58, 0.55); stroke: rgba(92, 157, 255, 0.3); stroke-width: 1.2; stroke-dasharray: 9 6; }
+  .qj-iso-grid { stroke: rgba(92, 157, 255, 0.06); stroke-width: 1; }
+  .qj-iso-road { fill: rgba(38, 56, 104, 0.85); }
+  .qj-iso-roadline { fill: none; stroke: rgba(255, 194, 77, 0.4); stroke-width: 1; stroke-dasharray: 8 9; }
+  .qj-iso-spur { stroke: rgba(38, 56, 104, 0.85); stroke-width: 9; stroke-linecap: round; }
+  .qj-iso-green { fill: rgba(64, 150, 118, 0.3); stroke: rgba(111, 224, 154, 0.28); stroke-width: 1; }
+  .qj-iso-cap-bg { fill: #f1f5ff; }
+  .qj-iso-cap-tx { font-size: 11.5px; font-weight: 600; fill: #0a1836; }
+  .qj-iso-cap-num { font-size: 11px; font-weight: 700; fill: #2f5296; }
+  .qj-iso-lead { stroke: rgba(220, 232, 255, 0.35); stroke-width: 1; stroke-dasharray: 2 3; }
+  .qj-iso-val { font: 700 11px var(--qj-mono); fill: #9cc2ff; }
+  .qj-iso-sub { font-size: 9.5px; fill: rgba(127, 146, 196, 0.95); }
+  .qj-iso-gate { font-size: 10.5px; letter-spacing: 0.14em; fill: rgba(255, 194, 77, 0.75); }
+  .qj-iso-lg { font-size: 10.5px; fill: var(--rnd-text-dim); }
+  .qj-iso-node.is-hot .qj-iso-cap-bg { filter: drop-shadow(0 0 7px rgba(92, 157, 255, 0.95)); }
+  .qj-pulse { animation: qj-pulse 2.8s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes qj-pulse {
+    0% { opacity: 0.7; transform: scale(0.55); }
+    70% { opacity: 0; transform: scale(1.45); }
+    100% { opacity: 0; transform: scale(1.45); }
+  }
+
+  /* ===== 右栏：本站团队清单 ===== */
+  .qj-teams { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+  .qj-teams li {
+    flex: none; min-height: 56px; display: grid; grid-template-columns: 62px 1fr auto; align-items: center; gap: 10px;
+    padding: 6px 12px; border-radius: 9px;
+    border: 1px solid rgba(96, 140, 255, 0.16); background: rgba(14, 26, 66, 0.5);
+  }
+  .qj-team-name { font-size: 16px; font-weight: 700; letter-spacing: 0.1em; color: #eaf1ff; }
+  .qj-team-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .qj-team-t1 { font-size: 11.5px; color: #c8d6f2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qj-team-t1 b { font-weight: 700; color: #eaf1ff; }
+  .qj-team-bar { height: 5px; border-radius: 3px; background: rgba(96, 140, 255, 0.16); overflow: hidden; }
+  .qj-team-bar u { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--rnd-blue-deep), var(--rnd-blue)); }
+  .qj-team-vel { text-align: right; font-variant-numeric: tabular-nums; }
+  .qj-team-vel b { display: block; font: 700 17px/1.1 var(--qj-mono); color: #ffd489; }
+  .qj-team-vel span { font-size: 10px; color: var(--rnd-text-dim); }
+
+  /* ===== 右栏：园区事件 ===== */
+  .qj-events { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; overflow: hidden; }
+  .qj-events li {
+    display: flex; align-items: center; gap: 10px; min-height: 0; flex: 1;
+    padding: 4px 10px; border-radius: 8px;
+    border: 1px solid rgba(96, 140, 255, 0.14); background: rgba(14, 26, 66, 0.5);
+    font-size: 12px; color: #c8d6f2; line-height: 1.45;
+  }
+  .qj-events li b { font-weight: 700; color: #eaf1ff; }
+  .qj-badge {
+    flex: none; min-width: 40px; text-align: center; padding: 3px 8px; border-radius: 6px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em;
+  }
+  .qj-badge.is-warn { color: #ffd9b0; background: rgba(255, 157, 92, 0.16); border: 1px solid rgba(255, 157, 92, 0.4); }
+  .qj-badge.is-good { color: #bff0d4; background: rgba(111, 224, 154, 0.14); border: 1px solid rgba(111, 224, 154, 0.4); }
+  .qj-badge.is-info { color: #b6d2ff; background: rgba(92, 157, 255, 0.13); border: 1px solid rgba(92, 157, 255, 0.35); }
+
+  /* ===== 底部口径滚动条 ===== */
+  .qj-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .qj-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .qj-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: qj-blink 1.6s ease-in-out infinite; }
+  @keyframes qj-blink { 50% { opacity: 0.35; } }
+  .qj-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .qj-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: qj-ticker 58s linear infinite; will-change: transform; }
+  .qj-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .qj-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes qj-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .qj-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="qj-stage" id="qj-stage">
+    <!-- mockflag:begin --><div class="qj-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="qj-error" id="qj-error" role="alert">ECharts 资源加载失败，等距园区孪生与站点清单不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="qj-header">
+      <div class="qj-head-left">
+        <div class="qj-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="qj-crumb-up" href="大屏样板间-研发多中心布局1920.html" title="返回上级专题页（Esc）">‹ 返回 多中心布局</a><i>›</i>
+          <em id="qj-crumb-obj">--</em>
+        </div>
+        <div class="qj-head-title-row">
+          <div class="qj-head-title" id="qj-title">-- · 园区数字孪生</div>
+          <div class="qj-head-meta">
+            <span>楼宇 <b>6</b> 座 · 在岗 <b id="qj-meta-people">--</b> 人</span><i>|</i>
+            <span>工位 <b id="qj-meta-seat">--</b> 个 · 负载 <b id="qj-meta-load">--</b>%</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="qj-head-right">
+        <div class="qj-switcher" id="qj-switcher" aria-label="研发站点切换"></div>
+        <div class="qj-chips">
+          <a class="qj-chip" id="qj-chip-sis" href="大屏样板间-研发单中心详情1920.html" title="切到指标视角：单中心详情"><span>姊妹页 · 指标视角</span><b>单中心详情 ›</b></a>
+        </div>
+        <div class="qj-clock" aria-label="实时时钟">
+          <span class="qj-clock-time" id="qj-clock-time">--:--:--</span>
+          <span class="qj-clock-date" id="qj-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 左栏：4 KPI + 职能人数条形 + 工位负载率仪表 -->
+    <div class="qj-col">
+      <section class="qj-kpis" aria-label="站点核心指标">
+        <div class="qj-kpi">
+          <div class="qj-kpi-label">站点研发人数</div>
+          <div class="qj-kpi-num"><span class="qj-kpi-val" id="qj-kpi-0">0</span><span class="qj-kpi-unit">人</span></div>
+          <div class="qj-kpi-sub" id="qj-kpi-0s">--</div>
+        </div>
+        <div class="qj-kpi">
+          <div class="qj-kpi-label">本站在研项目</div>
+          <div class="qj-kpi-num"><span class="qj-kpi-val" id="qj-kpi-1">0</span><span class="qj-kpi-unit">个</span></div>
+          <div class="qj-kpi-sub" id="qj-kpi-1s">--</div>
+        </div>
+        <div class="qj-kpi">
+          <div class="qj-kpi-label">承接 Scrum 团队</div>
+          <div class="qj-kpi-num"><span class="qj-kpi-val" id="qj-kpi-2">0</span><span class="qj-kpi-unit">个</span></div>
+          <div class="qj-kpi-sub" id="qj-kpi-2s">--</div>
+        </div>
+        <div class="qj-kpi is-good" id="qj-kpi-3box">
+          <div class="qj-kpi-label">工位负载率</div>
+          <div class="qj-kpi-num"><span class="qj-kpi-val" id="qj-kpi-3">0</span><span class="qj-kpi-unit">%</span></div>
+          <div class="qj-kpi-sub" id="qj-kpi-3s">--</div>
+        </div>
+      </section>
+      <section class="qj-panel" style="flex: 1;">
+        <div class="qj-panel-head">
+          <h2>六职能人数构成</h2>
+          <span class="qj-panel-tag">本站 <b id="qj-tag-func">--</b> 人 · 六职能之和</span>
+        </div>
+        <div class="qj-chart" id="qj-chart-func"></div>
+      </section>
+      <section class="qj-panel" style="flex: 0.9;">
+        <div class="qj-panel-head">
+          <h2>园区工位负载率</h2>
+          <span class="qj-panel-tag">工位 <b id="qj-tag-seat">--</b> 个 · 在岗 <b id="qj-tag-on">--</b> 人</span>
+        </div>
+        <div class="qj-chart" id="qj-chart-load"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：等距园区孪生 -->
+    <section class="qj-panel">
+      <div class="qj-panel-head">
+        <h2 id="qj-iso-title">园区数字孪生 · 楼宇即职能</h2>
+        <span class="qj-panel-tag" id="qj-tag-iso">--</span>
+      </div>
+      <div class="qj-isowrap">
+        <svg id="qj-iso" viewBox="0 0 924 740" preserveAspectRatio="xMidYMid meet" role="img" aria-label="研发站点等距园区数字孪生：软件研发楼、硬件实验楼、云平台机房、AI算力中心、测试验证楼、综合管理楼六座楼宇，楼高随该职能人数变化，左立面亮格比例随工位负载率变化，环形主路上有班车与人流粒子流动"></svg>
+      </div>
+    </section>
+
+    <!-- 右栏：六站点人数对比 + 本站团队 + 园区事件 -->
+    <div class="qj-col">
+      <section class="qj-panel" style="flex: 0.95;">
+        <div class="qj-panel-head">
+          <h2>六站点人数对比</h2>
+          <span class="qj-panel-tag">全集团 <b id="qj-tag-all">--</b> 人 · 契约同源</span>
+        </div>
+        <div class="qj-chart" id="qj-chart-sites"></div>
+      </section>
+      <section class="qj-panel" style="flex: 1.05;">
+        <div class="qj-panel-head">
+          <h2>本站研发团队</h2>
+          <span class="qj-panel-tag" id="qj-tag-team">--</span>
+        </div>
+        <ul class="qj-teams" id="qj-teams"></ul>
+      </section>
+      <section class="qj-panel" style="flex: 1;">
+        <div class="qj-panel-head">
+          <h2>园区事件</h2>
+          <span class="qj-panel-tag" id="qj-tag-evt">--</span>
+        </div>
+        <ul class="qj-events" id="qj-events"></ul>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="qj-foot" aria-label="园区孪生口径说明">
+      <div class="qj-foot-label"><span class="qj-foot-dot"></span>孪生口径</div>
+      <div class="qj-foot-viewport"><div class="qj-foot-track" id="qj-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("qj-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  /* 等距立体三面着色：由基准色现算，换色板后立体感自动跟随（工艺母本：交付流水线数字孪生页） */
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const lighten = (hex, t) => hexMix(hex, t, 255);
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层：单一数据源，六站点全部视图由此派生 =====
+     勾稽到契约基准盘（docs/RndIpdThemed.md §2.2 / §2.3）：
+     · 六站点研发人数逐字：北京总部 1,240 + 上海中心 680 + 深圳中心 720 + 成都中心 480
+       + 西安中心 420 + 南京中心 320 = 3,860 人。
+     · 六职能人数逐字：软件 1,460 + 硬件 620 + 云平台 540 + AI算法 420 + 测试 520 + PM与管理 300 = 3,860 人。
+     · 站点 × 职能 6×6 矩阵为二级拆分（本页自编）：行和 = 站点人数、列和 = 职能人数，双向 Σ 均由自检硬校验。
+     · 在研项目 48 个按站点分布（二级拆分）：14 + 8 + 9 + 6 + 6 + 5 = 48。
+     · 12 团队站点归属与速率引契约 §2.3 逐字；每站团队数 3/2/2/2/2/1。
+     · 工位口径（二级自编）：目标负载率 = 站点基准 + 职能偏移（截断到 72~98.5），
+       工位数 = ⌈人数 ÷ 目标负载率⌉，站点负载率 = 在岗人数 ÷ 工位总数 现算（非写死）。 */
+  const FUNCS = [
+    { key: "sw", fn: "软件",     bld: "软件研发楼", glyph: "💻", col: C.blue },
+    { key: "hw", fn: "硬件",     bld: "硬件实验楼", glyph: "🛠", col: C.amber },
+    { key: "cl", fn: "云平台",   bld: "云平台机房", glyph: "☁", col: C.cyan },
+    { key: "ai", fn: "AI算法",   bld: "AI算力中心", glyph: "🤖", col: C.violet },
+    { key: "ts", fn: "测试",     bld: "测试验证楼", glyph: "🧪", col: C.green },
+    { key: "mg", fn: "PM与管理", bld: "综合管理楼", glyph: "🏛", col: C.blueDeep }
+  ];
+  const FUNC_AUTH = [1460, 620, 540, 420, 520, 300];          /* 契约 §2.2 六职能逐字 */
+  const SITE_AUTH = "北京总部|1240;上海中心|680;深圳中心|720;成都中心|480;西安中心|420;南京中心|320";
+
+  /* 站点 × 职能矩阵：列序 = FUNCS 序（软件/硬件/云平台/AI算法/测试/PM与管理） */
+  const SITES = [
+    { name: "北京总部", short: "北京", people: 1240, proj: 14, role: "集团总部 · 软件与云平台主基地", loadBase: 93.2,
+      funcs: [520, 120, 220, 130, 150, 100] },
+    { name: "上海中心", short: "上海", people: 680, proj: 8, role: "AI 算法与行业方案中心", loadBase: 90.6,
+      funcs: [260, 60, 90, 130, 90, 50] },
+    { name: "深圳中心", short: "深圳", people: 720, proj: 9, role: "硬件与终端整机研发中心", loadBase: 91.8,
+      funcs: [210, 250, 80, 50, 90, 40] },
+    { name: "成都中心", short: "成都", people: 480, proj: 6, role: "AI 推理与软件交付中心", loadBase: 88.4,
+      funcs: [200, 60, 60, 70, 60, 30] },
+    { name: "西安中心", short: "西安", people: 420, proj: 6, role: "射频硬件与测试验证中心", loadBase: 86.5,
+      funcs: [160, 100, 40, 30, 60, 30] },
+    { name: "南京中心", short: "南京", people: 320, proj: 5, role: "云平台与自动化测试中心", loadBase: 84.2,
+      funcs: [110, 30, 50, 10, 70, 50] }
+  ];
+  const LOAD_DELTA = [2.2, -1.6, 3.4, 4.8, -2.4, -5.6];       /* 职能工位目标负载偏移（pp） */
+  const PROJ_ALL = 48;                                        /* 契约 §2.2 在研项目 */
+  const PEOPLE_ALL = 3860;                                    /* 契约 §2.2 研发人员 */
+  const SPRINTS = 26;                                         /* 年 Sprint 数，年吞吐 = 速率 × 26 */
+
+  /* 12 团队（契约 §2.3 逐字：名/速率/站点/域） */
+  const TEAMS = [
+    { name: "天枢", vel: 82, site: "北京总部", dom: "软件" },
+    { name: "天璇", vel: 76, site: "北京总部", dom: "云平台" },
+    { name: "天玑", vel: 71, site: "上海中心", dom: "AI算法" },
+    { name: "天权", vel: 68, site: "深圳中心", dom: "硬件" },
+    { name: "玉衡", vel: 66, site: "上海中心", dom: "软件" },
+    { name: "开阳", vel: 63, site: "成都中心", dom: "AI算法" },
+    { name: "摇光", vel: 61, site: "成都中心", dom: "软件" },
+    { name: "青龙", vel: 58, site: "深圳中心", dom: "硬件" },
+    { name: "白虎", vel: 55, site: "西安中心", dom: "硬件" },
+    { name: "朱雀", vel: 52, site: "南京中心", dom: "云平台" },
+    { name: "玄武", vel: 49, site: "西安中心", dom: "测试" },
+    { name: "紫微", vel: 45, site: "北京总部", dom: "软件" }
+  ];
+  const TEAM_AUTH = "天枢|82|北京总部|软件;天璇|76|北京总部|云平台;天玑|71|上海中心|AI算法;" +
+    "天权|68|深圳中心|硬件;玉衡|66|上海中心|软件;开阳|63|成都中心|AI算法;摇光|61|成都中心|软件;" +
+    "青龙|58|深圳中心|硬件;白虎|55|西安中心|硬件;朱雀|52|南京中心|云平台;玄武|49|西安中心|测试;紫微|45|北京总部|软件";
+  const TEAM_CNT_AUTH = [3, 2, 2, 2, 2, 1];                   /* 每站团队数（契约 §2.3 派生） */
+
+  /* 园区事件（每站 4 条，二级自编；文案中的数字与本站派生量一致） */
+  const EVENTS = {
+    "北京总部": [
+      ["is-info", "网络", "软件研发楼 A 座 12 层核心交换割接完成，影响 <b>天枢</b>、<b>紫微</b> 两队晨会"],
+      ["is-good", "算力", "AI算力中心新增 <b>24</b> 张训练卡，灵犀模型排队时长下降 31%"],
+      ["is-warn", "工位", "软件研发楼负载 <b>%SWLOAD%%</b> 逼近红线，二期扩容工位 <b>60</b> 个已立项"],
+      ["is-info", "通勤", "园区班车 3 号线早高峰满载率 <b>92%</b>，加开一班接驳"]
+    ],
+    "上海中心": [
+      ["is-good", "算力", "AI算力中心慧眼视觉质检模型训练占用算力 <b>78%</b>，本周完成 v3 评测"],
+      ["is-info", "工位", "软件研发楼为 <b>玉衡</b> 团队新增联调工位 <b>24</b> 个"],
+      ["is-warn", "排期", "测试验证楼 EMC 暗室排期紧张，车联1.0 认证窗口顺延 2 天"],
+      ["is-info", "园区", "园区绿化带喷灌系统检修，东门步道临时封闭"]
+    ],
+    "深圳中心": [
+      ["is-good", "样机", "硬件实验楼 澜芯M60-EVT1 样机上线，<b>天权</b> 团队跟线驻场"],
+      ["is-warn", "设备", "可靠性实验室高低温箱满载，星澜Pro2-PVT1 试验排队 <b>3</b> 天"],
+      ["is-info", "改造", "软件研发楼 3 层改造为软硬联调区，<b>青龙</b> 团队本周进驻"],
+      ["is-info", "安防", "园区门禁与访客系统升级，刷脸通道全量切换"]
+    ],
+    "成都中心": [
+      ["is-good", "算力", "AI算力中心推理集群扩容，<b>开阳</b> 团队智荐模型 A/B 提速"],
+      ["is-info", "工位", "<b>摇光</b> 团队整体搬迁至软件研发楼 5 层，软件研发楼工位负载升至 %SWLOAD%%"],
+      ["is-info", "自动化", "测试验证楼新上架自动化机柜 <b>6</b> 台，夜跑用例扩容"],
+      ["is-warn", "配套", "园区食堂错峰就餐，11:30 时段排队超 12 分钟"]
+    ],
+    "西安中心": [
+      ["is-good", "射频", "硬件实验楼射频暗室完成校准，<b>白虎</b> 团队开始整机辐射测试"],
+      ["is-info", "回归", "<b>玄武</b> 团队全量回归夜跑通过，测试验证楼机柜利用率 84%"],
+      ["is-info", "招聘", "综合管理楼校园宣讲会，硬件与测试岗位需求 <b>38</b> 人"],
+      ["is-warn", "能耗", "园区光伏车棚并网调试，午间供电切换有 2 次瞬时波动"]
+    ],
+    "南京中心": [
+      ["is-good", "机房", "云平台机房新机房交付，<b>朱雀</b> 团队云枢3.0 灰度环境迁入"],
+      ["is-info", "自动化", "测试验证楼自动化用例扩容至 <b>1.2</b> 万条，夜间全量执行"],
+      ["is-warn", "工位", "软件研发楼负载 <b>%SWLOAD%%</b>、站点负载 <b>%LOADALL%%</b> 为六站点最低，待承接新增需求填充"],
+      ["is-info", "通勤", "园区班车与地铁接驳时刻调整，末班延后至 21:30"]
+    ]
+  };
+
+  /* ===== 3.1 派生量（全部 JS 现算，不复制数字） ===== */
+  const peopleSum = sum(SITES.map((s) => s.people));                       /* 3,860 */
+  const funcCol = FUNCS.map((f, j) => sum(SITES.map((s) => s.funcs[j])));  /* 六职能列和 */
+  const projSum = sum(SITES.map((s) => s.proj));                           /* 48 */
+  const velAll = sum(TEAMS.map((t) => t.vel));                             /* 746 */
+  const throughput = velAll * SPRINTS;                                     /* 19,396 */
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  SITES.forEach((s) => {
+    s.loadTarget = FUNCS.map((f, j) => clamp(s.loadBase + LOAD_DELTA[j], 72, 98.5));
+    s.seats = s.funcs.map((p, j) => Math.ceil(p / (s.loadTarget[j] / 100)));
+    s.load = s.funcs.map((p, j) => p / s.seats[j] * 100);                  /* 各楼实际负载率 */
+    s.seatSum = sum(s.seats);
+    s.loadAll = s.people / s.seatSum * 100;                                /* 站点负载率 = 在岗 ÷ 工位 */
+    s.teams = TEAMS.filter((t) => t.site === s.name);                      /* 本站承接团队 */
+    s.velSum = sum(s.teams.map((t) => t.vel));
+    s.ptsYear = s.velSum * SPRINTS;                                        /* 本站年故事点吞吐 */
+  });
+  const teamCnt = SITES.map((s) => s.teams.length);
+
+  /* ===== 4. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("qj-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("qj-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. 站点切换器（tab 文本与契约 §6 hash 键逐字一致） ===== */
+  const switcher = $("qj-switcher");
+  switcher.innerHTML = SITES.map((s, i) => (
+    '<button class="qj-sw-tab" type="button" data-i="' + i + '" title="切换到' + s.name + '（← → 方向键）">' +
+      "<b>" + s.name + "</b><span>" + fmtInt(s.people) + " 人</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".qj-sw-tab"));
+
+  /* ===== 6. 等距园区舞台（纯 SVG，不依赖 echarts，资源守卫之前渲染） =====
+     五原语 isoCube / capsule / edgePath / lighten / darken 抄自交付流水线数字孪生页（dv）；
+     本页把节点锚点改为「地面基点」——楼高随人数变化时楼体向上生长，六座楼始终踩在同一地平面上。 */
+  const NP = {                     /* 地面基点（楼体底面菱形中心） */
+    sw: { x: 255, y: 242 }, hw: { x: 478, y: 155 }, cl: { x: 690, y: 260 },
+    ai: { x: 672, y: 460 }, ts: { x: 262, y: 460 }, mg: { x: 462, y: 356 }
+  };
+  const SPUR = {                   /* 各楼到环形主路的支路接入点 */
+    sw: { x: 258, y: 308 }, hw: { x: 478, y: 214 }, cl: { x: 690, y: 320 },
+    ai: { x: 672, y: 401 }, ts: { x: 262, y: 406 }, mg: { x: 462, y: 506 }
+  };
+  /* ★ 参数驱动几何：楼高 ∝ 该站该职能人数，楼面半宽 ∝ √人数（面积近似 ∝ 人数） */
+  const GEO = {
+    h: (p) => Math.round((14 + p * 0.13) * 10) / 10,          /* 10 人 → 15.3；520 人 → 81.6 */
+    a: (p) => Math.round((16 + Math.sqrt(p) * 0.85) * 10) / 10
+  };
+  const sizeOf = (p) => { const a = GEO.a(p); return { a: a, b: a / 2, h: GEO.h(p) }; };
+
+  /* 原语：等距立方体（cy = 顶面中心） */
+  function isoCube(cx, cy, s, col, extra) {
+    const a = s.a, b = s.b, h = s.h;
+    const top = lighten(col, 0.16), lf = darken(col, 0.38), rt = darken(col, 0.56);
+    let g = '<polygon points="' + cx + "," + (cy - b) + " " + (cx + a) + "," + cy + " " + cx + "," + (cy + b) + " " + (cx - a) + "," + cy + '" fill="' + top + '"/>' +
+      '<polygon points="' + (cx - a) + "," + cy + " " + cx + "," + (cy + b) + " " + cx + "," + (cy + b + h) + " " + (cx - a) + "," + (cy + h) + '" fill="' + lf + '"/>' +
+      '<polygon points="' + cx + "," + (cy + b) + " " + (cx + a) + "," + cy + " " + (cx + a) + "," + (cy + h) + " " + cx + "," + (cy + b + h) + '" fill="' + rt + '"/>';
+    return g + (extra || "");
+  }
+  /* 地面锚定包装：(gx, gy) 是底面中心，楼体从地面往上长 */
+  const standCube = (gx, gy, s, col, extra) => isoCube(gx, gy - s.h, s, col, extra);
+  const topCy = (gy, s) => gy - s.h;                          /* 顶面中心 y */
+
+  /* 立面参数化取点：左立面 (u 沿宽度, v 沿高度)、右立面、顶面 (p,q) */
+  const facePt = (cx, cy, s, u, v) => [cx - s.a + s.a * u, cy + s.b * u + s.h * v];
+  const rightPt = (cx, cy, s, u, v) => [cx + s.a * u, cy + s.b - s.b * u + s.h * v];
+  const roofPt = (cx, cy, s, p, q) => [cx - s.a + s.a * p + s.a * q, cy - s.b * p + s.b * q];
+
+  /* ★ 楼面亮格：格子总数由楼体尺寸算，亮格数 = 总格数 × 工位负载率（四舍五入） */
+  function winSpec(s, load) {
+    const cols = clamp(Math.round(s.a / 6), 3, 6);
+    const rows = clamp(Math.round(s.h / 9.5), 2, 9);
+    const cells = cols * rows;
+    return { cols: cols, rows: rows, cells: cells, lit: Math.round(cells * load / 100) };
+  }
+  function windows(cx, cy, s, load) {
+    const spec = winSpec(s, load);
+    const cols = spec.cols, rows = spec.rows, cells = spec.cells, lit = spec.lit;
+    const order = [];
+    for (let k = 0; k < cells; k += 1) order.push(k);
+    order.sort((p, q) => ((p * 37) % 101) - ((q * 37) % 101));  /* 确定性散布，亮格数严格等于 lit */
+    const on = {};
+    for (let k = 0; k < lit; k += 1) on[order[k]] = 1;
+    let g = "";
+    for (let r = 0; r < rows; r += 1) {
+      for (let c = 0; c < cols; c += 1) {
+        const u0 = (c + 0.18) / cols, u1 = (c + 0.86) / cols;
+        const v0 = (r + 0.2) / (rows + 0.35), v1 = (r + 0.82) / (rows + 0.35);
+        const p1 = facePt(cx, cy, s, u0, v0), p2 = facePt(cx, cy, s, u1, v0);
+        const p3 = facePt(cx, cy, s, u1, v1), p4 = facePt(cx, cy, s, u0, v1);
+        const hot = on[r * cols + c];
+        g += '<polygon points="' + p1 + " " + p2 + " " + p3 + " " + p4 + '" fill="' +
+          (hot ? "rgba(150,205,255,0.72)" : "rgba(10,22,52,0.5)") + '"/>';
+      }
+    }
+    return { svg: g, cells: cells, lit: lit };
+  }
+  /* 机房楼顶散热单元：数量 ∝ 人数，配呼吸散热环 */
+  function coolers(cx, cy, s, people) {
+    const n = clamp(Math.round(people / 55), 2, 5);
+    let g = "";
+    for (let i = 0; i < n; i += 1) {
+      const t = (i + 0.5) / n;
+      const pt = roofPt(cx, cy, s, t, 0.5);
+      const us = { a: 6.5, b: 3.25, h: 5 };
+      g += standCube(pt[0], pt[1], us, C.cyan);
+      g += '<circle cx="' + fmtDec(pt[0], 1) + '" cy="' + fmtDec(pt[1] - 8, 1) + '" r="3.4" fill="none" stroke="' + C.cyan +
+        '" stroke-width="1"><animate attributeName="r" values="2;7" dur="2.4s" begin="-' + fmtDec(i * 0.5, 2) +
+        's" repeatCount="indefinite"/><animate attributeName="opacity" values="0.75;0" dur="2.4s" begin="-' + fmtDec(i * 0.5, 2) + 's" repeatCount="indefinite"/></circle>';
+    }
+    return g;
+  }
+  /* AI 算力中心：右立面 GPU 机柜指示灯，柜数 ∝ 人数 */
+  function gpuRacks(cx, cy, s, people) {
+    const n = clamp(Math.round(people / 16), 3, 8);
+    let g = "";
+    for (let i = 0; i < n; i += 1) {
+      const u = (i + 0.5) / n;
+      const a1 = rightPt(cx, cy, s, u, 0.22), a2 = rightPt(cx, cy, s, u, 0.86);
+      g += '<line x1="' + fmtDec(a1[0], 1) + '" y1="' + fmtDec(a1[1], 1) + '" x2="' + fmtDec(a2[0], 1) + '" y2="' + fmtDec(a2[1], 1) +
+        '" stroke="rgba(255,255,255,0.2)" stroke-width="0.9"/>';
+      [0.36, 0.58, 0.78].forEach((v, k) => {
+        const p = rightPt(cx, cy, s, u, v);
+        g += '<circle cx="' + fmtDec(p[0], 1) + '" cy="' + fmtDec(p[1], 1) + '" r="1.7" fill="' + (k === 1 ? C.green : C.amber) +
+          '"><animate attributeName="opacity" values="1;0.25;1" dur="' + fmtDec(1.2 + (i % 3) * 0.4 + k * 0.2, 2) + 's" repeatCount="indefinite"/></circle>';
+      });
+    }
+    return g;
+  }
+  /* 顶面棱线（台面感，抄自 dv 的 gateExtra） */
+  function roofRim(cx, cy, s) {
+    const a = s.a * 0.58, b = s.b * 0.58;
+    return '<polygon points="' + cx + "," + (cy - b) + " " + (cx + a) + "," + cy + " " + cx + "," + (cy + b) + " " + (cx - a) + "," + cy +
+      '" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1"/>';
+  }
+  /* 硬件实验楼：屋顶排风机组 + 右立面琥珀试制带 */
+  function ventStack(cx, cy, s) {
+    const p = roofPt(cx, cy, s, 0.35, 0.55), q = roofPt(cx, cy, s, 0.72, 0.4);
+    return standCube(p[0], p[1], { a: 7, b: 3.5, h: 7 }, C.amber) +
+      standCube(q[0], q[1], { a: 5, b: 2.5, h: 5 }, C.amber) +
+      '<polygon points="' + cx + "," + (cy + s.b + s.h * 0.52) + " " + (cx + s.a) + "," + (cy + s.h * 0.52) + " " +
+      (cx + s.a) + "," + (cy + s.h * 0.7) + " " + cx + "," + (cy + s.b + s.h * 0.7) + '" fill="' + C.orange + '" opacity="0.8"/>';
+  }
+  /* 测试验证楼：楼顶测试天线 */
+  function antenna(cx, cy, s) {
+    return roofRim(cx, cy, s) +
+      '<line x1="' + cx + '" y1="' + (cy - s.b) + '" x2="' + cx + '" y2="' + (cy - s.b - 15) + '" stroke="' + C.green + '" stroke-width="1.5"/>' +
+      '<circle cx="' + cx + '" cy="' + (cy - s.b - 17) + '" r="2.8" fill="' + C.green + '"><animate attributeName="opacity" values="1;0.3;1" dur="1.9s" repeatCount="indefinite"/></circle>';
+  }
+  /* 综合管理楼：旗杆 + 呼吸灯 */
+  function flagPole(cx, cy, s) {
+    return roofRim(cx, cy, s) +
+      '<line x1="' + (cx - s.a * 0.45) + '" y1="' + (cy + s.b * 0.45) + '" x2="' + (cx - s.a * 0.45) + '" y2="' + (cy + s.b * 0.45 - 22) + '" stroke="rgba(220,232,255,0.55)" stroke-width="1.2"/>' +
+      '<polygon points="' + (cx - s.a * 0.45) + "," + (cy + s.b * 0.45 - 22) + " " + (cx - s.a * 0.45 + 13) + "," + (cy + s.b * 0.45 - 18) + " " +
+      (cx - s.a * 0.45) + "," + (cy + s.b * 0.45 - 14) + '" fill="' + C.amber + '" opacity="0.9"/>';
+  }
+
+  /* 原语：白底水平胶囊标签（职能楼名 + 人数） */
+  const textW = (s) => {
+    let w = 0;
+    for (const ch of String(s)) w += /[一-龥]/.test(ch) ? 12 : (/[0-9]/.test(ch) ? 6.8 : 5.8);
+    return w;
+  };
+  function capsule(x, y, glyph, name, num) {
+    const nw = textW(name), vw = num ? textW(num) + 7 : 0;
+    const w = 24 + nw + vw + 16;
+    return '<rect class="qj-iso-cap-bg" x="' + fmtDec(x - w / 2, 1) + '" y="' + (y - 11) + '" width="' + fmtDec(w, 1) + '" height="22" rx="11"/>' +
+      '<text class="qj-iso-cap-tx" x="' + fmtDec(x - w / 2 + 8, 1) + '" y="' + (y + 4) + '">' + glyph + "</text>" +
+      '<text class="qj-iso-cap-tx" x="' + fmtDec(x - w / 2 + 25, 1) + '" y="' + (y + 4) + '">' + name + "</text>" +
+      (num ? '<text class="qj-iso-cap-num" x="' + fmtDec(x - w / 2 + 25 + nw + 7, 1) + '" y="' + (y + 4) + '">' + num + "</text>" : "");
+  }
+  /* 原语：贝塞尔流转路径（横向控制柄） */
+  function edgePath(p1, p2) {
+    const dx = (p2[0] - p1[0]) * 0.45;
+    return "M" + p1[0] + "," + p1[1] + " C" + (p1[0] + dx) + "," + p1[1] + " " + (p2[0] - dx) + "," + p2[1] + " " + p2[0] + "," + p2[1];
+  }
+
+  /* 园区底板常量：围栏菱形 / 环形主路 / 绿地 */
+  const FENCE = "462,124 914,356 462,588 10,356";
+  const ROAD_OUT = "462,200 774,356 462,512 150,356";
+  const ROAD_IN = "462,212 750,356 462,500 174,356";
+  const ROAD_MID = "M462,206 L762,356 L462,506 L162,356 Z";
+  const GREENS = [[105, 356, 38], [372, 266, 34], [560, 420, 40], [830, 356, 36], [360, 500, 36]];
+
+  function buildIso(site) {
+    const S = [];       /* 底板与楼体层 */
+    const L = [];       /* 标签层（最后画，保证任何楼体都压不住标签） */
+
+    /* —— 园区底板：围栏 → 等距地面参考线 → 绿地 → 环形主路 → 支路 → 正门 —— */
+    S.push('<polygon class="qj-iso-fence" points="' + FENCE + '"/>');
+    [[60, 330, 500, 110], [30, 400, 620, 90], [200, 570, 880, 320], [420, 130, 900, 380]].forEach((l) =>
+      S.push('<line class="qj-iso-grid" x1="' + l[0] + '" y1="' + l[1] + '" x2="' + l[2] + '" y2="' + l[3] + '"/>'));
+    GREENS.forEach((g, i) => {
+      S.push('<ellipse class="qj-iso-green" cx="' + g[0] + '" cy="' + g[1] + '" rx="' + g[2] + '" ry="' + (g[2] / 2) + '"/>');
+      for (let k = 0; k < 3; k += 1) {
+        const tx = g[0] - g[2] * 0.5 + g[2] * 0.5 * k, ty = g[1] + (k % 2 ? 6 : -5);
+        S.push('<line x1="' + tx + '" y1="' + ty + '" x2="' + tx + '" y2="' + (ty - 7) + '" stroke="rgba(111,224,154,0.5)" stroke-width="1.2"/>' +
+          '<circle cx="' + tx + '" cy="' + (ty - 10) + '" r="4.2" fill="rgba(111,224,154,0.42)"/>');
+      }
+    });
+    S.push('<path class="qj-iso-road" fill-rule="evenodd" d="M' + ROAD_OUT.split(" ").join(" L") + ' Z M' + ROAD_IN.split(" ").join(" L") + ' Z"/>');
+    S.push('<path class="qj-iso-roadline" d="' + ROAD_MID + '"/>');
+    FUNCS.forEach((f) => {
+      const n = NP[f.key], sp = SPUR[f.key];
+      S.push('<line class="qj-iso-spur" x1="' + n.x + '" y1="' + n.y + '" x2="' + sp.x + '" y2="' + sp.y + '"/>');
+    });
+    S.push('<line class="qj-iso-spur" x1="462" y1="506" x2="462" y2="556"/>');
+    S.push('<polygon points="446,556 462,564 478,556 462,548" fill="' + C.amber + '" opacity="0.8"/>');
+    L.push('<text class="qj-iso-gate" x="462" y="582" text-anchor="middle">园区正门 · GATE</text>');
+
+    /* —— 班车与人流粒子：沿环形主路 SMIL 流动（班车 3 辆错峰 + 人流 8 点） —— */
+    const particles = [];
+    for (let i = 0; i < 3; i += 1) {
+      particles.push('<g>' +
+        '<animateMotion dur="15s" begin="-' + fmtDec(i * 5, 1) + 's" repeatCount="indefinite" path="' + ROAD_MID + '"/>' +
+        '<rect x="-8" y="-4" width="16" height="9" rx="2.5" fill="' + C.amber + '"/>' +
+        '<rect x="-5.5" y="-7.5" width="11" height="4.5" rx="1.6" fill="' + lighten(C.amber, 0.38) + '"/>' +
+        '<circle cx="-4.5" cy="5" r="1.6" fill="#22304f"/><circle cx="4.5" cy="5" r="1.6" fill="#22304f"/>' +
+        "</g>");
+    }
+    for (let i = 0; i < 8; i += 1) {
+      particles.push('<circle r="2.1" fill="#8fbcff" opacity="0.85"><animateMotion dur="24s" begin="-' + fmtDec(i * 3, 1) +
+        's" repeatCount="indefinite" path="' + ROAD_MID + '"/></circle>');
+    }
+
+    /* —— 六座职能楼：几何全部由本站人数与负载率现算 —— */
+    let litAll = 0, cellAll = 0;
+    const order = FUNCS.map((f, j) => ({ f: f, j: j, y: NP[f.key].y, x: NP[f.key].x }))
+      .sort((p, q) => (p.y - q.y) || (p.x - q.x));            /* 由远及近绘制，前排楼压住后排楼 */
+    order.forEach((o) => {
+      const f = o.f, j = o.j;
+      const people = site.funcs[j], load = site.load[j], seats = site.seats[j];
+      const n = NP[f.key], s = sizeOf(people), cy = topCy(n.y, s);
+      const win = windows(n.x, cy, s, load);
+      litAll += win.lit;
+      cellAll += win.cells;
+      let extra = win.svg;
+      if (f.key === "cl") extra += coolers(n.x, cy, s, people);
+      else if (f.key === "ai") extra += gpuRacks(n.x, cy, s, people) + roofRim(n.x, cy, s);
+      else if (f.key === "hw") extra += ventStack(n.x, cy, s);
+      else if (f.key === "ts") extra += antenna(n.x, cy, s);
+      else if (f.key === "mg") extra += flagPole(n.x, cy, s);
+      else extra += roofRim(n.x, cy, s);
+
+      let g = '<g class="qj-iso-node" data-node="' + f.key + '">';
+      if (f.key === "ai") {
+        g += '<ellipse class="qj-pulse" cx="' + n.x + '" cy="' + (n.y - 2) + '" rx="' + fmtDec(s.a + 20, 1) + '" ry="' +
+          fmtDec(s.b + 12, 1) + '" fill="none" stroke="' + C.violet + '" stroke-width="1.8"/>';
+      }
+      g += standCube(n.x, n.y, s, f.col, extra);
+      S.push(g + "</g>");
+
+      /* 标签层：白底胶囊（职能名 + 人数）+ 虚线引线 + 楼下现算注记 */
+      const capY = cy - s.b - 32;
+      L.push('<g class="qj-iso-node" data-cap="' + f.key + '">' +
+        '<line class="qj-iso-lead" x1="' + n.x + '" y1="' + (capY + 12) + '" x2="' + n.x + '" y2="' + fmtDec(cy - s.b - 3, 1) + '"/>' +
+        capsule(n.x, capY, f.glyph, f.bld, fmtInt(people) + " 人") +
+        '<text class="qj-iso-val" x="' + n.x + '" y="' + fmtDec(n.y + 17, 1) + '" text-anchor="middle">负载 ' + fmtDec(load, 1) + "% · 工位 " + fmtInt(seats) + "</text>" +
+        '<text class="qj-iso-sub" x="' + n.x + '" y="' + fmtDec(n.y + 30, 1) + '" text-anchor="middle">' + f.fn + " · 楼高 " + fmtDec(s.h, 1) + " · 亮格 " + win.lit + "/" + win.cells + "</text>" +
+        "</g>");
+    });
+
+    /* 分区注记与粒子层 */
+    L.push('<text class="qj-iso-zone" x="24" y="26">' + site.name + " · 研发园区</text>");
+    L.push('<text class="qj-iso-zone" x="900" y="26" text-anchor="end">在岗 ' + fmtInt(site.people) +
+      " 人 · 工位 " + fmtInt(site.seatSum) + " 个 · 负载 " + fmtDec(site.loadAll, 1) + "%</text>");
+    L.push('<text class="qj-iso-sub" x="462" y="638" text-anchor="middle" opacity="0.95">' + site.role +
+      " · 六座楼宇 = 六职能，楼高与楼面亮格全部由本站人数与工位负载率现算</text>");
+    S.push(particles.join(""));
+
+    /* 图例 */
+    L.push('<g transform="translate(14,700)">' +
+      '<rect x="0" y="-6" width="26" height="10" rx="2" fill="rgba(38,56,104,0.9)"/>' +
+      '<text class="qj-iso-lg" x="33" y="4">环形主路 · 班车与人流粒子</text>' +
+      '<rect x="196" y="-6" width="11" height="10" fill="rgba(150,205,255,0.72)"/><rect x="209" y="-6" width="11" height="10" fill="rgba(10,22,52,0.6)"/>' +
+      '<text class="qj-iso-lg" x="227" y="4">楼面亮格 ' + litAll + "/" + cellAll + " 格 ∝ 工位负载率</text>" +
+      '<text class="qj-iso-lg" x="446" y="4" opacity="0.82">楼高 = 14 + 该职能人数 × 0.13 · 楼面半宽 = 16 + √人数 × 0.85</text>' +
+      "</g>");
+
+    $("qj-iso").innerHTML = S.join("") + L.join("");
+    return { lit: litAll, cells: cellAll };
+  }
+
+  /* ===== 7. 侧栏渲染（全部不依赖 echarts） ===== */
+  function countUp(el, target, fmt) {
+    const t0 = performance.now(), dur = 1400;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+  function renderKpi(site) {
+    const topFn = FUNCS[site.funcs.indexOf(Math.max.apply(null, site.funcs))];
+    const defs = [
+      { v: site.people, f: (x) => fmtInt(x), sub: "占全集团 <b>" + fmtDec(site.people / peopleSum * 100, 1) + "%</b>（÷ " + fmtInt(peopleSum) + " 人现算）" },
+      { v: site.proj, f: (x) => fmtInt(x), sub: "全集团 <b>" + PROJ_ALL + "</b> 个 · 占 " + fmtDec(site.proj / projSum * 100, 1) + "%" },
+      { v: site.teams.length, f: (x) => fmtInt(x), sub: "<b>" + site.teams.map((t) => t.name).join("·") + "</b> · Σ速率 " + site.velSum + " 点" },
+      { v: site.loadAll, f: (x) => fmtDec(x, 1), sub: "工位 <b>" + fmtInt(site.seatSum) + "</b> 个 · 在岗 " + fmtInt(site.people) + " 人现算" }
+    ];
+    defs.forEach((d, i) => {
+      countUp($("qj-kpi-" + i), d.v, d.f);
+      $("qj-kpi-" + i + "s").innerHTML = d.sub;
+    });
+    const box = $("qj-kpi-3box");
+    box.classList.toggle("is-warn", site.loadAll >= 92);
+    box.classList.toggle("is-good", site.loadAll < 92);
+    $("qj-tag-func").textContent = fmtInt(sum(site.funcs));
+    $("qj-tag-seat").textContent = fmtInt(site.seatSum);
+    $("qj-tag-on").textContent = fmtInt(site.people);
+    $("qj-tag-all").textContent = fmtInt(peopleSum);
+    $("qj-tag-iso").innerHTML = "最高楼 <b>" + topFn.bld + "</b>（" + fmtInt(Math.max.apply(null, site.funcs)) +
+      " 人 · 楼高 " + fmtDec(GEO.h(Math.max.apply(null, site.funcs)), 1) + "）· 负载 " + fmtDec(site.loadAll, 1) + "%";
+  }
+  function renderTeams(site) {
+    $("qj-teams").innerHTML = site.teams.map((t) => (
+      "<li>" +
+        '<span class="qj-team-name">' + t.name + "</span>" +
+        '<span class="qj-team-main">' +
+          '<span class="qj-team-t1">' + t.dom + "域 · 年吞吐 <b>" + fmtInt(t.vel * SPRINTS) + "</b> 点（速率 × " + SPRINTS + " Sprint）</span>" +
+          '<span class="qj-team-bar"><u style="width:' + fmtDec(t.vel / 82 * 100, 1) + '%"></u></span>' +
+        "</span>" +
+        '<span class="qj-team-vel"><b>' + t.vel + "</b><span>点/Sprint</span></span>" +
+      "</li>"
+    )).join("");
+    $("qj-tag-team").innerHTML = "<b>" + site.teams.length + "</b> 队 · Σ速率 " + site.velSum + " 点 · 年吞吐 " + fmtInt(site.ptsYear) + " 点";
+  }
+  function renderEvents(site) {
+    const list = EVENTS[site.name] || [];
+    /* 事件文案里的负载数字用占位符，渲染时由本站派生量替换，避免手写值与现算值脱钩 */
+    const fill = (t) => t.replace(/%SWLOAD%/g, fmtDec(site.load[0], 1)).replace(/%LOADALL%/g, fmtDec(site.loadAll, 1));
+    $("qj-events").innerHTML = list.map((e) => (
+      '<li><span class="qj-badge ' + e[0] + '">' + e[1] + "</span><span>" + fill(e[2]) + "</span></li>"
+    )).join("");
+    $("qj-tag-evt").innerHTML = "<b>" + list.length + "</b> 条 · 今日园区";
+  }
+
+  /* 底部口径滚动（内容与站点无关，只建一次；★ 图表 init 之前填充） */
+  (function buildFoot() {
+    const items = [
+      ["口径", C.amber, "六站点研发人数 Σ = " + fmtInt(peopleSum) + " 人（契约 §2.2 逐字）：" +
+        SITES.map((s) => s.name + " " + fmtInt(s.people)).join(" + ")],
+      ["口径", C.amber, "六职能人数 Σ = " + fmtInt(sum(funcCol)) + " 人：" +
+        FUNCS.map((f, j) => f.fn + " " + fmtInt(funcCol[j])).join(" + ") + "；站点 × 职能矩阵行和 = 站点人数、列和 = 职能人数"],
+      ["口径", C.amber, "楼宇几何参数驱动：楼高 = 14 + 该职能人数 × 0.13，楼面半宽 = 16 + √人数 × 0.85，左立面亮格数 = 总格数 × 工位负载率"],
+      ["口径", C.amber, "工位数 = ⌈人数 ÷ 目标负载率⌉（目标 = 站点基准 + 职能偏移，截断 72~98.5）；站点负载率 = 在岗人数 ÷ 工位总数 现算"],
+      ["要点", C.blue, "12 个 Scrum 团队按站点归属 " + teamCnt.join("/") + " 分布，Σ速率 " + velAll +
+        " 点/Sprint，年故事点吞吐 " + fmtInt(throughput) + " 点（× " + SPRINTS + " 个 Sprint 现算）"],
+      ["要点", C.blue, "在研项目 " + PROJ_ALL + " 个按站点分布：" + SITES.map((s) => s.short + " " + s.proj).join(" · ") +
+        "；本页为孪生视角，指标视角见姊妹页「单中心详情」"]
+    ];
+    const html = items.map((a) => '<span class="qj-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("qj-foot-track").innerHTML = html + html;               /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* ===== 8. 静态层整页重绘（等距 SVG + 侧栏，均不依赖 echarts） ===== */
+  function paintStatic(site) {
+    $("qj-title").textContent = site.name + " · 园区数字孪生";
+    $("qj-crumb-obj").textContent = site.name + " · " + site.role;
+    $("qj-iso-title").textContent = "园区数字孪生 · " + site.name;
+    $("qj-meta-people").textContent = fmtInt(site.people);
+    $("qj-meta-seat").textContent = fmtInt(site.seatSum);
+    $("qj-meta-load").textContent = fmtDec(site.loadAll, 1);
+    $("qj-chip-sis").href = "大屏样板间-研发单中心详情1920.html#" + encodeURIComponent(site.name);
+    buildIso(site);                                            /* ★ 切站点 → 重新 buildIso（几何随人数重算） */
+    renderKpi(site);
+    renderTeams(site);
+    renderEvents(site);
+  }
+
+  /* hash 契约：decodeURIComponent → trim + 全角空白剔除归一 → 匹配六站点名 */
+  const HASH_ALIAS = { "北京": "北京总部", "上海": "上海中心", "深圳": "深圳中心", "成都": "成都中心", "西安": "西安中心", "南京": "南京中心" };
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    if (HASH_ALIAS[s]) s = HASH_ALIAS[s];
+    return SITES.findIndex((x) => x.name === s);
+  }
+  const bootHit = resolveHash(location.hash);
+  const bootIdx = bootHit >= 0 ? bootHit : 0;
+  paintStatic(SITES[bootIdx]);                                 /* ★ 等距主视觉先渲染，断网也是活的 */
+  swTabs.forEach((b, k) => b.classList.toggle("is-active", k === bootIdx));
+
+  /* 节点轮询呼吸：每 2.4s 点亮一座楼的胶囊 */
+  let hotIdx = 0;
+  setInterval(() => {
+    const caps = Array.from(document.querySelectorAll("[data-cap]"));
+    if (!caps.length) return;
+    caps.forEach((n) => n.classList.remove("is-hot"));
+    caps[hotIdx % caps.length].classList.add("is-hot");
+    hotIdx += 1;
+  }, 2400);
+
+  /* ===== 9. 资源守卫（等距园区与侧栏清单已在上方渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("qj-error").classList.add("is-visible");
+
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const funcChart = hasEcharts ? echarts.init($("qj-chart-func")) : null;
+  const loadChart = hasEcharts ? echarts.init($("qj-chart-load")) : null;
+  const siteChart = hasEcharts ? echarts.init($("qj-chart-sites")) : null;
+
+  /* 9.1 六职能人数构成（横向条，Σ = 本站人数） */
+  function funcOption(site) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 92, top: 6, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.dataIndex;
+          return "<b>" + FUNCS[j].bld + "</b><br/>" + FUNCS[j].fn + " <b>" + fmtInt(site.funcs[j]) + "</b> 人 · 占本站 " +
+            fmtDec(site.funcs[j] / site.people * 100, 1) + "%<br/>工位 " + fmtInt(site.seats[j]) + " 个 · 负载 " +
+            fmtDec(site.load[j], 1) + "%<br/>楼高 " + fmtDec(GEO.h(site.funcs[j]), 1) + "（参数驱动几何）";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max.apply(null, site.funcs) * 1.34 },
+      yAxis: {
+        type: "category", inverse: true, data: FUNCS.map((f) => f.fn),
+        axisLabel: { color: C.text, fontSize: 11.5 }, axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 15,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 8 },
+        data: site.funcs.map((v, j) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: 8,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(FUNCS[j].col, 0.4) }, { offset: 1, color: FUNCS[j].col }])
+          }
+        })),
+        label: {
+          show: true, position: "right", fontSize: 11.5, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => fmtInt(p.value) + " 人 · " + fmtDec(p.value / site.people * 100, 1) + "%"
+        }
+      }]
+    };
+  }
+
+  /* 9.2 园区工位负载率仪表（站点总负载 = 在岗 ÷ 工位 现算） */
+  function loadOption(site) {
+    return {
+      backgroundColor: "transparent",
+      series: [{
+        type: "gauge", min: 60, max: 100, startAngle: 210, endAngle: -30,
+        center: ["50%", "62%"], radius: "86%", splitNumber: 4,
+        axisLine: {
+          lineStyle: {
+            width: 16,
+            color: [[0.6, darken(C.blueDeep, 0.5)], [0.75, C.blueDeep], [0.875, C.blue], [1, C.orange]]
+          }
+        },
+        pointer: { icon: "triangle", width: 9, length: "58%", offsetCenter: [0, "6%"], itemStyle: { color: C.amber } },
+        axisTick: { distance: -16, length: 4, lineStyle: { color: "rgba(220,232,255,.4)", width: 1 } },
+        splitLine: { distance: -16, length: 12, lineStyle: { color: "rgba(220,232,255,.6)", width: 2 } },
+        axisLabel: { distance: -6, color: C.textDim, fontSize: 10 },
+        anchor: { show: true, size: 10, itemStyle: { color: C.amber } },
+        title: { offsetCenter: [0, "34%"], color: C.textDim, fontSize: 11 },
+        detail: {
+          offsetCenter: [0, "-2%"], valueAnimation: true, fontSize: 30, fontWeight: 700,
+          fontFamily: "Bahnschrift, DIN Alternate, sans-serif",
+          color: site.loadAll >= 92 ? "#ffd9b0" : "#b8f2cf",
+          formatter: (v) => fmtDec(v, 1) + "%"
+        },
+        data: [{ value: Number(fmtDec(site.loadAll, 1)), name: "在岗 " + fmtInt(site.people) + " 人 ÷ 工位 " + fmtInt(site.seatSum) + " 个" }]
+      }]
+    };
+  }
+
+  /* 9.3 六站点人数对比（当前站点高亮；Σ = 3,860 契约同源） */
+  function siteOption(cur) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 10, top: 30, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const s = SITES[ps[0].dataIndex];
+          return "<b>" + s.name + "</b><br/>研发人数 <b>" + fmtInt(s.people) + "</b> 人 · 占 " +
+            fmtDec(s.people / peopleSum * 100, 1) + "%<br/>在研项目 " + s.proj + " 个 · 团队 " + s.teams.length +
+            " 个<br/>工位 " + fmtInt(s.seatSum) + " 个 · 负载 " + fmtDec(s.loadAll, 1) + "%";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: SITES.map((s) => s.short),
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0 }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: { type: "value", name: "人", nameTextStyle: { color: C.textDim, fontSize: 10 }, axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
+      series: [{
+        type: "bar", barWidth: "52%",
+        data: SITES.map((s, i) => ({
+          value: s.people,
+          itemStyle: {
+            borderRadius: [4, 4, 0, 0],
+            color: i === cur
+              ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: C.amber }, { offset: 1, color: "rgba(255,157,92,0.28)" }])
+              : new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: C.blue }, { offset: 1, color: "rgba(47,111,214,0.2)" }])
+          },
+          /* 逐项写 label 颜色（不用 label.color 回调，避免版本差异） */
+          label: { color: i === cur ? "#ffd489" : C.textDim, fontWeight: i === cur ? 700 : 400 }
+        })),
+        label: { show: true, position: "top", fontSize: 10.5, formatter: (p) => fmtInt(p.value) },
+        markLine: {
+          symbol: "none", silent: true,
+          lineStyle: { color: C.violet, type: "dashed", opacity: 0.6 },
+          label: { color: C.violet, fontSize: 10, formatter: "均值 " + fmtInt(peopleSum / SITES.length) },
+          data: [{ yAxis: peopleSum / SITES.length }]
+        }
+      }]
+    };
+  }
+
+  /* ===== 10. 站点切换主流程：整页重绘（含重新 buildIso） ===== */
+  let idx = 0;
+  function applySite(i) {
+    const n = SITES.length;
+    idx = ((i % n) + n) % n;
+    const site = SITES[idx];
+    paintStatic(site);
+    swTabs.forEach((b, k) => b.classList.toggle("is-active", k === idx));
+    if (hasEcharts) {
+      funcChart.setOption(funcOption(site), true);            /* x 轴上限随站点变化 → notMerge */
+      loadChart.setOption(loadOption(site), true);
+      siteChart.setOption(siteOption(idx), true);
+    }
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(site.name));
+  }
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 =====
+     ★ kiosk 状态量（timer / holdUntil）必须声明在首次 hold() 调用之前：
+       let 有暂时性死区，冷启动带 hash 进来时先 hold() 再声明会直接抛 ReferenceError（整页脚本断掉）。 */
+  const PARENT = "大屏样板间-研发多中心布局1920.html";
+  let timer = null;
+  let holdUntil = 0;
+  function hold() { holdUntil = Date.now() + 20000; }
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applySite(idx + 1); }, 16000);
+  }
+
+  swTabs.forEach((b) => b.addEventListener("click", () => { applySite(Number(b.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applySite(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applySite(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  applySite(bootIdx);
+  if (bootHit >= 0) hold();                                    /* 父页下钻进来：先保持 20 秒不轮换 */
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applySite(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 16 秒切下一站点；鼠标停在切换器上时暂停 */
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  /* 36 座楼（6 站点 × 6 职能）的亮格规格全量复算，供构造性断言使用 */
+  const probe = [];
+  SITES.forEach((s) => s.funcs.forEach((p, j) => {
+    const spec = winSpec(sizeOf(p), s.load[j]);
+    probe.push({ cells: spec.cells, lit: spec.lit, load: s.load[j] });
+  }));
+  const checks = [
+    ["六站点名与人数与契约 §2.2 逐字（构造性断言）",
+      SITES.map((s) => s.name + "|" + s.people).join(";") === SITE_AUTH],
+    ["六站点人数 Σ = 3,860 人", peopleSum === PEOPLE_ALL && peopleSum === 3860],
+    ["每站六职能人数 Σ = 该站总人数（矩阵行和）",
+      SITES.every((s) => sum(s.funcs) === s.people)],
+    ["六职能列和与契约逐字（1,460/620/540/420/520/300）且 Σ = 3,860",
+      funcCol.every((v, j) => v === FUNC_AUTH[j]) && sum(funcCol) === PEOPLE_ALL],
+    ["12 团队名/速率/站点/域与契约 §2.3 逐字（构造性断言）",
+      TEAMS.map((t) => [t.name, t.vel, t.site, t.dom].join("|")).join(";") === TEAM_AUTH],
+    ["每站团队数 = 3/2/2/2/2/1，Σ = 12 队、Σ速率 = 746",
+      teamCnt.every((v, i) => v === TEAM_CNT_AUTH[i]) && sum(teamCnt) === TEAMS.length && velAll === 746],
+    ["各站团队年吞吐 Σ = 全量年吞吐 19,396 点",
+      sum(SITES.map((s) => s.ptsYear)) === throughput && throughput === 19396],
+    ["在研项目按站点 Σ = 48 个", projSum === PROJ_ALL && projSum === 48],
+    ["楼高由人数现算：每站人数最多的职能对应最高楼（构造性断言）",
+      SITES.every((s) => {
+        const hs = s.funcs.map(GEO.h);
+        return hs.indexOf(Math.max.apply(null, hs)) === s.funcs.indexOf(Math.max.apply(null, s.funcs));
+      })],
+    ["楼高公式单调且六站点楼高向量两两不同（园区形态互异）",
+      GEO.h(520) > GEO.h(130) && GEO.h(130) > GEO.h(10) &&
+      new Set(SITES.map((s) => s.funcs.map(GEO.h).join("/"))).size === SITES.length],
+    ["工位数 ≥ 人数，站点负载率 = 在岗 ÷ 工位 现算且落在 60~100%",
+      SITES.every((s) => s.seats.every((v, j) => v >= s.funcs[j]) &&
+        Math.abs(s.loadAll - s.people / s.seatSum * 100) < 1e-9 && s.loadAll > 60 && s.loadAll <= 100)],
+    ["36 座楼亮格数 = 总格数 × 该楼负载率（四舍五入）且 0 < 亮格 ≤ 总格数（构造性断言）",
+      probe.length === SITES.length * FUNCS.length &&
+      probe.every((p) => p.lit === Math.round(p.cells * p.load / 100) && p.lit > 0 && p.lit <= p.cells)],
+    ["hash 六站点名均可解析（构造性断言）",
+      SITES.every((s, i) => resolveHash("#" + encodeURIComponent(s.name)) === i)],
+    ["切换器 tab 数 = 6 且文本与契约 hash 键逐字",
+      swTabs.length === SITES.length && swTabs.every((b, i) => b.querySelector("b").textContent === SITES[i].name)]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[研发园区数字孪生] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

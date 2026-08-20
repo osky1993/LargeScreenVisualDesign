@@ -1,0 +1,1136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单样机批次详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --pc-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：整改闭环台账（问题 / 责任域 / 计划完成 / 状态 / 复测结果） */
+    --pc-tcols: 1fr 68px 76px 72px 82px;
+    /* 工序良率明细行列宽（工序 / 投入→产出 / 失效 / 条 / 良率 / 累计直通率） */
+    --pc-scols: 62px 92px 50px 1fr 58px 64px;
+    /* 五批次横向对比行列宽（批次 / 阶段 / 条 / 直通率 / 单机成本） */
+    --pc-ccols: 112px 40px 1fr 54px 62px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .pc-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 560px 1fr 520px;
+    grid-template-rows: 84px 122px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .pc-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .pc-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .pc-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .pc-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .pc-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .pc-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .pc-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .pc-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .pc-crumb em { font-style: normal; color: #d3e2ff; }
+  .pc-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .pc-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .pc-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .pc-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .pc-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .pc-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .pc-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .pc-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 对象切换器：5 个样机批次 tab，单行（← → 方向键 / 14s 自动轮换 / hash 直达） */
+  .pc-switcher { display: flex; align-items: center; gap: 6px; }
+  .pc-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 116px; padding: 4px 10px 5px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .pc-sw-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+  .pc-sw-tab span { font-size: 9.5px; letter-spacing: 0.05em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pc-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .pc-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .pc-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  .pc-chips { display: flex; align-items: center; gap: 9px; }
+  .pc-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 104px; padding: 7px 14px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .pc-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .pc-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .pc-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .pc-chip.is-key b { color: var(--rnd-blue); }
+  .pc-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .pc-clock-time { font: 700 26px/1 var(--pc-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .pc-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带（6 枚批次级） ===== */
+  .pc-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .pc-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 14px 0 16px;
+  }
+  .pc-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .pc-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .pc-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-orange), transparent); }
+  .pc-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 92, 0.14), transparent 68%); }
+  .pc-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .pc-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.26), rgba(70, 214, 200, 0.12));
+    border: 1px solid rgba(92, 157, 255, 0.35); box-shadow: inset 0 0 12px rgba(92, 157, 255, 0.14);
+  }
+  .pc-kpi.is-warn .pc-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 92, 0.28), rgba(255, 194, 77, 0.12));
+    border-color: rgba(255, 157, 92, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 92, 0.16);
+  }
+  .pc-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .pc-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .pc-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .pc-kpi-val { font: 700 28px/1 var(--pc-mono); color: #eaf1ff; letter-spacing: 0.02em; white-space: nowrap; }
+  .pc-kpi-val.is-text { font-size: 21px; letter-spacing: 0.1em; }
+  .pc-kpi.is-warn .pc-kpi-val { color: #ffd9b0; }
+  .pc-kpi.is-good .pc-kpi-val { color: #b8f2cf; }
+  .pc-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .pc-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pc-kpi-sub b { font-weight: 700; color: #bcd2f8; }
+
+  /* ===== 三栏主体 ===== */
+  .pc-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .pc-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .pc-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .pc-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .pc-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .pc-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .pc-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pc-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .pc-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 工序良率明细（CSS 条，面板写死高度） ===== */
+  .pc-steps { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+  .pc-steps-head, .pc-step {
+    display: grid; grid-template-columns: var(--pc-scols); align-items: center; gap: 8px;
+  }
+  .pc-steps-head {
+    flex: none; padding: 4px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 10.5px; letter-spacing: 0.06em; color: #8aa8e8;
+  }
+  .pc-steps-head span:nth-child(n+3), .pc-step span:nth-child(n+3) { text-align: right; }
+  .pc-steps-head span:nth-child(4), .pc-step span:nth-child(4) { text-align: left; }
+  .pc-step { font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums; padding: 0 8px; height: 28px; border-radius: 5px; }
+  .pc-step:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .pc-step-name { color: #dfe9ff; font-weight: 700; letter-spacing: 0.04em; }
+  .pc-step-flow { color: rgba(127, 146, 196, 0.95); font-size: 11.5px; }
+  .pc-step-loss { color: var(--rnd-red); font-weight: 700; }
+  .pc-step-bar { height: 9px; border-radius: 5px; background: rgba(96, 140, 255, 0.12); overflow: hidden; }
+  .pc-step-bar i { display: block; height: 100%; border-radius: 5px; transition: width .5s; }
+  .pc-step-y { font-weight: 700; color: #eaf1ff; }
+  .pc-step-cum { font-weight: 700; color: var(--rnd-amber); }
+  .pc-step-note { flex: none; font-size: 10.5px; color: rgba(127, 146, 196, 0.85); letter-spacing: 0.04em; padding-top: 5px; border-top: 1px dashed rgba(96, 140, 255, 0.2); }
+  .pc-step-note b { font-weight: 700; color: var(--rnd-amber); }
+
+  /* ===== CSS grid 模拟表格：整改闭环台账 ===== */
+  .pc-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .pc-thead, .pc-tbody li {
+    display: grid; grid-template-columns: var(--pc-tcols); align-items: center; gap: 8px;
+  }
+  .pc-thead {
+    flex: none; padding: 5px 10px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .pc-thead span:nth-child(n+2), .pc-tbody li span:nth-child(n+2) { text-align: center; }
+  .pc-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .pc-tbody li {
+    padding: 0 10px; height: 28px; border-radius: 5px;
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    transition: background .25s, box-shadow .25s;
+  }
+  .pc-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .pc-tbody li.is-active { background: rgba(92, 157, 255, 0.16); box-shadow: inset 0 0 0 1px rgba(92, 157, 255, 0.42); }
+  .pc-tbody li b { font-weight: 700; color: #eaf1ff; }
+  .pc-tbody li .pc-cell-issue { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+  .pc-tbody li .pc-cell-retest { font-size: 11px; color: rgba(127, 146, 196, 0.95); }
+  .pc-badge {
+    display: inline-block; padding: 1px 9px; border-radius: 999px;
+    font-size: 10.5px; letter-spacing: 0.06em; line-height: 1.6;
+    border: 1px solid rgba(96, 140, 255, 0.3); color: #a9c4f5; background: rgba(24, 44, 104, 0.4);
+  }
+  .pc-badge.is-done  { color: var(--rnd-green); border-color: rgba(111, 224, 154, 0.45); background: rgba(24, 74, 48, 0.32); }
+  .pc-badge.is-doing { color: var(--rnd-blue);  border-color: rgba(92, 157, 255, 0.5);   background: rgba(24, 44, 104, 0.5); }
+  .pc-badge.is-todo  { color: var(--rnd-text-dim); border-color: rgba(127, 146, 196, 0.4); background: rgba(24, 34, 66, 0.4); }
+
+  /* ===== 五批次横向对比（右下，写死高度面板内） ===== */
+  .pc-cmp { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
+  .pc-cmp-head, .pc-cmp-row {
+    display: grid; grid-template-columns: var(--pc-ccols); align-items: center; gap: 8px;
+  }
+  .pc-cmp-head {
+    flex: none; padding: 4px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 10.5px; letter-spacing: 0.06em; color: #8aa8e8;
+  }
+  .pc-cmp-head span:nth-child(n+4), .pc-cmp-row span:nth-child(n+4) { text-align: right; }
+  .pc-cmp-row {
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    padding: 0 8px; height: 26px; border-radius: 5px; cursor: pointer;
+    transition: background .25s, box-shadow .25s;
+  }
+  .pc-cmp-row:hover { background: rgba(92, 157, 255, 0.1); }
+  .pc-cmp-row.is-on { background: rgba(92, 157, 255, 0.16); box-shadow: inset 0 0 0 1px rgba(92, 157, 255, 0.42); }
+  .pc-cmp-name { color: #dfe9ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pc-cmp-stage { font-size: 10px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.95); text-align: center; }
+  .pc-cmp-bar { height: 9px; border-radius: 5px; background: rgba(96, 140, 255, 0.12); overflow: hidden; }
+  .pc-cmp-bar i { display: block; height: 100%; border-radius: 5px; transition: width .5s; }
+  .pc-cmp-fpy { font-weight: 700; color: #eaf1ff; }
+  .pc-cmp-cost { font-weight: 700; color: var(--rnd-amber); }
+  .pc-cmp-note { flex: none; font-size: 10.5px; color: rgba(127, 146, 196, 0.85); letter-spacing: 0.04em; padding-top: 5px; border-top: 1px dashed rgba(96, 140, 255, 0.2); }
+  .pc-cmp-note b { font-weight: 700; color: var(--rnd-amber); }
+
+  /* ===== 底部口径与要点滚动条 ===== */
+  .pc-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .pc-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-amber);
+  }
+  .pc-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-amber);
+    box-shadow: 0 0 10px var(--rnd-amber); animation: pc-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes pc-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .pc-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .pc-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .pc-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .pc-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .pc-foot-item b { font-weight: 700; color: #eaf1ff; }
+  .pc-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .pc-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="pc-stage" id="pc-stage">
+    <!-- mockflag:begin --><div class="pc-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="pc-error" id="pc-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容） -->
+    <header class="pc-header">
+      <div class="pc-head-left">
+        <div class="pc-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="pc-crumb-up" href="大屏样板间-研发硬件与样机1920.html" title="返回上级专题页（Esc）">‹ 返回 硬件与样机</a><i>›</i>
+          <em id="pc-crumb-obj">--</em>
+        </div>
+        <div class="pc-head-title-row">
+          <div class="pc-head-title" id="pc-title">-- · 样机批次详情</div>
+          <div class="pc-head-meta">
+            <span>试制线 <b>深圳中心 · NPI 一线</b></span><i>|</i>
+            <span>投产窗口 <b id="pc-window">--</b></span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="pc-head-right">
+        <div class="pc-switcher" id="pc-switcher" aria-label="样机批次切换"></div>
+        <div class="pc-chips">
+          <div class="pc-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="pc-chip is-key"><span>FPY</span><b id="pc-chip-fpy">--</b></div>
+        </div>
+        <div class="pc-clock" aria-label="实时时钟">
+          <span class="pc-clock-time" id="pc-clock-time">--:--:--</span>
+          <span class="pc-clock-date" id="pc-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带（随批次切换） -->
+    <div class="pc-band" id="pc-band"></div>
+
+    <!-- 左栏：工序良率阶梯瀑布 + 工序良率明细 -->
+    <div class="pc-col">
+      <section class="pc-panel" style="flex: 1;">
+        <div class="pc-panel-head">
+          <h2>批次试制良率 · 工序阶梯</h2>
+          <span class="pc-panel-tag">投产 <b id="pc-yl-qty">--</b> 台 → 良品 <b id="pc-yl-good">--</b> 台 · 直通率 <b id="pc-yl-fpy">--</b></span>
+        </div>
+        <div class="pc-chart" id="pc-chart-yield"></div>
+      </section>
+      <!-- 高度写死 246px：表头 + 4 工序行 + 口径注脚不裁切；min-height:0 + overflow:hidden 防内容撑破 -->
+      <section class="pc-panel" style="flex: none; height: 246px; min-height: 0; overflow: hidden;">
+        <div class="pc-panel-head">
+          <h2>工序良率明细</h2>
+          <span class="pc-panel-tag">逐工序良率连乘 = 直通率 <b id="pc-st-fpy">--</b></span>
+        </div>
+        <div class="pc-steps" id="pc-steps"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：失效模式帕累托 + 整改闭环台账 -->
+    <div class="pc-col">
+      <section class="pc-panel" style="flex: 1;">
+        <div class="pc-panel-head">
+          <h2>失效模式帕累托</h2>
+          <span class="pc-panel-tag">失效 <b id="pc-pa-total">--</b> 台 · 前二累计 <b id="pc-pa-top2">--</b> · Σ 各模式 = 失效台数</span>
+        </div>
+        <div class="pc-chart" id="pc-chart-pareto"></div>
+      </section>
+      <!-- 高度写死 320px：表头 + 最多 8 条整改行不裁切（JS 延迟填充，必须写死高度不压帕累托） -->
+      <section class="pc-panel" style="flex: none; height: 320px; min-height: 0; overflow: hidden;">
+        <div class="pc-panel-head">
+          <h2>整改闭环追踪</h2>
+          <span class="pc-panel-tag">整改项 <b id="pc-cl-cnt">--</b> 条 · 已闭环 <b id="pc-cl-done">--</b> 条 · 闭环率 <b id="pc-cl-rate">--</b></span>
+        </div>
+        <div class="pc-table">
+          <div class="pc-thead">
+            <span>问题</span><span>责任域</span><span>计划完成</span><span>状态</span><span>复测结果</span>
+          </div>
+          <ul class="pc-tbody" id="pc-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右栏：BOM 成本明细 + 五批次横向对比 -->
+    <div class="pc-col">
+      <section class="pc-panel" style="flex: 1;">
+        <div class="pc-panel-head">
+          <h2>BOM 成本明细</h2>
+          <span class="pc-panel-tag">单机成本 <b id="pc-bm-cost">--</b> 元 · 较 MP 目标 <b id="pc-bm-prem">--</b></span>
+        </div>
+        <div class="pc-chart" id="pc-chart-bom"></div>
+      </section>
+      <!-- 高度写死 246px：表头 + 5 批次行 + 口径注脚不裁切 -->
+      <section class="pc-panel" style="flex: none; height: 246px; min-height: 0; overflow: hidden;">
+        <div class="pc-panel-head">
+          <h2>五批次横向对比</h2>
+          <span class="pc-panel-tag">直通率条按 <b>85%–100%</b> 区间映射 · 点击切换</span>
+        </div>
+        <div class="pc-cmp" id="pc-cmp"></div>
+      </section>
+    </div>
+
+    <!-- 底部口径与要点 -->
+    <div class="pc-foot">
+      <div class="pc-foot-tag">口径与要点</div>
+      <div class="pc-foot-view"><div class="pc-foot-track" id="pc-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("pc-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("pc-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  /* kiosk 轮换保持窗：从父页下钻进来（hash 命中）时先保持 20 秒不轮换。
+     ★ 声明必须早于任何 hold() 调用——初始 hash 解析就会调它，
+     若把 let 留在页尾的 kiosk 段，会因 TDZ 抛 ReferenceError 打断后续脚本。 */
+  let holdUntil = 0;
+  function hold() { holdUntil = Date.now() + 20000; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 深圳中心 NPI 一线）
+         口径与全系列基准盘（docs/RndIpdThemed.md §2.3）一致：
+         5 个样机批次名称逐字引契约 §2.3（星澜S3-EVT2 / 星澜S3-DVT1 / 星澜Pro2-DVT2 /
+         星澜Pro2-PVT1 / 澜芯M60-EVT1），亦即父页「硬件与样机」下钻 hash 键（§6）。
+         本页二级拆分（工序失效台数 / 失效模式权重 / BOM 权重 / 整改项）为自编，
+         但一律满足 Σ == 上级：
+           · 逐工序台数递推：投入(k+1) = 投入(k) − 失效(k)，末端 = 良品台数；
+           · 直通率 = Π 工序良率 = 良品 ÷ 投产（现算恒等，页面不写死）；
+           · 帕累托各失效模式 Σ = 失效台数 = 投产 − 良品，累计线末值恒 100%；
+           · BOM 五类金额 Σ = 批次单机成本（整数分配器保证）。
+         合计一律由分项求和，比率一律现算，页面上不出现任何硬编码的合计值。 ===== */
+
+  const PARENT = "大屏样板间-研发硬件与样机1920.html";
+
+  /* 4.1 试制工序链（SMT → 组装 → 老化 → 终测），逐工序良率相乘 = 批次直通率 */
+  const STEPS = ["SMT贴装", "组装", "老化", "终测"];
+  const STEP_FULL = ["SMT 贴装焊接", "整机装配", "高温老化", "终检与功能全测"];
+
+  /* 4.2 失效模式（帕累托维度，柱 + 累计线） */
+  const MODES = ["虚焊", "器件失效", "结构干涉", "软件异常", "外观不良", "参数超差"];
+  const MODE_COLORS = [C.red, C.orange, C.amber, C.violet, C.cyan, C.blue];
+  /* 失效模式 → 责任域（整改台账首三条由帕累托前三模式驱动，两块互相咬合） */
+  const MODE_DOMAIN = {
+    "虚焊": "工艺", "器件失效": "供应链", "结构干涉": "结构",
+    "软件异常": "软件", "外观不良": "工艺", "参数超差": "硬件"
+  };
+  const MODE_FIX = {
+    "虚焊": ["回流焊温区曲线重调 + 钢网清洗频次加密", "BGA 焊盘阻焊开窗尺寸修正"],
+    "器件失效": ["电源 MOS 换二供并加来料全检", "晶振选型升级至工业级温漂档"],
+    "结构干涉": ["中框卡扣模具补偿 0.15mm", "散热支架与主板间隙加垫片"],
+    "软件异常": ["产测固件看门狗超时策略修正", "配网重试逻辑补齐并回归"],
+    "外观不良": ["面壳注塑保压参数调整", "装配工位防划伤治具增配"],
+    "参数超差": ["射频功率校准工装重标定", "充放电截止阈值复校"]
+  };
+  /* 通用整改项池（前三条之外按批次偏移轮转取用） */
+  const FIX_POOL = [
+    ["产测节拍瓶颈工位分流", "测试"],
+    ["老化房温控波动收敛至 ±2℃", "工艺"],
+    ["物料齐套率提升至 98%", "供应链"],
+    ["EMC 辐射余量整改并复测", "硬件"],
+    ["装配 SOP 图文更新与培训", "工艺"],
+    ["整机包装跌落缓冲加强", "结构"],
+    ["产测数据自动上传打通", "测试"],
+    ["锂电二供导入与认证", "供应链"]
+  ];
+  const FIX_STATES = [
+    { name: "已闭环", cls: "is-done", retest: "复测通过" },
+    { name: "整改中", cls: "is-doing", retest: "复测中" },
+    { name: "待启动", cls: "is-todo", retest: "待安排" }
+  ];
+  /* 状态轮转模板（0 已闭环 / 1 整改中 / 2 待启动）：按 (k + 批次序) % 8 取，三态必现 */
+  const STATE_PATTERN = [0, 0, 1, 0, 2, 0, 1, 0];
+
+  /* 4.3 BOM 分类与各机型权重（Σ 权重不必为 100，分配器按比例取整后 Σ == 单机成本） */
+  const BOM_CATS = ["主控", "存储", "电源", "结构", "其他"];
+  const BOM_COLORS = [C.blue, C.cyan, C.amber, C.violet, C.textDim];
+  const BOM_WEIGHTS = {
+    "星澜S3": [34, 18, 16, 22, 10],
+    "星澜Pro2": [36, 20, 15, 19, 10],
+    "澜芯M60": [46, 22, 12, 8, 12]
+  };
+  /* MP 量产目标单机成本（元）：与父页「硬件与样机」BOM 成本瀑布**末值**同口径。
+     样机批次成本 = MP 目标 × 试制溢价系数（小批量物料非量产价 + 工装摊销 + 手工工时），
+     阶段越靠前溢价越高；批次差异即「样机 → 量产」的降本空间，故两页数字不相等亦不冲突。 */
+  const MP_TARGET = { "星澜S3": 1180, "星澜Pro2": 1460, "澜芯M60": 268 };
+
+  /* 4.4 五个样机批次（契约 §2.3 逐字；qty 投产台数、fails 逐工序失效台数、mw 失效模式权重、prem 试制溢价系数） */
+  const BATCHES = [
+    { name: "星澜S3-EVT2", prod: "星澜S3", line: "智家终端", stage: "EVT", seq: 2,
+      qty: 120, fails: [5, 4, 3, 2], mw: [30, 24, 18, 12, 10, 6], prem: 1.42,
+      win: "07-28 → 08-05", owner: "样机工程组 · 何静姝" },
+    { name: "星澜S3-DVT1", prod: "星澜S3", line: "智家终端", stage: "DVT", seq: 1,
+      qty: 260, fails: [7, 6, 4, 3], mw: [28, 20, 14, 16, 14, 8], prem: 1.24,
+      win: "08-06 → 08-14", owner: "样机工程组 · 唐既白" },
+    { name: "星澜Pro2-DVT2", prod: "星澜Pro2", line: "智家终端", stage: "DVT", seq: 2,
+      qty: 200, fails: [5, 4, 3, 2], mw: [26, 18, 16, 18, 14, 8], prem: 1.18,
+      win: "08-08 → 08-16", owner: "样机工程组 · 石竞舟" },
+    { name: "星澜Pro2-PVT1", prod: "星澜Pro2", line: "智家终端", stage: "PVT", seq: 1,
+      qty: 480, fails: [7, 5, 4, 3], mw: [30, 16, 10, 14, 22, 8], prem: 1.07,
+      win: "08-12 → 08-19", owner: "工艺工程组 · 田镜湖" },
+    { name: "澜芯M60-EVT1", prod: "澜芯M60", line: "AIoT模组", stage: "EVT", seq: 1,
+      qty: 150, fails: [8, 5, 4, 3], mw: [32, 26, 10, 14, 8, 10], prem: 1.58,
+      win: "08-10 → 08-18", owner: "模组工程组 · 秦观澜" }
+  ];
+  /* 契约 §2.3 权威串（构造性断言用：BATCHES 名称逐字拼接必须与其一致，防手滑改名） */
+  const AUTH_BATCHES = "星澜S3-EVT2;星澜S3-DVT1;星澜Pro2-DVT2;星澜Pro2-PVT1;澜芯M60-EVT1";
+  const STAGE_FULL = { EVT: "工程验证样机", DVT: "设计验证样机", PVT: "生产验证样机" };
+
+  /* ===== 4.5 确定性整数分配器（无随机数，刷新不抖动） =====
+     distribute：按权重把 total 拆成整数数组，Σ == total（最大余数法，破平取小下标）。 */
+  function distribute(total, ws) {
+    const s = sum(ws);
+    const raw = ws.map((w) => total * w / s);
+    const base = raw.map(Math.floor);
+    let r = total - sum(base);
+    const order = raw.map((v, i) => [v - Math.floor(v), i])
+      .sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+    for (let k = 0; k < order.length && r > 0; k++) { base[order[k][1]] += 1; r -= 1; }
+    return base;
+  }
+
+  /* 计划完成日期：以 2026-08-22 为基准按 (批次序, 条目序) 确定性推移 */
+  const PLAN_BASE = new Date(2026, 7, 22);
+  function planDate(i, k) {
+    const d = new Date(PLAN_BASE.getTime());
+    d.setDate(d.getDate() + i * 2 + k * 3);
+    return pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+
+  /* ===== 4.6 派生量：每批次全量数据（良率阶梯 / 帕累托 / 整改台账 / BOM），全部现算 ===== */
+  BATCHES.forEach((b, i) => {
+    /* —— 工序台数递推：ins[0] = 投产，ins[k+1] = ins[k] − fails[k]，ins[4] = 良品 —— */
+    b.ins = [b.qty];
+    b.fails.forEach((f) => b.ins.push(b.ins[b.ins.length - 1] - f));
+    b.good = b.ins[STEPS.length];
+    b.failTotal = sum(b.fails);
+    /* —— 逐工序良率 = 出 ÷ 入；累计直通率 = 逐工序良率连乘（现算，不写死） —— */
+    b.yields = STEPS.map((_, k) => b.ins[k + 1] / b.ins[k]);
+    b.cumY = [];
+    b.yields.reduce((acc, y) => { const v = acc * y; b.cumY.push(v); return v; }, 1);
+    b.fpy = b.cumY[b.cumY.length - 1];                       /* 批次直通率（连乘口径） */
+
+    /* —— 失效模式帕累托：Σ 各模式 = 失效台数（整数分配器保证），按台数降序 —— */
+    const cnt = distribute(b.failTotal, b.mw);
+    b.pareto = MODES.map((m, k) => ({ mode: m, cnt: cnt[k], ci: k }))
+      .sort((x, y) => (y.cnt - x.cnt) || (x.ci - y.ci));
+    b.paretoCum = [];
+    b.pareto.reduce((acc, p) => { const v = acc + p.cnt; b.paretoCum.push(v / b.failTotal * 100); return v; }, 0);
+    b.top2 = b.paretoCum[1];
+
+    /* —— 整改闭环台账 6~8 条：前 3 条对应帕累托前 3 失效模式，其余取通用池 —— */
+    const n = 6 + (i % 3);
+    b.fixes = Array.from({ length: n }, (_, k) => {
+      let issue, dom;
+      if (k < 3) {
+        const m = b.pareto[k].mode;
+        const opts = MODE_FIX[m];
+        issue = opts[(i + k) % opts.length];
+        dom = MODE_DOMAIN[m];
+      } else {
+        const p = FIX_POOL[(i * 3 + k) % FIX_POOL.length];
+        issue = p[0];
+        dom = p[1];
+      }
+      const st = FIX_STATES[STATE_PATTERN[(k + i) % STATE_PATTERN.length]];
+      return { issue: issue, dom: dom, plan: planDate(i, k), stName: st.name, stCls: st.cls, retest: st.retest };
+    });
+    b.fixDone = b.fixes.filter((f) => f.stName === "已闭环").length;
+    b.closeRate = b.fixDone / b.fixes.length * 100;          /* 闭环率 = 已闭环 ÷ 总数（现算） */
+
+    /* —— BOM：五类金额 Σ == 批次单机成本；单机成本 = MP 目标 × 试制溢价系数 —— */
+    b.mp = MP_TARGET[b.prod];
+    b.cost = Math.round(b.mp * b.prem);
+    b.bom = distribute(b.cost, BOM_WEIGHTS[b.prod]);
+    b.premRate = (b.cost - b.mp) / b.mp * 100;               /* 试制溢价率（现算） */
+    b.matTotal = b.cost * b.qty / 10000;                     /* 批次物料投入（万元） */
+  });
+
+  const D = {};
+  D.qtySum = sum(BATCHES.map((b) => b.qty));
+  D.goodSum = sum(BATCHES.map((b) => b.good));
+  D.failSum = sum(BATCHES.map((b) => b.failTotal));
+  D.fixSum = sum(BATCHES.map((b) => b.fixes.length));
+  D.fixDoneSum = sum(BATCHES.map((b) => b.fixDone));
+  D.bestIdx = BATCHES.reduce((a, b, k) => (BATCHES[a].fpy >= b.fpy ? a : k), 0);
+  D.worstIdx = BATCHES.reduce((a, b, k) => (BATCHES[a].fpy <= b.fpy ? a : k), 0);
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("pc-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("pc-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 6. 批次切换器（对象切换器：tab 文本与契约 §6 hash 键逐字一致） ===== */
+  const switcher = $("pc-switcher");
+  switcher.innerHTML = BATCHES.map((b, i) => (
+    '<button class="pc-sw-tab" type="button" data-i="' + i + '" title="切换到' + b.name + '（← → 方向键）">' +
+      "<b>" + b.name + "</b><span>" + b.stage + " · " + b.qty + " 台</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".pc-sw-tab"));
+
+  /* ===== 7. 底部口径与要点（★ 图表 init 之前填充；全部由派生量现算） ===== */
+  const FOOT_ITEMS = [
+    { tag: "口径", t: "批次直通率 FPY = 逐工序良率连乘（" + STEPS.join(" × ") +
+        "）= 良品 ÷ 投产；工序台数逐级递推：投入(k+1) = 投入(k) − 本工序失效(k)" },
+    { tag: "口径", t: "失效模式帕累托 Σ 各模式 = 失效台数 = 投产 − 良品；累计线末值恒为 100%；" +
+        "整改台账前三条即帕累托前三模式，责任域随模式派生" },
+    { tag: "口径", t: "BOM 分类成本 Σ（" + BOM_CATS.join(" + ") + "）= 批次单机成本；" +
+        "单机成本 = 硬件与样机页 BOM 瀑布末值（MP 量产目标）× 试制溢价系数——样机小批量物料非量产价、含工装摊销与手工工时，故各批次高于量产目标，差额即降本空间" },
+    { tag: "口径", t: "五批次合计投产 " + fmtInt(D.qtySum) + " 台 = 良品 " + fmtInt(D.goodSum) +
+        " + 失效 " + fmtInt(D.failSum) + " 台；整改项合计 " + fmtInt(D.fixSum) + " 条 · 已闭环 " +
+        fmtInt(D.fixDoneSum) + " 条（闭环率 " + fmtDec(D.fixDoneSum / D.fixSum * 100, 1) + "%）" },
+    { tag: "要点", t: "直通率最高 " + BATCHES[D.bestIdx].name + "（" + fmtDec(BATCHES[D.bestIdx].fpy * 100, 2) +
+        "%，" + BATCHES[D.bestIdx].stage + " 阶段）、最低 " + BATCHES[D.worstIdx].name + "（" +
+        fmtDec(BATCHES[D.worstIdx].fpy * 100, 2) + "%）——EVT 首轮以暴露问题为目的，良率不与 PVT 直接横比" },
+    { tag: "要点", t: "PVT 批次须在转 MP 前把整改项全部闭环并完成复测；EVT/DVT 未闭环项随批次滚动至下一轮试制验证" }
+  ];
+  const track = $("pc-foot-track");
+  const footHtml = FOOT_ITEMS.map((a) => (
+    '<div class="pc-foot-item"><i style="color:' + (a.tag === "口径" ? C.amber : C.blue) + '">[' + a.tag + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = footHtml + footHtml;                          /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 8. 图表初始化 =====
+     ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize()
+     ★ 进 option 的数据只放标量与数组（批次对象绝不塞进 series.data，防 setOption 深拷贝成环） */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = {
+    backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  };
+  const ylChart = makeChart("pc-chart-yield");
+  const paChart = makeChart("pc-chart-pareto");
+  const bmChart = makeChart("pc-chart-bom");
+
+  /* 8.1 工序良率阶梯瀑布：投产 → 逐工序失效落差 → 良品；叠加累计直通率折线 */
+  function yieldOption(i) {
+    const b = BATCHES[i];
+    const cats = ["投产"].concat(STEPS).concat(["良品"]);
+    /* 瀑布三段同 stack："占位"托底（透明）+「工序失效」红条 +「台数」首尾端点条 */
+    const holder = [0].concat(b.ins.slice(1)).concat([0]);
+    const loss = ["-"].concat(b.fails).concat(["-"]);
+    const ends = [
+      { value: b.qty, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: C.blue }, { offset: 1, color: C.blueDeep }]) } },
+      "-", "-", "-", "-",
+      { value: b.good, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: C.green }, { offset: 1, color: "rgba(111,224,154,.35)" }]) } }
+    ];
+    const cumLine = [100].concat(b.cumY.map((v) => Number(fmtDec(v * 100, 2)))).concat([Number(fmtDec(b.fpy * 100, 2))]);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 10, top: 36, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis",
+        formatter: (ps) => {
+          const d = ps[0].dataIndex;
+          if (d === 0) return "<b>投产</b><br/>投产台数 <b style=\"color:" + C.blue + "\">" + b.qty + "</b> 台";
+          if (d === cats.length - 1) {
+            return "<b>良品</b><br/>良品台数 <b style=\"color:" + C.green + "\">" + b.good + "</b> 台" +
+              "<br/>直通率 <b style=\"color:" + C.amber + "\">" + fmtDec(b.fpy * 100, 2) + "%</b>（逐工序连乘）";
+          }
+          const k = d - 1;
+          return "<b>" + STEP_FULL[k] + "</b><br/>投入 <b>" + b.ins[k] + "</b> → 产出 <b>" + b.ins[k + 1] + "</b> 台" +
+            "<br/>本工序失效 <b style=\"color:" + C.red + "\">" + b.fails[k] + "</b> 台 · 良率 <b style=\"color:" +
+            C.blue + "\">" + fmtDec(b.yields[k] * 100, 2) + "%</b>" +
+            "<br/>累计直通率 <b style=\"color:" + C.amber + "\">" + fmtDec(b.cumY[k] * 100, 2) + "%</b>";
+        }
+      }, TIP),
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: ["工序失效", "累计直通率"]
+      },
+      xAxis: {
+        type: "category", data: cats,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 10.5 })
+      },
+      yAxis: [
+        { type: "value", name: "台", max: Math.ceil(b.qty * 1.1), nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false } },
+        { type: "value", name: "%", min: Math.floor(b.fpy * 100) - 4, max: 100,
+          nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { formatter: "{value}" }),
+          splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "占位", type: "bar", stack: "w", barWidth: 30, silent: true,
+          itemStyle: { color: "transparent" }, emphasis: { itemStyle: { color: "transparent" } },
+          data: holder, tooltip: { show: false } },
+        { name: "台数", type: "bar", stack: "w", barWidth: 30, z: 3,
+          label: { show: true, position: "top", color: "#eaf1ff", fontSize: 11.5, fontWeight: 700,
+            /* 端点系列的中间四格是空值 "-"，formatter 需自行让位，否则渲染出 NaN */
+            formatter: (p) => (typeof p.value === "number" ? fmtInt(p.value) + " 台" : "") },
+          data: ends },
+        { name: "工序失效", type: "bar", stack: "w", barWidth: 30, z: 3,
+          itemStyle: { color: C.red, borderRadius: 3 },
+          label: { show: true, position: "top", color: C.red, fontSize: 10.5, fontWeight: 700,
+            formatter: (p) => (typeof p.value === "number" ? "-" + p.value : "") },
+          data: loss },
+        { name: "累计直通率", type: "line", yAxisIndex: 1, z: 6, symbol: "circle", symbolSize: 6,
+          lineStyle: { width: 2, color: C.amber }, itemStyle: { color: C.amber },
+          label: { show: true, position: "bottom", color: C.amber, fontSize: 10,
+            formatter: (p) => fmtDec(p.value, 1) + "%" },
+          data: cumLine }
+      ]
+    };
+  }
+
+  /* 8.2 失效模式帕累托：台数降序柱 + 累计占比折线（末值恒 100%） */
+  function paretoOption(i) {
+    const b = BATCHES[i];
+    const names = b.pareto.map((p) => p.mode);
+    const vals = b.pareto.map((p) => ({
+      value: p.cnt, itemStyle: { color: MODE_COLORS[p.ci], borderRadius: [4, 4, 0, 0] }
+    }));
+    const cum = b.paretoCum.map((v) => Number(fmtDec(v, 1)));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 12, top: 36, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis",
+        formatter: (ps) => {
+          const d = ps[0].dataIndex;
+          const p = b.pareto[d];
+          return "<b>" + p.mode + "</b><br/>失效 <b style=\"color:" + MODE_COLORS[p.ci] + "\">" + p.cnt +
+            "</b> 台 · 占比 <b>" + fmtDec(p.cnt / b.failTotal * 100, 1) + "%</b>" +
+            "<br/>累计占比 <b style=\"color:" + C.amber + "\">" + fmtDec(b.paretoCum[d], 1) + "%</b>" +
+            "<br/>责任域 <b>" + MODE_DOMAIN[p.mode] + "</b>";
+        }
+      }, TIP),
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: ["失效台数", "累计占比"]
+      },
+      xAxis: {
+        type: "category", data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0 })
+      },
+      yAxis: [
+        { type: "value", name: "台", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          minInterval: 1, axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false } },
+        { type: "value", name: "累计 %", min: 0, max: 100, nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { formatter: "{value}" }),
+          splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "失效台数", type: "bar", barWidth: 26, z: 3, data: vals,
+          label: { show: true, position: "top", color: "#eaf1ff", fontSize: 11, fontWeight: 700,
+            formatter: (p) => p.value + " 台" } },
+        { name: "累计占比", type: "line", yAxisIndex: 1, z: 6, symbol: "circle", symbolSize: 6,
+          lineStyle: { width: 2, color: C.amber }, itemStyle: { color: C.amber },
+          label: { show: true, position: "top", color: C.amber, fontSize: 10,
+            formatter: (p) => fmtDec(p.value, 0) + "%" },
+          markLine: {
+            silent: true, symbol: "none",
+            lineStyle: { color: "rgba(255,194,77,.45)", type: "dashed", width: 1.2 },
+            label: { show: true, position: "insideEndTop", color: C.amber, fontSize: 10, formatter: "80% 线" },
+            data: [{ yAxis: 80 }]
+          },
+          data: cum }
+      ]
+    };
+  }
+
+  /* 8.3 BOM 分类成本环形：五类金额 Σ = 批次单机成本，中心显示单机成本 */
+  function bomOption(i) {
+    const b = BATCHES[i];
+    const data = BOM_CATS.map((c, k) => ({
+      name: c, value: b.bom[k], itemStyle: { color: BOM_COLORS[k], borderColor: "rgba(8,18,49,.9)", borderWidth: 2 }
+    }));
+    const total = sum(b.bom);
+    return {
+      backgroundColor: "transparent",
+      title: [
+        { text: fmtInt(total), left: "center", top: "40%",
+          textStyle: { color: "#eaf1ff", fontSize: 30, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" } },
+        { text: "批次单机成本（元）", left: "center", top: "54%",
+          textStyle: { color: C.textDim, fontSize: 11.5, fontWeight: 400 } }
+      ],
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => "<b>" + p.name + "</b><br/>金额 <b style=\"color:" + BOM_COLORS[p.dataIndex] + "\">" +
+          fmtInt(p.value) + "</b> 元 · 占比 <b>" + fmtDec(p.value / total * 100, 1) + "%</b>" +
+          "<br/>批次 " + b.qty + " 台合计 <b>" + fmtDec(p.value * b.qty / 10000, 1) + "</b> 万元"
+      }, TIP),
+      legend: {
+        show: true, bottom: 2, left: "center", itemWidth: 12, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: BOM_CATS.slice()
+      },
+      series: [
+        { name: "BOM 分类成本", type: "pie", radius: ["44%", "68%"], center: ["50%", "46%"],
+          avoidLabelOverlap: true, minAngle: 6,
+          label: { color: C.text, fontSize: 11, formatter: (p) => p.name + " " + fmtInt(p.value) + " 元" },
+          labelLine: { length: 8, length2: 10, lineStyle: { color: "rgba(96,140,255,.4)" } },
+          data: data }
+      ]
+    };
+  }
+
+  /* ===== 9. KPI 带 / 工序明细 / 整改台账 / 批次对比（随批次切换重绘） ===== */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+
+  const band = $("pc-band");
+  function renderKpi(i) {
+    const b = BATCHES[i];
+    const defs = [
+      { icon: "▣", label: "投产台数", val: b.qty, unit: "台", dec: 0, cls: "",
+        sub: b.line + " · " + b.prod + " · 良品 <b>" + b.good + "</b> 台（投产 − 失效）" },
+      { icon: "◈", label: "直通率 FPY", val: b.fpy * 100, unit: "%", dec: 2,
+        cls: b.fpy >= 0.95 ? " is-good" : (b.fpy < 0.9 ? " is-warn" : ""),
+        sub: STEPS.length + " 道工序良率连乘 · 最低工序 <b>" + STEPS[b.yields.indexOf(Math.min.apply(null, b.yields))] + "</b>" },
+      { icon: "⚠", label: "失效台数", val: b.failTotal, unit: "台", dec: 0, cls: " is-warn",
+        sub: "首因 <b>" + b.pareto[0].mode + "</b> " + b.pareto[0].cnt + " 台 · 前二累计 <b>" + fmtDec(b.top2, 1) + "%</b>" },
+      { icon: "✓", label: "整改闭环率", val: b.closeRate, unit: "%", dec: 1,
+        cls: b.closeRate >= 65 ? " is-good" : (b.closeRate < 60 ? " is-warn" : ""),
+        sub: "已闭环 <b>" + b.fixDone + "</b> / " + b.fixes.length + " 条 · 复测通过即闭环" },
+      { icon: "¥", label: "批次单机成本", val: b.cost, unit: "元", dec: 0, cls: "",
+        sub: "较 MP 目标 " + fmtInt(b.mp) + " 元 <b>+" + fmtDec(b.premRate, 1) + "%</b> · 物料 <b>" + fmtDec(b.matTotal, 1) + "</b> 万元" },
+      { icon: "◎", label: "样机阶段", text: b.stage,
+        cls: b.stage === "PVT" ? " is-good" : (b.stage === "EVT" ? " is-warn" : ""),
+        sub: STAGE_FULL[b.stage] + " · 第 <b>" + b.seq + "</b> 轮 · " + b.owner }
+    ];
+    band.innerHTML = defs.map((k, j) => (
+      '<div class="pc-kpi' + k.cls + '">' +
+        '<div class="pc-kpi-icon">' + k.icon + "</div>" +
+        '<div class="pc-kpi-main">' +
+          '<div class="pc-kpi-label">' + k.label + "</div>" +
+          (k.text != null
+            ? '<div class="pc-kpi-num"><span class="pc-kpi-val is-text">' + k.text + "</span></div>"
+            : '<div class="pc-kpi-num"><span class="pc-kpi-val" id="pc-kpi-' + j + '">0</span><span class="pc-kpi-unit">' + k.unit + "</span></div>") +
+          '<div class="pc-kpi-sub">' + k.sub + "</div>" +
+        "</div>" +
+      "</div>"
+    )).join("");
+    defs.forEach((k, j) => { if (k.text == null) countUp($("pc-kpi-" + j), k.val, k.dec); });
+  }
+
+  const stepsBox = $("pc-steps");
+  function renderSteps(i) {
+    const b = BATCHES[i];
+    /* 条长按 90%–100% 线性映射（良率区间窄，等比例条几乎看不出差异） */
+    const barW = (y) => Math.max(4, Math.min(100, (y - 0.9) / 0.1 * 100));
+    stepsBox.innerHTML =
+      '<div class="pc-steps-head"><span>工序</span><span>投入 → 产出</span><span>失效</span><span>良率（90%–100%）</span><span>良率</span><span>累计</span></div>' +
+      STEPS.map((s, k) => (
+        '<div class="pc-step">' +
+          '<span class="pc-step-name">' + s + "</span>" +
+          '<span class="pc-step-flow">' + b.ins[k] + " → " + b.ins[k + 1] + "</span>" +
+          '<span class="pc-step-loss">-' + b.fails[k] + "</span>" +
+          '<span class="pc-step-bar"><i style="width:' + fmtDec(barW(b.yields[k]), 1) +
+            "%; background: linear-gradient(90deg, " + C.blueDeep + ", " + C.blue + ');"></i></span>' +
+          '<span class="pc-step-y">' + fmtDec(b.yields[k] * 100, 2) + "%</span>" +
+          '<span class="pc-step-cum">' + fmtDec(b.cumY[k] * 100, 2) + "%</span>" +
+        "</div>"
+      )).join("") +
+      '<div class="pc-step-note">直通率 = ' +
+        b.yields.map((y) => fmtDec(y * 100, 2) + "%").join(" × ") +
+        " = <b>" + fmtDec(b.fpy * 100, 2) + "%</b> = 良品 " + b.good + " ÷ 投产 " + b.qty + "（现算恒等）</div>";
+    $("pc-st-fpy").textContent = fmtDec(b.fpy * 100, 2) + "%";
+  }
+
+  const tbody = $("pc-tbody");
+  let fixRows = [];
+  function renderFixes(i) {
+    const b = BATCHES[i];
+    tbody.innerHTML = b.fixes.map((f, k) => (
+      '<li data-i="' + k + '">' +
+        '<span class="pc-cell-issue"><b>' + f.issue + "</b></span>" +
+        "<span>" + f.dom + "</span>" +
+        "<span>" + f.plan + "</span>" +
+        '<span><span class="pc-badge ' + f.stCls + '">' + f.stName + "</span></span>" +
+        '<span class="pc-cell-retest">' + f.retest + "</span>" +
+      "</li>"
+    )).join("");
+    fixRows = Array.from(tbody.children);
+    $("pc-cl-cnt").textContent = fmtDec(b.fixes.length, 0);
+    $("pc-cl-done").textContent = fmtDec(b.fixDone, 0);
+    $("pc-cl-rate").textContent = fmtDec(b.closeRate, 1) + "%";
+  }
+
+  const cmpBox = $("pc-cmp");
+  let cmpRows = [];
+  function renderCmp(i) {
+    /* 直通率条按 85%–100% 区间映射，五批次横向可比 */
+    const barW = (y) => Math.max(4, Math.min(100, (y - 0.85) / 0.15 * 100));
+    cmpBox.innerHTML =
+      '<div class="pc-cmp-head"><span>批次</span><span>阶段</span><span>直通率</span><span>FPY</span><span>单机成本</span></div>' +
+      BATCHES.map((b, k) => (
+        '<div class="pc-cmp-row' + (k === i ? " is-on" : "") + '" data-i="' + k + '" title="切换到' + b.name + '">' +
+          '<span class="pc-cmp-name">' + b.name + "</span>" +
+          '<span class="pc-cmp-stage">' + b.stage + "</span>" +
+          '<span class="pc-cmp-bar"><i style="width:' + fmtDec(barW(b.fpy), 1) +
+            "%; background: linear-gradient(90deg, " + (k === i ? C.amber : C.blueDeep) + ", " +
+            (k === i ? "rgba(255,194,77,.5)" : C.blue) + ');"></i></span>' +
+          '<span class="pc-cmp-fpy">' + fmtDec(b.fpy * 100, 2) + "%</span>" +
+          '<span class="pc-cmp-cost">' + fmtInt(b.cost) + "</span>" +
+        "</div>"
+      )).join("") +
+      '<div class="pc-cmp-note">五批次合计投产 <b>' + fmtInt(D.qtySum) + "</b> 台 = 良品 " + fmtInt(D.goodSum) +
+        " + 失效 " + fmtInt(D.failSum) + " 台 · 单机成本为试制口径（含工装摊销），量产目标见硬件与样机页 BOM 瀑布末值</div>";
+    cmpRows = Array.from(cmpBox.querySelectorAll(".pc-cmp-row"));
+    cmpRows.forEach((r) => r.addEventListener("click", () => {
+      applyBatch(Number(r.dataset.i)); restart(); hold();
+    }));
+  }
+
+  /* ===== 10. 批次切换主流程 ===== */
+  let idx = 0;
+  let rowIdx = 0;
+  function applyBatch(i) {
+    const n = BATCHES.length;
+    idx = ((i % n) + n) % n;
+    const b = BATCHES[idx];
+
+    $("pc-title").textContent = b.name + " · 样机批次详情";
+    $("pc-crumb-obj").textContent = b.name + "（" + b.line + " · " + STAGE_FULL[b.stage] + "）";
+    $("pc-window").textContent = b.win;
+    $("pc-chip-fpy").textContent = fmtDec(b.fpy * 100, 2) + "%";
+    swTabs.forEach((t, k) => t.classList.toggle("is-active", k === idx));
+
+    renderKpi(idx);
+    renderSteps(idx);
+    renderFixes(idx);
+    renderCmp(idx);
+
+    ylChart.setOption(yieldOption(idx), true);                    /* y 轴上限随批次变化 → notMerge */
+    paChart.setOption(paretoOption(idx), true);                   /* 模式排序随批次变化 → notMerge */
+    bmChart.setOption(bomOption(idx), true);
+
+    $("pc-yl-qty").textContent = fmtDec(b.qty, 0);
+    $("pc-yl-good").textContent = fmtDec(b.good, 0);
+    $("pc-yl-fpy").textContent = fmtDec(b.fpy * 100, 2) + "%";
+    $("pc-pa-total").textContent = fmtDec(b.failTotal, 0);
+    $("pc-pa-top2").textContent = fmtDec(b.top2, 1) + "%";
+    $("pc-bm-cost").textContent = fmtInt(b.cost);
+    $("pc-bm-prem").textContent = "+" + fmtDec(b.premRate, 1) + "%";
+
+    rowIdx = 0;
+    playRow();
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(b.name));
+  }
+
+  /* 台账行轮播高亮 + BOM 扇区轮播提示，制造"活性" */
+  function playRow() {
+    if (!fixRows.length) return;
+    fixRows.forEach((r, k) => r.classList.toggle("is-active", k === rowIdx));
+    rowIdx = (rowIdx + 1) % fixRows.length;
+  }
+  setInterval(playRow, 2400);
+
+  let bmIdx = 0;
+  setInterval(() => {
+    bmIdx = bmIdx % BOM_CATS.length;
+    bmChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: bmIdx });
+    bmIdx = (bmIdx + 1) % BOM_CATS.length;
+  }, 3200);
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 ===== */
+  swTabs.forEach((t) => t.addEventListener("click", () => { applyBatch(Number(t.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyBatch(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyBatch(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* hash 契约：decodeURIComponent(location.hash.slice(1)) → 归一化 → 匹配 5 批次名。
+     归一化只做三件事，绝不动连字符与英文本身：
+       ① 去空白（含全角空格）；② 各式连字符/减号统一成 ASCII "-"；③ 英文大小写不敏感（中文不受影响）。 */
+  function normKey(s) {
+    return String(s == null ? "" : s)
+      .replace(/[\s　]+/g, "")
+      .replace(/[－‐‑‒–—―−]/g, "-")
+      .toUpperCase();
+  }
+  BATCHES.forEach((b) => { b.key = normKey(b.name); });
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = normKey(s);
+    if (!s) return -1;
+    return BATCHES.findIndex((b) => b.key === s);
+  }
+  const hit = resolveHash(location.hash);
+  applyBatch(hit >= 0 ? hit : 0);
+  if (hit >= 0) hold();
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applyBatch(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 14 秒切下一批次；鼠标停在切换器上时暂停。
+     从父页下钻进来（hash 命中）时先保持 20 秒不轮换，否则读者还没看清这一批次就被切走。 */
+  let timer = null;
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyBatch(idx + 1); }, 14000);
+  }
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const EPS = 1e-9;
+  const checks = [
+    ["5 个样机批次名与契约 §2.3 逐字（构造性断言）",
+      BATCHES.map((b) => b.name).join(";") === AUTH_BATCHES],
+    ["切换器 tab 数 = 5 且文本与契约 hash 键逐字", swTabs.length === 5 &&
+      swTabs.every((t, i) => t.querySelector("b").textContent === BATCHES[i].name)],
+    ["hash 五批次名均可解析（构造性断言）",
+      BATCHES.every((b, i) => resolveHash("#" + encodeURIComponent(b.name)) === i)],
+    ["hash 归一化容错：全角空格 / 全角连字符 / 小写英文均可解析",
+      BATCHES.every((b, i) => resolveHash("#" + encodeURIComponent("　" + b.name.replace(/-/g, "－").toLowerCase() + " ")) === i)],
+    ["工序台数逐级递推：投入(k+1) = 投入(k) − 失效(k)，末端 = 良品",
+      BATCHES.every((b) => b.ins.every((v, k) => k === 0 || v === b.ins[k - 1] - b.fails[k - 1]) &&
+        b.good === b.ins[STEPS.length])],
+    ["逐工序良率 = 产出 ÷ 投入（4 道工序齐备）",
+      BATCHES.every((b) => b.yields.length === STEPS.length &&
+        b.yields.every((y, k) => Math.abs(y - b.ins[k + 1] / b.ins[k]) < EPS && y > 0 && y <= 1))],
+    ["直通率 = Σ 工序良率连乘 = 良品 ÷ 投产（现算恒等）",
+      BATCHES.every((b) => {
+        const prod = b.yields.reduce((a, y) => a * y, 1);
+        return Math.abs(b.fpy - prod) < EPS && Math.abs(b.fpy - b.good / b.qty) < EPS;
+      })],
+    ["投产 − 失效 = 良品，且失效台数 = Σ 逐工序失效",
+      BATCHES.every((b) => b.qty - b.failTotal === b.good && sum(b.fails) === b.failTotal)],
+    ["帕累托 Σ 各失效模式 = 失效台数，且模式数 = 6、逐项 ≥ 1",
+      BATCHES.every((b) => sum(b.pareto.map((p) => p.cnt)) === b.failTotal &&
+        b.pareto.length === MODES.length && b.pareto.every((p) => p.cnt >= 1))],
+    ["帕累托按台数降序且累计线末值 = 100%",
+      BATCHES.every((b) => b.pareto.every((p, k) => k === 0 || p.cnt <= b.pareto[k - 1].cnt) &&
+        Math.abs(b.paretoCum[b.paretoCum.length - 1] - 100) < 1e-9)],
+    ["整改台账 6~8 条，前三条对应帕累托前三失效模式的责任域",
+      BATCHES.every((b) => b.fixes.length >= 6 && b.fixes.length <= 8 &&
+        b.fixes.slice(0, 3).every((f, k) => f.dom === MODE_DOMAIN[b.pareto[k].mode]))],
+    ["整改闭环率 = 已闭环 ÷ 总数（现算）",
+      BATCHES.every((b) => {
+        const done = b.fixes.filter((f) => f.stName === "已闭环").length;
+        return done === b.fixDone && Math.abs(b.closeRate - done / b.fixes.length * 100) < EPS;
+      })],
+    ["整改状态三态齐备且复测结果与状态一一对应",
+      BATCHES.every((b) => ["已闭环", "整改中", "待启动"].every((s) => b.fixes.some((f) => f.stName === s)) &&
+        b.fixes.every((f) => {
+          const st = FIX_STATES.filter((x) => x.name === f.stName)[0];
+          return st && st.cls === f.stCls && st.retest === f.retest;
+        }))],
+    ["BOM 五类金额 Σ = 批次单机成本，且逐项 > 0",
+      BATCHES.every((b) => sum(b.bom) === b.cost && b.bom.length === BOM_CATS.length &&
+        b.bom.every((v) => v > 0))],
+    ["批次单机成本 = MP 目标 × 试制溢价（恒高于量产目标，差额即降本空间）",
+      BATCHES.every((b) => b.cost === Math.round(b.mp * b.prem) && b.cost > b.mp && b.premRate > 0)],
+    ["阶段 ∈ {EVT, DVT, PVT} 且与批次名后缀一致",
+      BATCHES.every((b) => ["EVT", "DVT", "PVT"].indexOf(b.stage) >= 0 &&
+        b.name.indexOf("-" + b.stage) > 0 && b.name.slice(-1) === String(b.seq))],
+    ["五批次合计：投产 = 良品 + 失效",
+      D.qtySum === D.goodSum + D.failSum && D.qtySum === sum(BATCHES.map((b) => b.qty))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单样机批次详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

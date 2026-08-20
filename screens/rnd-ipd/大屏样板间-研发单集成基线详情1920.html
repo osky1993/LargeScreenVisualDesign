@@ -1,0 +1,1130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单集成基线详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --jx-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：基线风险清单（风险 / 域 / 等级） */
+    --jx-tcols: 1fr 58px 46px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .jx-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 560px 1fr 532px;
+    grid-template-rows: 84px 122px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .jx-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .jx-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .jx-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .jx-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .jx-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .jx-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .jx-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .jx-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .jx-crumb em { font-style: normal; color: #d3e2ff; }
+  .jx-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .jx-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .jx-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .jx-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .jx-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .jx-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .jx-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .jx-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 对象切换器：4 条集成基线 tab（← → 方向键 / 14s 自动轮换 / hash 直达） */
+  .jx-switcher { display: grid; grid-template-columns: repeat(4, auto); gap: 6px; }
+  .jx-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-width: 84px; padding: 5px 12px 6px; border-radius: 9px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .jx-sw-tab b { font: 700 14px/1 var(--jx-mono); letter-spacing: 0.08em; }
+  .jx-sw-tab span { font-size: 10px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.9); }
+  .jx-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .jx-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .jx-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  .jx-chips { display: flex; align-items: center; gap: 9px; }
+  .jx-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 104px; padding: 7px 14px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .jx-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .jx-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .jx-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .jx-chip.is-key b { color: var(--rnd-blue); }
+  .jx-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .jx-clock-time { font: 700 26px/1 var(--jx-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .jx-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带（6 枚单基线级） ===== */
+  .jx-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .jx-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 14px 0 16px;
+  }
+  .jx-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .jx-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .jx-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-orange), transparent); }
+  .jx-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 92, 0.14), transparent 68%); }
+  .jx-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .jx-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.26), rgba(70, 214, 200, 0.12));
+    border: 1px solid rgba(92, 157, 255, 0.35); box-shadow: inset 0 0 12px rgba(92, 157, 255, 0.14);
+  }
+  .jx-kpi.is-warn .jx-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 92, 0.28), rgba(255, 194, 77, 0.12));
+    border-color: rgba(255, 157, 92, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 92, 0.16);
+  }
+  .jx-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .jx-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .jx-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .jx-kpi-val { font: 700 28px/1 var(--jx-mono); color: #eaf1ff; letter-spacing: 0.02em; white-space: nowrap; }
+  .jx-kpi-val.is-text { font-size: 20px; letter-spacing: 0.06em; }
+  .jx-kpi.is-warn .jx-kpi-val { color: #ffd9b0; }
+  .jx-kpi.is-good .jx-kpi-val { color: #b8f2cf; }
+  .jx-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .jx-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .jx-kpi-sub b { font-weight: 700; color: #bcd2f8; }
+
+  /* ===== 三栏主体 ===== */
+  .jx-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .jx-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .jx-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .jx-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .jx-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .jx-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .jx-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .jx-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .jx-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 基线构成清单：四域卡 2x2（面板写死高度） ===== */
+  .jx-comp { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; }
+  .jx-dcard {
+    display: flex; flex-direction: column; min-height: 0; min-width: 0; gap: 5px;
+    border: 1px solid rgba(96, 140, 255, 0.18); border-radius: 9px;
+    background: rgba(10, 20, 52, 0.45); padding: 7px 10px 8px;
+    border-top-width: 2px; border-top-style: solid;
+  }
+  .jx-dcard-head { flex: none; display: flex; align-items: center; gap: 7px; }
+  .jx-dcard-icon { font-size: 13px; }
+  .jx-dcard-name { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .jx-dcard-pct { font: 700 14px/1 var(--jx-mono); font-variant-numeric: tabular-nums; }
+  .jx-dcard-pct i { font-style: normal; font-size: 9.5px; font-weight: 400; color: rgba(127, 146, 196, 0.8); margin-left: 1px; }
+  .jx-dcard-bar { flex: none; height: 5px; border-radius: 3px; background: rgba(96, 140, 255, 0.12); overflow: hidden; }
+  .jx-dcard-bar i { display: block; height: 100%; border-radius: 3px; transition: width .55s ease-out; }
+  .jx-dcard-items { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden; margin-top: 2px; }
+  .jx-dcard-item {
+    font-size: 11px; line-height: 1.36; color: #c9d8f8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+  .jx-dcard-item::before { content: "· "; color: rgba(127, 146, 196, 0.7); }
+  .jx-dcard-item b { font-weight: 700; color: #eaf1ff; }
+  .jx-dcard-w { font-size: 9.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.75); }
+
+  /* ===== CSS grid 模拟表格：基线风险清单 ===== */
+  .jx-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .jx-thead, .jx-tbody li {
+    display: grid; grid-template-columns: var(--jx-tcols); align-items: center; gap: 8px;
+  }
+  .jx-thead {
+    flex: none; padding: 5px 10px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .jx-thead span:last-child, .jx-tbody li span:last-child { text-align: right; }
+  .jx-tbody { flex: 1; min-height: 0; margin: 5px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .jx-tbody li {
+    padding: 4px 10px; min-height: 46px; border-radius: 5px; margin-bottom: 4px;
+    font-size: 12px; color: #c9d8f8;
+    transition: background .25s, box-shadow .25s;
+  }
+  .jx-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .jx-tbody li.is-active { background: rgba(92, 157, 255, 0.16); box-shadow: inset 0 0 0 1px rgba(92, 157, 255, 0.42); }
+  .jx-risk-cat { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; margin-bottom: 1px; }
+  .jx-risk-txt { display: block; font-size: 11.5px; line-height: 1.32; color: #cfdcff; }
+  .jx-risk-st { display: block; font-size: 10px; color: rgba(127, 146, 196, 0.85); margin-top: 1px; }
+  .jx-badge {
+    display: inline-block; padding: 1px 9px; border-radius: 999px;
+    font-size: 10.5px; letter-spacing: 0.06em; line-height: 1.6;
+    border: 1px solid rgba(96, 140, 255, 0.3); color: #a9c4f5; background: rgba(24, 44, 104, 0.4);
+  }
+  .jx-badge.is-high { color: var(--rnd-red);   border-color: rgba(255, 95, 107, 0.5); background: rgba(84, 22, 32, 0.36); }
+  .jx-badge.is-mid  { color: var(--rnd-amber); border-color: rgba(255, 194, 77, 0.45); background: rgba(84, 62, 20, 0.32); }
+  .jx-badge.is-low  { color: var(--rnd-text-dim); border-color: rgba(127, 146, 196, 0.4); background: rgba(24, 34, 66, 0.4); }
+  .jx-badge.is-dom  { color: #a9c4f5; }
+
+  /* ===== 基线里程碑时间轴（HTML/CSS 竖轴，三态；面板写死高度） ===== */
+  .jx-tl { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 4px 2px 2px; }
+  /* 五段等分：行 flex:1 + rail 拉伸满行高，连接线 top:-50%/height:100% 恰好上探到前一枚圆点 */
+  .jx-tl-row { flex: 1; position: relative; display: grid; grid-template-columns: 30px 1fr 96px; align-items: center; gap: 10px; min-height: 0; }
+  .jx-tl-rail { position: relative; align-self: stretch; height: 100%; display: flex; align-items: center; justify-content: center; }
+  .jx-tl-rail::before {
+    content: ""; position: absolute; left: 50%; top: -50%; height: 100%; width: 2px; margin-left: -1px;
+    background: rgba(96, 140, 255, 0.28);
+  }
+  .jx-tl-row:first-child .jx-tl-rail::before { display: none; }
+  .jx-tl-dot {
+    position: relative; z-index: 2; width: 13px; height: 13px; border-radius: 50%;
+    border: 2px solid rgba(127, 146, 196, 0.55); background: rgba(10, 20, 52, 0.9);
+  }
+  .jx-tl-row.is-done .jx-tl-rail::before { background: rgba(111, 224, 154, 0.42); }
+  .jx-tl-row.is-done .jx-tl-dot { border-color: var(--rnd-green); background: var(--rnd-green); box-shadow: 0 0 10px rgba(111, 224, 154, 0.55); }
+  .jx-tl-row.is-cur .jx-tl-rail::before { background: rgba(255, 194, 77, 0.45); }
+  .jx-tl-row.is-cur .jx-tl-dot {
+    border-color: var(--rnd-amber); background: var(--rnd-amber);
+    box-shadow: 0 0 0 5px rgba(255, 194, 77, 0.16); animation: jx-pulse 1.7s ease-in-out infinite;
+  }
+  @keyframes jx-pulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(255, 194, 77, 0.14); } 50% { box-shadow: 0 0 0 9px rgba(255, 194, 77, 0.05); } }
+  .jx-tl-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .jx-tl-name { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .jx-tl-row.is-future .jx-tl-name { color: rgba(127, 146, 196, 0.9); font-weight: 400; }
+  .jx-tl-note { font-size: 10.5px; color: rgba(127, 146, 196, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .jx-tl-note b { font-weight: 700; color: #a9c4f5; }
+  .jx-tl-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .jx-tl-date { font: 700 12.5px/1 var(--jx-mono); color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  .jx-tl-row.is-future .jx-tl-date { color: rgba(188, 210, 248, 0.72); font-weight: 400; }
+  .jx-tl-tag { font-size: 9.5px; letter-spacing: 0.08em; }
+  .jx-tl-row.is-done .jx-tl-tag { color: var(--rnd-green); }
+  .jx-tl-row.is-cur .jx-tl-tag { color: var(--rnd-amber); }
+  .jx-tl-row.is-future .jx-tl-tag { color: rgba(127, 146, 196, 0.7); }
+
+  /* ===== 底部口径与要点滚动条 ===== */
+  .jx-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .jx-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-amber);
+  }
+  .jx-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-amber);
+    box-shadow: 0 0 10px var(--rnd-amber); animation: jx-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes jx-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .jx-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .jx-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .jx-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .jx-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .jx-foot-item b { font-weight: 700; color: #eaf1ff; }
+  .jx-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .jx-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="jx-stage" id="jx-stage">
+    <!-- mockflag:begin --><div class="jx-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="jx-error" id="jx-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容） -->
+    <header class="jx-header">
+      <div class="jx-head-left">
+        <div class="jx-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="jx-crumb-up" href="大屏样板间-研发软硬云AI集成协同1920.html" title="返回上级专题页（Esc）">‹ 返回 软硬云AI集成协同</a><i>›</i>
+          <em id="jx-crumb-obj">--</em>
+        </div>
+        <div class="jx-head-title-row">
+          <div class="jx-head-title" id="jx-title">-- · 集成基线详情</div>
+          <div class="jx-head-meta">
+            <span>发布列车 <b>年度四主基线</b></span><i>|</i>
+            <span>四域 <b>软件 / 硬件 / 云端 / AI</b></span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="jx-head-right">
+        <div class="jx-switcher" id="jx-switcher" aria-label="集成基线切换"></div>
+        <div class="jx-chips">
+          <div class="jx-chip"><span>DATA AS OF</span><b>2026-08-20</b></div>
+          <div class="jx-chip is-key"><span>READINESS</span><b id="jx-chip-rd">--</b></div>
+        </div>
+        <div class="jx-clock" aria-label="实时时钟">
+          <span class="jx-clock-time" id="jx-clock-time">--:--:--</span>
+          <span class="jx-clock-date" id="jx-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带（随基线切换） -->
+    <div class="jx-band" id="jx-band"></div>
+
+    <!-- 左栏：基线构成清单（四域卡，写死高度）+ 基线风险清单 -->
+    <div class="jx-col">
+      <!-- 高度写死 352px：2x2 域卡（每卡内容区 80px）最多 5 条版本行不裁切；min-height:0 + overflow:hidden 防内容撑破 -->
+      <section class="jx-panel" style="flex: none; height: 352px; min-height: 0; overflow: hidden;">
+        <div class="jx-panel-head">
+          <h2>基线构成清单</h2>
+          <span class="jx-panel-tag">四域交付物 <b id="jx-comp-cnt">--</b> 项 · 版本号逐字随基线切换</span>
+        </div>
+        <div class="jx-comp" id="jx-comp"></div>
+      </section>
+      <section class="jx-panel" style="flex: 1;">
+        <div class="jx-panel-head">
+          <h2>基线风险清单</h2>
+          <span class="jx-panel-tag">在册 <b id="jx-risk-cnt">--</b> 条 · 高风险 <b id="jx-risk-high">--</b> 条 · 归因引契约五类阻塞</span>
+        </div>
+        <div class="jx-table">
+          <div class="jx-thead">
+            <span>风险（归因 · 描述 · 状态）</span><span>域</span><span>等级</span>
+          </div>
+          <ul class="jx-tbody" id="jx-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中栏：四域就绪度四联仪表（写死高度）+ 联调缺陷按域堆叠 -->
+    <div class="jx-col">
+      <!-- 高度写死 300px：四联仪表半径按容器短边定，避免被兄弟块压矮后表盘出框 -->
+      <section class="jx-panel" style="flex: none; height: 300px; min-height: 0; overflow: hidden;">
+        <div class="jx-panel-head">
+          <h2>四域就绪度 · 四联仪表</h2>
+          <span class="jx-panel-tag">加权 软件 35% + 硬件 25% + 云端 25% + AI 15% → 总分 <b id="jx-rd-score">--</b> 分</span>
+        </div>
+        <div class="jx-chart" id="jx-chart-gauge"></div>
+      </section>
+      <section class="jx-panel" style="flex: 1;">
+        <div class="jx-panel-head">
+          <h2>联调缺陷统计 · 四基线按域堆叠</h2>
+          <span class="jx-panel-tag">本基线 <b id="jx-df-cur">--</b> 条 · 四基线 Σ <b id="jx-df-all">--</b> 条 = 契约「集成」拦截口径</span>
+        </div>
+        <div class="jx-chart" id="jx-chart-defect"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：里程碑时间轴（写死高度）+ 严重级分布 -->
+    <div class="jx-col">
+      <!-- 高度写死 430px：5 个里程碑行等分不裁切 -->
+      <section class="jx-panel" style="flex: none; height: 430px; min-height: 0; overflow: hidden;">
+        <div class="jx-panel-head">
+          <h2>基线里程碑时间轴</h2>
+          <span class="jx-panel-tag">已过 <b id="jx-tl-done">--</b> / 5 · 当前 <b id="jx-tl-cur">--</b></span>
+        </div>
+        <div class="jx-tl" id="jx-tl"></div>
+      </section>
+      <section class="jx-panel" style="flex: 1;">
+        <div class="jx-panel-head">
+          <h2>联调缺陷 · 严重级分布</h2>
+          <span class="jx-panel-tag">致命+严重 <b id="jx-sev-hi">--</b> 条 · 占比 <b id="jx-sev-rate">--</b></span>
+        </div>
+        <div class="jx-chart" id="jx-chart-sev"></div>
+      </section>
+    </div>
+
+    <!-- 底部口径与要点 -->
+    <div class="jx-foot">
+      <div class="jx-foot-tag">口径与要点</div>
+      <div class="jx-foot-view"><div class="jx-foot-track" id="jx-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("jx-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("jx-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  /* kiosk 轮换保持窗：从父页下钻进来（hash 命中）时先保持 20 秒不轮换。
+     ★ 声明必须早于任何 hold() 调用——初始 hash 解析就会调它，
+     若把 let 留在页尾的 kiosk 段，会因 TDZ 抛 ReferenceError 打断后续脚本。 */
+  let holdUntil = 0;
+  function hold() { holdUntil = Date.now() + 20000; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技）
+         口径与全系列基准盘（docs/RndIpdThemed.md §2.2/§2.3）一致：
+         4 条集成基线名与状态逐字引契约 §2.3/§6：R26.2 已发布 / R26.4 已发布 / R26.6 集成中 / R26.8 规划中；
+         5 个样机批次、5 个 AI 模型逐字引契约 §2.3，四基线上取并集恰好全覆盖且互不重复；
+         联调缺陷 = 契约 §2.2「按拦截阶段 · 集成 2,480 条」年度口径的四基线一级拆分（Σ 行 = Σ 列 = 2,480）；
+         Sprint 故事点 = Sprint 数 × Σ12 队速率 746（契约 §2.3），四基线连续覆盖 S1–S21；
+         合计一律由分项求和，比率一律现算，页面上不出现任何硬编码的合计值。 ===== */
+
+  const PARENT = "大屏样板间-研发软硬云AI集成协同1920.html";
+  const TODAY = "2026-08-20";                  /* 数据基准日（固定，不取系统日期，保证勾稽稳定） */
+  const VEL_SUM = 746;                         /* 契约 §2.3：Σ 12 团队速率 = 746 点/Sprint */
+  const SPRINTS_PER_YEAR = 26;
+  const INTEG_YEAR = 2480;                     /* 契约 §2.2：年缺陷按拦截阶段 · 集成 = 2,480 条 */
+
+  const dayDiff = (a, b) =>
+    Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
+
+  /* 4.1 四域定义（顺序与权重同源：就绪度加权、缺陷堆叠、构成卡三处共用一张表） */
+  const DOMAINS = [
+    { key: "软件", w: 35, icon: "◧", color: C.blue,   slot: "Sprint 区间" },
+    { key: "硬件", w: 25, icon: "▣", color: C.amber,  slot: "样机批次" },
+    { key: "云端", w: 25, icon: "☁", color: C.cyan,   slot: "服务版本" },
+    { key: "AI",   w: 15, icon: "✦", color: C.violet, slot: "模型版本" }
+  ];
+
+  /* 4.2 里程碑轴（5 段，逐字）与严重级（4 档，逐字） */
+  const MILESTONES = ["需求冻结", "代码冻结", "集成测试", "TR5", "发布"];
+  const MS_NOTE = [
+    "OR/IR 收敛完成，SR 基线冻结",
+    "四域代码与图纸封版，进入集成窗口",
+    "跨域联调 + 系统测试三段执行",
+    "IPMT 发布评审决策点",
+    "版本对外发布 / OTA 灰度开闸"
+  ];
+  const SEVS = [
+    { key: "致命", color: C.red },
+    { key: "严重", color: C.orange },
+    { key: "一般", color: C.blue },
+    { key: "提示", color: C.cyan }
+  ];
+
+  /* 4.3 契约 §2.3 权威串（构造性断言用：防手滑改名/改序） */
+  const AUTH_NAMES = "R26.2|已发布;R26.4|已发布;R26.6|集成中;R26.8|规划中";
+  const AUTH_BATCH = ["星澜S3-EVT2", "星澜S3-DVT1", "星澜Pro2-DVT2", "星澜Pro2-PVT1", "澜芯M60-EVT1"];
+  const AUTH_MODEL = ["灵犀", "慧眼", "澜音", "智荐", "御风"];
+
+  /* 4.4 四条集成基线（一级数据，全部逐字/可核算）
+         sprints：[起, 止] Sprint 号；四基线连续无重叠覆盖 S1–S21（余 S22–S26 归 R27.2 首批）
+         ms：五里程碑日期（代码冻结日 = 该基线末个 Sprint 收官日）
+         rd：四域就绪度（顺序同 DOMAINS：软件/硬件/云端/AI），已发布基线四域均 100
+         df：四域联调缺陷（顺序同 DOMAINS），行和 = 该基线总数
+         sev：四档严重级缺陷，Σ 必须 == 行和 */
+  const BASELINES = [
+    {
+      name: "R26.2", status: "已发布", sprints: [1, 4],
+      ms: ["2025-12-26", "2026-02-20", "2026-03-13", "2026-04-03", "2026-04-17"],
+      rd: [100, 100, 100, 100],
+      df: [512, 218, 168, 88],
+      sev: [28, 168, 552, 238],
+      hw: ["星澜S3-EVT2"],
+      cloud: ["云枢 3.0.2", "云盾 2.0.6"],
+      ai: ["灵犀 v2.1", "慧眼 v1.4"],
+      risks: [
+        { cat: "跨域依赖", txt: "灵犀 v2.1 唤醒词接口延交 5 天，端侧语音联调顺延", dom: "AI", lv: "中", st: "已关闭" },
+        { cat: "环境与资源", txt: "整机联调台架档期与 S3-EVT2 试制窗口冲突", dom: "硬件", lv: "中", st: "已关闭" },
+        { cat: "评审等待", txt: "TR5 材料评审排期顺延 3 天，发布日未受影响", dom: "全域", lv: "低", st: "已关闭" }
+      ]
+    },
+    {
+      name: "R26.4", status: "已发布", sprints: [5, 9],
+      ms: ["2026-02-20", "2026-05-01", "2026-05-29", "2026-06-12", "2026-06-26"],
+      rd: [100, 100, 100, 100],
+      df: [496, 206, 162, 78],
+      sev: [24, 158, 528, 232],
+      hw: ["星澜S3-DVT1"],
+      cloud: ["云枢 3.0.4", "云盾 2.1.0"],
+      ai: ["灵犀 v2.3", "慧眼 v1.6", "澜音 v1.2"],
+      risks: [
+        { cat: "跨域依赖", txt: "云盾 2.1.0 鉴权改造与端侧配网协议版本不同步", dom: "云端", lv: "高", st: "已关闭" },
+        { cat: "需求变更", txt: "多语言资源热更新需求于 S8 中途插入，走 CCB 快速通道", dom: "软件", lv: "中", st: "已关闭" },
+        { cat: "外部供应", txt: "射频前端物料替代认证延期 2 周，DVT1 备料压线", dom: "硬件", lv: "中", st: "已关闭" }
+      ]
+    },
+    {
+      name: "R26.6", status: "集成中", sprints: [10, 16],
+      ms: ["2026-05-01", "2026-08-07", "2026-08-28", "2026-09-04", "2026-09-11"],
+      rd: [96, 88, 92, 84],
+      df: [240, 104, 82, 42],
+      sev: [16, 86, 258, 108],
+      hw: ["星澜Pro2-DVT2", "澜芯M60-EVT1"],
+      cloud: ["云枢 3.0.6", "云盾 2.1.2"],
+      ai: ["灵犀 v2.5", "慧眼 v2.0", "澜音 v1.4", "智荐 v3.1"],
+      risks: [
+        { cat: "跨域依赖", txt: "慧眼 v2.0 量化模型与澜芯M60-EVT1 算力不匹配，端侧推理超时", dom: "AI", lv: "高", st: "处置中" },
+        { cat: "环境与资源", txt: "联调环境仅 2 套，Pro2-DVT2 与 M60-EVT1 争抢台架档期", dom: "硬件", lv: "高", st: "处置中" },
+        { cat: "需求变更", txt: "云枢 3.0.6 计费对账口径在代码冻结后变更，需回归全链路", dom: "云端", lv: "中", st: "处置中" },
+        { cat: "外部供应", txt: "屏幕排线供应商交期后移 2 周，影响 PVT 备料前置", dom: "硬件", lv: "中", st: "观察" },
+        { cat: "评审等待", txt: "TR5 跨域评审委员会档期与 09-04 决策点冲突", dom: "全域", lv: "低", st: "观察" }
+      ]
+    },
+    {
+      name: "R26.8", status: "规划中", sprints: [17, 21],
+      ms: ["2026-08-07", "2026-10-16", "2026-10-30", "2026-11-06", "2026-11-20"],
+      rd: [35, 22, 28, 18],
+      df: [42, 18, 16, 8],
+      sev: [2, 13, 47, 22],
+      hw: ["星澜Pro2-PVT1"],
+      cloud: ["云枢 3.0.8", "云盾 2.1.4"],
+      ai: ["灵犀 v2.7", "慧眼 v2.2", "澜音 v1.6", "智荐 v3.3", "御风 v1.0"],
+      risks: [
+        { cat: "跨域依赖", txt: "御风 v1.0 边缘模型尚未定版，端云推理接口无法冻结", dom: "AI", lv: "高", st: "未启动" },
+        { cat: "需求变更", txt: "行业方案侧 OR 仍在收敛，未全部转 SR，范围存在放大风险", dom: "软件", lv: "高", st: "观察" },
+        { cat: "环境与资源", txt: "PVT1 产测夹具尚未排产，试制节拍无法验证", dom: "硬件", lv: "中", st: "未启动" },
+        { cat: "外部供应", txt: "云资源年度采购窗口在 10 月，算力配额待批", dom: "云端", lv: "中", st: "观察" }
+      ]
+    }
+  ];
+
+  /* 4.5 Sprint 日历（S1 起于 2025-12-29，双周一班；Sn 收官日 = 起始 + 11 天） */
+  const S1_START = "2025-12-29";
+  const sprintStart = (n) => isoAdd(S1_START, (n - 1) * 14);
+  const sprintEnd = (n) => isoAdd(S1_START, (n - 1) * 14 + 11);
+  function isoAdd(iso, days) {
+    const t = Date.parse(iso + "T00:00:00Z") + days * 86400000;
+    const d = new Date(t);
+    return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate());
+  }
+
+  /* ===== 4.6 派生量：每条基线的就绪度 / 缺陷 / 里程碑三态 / 构成卡，全部现算 ===== */
+  const W_SUM = sum(DOMAINS.map((d) => d.w));            /* = 100 */
+
+  BASELINES.forEach((b) => {
+    /* —— Sprint 区间与故事点 —— */
+    b.spN = b.sprints[1] - b.sprints[0] + 1;
+    b.spPts = b.spN * VEL_SUM;
+    b.spLabel = "S" + b.sprints[0] + "–S" + b.sprints[1];
+    b.spWin = sprintStart(b.sprints[0]) + " → " + sprintEnd(b.sprints[1]);
+
+    /* —— 就绪度总分 = Σ(域就绪度 × 权重) / 100（整数乘法后再除，避免浮点毛刺）—— */
+    b.score = sum(b.rd.map((v, k) => v * DOMAINS[k].w)) / W_SUM;
+    b.rdMinIdx = b.rd.indexOf(Math.min.apply(null, b.rd));
+
+    /* —— 联调缺陷：行和 / 严重级 / 高优占比 —— */
+    b.dfTotal = sum(b.df);
+    b.sevTotal = sum(b.sev);
+    b.sevHi = b.sev[0] + b.sev[1];
+    b.sevRate = b.sevHi / b.dfTotal * 100;
+    b.dfMaxIdx = b.df.indexOf(Math.max.apply(null, b.df));
+
+    /* —— 里程碑三态：已过（日期 < 基准日）→ 首个未到期为「当前」→ 其余「未来」—— */
+    let curSeen = false;
+    b.tl = b.ms.map((iso, k) => {
+      const past = dayDiff(TODAY, iso) < 0;
+      let st = "future";
+      if (past) st = "done";
+      else if (!curSeen) { st = "cur"; curSeen = true; }
+      return { name: MILESTONES[k], iso: iso, st: st, delta: dayDiff(TODAY, iso), note: MS_NOTE[k] };
+    });
+    b.tlDone = b.tl.filter((m) => m.st === "done").length;
+    const cur = b.tl.filter((m) => m.st === "cur")[0];
+    b.tlCur = cur ? cur.name : "已全部完成";
+    b.freeze = b.ms[1];
+    b.freezeDelta = dayDiff(TODAY, b.freeze);
+    b.release = b.ms[4];
+    b.relDelta = dayDiff(TODAY, b.release);
+
+    /* —— 四域构成卡条目（软件条目由 Sprint 区间现算，不写死）—— */
+    b.items = [
+      [b.spLabel + "（" + b.spN + " 个 Sprint）", "窗口 " + b.spWin, "故事点 " + fmtInt(b.spPts) + " = " + b.spN + " × " + VEL_SUM],
+      b.hw.slice(),
+      b.cloud.slice(),
+      b.ai.slice()
+    ];
+    b.compCnt = sum(b.items.map((a) => a.length));
+    b.riskHigh = b.risks.filter((r) => r.lv === "高").length;
+  });
+
+  /* 跨基线汇总（图表 x 轴与页尾口径共用） */
+  const D = {};
+  D.names = BASELINES.map((b) => b.name);
+  D.dfRow = BASELINES.map((b) => b.dfTotal);
+  D.dfCol = DOMAINS.map((_, k) => sum(BASELINES.map((b) => b.df[k])));
+  D.dfAll = sum(D.dfRow);
+  D.spN = sum(BASELINES.map((b) => b.spN));
+  D.spPts = sum(BASELINES.map((b) => b.spPts));
+  D.spRest = SPRINTS_PER_YEAR - D.spN;
+  D.yearPts = SPRINTS_PER_YEAR * VEL_SUM;
+  D.batchAll = BASELINES.reduce((a, b) => a.concat(b.hw), []);
+  D.modelAll = BASELINES.reduce((a, b) => a.concat(b.ai.map((s) => s.split(" ")[0])), []);
+  D.modelUniq = D.modelAll.filter((v, i, a) => a.indexOf(v) === i);
+  D.released = BASELINES.filter((b) => b.status === "已发布");
+  D.integ = BASELINES.filter((b) => b.status === "集成中")[0];
+  D.plan = BASELINES.filter((b) => b.status === "规划中")[0];
+  D.relGaps = BASELINES.slice(1).map((b, i) => dayDiff(BASELINES[i].release, b.release));
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("jx-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("jx-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 6. 基线切换器（对象切换器：tab 文本与契约 §6 hash 键逐字一致） ===== */
+  const switcher = $("jx-switcher");
+  switcher.innerHTML = BASELINES.map((b, i) => (
+    '<button class="jx-sw-tab" type="button" data-i="' + i + '" title="切换到集成基线 ' + b.name + '（← → 方向键）">' +
+      "<b>" + b.name + "</b><span>" + b.status + "</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".jx-sw-tab"));
+
+  /* ===== 7. 底部口径与要点（★ 图表 init 之前填充；全部由派生量现算） ===== */
+  const FOOT_ITEMS = [
+    { tag: "口径", t: "联调缺陷 = 契约 §2.2「年缺陷按拦截阶段 · 集成」年度口径的四基线一级拆分：" +
+        D.names.map((n, i) => n + " " + fmtInt(D.dfRow[i])).join(" + ") + " = " + fmtInt(D.dfAll) +
+        " 条；按域列和 " + DOMAINS.map((d, k) => d.key + " " + fmtInt(D.dfCol[k])).join(" + ") + " = " + fmtInt(sum(D.dfCol)) + " 条" },
+    { tag: "口径", t: "四域就绪度总分 = " + DOMAINS.map((d) => d.key + "×" + d.w + "%").join(" + ") +
+        "（权重和 " + W_SUM + "%）；已发布基线（" + D.released.map((b) => b.name).join("、") +
+        "）四域均 100% → 总分 " + fmtDec(D.released[0].score, 1) + " 分" },
+    { tag: "口径", t: "四基线 Sprint 区间连续无重叠覆盖 " + BASELINES[0].spLabel.split("–")[0] + "–S" + BASELINES[3].sprints[1] +
+        "（" + D.spN + " 个 Sprint）：故事点 " + D.spN + " × Σ12 队速率 " + VEL_SUM + " = " + fmtInt(D.spPts) +
+        " 点；年吞吐 " + fmtInt(D.yearPts) + " 点余 " + D.spRest + " 个 Sprint 归 R27.2 首批" },
+    { tag: "口径", t: "契约 §2.3 的 " + AUTH_BATCH.length + " 个样机批次与 " + AUTH_MODEL.length +
+        " 个 AI 模型，在四基线上取并集恰好全覆盖且互不重复：样机 " + D.batchAll.join(" / ") +
+        "；模型 " + D.modelUniq.join(" / ") },
+    { tag: "要点", t: D.integ.name + " 集成中：就绪度 " + fmtDec(D.integ.score, 1) + " 分，最低域为 " +
+        DOMAINS[D.integ.rdMinIdx].key + " " + D.integ.rd[D.integ.rdMinIdx] + "%（" + D.integ.risks[0].txt +
+        "）；代码已于 " + D.integ.freeze + " 冻结，距发布 " + D.integ.relDelta + " 天" },
+    { tag: "要点", t: D.plan.name + " 规划中：需求已于 " + D.plan.ms[0] + " 冻结、" + D.plan.spLabel +
+        " 在途，集成窗口 " + D.plan.ms[2] + " 开启；已录 " + fmtInt(D.plan.dfTotal) +
+        " 条缺陷全部来自预集成接口冒烟，距代码冻结 " + D.plan.freezeDelta + " 天" },
+    { tag: "要点", t: "相邻主基线发布间隔 " + D.relGaps.join(" / ") + " 天（发布列车双月一班，R26.x 为年度主基线）；" +
+        "四基线在册风险 " + sum(BASELINES.map((b) => b.risks.length)) + " 条，其中高风险 " +
+        sum(BASELINES.map((b) => b.riskHigh)) + " 条，归因全部落在契约五类阻塞词汇内" }
+  ];
+  const track = $("jx-foot-track");
+  const footHtml = FOOT_ITEMS.map((a) => (
+    '<div class="jx-foot-item"><i style="color:' + (a.tag === "口径" ? C.amber : C.blue) + '">[' + a.tag + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = footHtml + footHtml;                          /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 8. 图表初始化 =====
+     ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize()
+     ★ 进 option 的数据只放标量与数组（缺陷/就绪度均为数值数组），业务对象不进 series，杜绝循环引用 */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = {
+    backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  };
+  const gaugeChart = makeChart("jx-chart-gauge");
+  const dfChart = makeChart("jx-chart-defect");
+  const sevChart = makeChart("jx-chart-sev");
+
+  /* 8.1 四域就绪度四联仪表：一图四表盘，中心按 12.5%/37.5%/62.5%/87.5% 均分 */
+  function gaugeOption(i) {
+    const b = BASELINES[i];
+    return {
+      backgroundColor: "transparent",
+      series: DOMAINS.map((d, k) => ({
+        name: d.key,
+        type: "gauge",
+        center: [(12.5 + k * 25) + "%", "58%"],
+        radius: "68%",
+        startAngle: 208, endAngle: -28,
+        min: 0, max: 100, splitNumber: 4,
+        progress: { show: true, width: 9, roundCap: true, itemStyle: { color: d.color } },
+        pointer: { show: true, length: "56%", width: 3, itemStyle: { color: d.color } },
+        anchor: { show: true, size: 7, showAbove: true, itemStyle: { color: d.color, borderColor: "rgba(8,18,49,.9)", borderWidth: 2 } },
+        axisLine: { roundCap: true, lineStyle: { width: 9, color: [[1, "rgba(96,140,255,.15)"]] } },
+        axisTick: { distance: -13, length: 4, lineStyle: { color: "rgba(96,140,255,.35)", width: 1 } },
+        splitLine: { distance: -15, length: 8, lineStyle: { color: "rgba(96,140,255,.5)", width: 1.6 } },
+        axisLabel: { distance: -2, color: "rgba(127,146,196,.75)", fontSize: 9 },
+        title: {
+          offsetCenter: [0, "70%"], color: C.textDim, fontSize: 11.5,
+          formatter: () => d.key + " · 权重 " + d.w + "%"
+        },
+        detail: {
+          offsetCenter: [0, "34%"], color: d.color, fontSize: 20, fontWeight: 700,
+          formatter: (v) => Math.round(v) + "%"
+        },
+        data: [{ value: b.rd[k], name: d.key }]
+      }))
+    };
+  }
+
+  /* 8.2 联调缺陷 · 四基线按域堆叠：非当前基线降透明度，顶部标注行合计 */
+  function defectOption(i) {
+    const rowTot = D.dfRow.slice();
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 14, top: 34, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex;
+          const b = BASELINES[k];
+          let s = "<b>" + b.name + "</b> · " + b.status + "<br/>集成期联调缺陷 <b>" + fmtInt(b.dfTotal) + "</b> 条<br/>";
+          s += DOMAINS.map((d, c) => (
+            '<span style="color:' + d.color + '">■</span> ' + d.key + " <b>" + fmtInt(b.df[c]) + "</b> 条 · 占 " +
+            fmtDec(b.df[c] / b.dfTotal * 100, 1) + "%"
+          )).join("<br/>");
+          return s;
+        }
+      }, TIP),
+      legend: {
+        show: true, top: 0, right: 2, itemWidth: 13, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: DOMAINS.map((d) => d.key)
+      },
+      xAxis: {
+        type: "category", data: D.names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: {
+          color: C.textDim, fontSize: 12, fontWeight: 700, interval: 0,
+          formatter: (v, k) => (k === i ? "{cur|" + v + "}" : v),
+          rich: { cur: { color: C.amber, fontSize: 12.5, fontWeight: 700 } }
+        }
+      },
+      yAxis: {
+        type: "value", name: "条", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+      },
+      series: DOMAINS.map((d, c) => ({
+        name: d.key, type: "bar", stack: "def", barWidth: 46,
+        itemStyle: { color: d.color },
+        data: BASELINES.map((b, k) => ({
+          value: b.df[c],
+          itemStyle: {
+            color: d.color, opacity: k === i ? 1 : 0.34,
+            borderRadius: c === DOMAINS.length - 1 ? [5, 5, 0, 0] : 0
+          }
+        })),
+        label: c === DOMAINS.length - 1 ? {
+          show: true, position: "top", color: "#cfdcff", fontSize: 11.5, fontWeight: 700,
+          formatter: (p) => fmtInt(rowTot[p.dataIndex])
+        } : { show: false }
+      }))
+    };
+  }
+
+  /* 8.3 严重级分布环形（当前基线） */
+  function sevOption(i) {
+    const b = BASELINES[i];
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => "<b>" + p.name + "</b><br/>" + fmtInt(p.value) + " 条 · 占 " + fmtDec(p.percent, 1) + "%"
+      }, TIP),
+      legend: {
+        show: true, orient: "vertical", right: 8, top: "center", itemWidth: 12, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11.5 },
+        formatter: (n) => {
+          const k = SEVS.map((s) => s.key).indexOf(n);
+          return n + "  " + fmtInt(b.sev[k]) + " 条";
+        },
+        data: SEVS.map((s) => s.key)
+      },
+      graphic: [
+        { type: "text", left: "31%", top: "44%", style: {
+            text: fmtInt(b.dfTotal), textAlign: "center", fill: "#eaf1ff", fontSize: 26, fontWeight: 700 } },
+        { type: "text", left: "31%", top: "60%", style: {
+            text: "联调缺陷 · 条", textAlign: "center", fill: C.textDim, fontSize: 11 } }
+      ],
+      series: [{
+        type: "pie", radius: ["48%", "70%"], center: ["33%", "52%"], avoidLabelOverlap: true,
+        itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 2 },
+        label: { show: true, color: C.textDim, fontSize: 10.5, formatter: "{d}%" },
+        labelLine: { length: 7, length2: 8, lineStyle: { color: "rgba(96,140,255,.35)" } },
+        data: SEVS.map((s, k) => ({ name: s.key, value: b.sev[k], itemStyle: { color: s.color } }))
+      }]
+    };
+  }
+
+  /* ===== 9. KPI 带 / 构成卡 / 风险清单 / 时间轴（随基线切换重绘） ===== */
+  function countUp(el, target, dec) {
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtDec(target * e, dec);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtDec(target, dec);
+    })(t0);
+  }
+
+  const band = $("jx-band");
+  function renderKpi(i) {
+    const b = BASELINES[i];
+    const relTxt = b.relDelta >= 0
+      ? "计划发布 <b>" + b.release + "</b> · 距 TR5 <b>" + b.tl[3].delta + "</b> 天"
+      : "已于 <b>" + b.release + "</b> 发布 · 上线 <b>" + (-b.relDelta) + "</b> 天";
+    const freezeTxt = b.freezeDelta < 0
+      ? "已冻结 <b>" + (-b.freezeDelta) + "</b> 天 · 末个 Sprint <b>S" + b.sprints[1] + "</b> 收官日"
+      : "距冻结 <b>" + b.freezeDelta + "</b> 天 · 末个 Sprint <b>S" + b.sprints[1] + "</b> 收官日";
+    const defs = [
+      { icon: "◈", label: "基线状态", text: b.status,
+        cls: b.status === "已发布" ? " is-good" : (b.status === "规划中" ? " is-warn" : ""),
+        sub: b.spLabel + " · " + b.spN + " 个 Sprint · 里程碑 <b>" + b.tlDone + "/5</b> 已过" },
+      { icon: "◎", label: "就绪度总分", val: b.score, unit: "分", dec: 1,
+        cls: b.score >= 99.95 ? " is-good" : (b.score < 60 ? " is-warn" : ""),
+        sub: "四域加权现算 · 最低域 <b>" + DOMAINS[b.rdMinIdx].key + " " + b.rd[b.rdMinIdx] + "%</b>" },
+      { icon: "⚠", label: "集成缺陷数", val: b.dfTotal, unit: "条", dec: 0,
+        cls: b.sevRate >= 20 ? " is-warn" : "",
+        sub: "首因域 <b>" + DOMAINS[b.dfMaxIdx].key + "</b> · 致命+严重 <b>" + fmtInt(b.sevHi) + "</b> 条（" + fmtDec(b.sevRate, 1) + "%）" },
+      { icon: "❄", label: "代码冻结日", text: b.freeze, cls: b.freezeDelta < 0 ? "" : " is-warn", sub: freezeTxt },
+      { icon: "⏱", label: b.relDelta >= 0 ? "距发布天数" : "发布已历天数",
+        val: Math.abs(b.relDelta), unit: "天", dec: 0,
+        cls: b.relDelta >= 0 && b.relDelta <= 30 ? " is-warn" : "",
+        sub: relTxt },
+      { icon: "◫", label: "Sprint 故事点", val: b.spPts, unit: "点", dec: 0, cls: "",
+        sub: b.spN + " × Σ12 队速率 <b>" + VEL_SUM + "</b> · 窗口 " + b.spWin }
+    ];
+    band.innerHTML = defs.map((k, j) => (
+      '<div class="jx-kpi' + (k.cls || "") + '">' +
+        '<div class="jx-kpi-icon">' + k.icon + "</div>" +
+        '<div class="jx-kpi-main">' +
+          '<div class="jx-kpi-label">' + k.label + "</div>" +
+          (k.text != null
+            ? '<div class="jx-kpi-num"><span class="jx-kpi-val is-text">' + k.text + "</span></div>"
+            : '<div class="jx-kpi-num"><span class="jx-kpi-val" id="jx-kpi-' + j + '">0</span><span class="jx-kpi-unit">' + k.unit + "</span></div>") +
+          '<div class="jx-kpi-sub">' + k.sub + "</div>" +
+        "</div>" +
+      "</div>"
+    )).join("");
+    defs.forEach((k, j) => { if (k.text == null) countUp($("jx-kpi-" + j), k.val, k.dec); });
+  }
+
+  const compBox = $("jx-comp");
+  function renderComp(i) {
+    const b = BASELINES[i];
+    compBox.innerHTML = DOMAINS.map((d, k) => (
+      '<div class="jx-dcard" style="border-top-color:' + d.color + ';">' +
+        '<div class="jx-dcard-head">' +
+          '<span class="jx-dcard-icon" style="color:' + d.color + '">' + d.icon + "</span>" +
+          '<span class="jx-dcard-name" style="color:' + d.color + '">' + d.key + " · " + d.slot + "</span>" +
+          '<span class="jx-dcard-pct" style="color:' + d.color + '">' + b.rd[k] + "<i>%</i></span>" +
+        "</div>" +
+        '<div class="jx-dcard-bar"><i style="width:' + b.rd[k] + "%; background: linear-gradient(90deg, " +
+          d.color + ", rgba(92,157,255,.28));\"></i></div>" +
+        '<div class="jx-dcard-items">' +
+          b.items[k].map((s) => '<div class="jx-dcard-item">' + s + "</div>").join("") +
+        "</div>" +
+        '<div class="jx-dcard-w">就绪度权重 ' + d.w + "% · 计入总分 " + fmtDec(b.rd[k] * d.w / W_SUM, 2) + " 分</div>" +
+      "</div>"
+    )).join("");
+    $("jx-comp-cnt").textContent = fmtDec(b.compCnt, 0);
+  }
+
+  const tbody = $("jx-tbody");
+  let riskRows = [];
+  const LV_CLS = { "高": "is-high", "中": "is-mid", "低": "is-low" };
+  function renderRisk(i) {
+    const b = BASELINES[i];
+    tbody.innerHTML = b.risks.map((r, k) => {
+      const c = r.lv === "高" ? C.red : (r.lv === "中" ? C.amber : C.textDim);
+      return '<li data-i="' + k + '">' +
+        "<span>" +
+          '<span class="jx-risk-cat" style="color:' + c + '">' + r.cat + "</span>" +
+          '<span class="jx-risk-txt">' + r.txt + "</span>" +
+          '<span class="jx-risk-st">状态 · ' + r.st + "</span>" +
+        "</span>" +
+        '<span><span class="jx-badge is-dom">' + r.dom + "</span></span>" +
+        '<span><span class="jx-badge ' + LV_CLS[r.lv] + '">' + r.lv + "</span></span>" +
+      "</li>";
+    }).join("");
+    riskRows = Array.from(tbody.children);
+    $("jx-risk-cnt").textContent = fmtDec(b.risks.length, 0);
+    $("jx-risk-high").textContent = fmtDec(b.riskHigh, 0);
+  }
+
+  const tlBox = $("jx-tl");
+  const ST_CLS = { done: "is-done", cur: "is-cur", future: "is-future" };
+  const ST_TXT = { done: "已完成", cur: "进行中", future: "未开始" };
+  function renderTimeline(i) {
+    const b = BASELINES[i];
+    tlBox.innerHTML = b.tl.map((m) => {
+      const rel = m.delta < 0 ? (-m.delta) + " 天前" : (m.delta === 0 ? "今日" : m.delta + " 天后");
+      return '<div class="jx-tl-row ' + ST_CLS[m.st] + '">' +
+        '<div class="jx-tl-rail"><span class="jx-tl-dot"></span></div>' +
+        '<div class="jx-tl-main">' +
+          '<div class="jx-tl-name">' + m.name + "</div>" +
+          '<div class="jx-tl-note">' + m.note + "</div>" +
+        "</div>" +
+        '<div class="jx-tl-right">' +
+          '<span class="jx-tl-date">' + m.iso + "</span>" +
+          '<span class="jx-tl-tag">' + ST_TXT[m.st] + " · " + rel + "</span>" +
+        "</div>" +
+      "</div>";
+    }).join("");
+    $("jx-tl-done").textContent = fmtDec(b.tlDone, 0);
+    $("jx-tl-cur").textContent = b.tlCur;
+  }
+
+  /* ===== 10. 基线切换主流程 ===== */
+  let idx = 0;
+  let rowIdx = 0;
+  function applyBaseline(i) {
+    const n = BASELINES.length;
+    idx = ((i % n) + n) % n;
+    const b = BASELINES[idx];
+
+    $("jx-title").textContent = b.name + " · 集成基线详情";
+    $("jx-crumb-obj").textContent = b.name + "（" + b.status + " · " + b.spLabel + "）";
+    $("jx-chip-rd").textContent = fmtDec(b.score, 1) + " 分";
+    swTabs.forEach((t, k) => t.classList.toggle("is-active", k === idx));
+
+    renderKpi(idx);
+    renderComp(idx);
+    renderRisk(idx);
+    renderTimeline(idx);
+
+    gaugeChart.setOption(gaugeOption(idx), true);                 /* 四表盘数值整组替换 → notMerge */
+    dfChart.setOption(defectOption(idx), true);                   /* 高亮列随基线变化 → notMerge */
+    sevChart.setOption(sevOption(idx), true);                     /* 环心文案随基线变化 → notMerge */
+
+    $("jx-rd-score").textContent = fmtDec(b.score, 1);
+    $("jx-df-cur").textContent = fmtInt(b.dfTotal);
+    $("jx-df-all").textContent = fmtInt(D.dfAll);
+    $("jx-sev-hi").textContent = fmtInt(b.sevHi);
+    $("jx-sev-rate").textContent = fmtDec(b.sevRate, 1) + "%";
+
+    rowIdx = 0;
+    playRow();
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(b.name));
+  }
+
+  /* 风险行轮播高亮，制造"活性" */
+  function playRow() {
+    if (!riskRows.length) return;
+    riskRows.forEach((r, k) => r.classList.toggle("is-active", k === rowIdx));
+    rowIdx = (rowIdx + 1) % riskRows.length;
+  }
+  setInterval(playRow, 2800);
+
+  /* 严重级环形逐档轮播提示 */
+  let sevIdx = 0;
+  setInterval(() => {
+    sevChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: sevIdx });
+    sevIdx = (sevIdx + 1) % SEVS.length;
+  }, 3200);
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 ===== */
+  swTabs.forEach((t) => t.addEventListener("click", () => { applyBaseline(Number(t.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyBaseline(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyBaseline(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* hash 契约：decodeURIComponent(location.hash.slice(1)) → 去空白 + 全角句点归一 + 大写化 → 匹配四基线名 */
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "").replace(/[．。]/g, ".").toUpperCase();
+    if (!s) return -1;
+    return BASELINES.findIndex((b) => b.name.toUpperCase() === s);
+  }
+  const hit = resolveHash(location.hash);
+  applyBaseline(hit >= 0 ? hit : 0);
+  if (hit >= 0) hold();
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applyBaseline(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 14 秒切下一基线；鼠标停在切换器上时暂停。
+     从父页下钻进来（hash 命中）时先保持 20 秒不轮换，否则读者还没看清这条基线就被切走。 */
+  let timer = null;
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyBaseline(idx + 1); }, 14000);
+  }
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const EPS = 1e-9;
+  const checks = [
+    ["四基线名与状态与契约 §2.3/§6 逐字（构造性断言）",
+      BASELINES.map((b) => b.name + "|" + b.status).join(";") === AUTH_NAMES],
+    ["切换器 tab 数 = 4 且文本与契约 hash 键逐字",
+      swTabs.length === 4 && swTabs.every((t, i) => t.querySelector("b").textContent === BASELINES[i].name)],
+    ["hash 四基线名均可解析（构造性断言）",
+      BASELINES.every((b, i) => resolveHash("#" + encodeURIComponent(b.name)) === i)],
+    ["hash 归一化容错（小写 / 前后空白 / 全角句点）均可解析",
+      resolveHash("#r26.6") === 2 && resolveHash("#  R26.4 ") === 1 && resolveHash("#R26．8") === 3],
+    ["四域权重和 = 100%", W_SUM === 100],
+    ["就绪度总分 = 四域加权现算（Σ 域值×权重 ÷ 100）",
+      BASELINES.every((b) => Math.abs(b.score - sum(b.rd.map((v, k) => v * DOMAINS[k].w)) / 100) < EPS)],
+    ["已发布基线（R26.2 / R26.4）四域就绪度均 100% 且总分 = 100.0",
+      D.released.length === 2 && D.released.every((b) => b.rd.every((v) => v === 100) && Math.abs(b.score - 100) < EPS)],
+    ["集成中基线为爬坡值（四域均 < 100 且总分 ≥ 80）",
+      D.integ.rd.every((v) => v > 0 && v < 100) && D.integ.score >= 80 && D.integ.score < 100],
+    ["规划中基线为低值（四域均 ≤ 40 且总分 < 40）",
+      D.plan.rd.every((v) => v > 0 && v <= 40) && D.plan.score < 40],
+    ["联调缺陷按域 Σ = 该基线总数（行和逐条成立）",
+      BASELINES.every((b) => sum(b.df) === b.dfTotal && b.df.length === DOMAINS.length)],
+    ["四基线联调缺陷 Σ = 契约「集成」拦截口径 2,480 条，且行和 Σ == 列和 Σ",
+      D.dfAll === INTEG_YEAR && sum(D.dfCol) === INTEG_YEAR && sum(D.dfRow) === sum(D.dfCol)],
+    ["严重级四档 Σ = 该基线联调缺陷总数",
+      BASELINES.every((b) => b.sev.length === SEVS.length && b.sevTotal === b.dfTotal)],
+    ["里程碑五段名与顺序逐字（需求冻结→代码冻结→集成测试→TR5→发布）",
+      BASELINES.every((b) => b.tl.map((m) => m.name).join(">") === MILESTONES.join(">")) &&
+      MILESTONES.join(">") === "需求冻结>代码冻结>集成测试>TR5>发布"],
+    ["里程碑日期严格递增，且代码冻结日 = 该基线末个 Sprint 收官日",
+      BASELINES.every((b) => b.ms.every((d, k) => k === 0 || dayDiff(b.ms[k - 1], d) > 0) &&
+        b.freeze === sprintEnd(b.sprints[1]))],
+    ["里程碑三态判定：已过=日期<基准日、当前=首个未到期、其余未来（当前至多 1 个）",
+      BASELINES.every((b) => b.tl.filter((m) => m.st === "cur").length <= 1 &&
+        b.tl.every((m) => (m.st === "done") === (dayDiff(TODAY, m.iso) < 0)))],
+    ["已发布基线里程碑五段全部已过；集成中 / 规划中三态齐全",
+      D.released.every((b) => b.tlDone === 5) &&
+      ["done", "cur", "future"].every((s) => D.integ.tl.some((m) => m.st === s)) &&
+      ["done", "cur", "future"].every((s) => D.plan.tl.some((m) => m.st === s))],
+    ["四基线 Sprint 区间连续无重叠覆盖 S1–S21，故事点 = Sprint 数 × 746",
+      BASELINES[0].sprints[0] === 1 &&
+      BASELINES.every((b, k) => k === 0 || b.sprints[0] === BASELINES[k - 1].sprints[1] + 1) &&
+      BASELINES.every((b) => b.spPts === b.spN * VEL_SUM) &&
+      D.spN === 21 && D.spPts === 21 * VEL_SUM && D.spPts + D.spRest * VEL_SUM === D.yearPts],
+    ["样机批次并集 = 契约 §2.3 五批次，逐字且互不重复",
+      D.batchAll.length === AUTH_BATCH.length &&
+      D.batchAll.filter((v, i, a) => a.indexOf(v) === i).length === AUTH_BATCH.length &&
+      AUTH_BATCH.every((n) => D.batchAll.indexOf(n) >= 0)],
+    ["AI 模型并集 = 契约 §2.3 五模型，逐字全覆盖",
+      D.modelUniq.length === AUTH_MODEL.length && AUTH_MODEL.every((n) => D.modelUniq.indexOf(n) >= 0)],
+    ["每基线风险 3~5 条，归因全部落在契约五类阻塞词汇内",
+      BASELINES.every((b) => b.risks.length >= 3 && b.risks.length <= 5 &&
+        b.risks.every((r) => ["跨域依赖", "环境与资源", "需求变更", "外部供应", "评审等待"].indexOf(r.cat) >= 0))],
+    ["风险等级三档齐备且域标签合法（四域 + 全域）",
+      BASELINES.every((b) => b.risks.every((r) =>
+        ["高", "中", "低"].indexOf(r.lv) >= 0 &&
+        (DOMAINS.map((d) => d.key).indexOf(r.dom) >= 0 || r.dom === "全域")))],
+    ["构成清单条目数 = 四域条目之和（软件 3 + 硬件/云端/AI 实际条数）",
+      BASELINES.every((b) => b.compCnt === sum(b.items.map((a) => a.length)) && b.items[0].length === 3)],
+    ["距发布天数现算：已发布基线为负、集成中 / 规划中为正",
+      D.released.every((b) => b.relDelta < 0) && D.integ.relDelta > 0 && D.plan.relDelta > 0]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单集成基线详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

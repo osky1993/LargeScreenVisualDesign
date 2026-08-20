@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发需求条目台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --tz-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：需求编号 / 标题 / 来源 / 产品线 / 当前层级 / 状态 / 受理时长 */
+    --tz-tcols: 106px 1fr 78px 86px 62px 70px 116px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .tz-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 452px;
+    grid-template-rows: 84px 128px 46px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .tz-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .tz-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .tz-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .tz-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .tz-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .tz-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .tz-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .tz-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .tz-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到需求全生命周期，琥珀描边与本页星蓝主色区分 */
+  .tz-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .tz-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .tz-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .tz-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .tz-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .tz-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .tz-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .tz-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .tz-chips { display: flex; align-items: center; gap: 9px; }
+  .tz-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .tz-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .tz-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .tz-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .tz-chip.is-key b { color: var(--rnd-blue); }
+  .tz-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .tz-clock-time { font: 700 26px/1 var(--tz-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .tz-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 来源四卡 ===== */
+  .tz-cards { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; min-height: 0; }
+  .tz-card {
+    position: relative; overflow: hidden; cursor: pointer;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; gap: 5px; padding: 10px 16px 9px;
+    transition: border-color .2s, box-shadow .2s, transform .2s;
+  }
+  .tz-card::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--tz-cc, var(--rnd-blue)), transparent); }
+  .tz-card::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.10), transparent 68%);
+  }
+  .tz-card:hover, .tz-card.is-on {
+    border-color: var(--tz-cc, rgba(92, 157, 255, 0.62)); transform: translateY(-2px);
+    box-shadow: inset 0 0 18px rgba(92, 157, 255, 0.12);
+  }
+  .tz-card.is-hit { animation: tz-hit 0.9s ease-in-out 2; }
+  @keyframes tz-hit { 0%, 100% { box-shadow: inset 0 0 18px rgba(92, 157, 255, 0.12); } 50% { box-shadow: 0 0 26px var(--tz-cc, rgba(92, 157, 255, 0.7)), inset 0 0 22px rgba(92, 157, 255, 0.22); } }
+  .tz-card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .tz-card-name { font-size: 14.5px; font-weight: 700; letter-spacing: 0.06em; color: #dfe9ff; }
+  .tz-card-name::before { content: "▎"; color: var(--tz-cc, var(--rnd-blue)); margin-right: 2px; }
+  .tz-card-rate { font-size: 11.5px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; }
+  .tz-card-rate b { font: 700 14px/1 var(--tz-mono); color: var(--tz-cc, var(--rnd-blue)); }
+  .tz-card-num { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+  .tz-card-num b { font: 700 27px/1 var(--tz-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .tz-card-num span { font-size: 11.5px; color: var(--rnd-text-dim); }
+  .tz-card-num em { font-style: normal; margin-left: auto; font-size: 11.5px; color: var(--rnd-text-dim); }
+  .tz-card-num em b { font-size: 14px; color: var(--rnd-cyan); }
+  /* 三段微漏斗：OR / IR / SR 条宽按数值比例，同一把尺 */
+  .tz-card-funnel { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+  .tz-card-fr { display: grid; grid-template-columns: 22px 1fr 46px; align-items: center; gap: 8px; font-size: 10px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; }
+  .tz-card-fr u { display: block; height: 5px; border-radius: 3px; text-decoration: none; background: var(--tz-cc, var(--rnd-blue)); }
+  .tz-card-fr:nth-child(2) u { opacity: 0.66; }
+  .tz-card-fr:nth-child(3) u { opacity: 0.38; }
+  .tz-card-fr em { font-style: normal; text-align: right; color: #c9d8f8; }
+
+  /* ===== 来源筛选条 ===== */
+  .tz-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .tz-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .tz-fchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 5px 14px 6px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .tz-fchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .tz-fchip i { font-style: normal; font-size: 11.5px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .tz-fchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .tz-fchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .tz-fchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .tz-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .tz-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .tz-filters-state em { font-style: normal; color: #d3e2ff; }
+  .tz-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== 面板 ===== */
+  .tz-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .tz-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .tz-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .tz-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .tz-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .tz-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .tz-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tz-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .tz-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 时间轴块由 JS 填充（选中行联动重绘），且与状态分布图同属 .tz-col 一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .tz-panel.is-fixed { flex: none; height: 398px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>）：行高写死、tbody overflow hidden 防撑破 ===== */
+  .tz-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .tz-thead, .tz-tbody li {
+    display: grid; grid-template-columns: var(--tz-tcols); align-items: center; gap: 8px;
+  }
+  .tz-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .tz-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .tz-tbody li {
+    padding: 0 8px; height: 29px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: tz-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes tz-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .tz-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .tz-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .tz-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .tz-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tz-tbody li .tz-no { font: 700 11.5px/1 var(--tz-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.03em; }
+  .tz-tbody li .tz-title { color: #dfe9ff; }
+  .tz-tbody li .tz-src { font-size: 11.5px; }
+  .tz-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .tz-badge.is-wait { color: #3a2a05; background: var(--rnd-amber); }
+  .tz-badge.is-ana  { color: #041b3a; background: var(--rnd-blue); }
+  .tz-badge.is-dev  { color: #21103d; background: var(--rnd-violet); }
+  .tz-badge.is-done { color: #063a25; background: var(--rnd-green); }
+  .tz-lv { font: 700 11px/1 var(--tz-mono); letter-spacing: 0.06em; padding: 2px 7px; border-radius: 4px; justify-self: start; border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+  /* 受理时长：微条 + 数值 */
+  .tz-age { display: flex; align-items: center; gap: 8px; }
+  .tz-age-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .tz-age-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .tz-age em { flex: none; width: 44px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+
+  /* ===== 右栏：单条需求流转时间轴（纯 HTML/CSS） ===== */
+  .tz-tl-head { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 7px 10px 8px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 8px; }
+  .tz-tl-no { display: flex; align-items: center; gap: 9px; }
+  .tz-tl-no b { font: 700 13px/1 var(--tz-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .tz-tl-title { font-size: 13px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tz-tl-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; }
+  .tz-tl-sub b { font-weight: 700; color: #c9d8f8; }
+  .tz-tl { flex: 1; min-height: 0; margin: 0; padding: 2px 0 0 6px; list-style: none; display: flex; flex-direction: column; }
+  .tz-tl li { position: relative; flex: 1; display: flex; align-items: flex-start; gap: 12px; padding-left: 22px; }
+  /* 竖向连接线：非末项画到下一个节点 */
+  .tz-tl li::before { content: ""; position: absolute; left: 6px; top: 16px; bottom: -4px; width: 2px; background: rgba(96, 140, 255, 0.22); }
+  .tz-tl li:last-child::before { display: none; }
+  .tz-tl li.is-done::before { background: rgba(92, 157, 255, 0.55); }
+  .tz-tl-dot {
+    position: absolute; left: 0; top: 4px; width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(96, 140, 255, 0.4); background: rgba(8, 18, 49, 0.9);
+  }
+  .tz-tl li.is-done .tz-tl-dot { border-color: var(--rnd-blue); background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.5); }
+  .tz-tl li.is-cur .tz-tl-dot { border-color: var(--rnd-amber); background: rgba(255, 194, 77, 0.25); animation: tz-pulse 1.4s ease-in-out infinite; }
+  @keyframes tz-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 194, 77, 0.5); } 50% { box-shadow: 0 0 0 7px rgba(255, 194, 77, 0); } }
+  .tz-tl-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
+  .tz-tl-body b { font-size: 13px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.04em; }
+  .tz-tl li.is-todo .tz-tl-body b { color: rgba(127, 146, 196, 0.6); }
+  .tz-tl-body span { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; }
+  .tz-tl-days { flex: none; padding-top: 3px; font: 700 15px/1 var(--tz-mono); color: var(--rnd-cyan); font-variant-numeric: tabular-nums; }
+  .tz-tl-days i { font-style: normal; font-size: 10px; font-weight: 400; color: var(--rnd-text-dim); margin-left: 2px; }
+  .tz-tl li.is-cur .tz-tl-days { color: var(--rnd-amber); }
+  .tz-tl li.is-todo .tz-tl-days { color: rgba(127, 146, 196, 0.5); }
+
+  /* ===== 底部滚动条 ===== */
+  .tz-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .tz-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange);
+  }
+  .tz-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: tz-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes tz-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .tz-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .tz-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .tz-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .tz-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .tz-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .tz-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="tz-stage" id="tz-stage">
+    <!-- mockflag:begin --><div class="tz-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="tz-error" id="tz-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="tz-header">
+      <div class="tz-head-left">
+        <div class="tz-crumb">
+          <a class="tz-crumb-up" href="大屏样板间-研发需求全生命周期1920.html" title="返回上级专题页（Esc）">‹ 返回 需求全生命周期</a>
+          <b>云麓智联科技</b><i>›</i><span>需求全生命周期</span><i>›</i><em>需求条目台账</em>
+        </div>
+        <div class="tz-head-title-row">
+          <div class="tz-head-title">需求条目台账</div>
+          <div class="tz-head-meta">
+            <span>总盘 OR <b id="tz-meta-or">--</b> 条 · 本表样例 <b id="tz-meta-n">--</b> 条（抽样展示）</span><i>|</i>
+            <span><b>4</b> 类来源 · <b>4</b> 条产品线 · <b>4</b> 种状态</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="tz-head-right">
+        <div class="tz-chips">
+          <div class="tz-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="tz-chip is-key"><span id="tz-chip-key">受理率 · 全部</span><b id="tz-chip-rate">--</b></div>
+        </div>
+        <div class="tz-clock" aria-label="实时时钟">
+          <span class="tz-clock-time" id="tz-clock-time">--:--:--</span>
+          <span class="tz-clock-date" id="tz-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 来源四卡（点击亦可筛选） -->
+    <div class="tz-cards" id="tz-cards"></div>
+
+    <!-- 来源筛选条 -->
+    <div class="tz-filters">
+      <span class="tz-filters-tag">来源筛选</span>
+      <div id="tz-fchips" style="display:flex;align-items:center;gap:10px;"></div>
+      <div class="tz-filters-state" id="tz-filters-state">--</div>
+    </div>
+
+    <!-- 左：需求台账主表 -->
+    <section class="tz-panel">
+      <div class="tz-panel-head">
+        <h2>需求条目台账（来源维度）</h2>
+        <span class="tz-panel-tag" id="tz-table-tag">--</span>
+      </div>
+      <div class="tz-table">
+        <div class="tz-thead">
+          <span>需求编号</span><span>标题</span><span>来源</span><span>产品线</span>
+          <span>当前层级</span><span>状态</span><span>受理时长</span>
+        </div>
+        <ul class="tz-tbody" id="tz-tbody"></ul>
+      </div>
+    </section>
+
+    <!-- 右：单条流转时间轴 + 状态分布 -->
+    <div class="tz-col">
+      <section class="tz-panel is-fixed">
+        <div class="tz-panel-head">
+          <h2>单条需求流转时间轴</h2>
+          <span class="tz-panel-tag" id="tz-tl-tag">--</span>
+        </div>
+        <div class="tz-tl-head" id="tz-tl-headbox"></div>
+        <ol class="tz-tl" id="tz-tl"></ol>
+      </section>
+      <section class="tz-panel" style="flex: 1;">
+        <div class="tz-panel-head">
+          <h2>状态分布 · 按来源</h2>
+          <span class="tz-panel-tag">四状态合计 <b id="tz-status-total">--</b> 条</span>
+        </div>
+        <div class="tz-chart" id="tz-chart-status"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="tz-foot">
+      <div class="tz-foot-tag">需求研判</div>
+      <div class="tz-foot-view"><div class="tz-foot-track" id="tz-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("tz-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("tz-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const signed = (v, dec) => (v >= 0 ? "+" : "") + fmtDec(v, dec == null ? 1 : dec);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技）
+         ★ 与父页 P3「需求全生命周期」严格同源（docs/RndIpdThemed.md §2.2）：
+           OR 年吞吐 12,400 条 = 四来源之和（客户直采 4,460 + 市场洞察 3,290 + 技术规划 2,830 + 内部运营 1,820）；
+           各来源 IR 拆分 Σ = 9,800、SR 拆分 Σ = 7,600，与父页漏斗同口径。
+         ★ 本表台账为**抽样样例**（12,400 条不可能逐条陈列），20 条样例的来源分布
+           与来源结构大体成比例（7/5/5/3），筛选计数由样例数组现算。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，样例行与来源/产品线之间
+           一律用索引（si / li）关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 四来源基准（父页 P3 来源明细同口径）：or 契约逐字；ir / sr 为本页二级拆分，Σ 恰等父页漏斗 */
+  const SOURCES = [
+    { name: "客户直采", or: 4460, ir: 3560, sr: 2780, color: C.blue },
+    { name: "市场洞察", or: 3290, ir: 2590, sr: 2010, color: C.cyan },
+    { name: "技术规划", or: 2830, ir: 2280, sr: 1790, color: C.violet },
+    { name: "内部运营", or: 1820, ir: 1370, sr: 1020, color: C.amber }
+  ];
+  const IR_TOTAL_REF = 9800, SR_TOTAL_REF = 7600, OR_TOTAL_REF = 12400;
+
+  /* 4.2 全盘状态分布（来源 × 四状态，行和 = 该来源 OR 条数；待受理 ⊂ 未受理 OR−IR） */
+  const STATUS_NAMES = ["待受理", "分析中", "开发中", "已完成"];
+  const STATUS_COLORS = [C.amber, C.blue, C.violet, C.green];
+  const STATUS_BADGE = ["is-wait", "is-ana", "is-dev", "is-done"];
+  const STATUS_MIX = [
+    [620, 980, 1450, 1410],
+    [430, 740, 1060, 1060],
+    [360, 590, 940, 940],
+    [260, 400, 570, 590]
+  ];
+
+  /* 4.3 四条产品线与需求分层（层级枚举与父页一致） */
+  const LINE_NAMES = ["智家终端", "云平台服务", "AIoT模组", "行业方案"];
+  const LAYERS = ["OR", "IR", "SR", "AR"];
+  const TL_STAGES = ["OR 受理", "IR 分析", "SR 定义", "AR 开发", "交付上线"];
+
+  /* 4.4 台账样例 20 条（抽样展示）：si=来源索引 li=产品线索引 lv=当前层级 st=状态索引
+         d0=[月,日] OR 提交日；dw=各阶段停留天数（最后一项为当前阶段已停留；已完成含交付段共 5 项）
+         受理时长 = Σdw 现算，不复制数字。 */
+  const ROWS = [
+    { no: "OR-2026-0182", t: "门锁指静脉识别支持双模验证",       si: 0, li: 0, lv: 3, st: 2, d0: [3, 12], dw: [2, 9, 14, 38] },
+    { no: "OR-2026-0347", t: "设备影子服务支持批量查询接口",     si: 0, li: 1, lv: 3, st: 3, d0: [2, 6],  dw: [1, 7, 12, 31, 3] },
+    { no: "OR-2026-0415", t: "中控屏离线语音唤醒词自定义",       si: 0, li: 0, lv: 2, st: 1, d0: [6, 3],  dw: [2, 11, 17] },
+    { no: "OR-2026-0562", t: "智慧园区能耗看板按租户分账",       si: 0, li: 3, lv: 3, st: 2, d0: [4, 21], dw: [3, 10, 16, 29] },
+    { no: "OR-2026-0733", t: "M60 模组低功耗待机电流优化",       si: 0, li: 2, lv: 3, st: 3, d0: [1, 15], dw: [2, 8, 15, 42, 4] },
+    { no: "OR-2026-0861", t: "全屋传感器电量集中告警",           si: 0, li: 0, lv: 1, st: 1, d0: [7, 20], dw: [2, 13] },
+    { no: "OR-2026-0908", t: "云端日志导出支持自定义字段",       si: 0, li: 1, lv: 0, st: 0, d0: [8, 11], dw: [6] },
+    { no: "OR-2026-1024", t: "适老化大字模式全屋联动场景",       si: 1, li: 0, lv: 3, st: 2, d0: [3, 28], dw: [3, 12, 18, 27] },
+    { no: "OR-2026-1187", t: "连锁酒店客控离线断网兜底策略",     si: 1, li: 3, lv: 2, st: 1, d0: [5, 16], dw: [2, 10, 21] },
+    { no: "OR-2026-1246", t: "家庭套餐订阅计费支持年付折扣",     si: 1, li: 1, lv: 3, st: 3, d0: [1, 28], dw: [2, 9, 13, 35, 3] },
+    { no: "OR-2026-1352", t: "模组出货区域画像月度报告",         si: 1, li: 2, lv: 1, st: 1, d0: [7, 9],  dw: [3, 16] },
+    { no: "OR-2026-1490", t: "竞品语音助手响应速度对标",         si: 1, li: 0, lv: 0, st: 0, d0: [8, 14], dw: [3] },
+    { no: "OR-2026-1573", t: "M80 预研双频 Wi-Fi 6 共存方案",    si: 2, li: 2, lv: 3, st: 2, d0: [2, 19], dw: [2, 14, 20, 46] },
+    { no: "OR-2026-1628", t: "消息总线升级至分区有序队列",       si: 2, li: 1, lv: 3, st: 3, d0: [1, 8],  dw: [1, 10, 16, 48, 5] },
+    { no: "OR-2026-1755", t: "端侧推理框架统一算子接入层",       si: 2, li: 0, lv: 2, st: 1, d0: [5, 26], dw: [2, 12, 24] },
+    { no: "OR-2026-1811", t: "行业方案交付工具链容器化改造",     si: 2, li: 3, lv: 1, st: 1, d0: [7, 2],  dw: [2, 18] },
+    { no: "OR-2026-1902", t: "多云容灾演练自动化编排",           si: 2, li: 1, lv: 3, st: 2, d0: [4, 7],  dw: [2, 11, 19, 33] },
+    { no: "OR-2026-2046", t: "工单系统与告警平台打通自动建单",   si: 3, li: 1, lv: 3, st: 3, d0: [2, 24], dw: [1, 6, 11, 26, 2] },
+    { no: "OR-2026-2133", t: "交付项目验收资料自动归档",         si: 3, li: 3, lv: 3, st: 2, d0: [5, 9],  dw: [2, 8, 13, 22] },
+    { no: "OR-2026-2217", t: "研发效能月报数据源自动巡检",       si: 3, li: 1, lv: 0, st: 0, d0: [8, 10], dw: [4] }
+  ];
+  ROWS.forEach((r) => { r.age = sum(r.dw); });
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+  D.or = sum(SOURCES.map((s) => s.or));
+  D.ir = sum(SOURCES.map((s) => s.ir));
+  D.sr = sum(SOURCES.map((s) => s.sr));
+  SOURCES.forEach((s) => { s.accept = 100 * s.ir / s.or; s.toSr = 100 * s.sr / s.ir; });
+  D.accept = 100 * D.ir / D.or;
+  D.toSr = 100 * D.sr / D.ir;
+  D.statusTotal = sum(STATUS_MIX.map((m) => sum(m)));
+  D.statusByName = STATUS_NAMES.map((n, k) => sum(STATUS_MIX.map((m) => m[k])));
+  D.n = ROWS.length;
+  /* 样例来源分布（筛选计数即由此现算） */
+  D.rowsBySrc = SOURCES.map((s, si) => ROWS.filter((r) => r.si === si).length);
+  D.ageMaxRow = ROWS.slice().sort((a, b) => b.age - a.age)[0];
+  const devRows = ROWS.filter((r) => r.st === 2);
+  D.devDwellAvg = devRows.length ? sum(devRows.map((r) => r.dw[3])) / devRows.length : 0;
+  D.acceptWorst = SOURCES.slice().sort((a, b) => a.accept - b.accept)[0];
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("tz-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("tz-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("tz-meta-or").textContent = fmtInt(D.or);
+  $("tz-meta-n").textContent = fmtInt(D.n);
+  $("tz-status-total").textContent = fmtInt(D.statusTotal);
+
+  /* ===== 7. 来源四卡：OR 条数翻牌 + 受理率 + 转化 SR 数 + 三段微漏斗（点击即筛选） ===== */
+  const cards = $("tz-cards");
+  cards.innerHTML = SOURCES.map((s, si) => (
+    '<div class="tz-card" data-i="' + (si + 1) + '" style="--tz-cc:' + s.color + '" title="点击筛选：' + s.name + '">' +
+      '<div class="tz-card-top"><span class="tz-card-name">' + s.name + '</span>' +
+        '<span class="tz-card-rate">受理率 <b>' + fmtDec(s.accept, 1) + '%</b></span></div>' +
+      '<div class="tz-card-num"><b id="tz-card-or-' + si + '">0</b><span>条 OR</span>' +
+        '<em>转化 SR <b>' + fmtInt(s.sr) + '</b> 条（' + fmtDec(s.toSr, 1) + '%）</em></div>' +
+      '<div class="tz-card-funnel">' +
+        '<div class="tz-card-fr"><span>OR</span><u style="width:100%"></u><em>' + fmtInt(s.or) + '</em></div>' +
+        '<div class="tz-card-fr"><span>IR</span><u style="width:' + fmtDec(100 * s.ir / s.or, 1) + '%"></u><em>' + fmtInt(s.ir) + '</em></div>' +
+        '<div class="tz-card-fr"><span>SR</span><u style="width:' + fmtDec(100 * s.sr / s.or, 1) + '%"></u><em>' + fmtInt(s.sr) + '</em></div>' +
+      '</div>' +
+    '</div>'
+  )).join("");
+  const cardEls = Array.from(cards.children);
+
+  /* OR 条数翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  SOURCES.forEach((s, si) => {
+    const el = $("tz-card-or-" + si), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtInt(s.or * e);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtInt(s.or);
+    })(t0);
+  });
+
+  /* ===== 8. 来源筛选 chip（全部 + 四来源；计数 = 样例行现算） ===== */
+  const FILTERS = [{ name: "全部", color: C.blue, cnt: D.n }]
+    .concat(SOURCES.map((s, si) => ({ name: s.name, color: s.color, cnt: D.rowsBySrc[si] })));
+  const fbox = $("tz-fchips");
+  fbox.innerHTML = FILTERS.map((f, i) => (
+    '<button class="tz-fchip" type="button" data-i="' + i + '">' +
+      "<u>" + f.name + "</u><i>" + (i === 0 ? fmtInt(D.or) + " 条 · 样例 " : fmtInt(SOURCES[i - 1].or) + " 条 · 样例 ") + f.cnt + "</i>" +
+    "</button>"
+  )).join("");
+  const fchips = Array.from(fbox.children);
+
+  /* ===== 9. hash 契约：父页下钻「子页#encodeURIComponent(来源名)」，四来源名逐字匹配 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("全量", 0);
+  SOURCES.forEach((s, si) => { alias(s.name, si + 1); alias(s.name + "需求", si + 1); });
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                  /* trim + 全角空白剔除归一化 */
+    if (!raw) return -1;                                    /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(fi) {
+    const want = "#" + encodeURIComponent(FILTERS[fi].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 10. 台账主表渲染（行高 29px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("tz-tbody");
+  let view = ROWS, fIdx = 0, selPos = 0;
+  const AGE_MAX = 100;                                       /* 受理时长条：0~100 天映射条宽 */
+
+  function rowHtml(r, k) {
+    const w = clamp(r.age / AGE_MAX * 100, 4, 100);
+    const cAge = r.age > 70 ? C.red : r.age > 45 ? C.amber : C.cyan;
+    return "<li data-no=\"" + r.no + "\" style=\"animation-delay:" + (k * 14) + "ms\">" +
+      '<span class="tz-no">' + r.no + "</span>" +
+      '<span class="tz-title">' + r.t + "</span>" +
+      '<span class="tz-src" style="color:' + SOURCES[r.si].color + '">' + SOURCES[r.si].name + "</span>" +
+      "<span>" + LINE_NAMES[r.li] + "</span>" +
+      '<span class="tz-lv">' + LAYERS[r.lv] + "</span>" +
+      '<span class="tz-badge ' + STATUS_BADGE[r.st] + '">' + STATUS_NAMES[r.st] + "</span>" +
+      '<span class="tz-age"><span class="tz-age-t"><u style="width:' + fmtDec(w, 1) + "%;background:" + cAge + '"></u></span><em style="color:' + cAge + '">' + r.age + " 天</em></span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    $("tz-table-tag").textContent =
+      "样例为抽样展示，总盘 " + fmtInt(D.or) + " 条 · 当前筛选样例 " + view.length + " 条";
+    const overN = view.filter((r) => r.age > 70).length;
+    $("tz-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 条样例 / 共 " + D.n + " 条<i>|</i>受理时长 &gt; 70 天 <em>" + overN +
+      "</em> 条<i>|</i>行点击或轮巡联动右侧时间轴";
+  }
+
+  /* ===== 11. 单条需求流转时间轴（纯 HTML/CSS；选中行联动） ===== */
+  const dateOf = (r, addDays) => new Date(2026, r.d0[0] - 1, r.d0[1] + addDays);
+  const fmtD = (d) => pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  function renderSel() {
+    if (!view.length) return;
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    Array.from(tbody.children).forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    $("tz-tl-tag").textContent = "OR→IR→SR→AR→交付 · 各阶段停留天数";
+    $("tz-tl-headbox").innerHTML =
+      '<div class="tz-tl-no"><b>' + r.no + '</b>' +
+        '<span class="tz-badge ' + STATUS_BADGE[r.st] + '">' + STATUS_NAMES[r.st] + "</span>" +
+        '<span class="tz-lv">当前 ' + LAYERS[r.lv] + "</span></div>" +
+      '<div class="tz-tl-title">' + r.t + "</div>" +
+      '<div class="tz-tl-sub">' + SOURCES[r.si].name + " · " + LINE_NAMES[r.li] +
+        " · 提交 <b>2026-" + pad(r.d0[0]) + "-" + pad(r.d0[1]) + "</b> · 受理时长合计 <b>" + r.age + "</b> 天</div>";
+    let acc = 0;
+    $("tz-tl").innerHTML = TL_STAGES.map((name, k) => {
+      const entered = k < r.dw.length;
+      const isCur = entered && k === r.dw.length - 1 && r.st !== 3;
+      const cls = !entered ? "is-todo" : isCur ? "is-cur" : "is-done";
+      let body;
+      if (entered) {
+        const d1 = dateOf(r, acc);
+        body = fmtD(d1) + " 进入 · " + (isCur ? "停留中" : "停留 " + r.dw[k] + " 天");
+        acc += r.dw[k];
+      } else {
+        body = "未进入";
+      }
+      return '<li class="' + cls + '"><i class="tz-tl-dot"></i>' +
+        '<div class="tz-tl-body"><b>' + name + "</b><span>" + body + "</span></div>" +
+        '<em class="tz-tl-days">' + (entered ? r.dw[k] + "<i>天</i>" : "--") + "</em></li>";
+    }).join("");
+  }
+
+  /* ===== 12. 状态分布小图（堆叠条 · 来源 × 四状态；筛选时非选中来源压暗） ===== */
+  /* ★ 时间轴块与本图同属 .tz-col：时间轴面板已写死高度，且先填充再 init，图表高度不受挤压 */
+  function statusOption(fi) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 34, top: 26, bottom: 2, containLabel: true },
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 },
+        formatter: (ps) => {
+          const si = ps[0].dataIndex, s = SOURCES[si];
+          return "<b>" + s.name + "</b>　OR <b>" + fmtInt(s.or) + "</b> 条<br/>" +
+            ps.map((p) => p.marker + p.seriesName + " <b>" + fmtInt(p.value) + "</b> 条 · " +
+              fmtDec(100 * p.value / s.or, 1) + "%").join("<br/>") +
+            "<br/><span style=\"color:" + C.textDim + "\">受理率 " + fmtDec(s.accept, 1) +
+            "% · 转化 SR " + fmtInt(s.sr) + " 条</span>";
+        }
+      },
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 11 }, data: STATUS_NAMES
+      },
+      xAxis: {
+        type: "value",
+        axisLabel: { color: C.textDim, fontSize: 10 }, axisLine: { show: false },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      yAxis: {
+        type: "category", inverse: true, data: SOURCES.map((s) => s.name),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: "#bcd2f8", fontSize: 12, fontWeight: 700 }
+      },
+      series: STATUS_NAMES.map((name, k) => ({
+        name: name, type: "bar", stack: "st", barWidth: "56%",
+        emphasis: { focus: "series" },
+        label: k === STATUS_NAMES.length - 1 ? {
+          show: true, position: "right", color: C.textDim, fontSize: 10,
+          formatter: (p) => fmtInt(SOURCES[p.dataIndex].or)
+        } : { show: false },
+        data: STATUS_MIX.map((m, si) => ({
+          value: m[k],
+          itemStyle: { color: STATUS_COLORS[k], opacity: (fi === 0 || fi - 1 === si) ? 1 : 0.22 }
+        }))
+      }))
+    };
+  }
+
+  /* ===== 13. 筛选主流程：一次调用刷新 卡片/chip/表/时间轴/状态图/页头 chip ===== */
+  function applyFilter(fi, pushHash) {
+    fIdx = clamp(fi, 0, FILTERS.length - 1);
+    view = fIdx === 0 ? ROWS : ROWS.filter((r) => r.si === fIdx - 1);
+    selPos = 0;
+    fchips.forEach((el, i) => {
+      const on = i === fIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? FILTERS[i].color : "";
+      el.style.borderColor = on ? FILTERS[i].color : "";
+    });
+    cardEls.forEach((el, si) => el.classList.toggle("is-on", fIdx === si + 1));
+    const s = fIdx === 0 ? null : SOURCES[fIdx - 1];
+    $("tz-chip-key").textContent = "受理率 · " + FILTERS[fIdx].name;
+    $("tz-chip-rate").textContent = fmtDec(s ? s.accept : D.accept, 1) + "%";
+    renderTable();
+    renderSel();
+    if (statusChart) statusChart.setOption(statusOption(fIdx), true);
+    if (pushHash) syncHash(fIdx);
+  }
+
+  fchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), true)));
+  cardEls.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), true)));
+
+  /* hash 定位：命中来源则激活筛选 chip、闪烁对应来源卡，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyFilter(0, false); return; }
+    applyFilter(hit, false);
+    if (hit > 0) {
+      const card = cardEls[hit - 1];
+      card.classList.remove("is-hit");
+      void card.offsetWidth;                                 /* 重排以重启动画 */
+      card.classList.add("is-hit");
+      card.scrollIntoView({ block: "nearest" });
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发需求全生命周期1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 14. kiosk 轮巡：台账行 3 秒逐行高亮并联动时间轴；hash 定位后暂停 20 秒 ===== */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 15. 初始渲染：先填充全部 DOM（表 + 时间轴），再 init 图表 ===== */
+  let statusChart = null;
+  applyFilter(0, false);                                     /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  statusChart = echarts.init($("tz-chart-status"));
+  statusChart.setOption(statusOption(0));
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* 状态图轮播提示 */
+  let tipIdx = 0;
+  setInterval(() => {
+    statusChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % SOURCES.length;
+  }, 4200);
+
+  /* ===== 16. 底部需求研判滚动条（文案数字全部由派生量现算） ===== */
+  const srcTop = SOURCES.slice().sort((a, b) => b.or - a.or)[0];
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "样例最长受理「" + D.ageMaxRow.no + "」" + D.ageMaxRow.t + "，累计 " + D.ageMaxRow.age +
+        " 天（AR 开发段停留 " + D.ageMaxRow.dw[3] + " 天），建议列入本 Sprint 清偿" },
+    { lv: "中", c: C.orange, t: "「" + D.acceptWorst.name + "」受理率 " + fmtDec(D.acceptWorst.accept, 1) + "% 为四来源最低，距整体 " +
+        fmtDec(D.accept, 1) + "% 差 " + fmtDec(D.accept - D.acceptWorst.accept, 1) + "pp，需求澄清例会需提级" },
+    { lv: "中", c: C.orange, t: "开发中样例 " + devRows.length + " 条，AR 段平均已停留 " + fmtDec(D.devDwellAvg, 1) +
+        " 天；全盘开发中 " + fmtInt(D.statusByName[2]) + " 条为四状态之首" },
+    { lv: "低", c: C.amber, t: "「" + srcTop.name + "」OR " + fmtInt(srcTop.or) + " 条居四来源之首（占 " +
+        fmtDec(100 * srcTop.or / D.or, 1) + "%），转化 SR " + fmtInt(srcTop.sr) + " 条" },
+    { lv: "低", c: C.green, t: "整体漏斗：OR " + fmtInt(D.or) + " → IR " + fmtInt(D.ir) + "（受理 " + fmtDec(D.accept, 1) +
+        "%）→ SR " + fmtInt(D.sr) + "（转化 " + fmtDec(D.toSr, 1) + "%），与父页 P3 同口径" },
+    { lv: "低", c: C.green, t: "勾稽：四来源 OR Σ = " + fmtInt(D.or) + " · IR Σ = " + fmtInt(D.ir) + " · SR Σ = " +
+        fmtInt(D.sr) + "；状态四档 Σ = " + fmtInt(D.statusTotal) + " 条与总盘恰等" }
+  ];
+  const track = $("tz-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="tz-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                   /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 17. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(statusOption(0)); }
+  catch (e) { optAcyclic = false; console.error("[需求条目台账] option 存在循环引用：", e.message); }
+
+  const checks = [
+    ["四来源 OR Σ = 12,400（契约逐字）", D.or === OR_TOTAL_REF],
+    ["各来源 IR 拆分 Σ = 9,800（父页漏斗同口径）", D.ir === IR_TOTAL_REF],
+    ["各来源 SR 拆分 Σ = 7,600（父页漏斗同口径）", D.sr === SR_TOTAL_REF],
+    ["逐来源漏斗单调：OR ≥ IR ≥ SR", SOURCES.every((s) => s.or >= s.ir && s.ir >= s.sr)],
+    ["状态矩阵行和 = 该来源 OR 条数", STATUS_MIX.every((m, si) => sum(m) === SOURCES[si].or)],
+    ["状态四档合计 = 总盘 12,400 条", D.statusTotal === OR_TOTAL_REF],
+    ["待受理 ⊆ 未受理（各来源 待受理 ≤ OR − IR）", STATUS_MIX.every((m, si) => m[0] <= SOURCES[si].or - SOURCES[si].ir)],
+    ["样例行来源分布与筛选计数一致", FILTERS.every((f, i) =>
+      f.cnt === (i === 0 ? ROWS.length : ROWS.filter((r) => r.si === i - 1).length))],
+    ["样例来源分布之和 = 样例总数 20", sum(D.rowsBySrc) === D.n && D.n === 20],
+    ["样例编号两两不重复且格式 OR-2026-XXXX", (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^OR-2026-\d{4}$/.test(r.no))],
+    ["受理时长 = 各阶段停留之和（逐行）", ROWS.every((r) => r.age === sum(r.dw))],
+    ["层级 / 状态 / 停留数组自洽（已完成 5 段，其余 lv+1 段）",
+      ROWS.every((r) => r.dw.length === (r.st === 3 ? 5 : r.lv + 1) && r.dw.every((d) => d > 0)) &&
+      ROWS.every((r) => (r.st === 0) === (r.lv === 0)) &&
+      ROWS.every((r) => r.st !== 1 || r.lv === 1 || r.lv === 2) &&
+      ROWS.every((r) => r.st < 2 || r.lv === 3)],
+    ["hash 四来源名均可解析（契约逐字）",
+      HASH_ALIAS["客户直采"] === 1 && HASH_ALIAS["市场洞察"] === 2 &&
+      HASH_ALIAS["技术规划"] === 3 && HASH_ALIAS["内部运营"] === 4],
+    ["受理率现算落在 (0,100)", SOURCES.every((s) => s.accept > 0 && s.accept < 100)],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[需求条目台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

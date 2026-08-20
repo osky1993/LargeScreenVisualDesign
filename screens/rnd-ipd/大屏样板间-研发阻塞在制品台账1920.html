@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发阻塞在制品台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --bs-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：卡编号 / 标题 / 团队 / 阻塞原因 / 已阻塞天数 / 解阻责任人 */
+    --bs-tcols: 96px 1fr 58px 90px 132px 82px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .bs-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 92, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 452px;
+    grid-template-rows: 84px 128px 46px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .bs-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .bs-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .bs-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .bs-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .bs-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .bs-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .bs-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .bs-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .bs-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到看板流动效率，琥珀描边与本页星蓝主色区分 */
+  .bs-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .bs-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .bs-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .bs-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .bs-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .bs-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .bs-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .bs-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .bs-chips { display: flex; align-items: center; gap: 9px; }
+  .bs-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .bs-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .bs-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .bs-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .bs-chip.is-key b { color: var(--rnd-blue); }
+  .bs-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .bs-clock-time { font: 700 26px/1 var(--bs-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .bs-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 原因五卡 ===== */
+  .bs-cards { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; min-height: 0; }
+  .bs-card {
+    position: relative; overflow: hidden; cursor: pointer;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; gap: 6px; padding: 10px 15px 9px;
+    transition: border-color .2s, box-shadow .2s, transform .2s;
+  }
+  .bs-card::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--bs-cc, var(--rnd-blue)), transparent); }
+  .bs-card::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.10), transparent 68%);
+  }
+  .bs-card:hover, .bs-card.is-on {
+    border-color: var(--bs-cc, rgba(92, 157, 255, 0.62)); transform: translateY(-2px);
+    box-shadow: inset 0 0 18px rgba(92, 157, 255, 0.12);
+  }
+  .bs-card.is-hit { animation: bs-hit 0.9s ease-in-out 2; }
+  @keyframes bs-hit { 0%, 100% { box-shadow: inset 0 0 18px rgba(92, 157, 255, 0.12); } 50% { box-shadow: 0 0 26px var(--bs-cc, rgba(92, 157, 255, 0.7)), inset 0 0 22px rgba(92, 157, 255, 0.22); } }
+  .bs-card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .bs-card-name { font-size: 14.5px; font-weight: 700; letter-spacing: 0.06em; color: #dfe9ff; white-space: nowrap; }
+  .bs-card-name::before { content: "▎"; color: var(--bs-cc, var(--rnd-blue)); margin-right: 2px; }
+  .bs-card-share { font-size: 11.5px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; }
+  .bs-card-share b { font: 700 13px/1 var(--bs-mono); color: var(--bs-cc, var(--rnd-blue)); }
+  .bs-card-num { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+  .bs-card-num b { font: 700 27px/1 var(--bs-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .bs-card-num span { font-size: 11.5px; color: var(--rnd-text-dim); }
+  .bs-card-num em { font-style: normal; margin-left: auto; font-size: 11px; color: var(--rnd-text-dim); }
+  .bs-card-num em b { font-size: 13px; color: var(--rnd-cyan); }
+  .bs-card-max { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+  .bs-card-max u { text-decoration: none; font: 700 11px/1 var(--bs-mono); color: #9cc2ff; letter-spacing: 0.03em; }
+  .bs-card-max b { font-weight: 700; color: var(--rnd-amber); }
+
+  /* ===== 原因筛选条 ===== */
+  .bs-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .bs-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .bs-fchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 5px 14px 6px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .bs-fchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .bs-fchip i { font-style: normal; font-size: 11.5px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .bs-fchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .bs-fchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .bs-fchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .bs-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .bs-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .bs-filters-state em { font-style: normal; color: #d3e2ff; }
+  .bs-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== 面板 ===== */
+  .bs-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .bs-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .bs-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .bs-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .bs-panel-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .bs-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .bs-panel-tag { font-size: 11px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .bs-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .bs-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 时间轴块由 JS 填充（选中行联动重绘）、直方图为 echarts 容器：
+     右列三块全部写死高度或 flex 显式约束 + min-height:0 + overflow:hidden，
+     避免 init 之后 JS 填充把 flex:1 的图表容器压矮（仓库已知坑）。 */
+  .bs-panel.is-tl { flex: none; height: 284px; min-height: 0; overflow: hidden; }
+  .bs-panel.is-hist { flex: none; height: 168px; min-height: 0; overflow: hidden; }
+  .bs-panel.is-over { flex: 1; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>）：行高写死、tbody overflow hidden 防撑破 ===== */
+  .bs-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .bs-thead, .bs-tbody li {
+    display: grid; grid-template-columns: var(--bs-tcols); align-items: center; gap: 8px;
+  }
+  .bs-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .bs-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .bs-tbody li {
+    padding: 0 8px; height: 29px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: bs-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes bs-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .bs-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .bs-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .bs-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .bs-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bs-tbody li .bs-no { font: 700 11.5px/1 var(--bs-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.03em; }
+  .bs-tbody li .bs-title { color: #dfe9ff; }
+  .bs-tbody li .bs-reason { font-size: 11.5px; }
+  .bs-tbody li .bs-owner { font-size: 12px; color: #b4c8f0; }
+  /* 已升级标记：编号后缀小三角 */
+  .bs-esc-flag { display: inline-block; margin-left: 4px; font-size: 9px; color: var(--rnd-red); vertical-align: 1px; }
+  /* 已阻塞天数：微条 + 数值 */
+  .bs-age { display: flex; align-items: center; gap: 8px; }
+  .bs-age-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .bs-age-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .bs-age em { flex: none; width: 42px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+
+  /* ===== 右栏：单卡阻塞时间轴（纯 HTML/CSS） ===== */
+  .bs-tl-head { flex: none; display: flex; flex-direction: column; gap: 4px; padding: 6px 10px 7px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 7px; }
+  .bs-tl-no { display: flex; align-items: center; gap: 9px; }
+  .bs-tl-no b { font: 700 13px/1 var(--bs-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .bs-tl-reason { padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; color: #071026; white-space: nowrap; }
+  .bs-tl-team { font: 700 11px/1 var(--bs-mono); letter-spacing: 0.06em; padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+  .bs-tl-title { font-size: 13px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bs-tl-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bs-tl-sub b { font-weight: 700; color: #c9d8f8; }
+  .bs-tl { flex: 1; min-height: 0; margin: 0; padding: 2px 0 0 6px; list-style: none; display: flex; flex-direction: column; }
+  .bs-tl li { position: relative; flex: 1; display: flex; align-items: flex-start; gap: 12px; padding-left: 22px; }
+  /* 竖向连接线：非末项画到下一个节点 */
+  .bs-tl li::before { content: ""; position: absolute; left: 6px; top: 16px; bottom: -4px; width: 2px; background: rgba(96, 140, 255, 0.22); }
+  .bs-tl li:last-child::before { display: none; }
+  .bs-tl li.is-done::before { background: rgba(92, 157, 255, 0.55); }
+  .bs-tl-dot {
+    position: absolute; left: 0; top: 4px; width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(96, 140, 255, 0.4); background: rgba(8, 18, 49, 0.9);
+  }
+  .bs-tl li.is-done .bs-tl-dot { border-color: var(--rnd-blue); background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.5); }
+  .bs-tl li.is-cur .bs-tl-dot { border-color: var(--rnd-amber); background: rgba(255, 194, 77, 0.25); animation: bs-pulse 1.4s ease-in-out infinite; }
+  @keyframes bs-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 194, 77, 0.5); } 50% { box-shadow: 0 0 0 7px rgba(255, 194, 77, 0); } }
+  .bs-tl-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding-top: 2px; }
+  .bs-tl-body b { font-size: 12.5px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.04em; }
+  .bs-tl li.is-todo .bs-tl-body b { color: rgba(127, 146, 196, 0.6); }
+  .bs-tl-body span { font-size: 10.5px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bs-tl-days { flex: none; padding-top: 3px; font: 700 14px/1 var(--bs-mono); color: var(--rnd-cyan); font-variant-numeric: tabular-nums; }
+  .bs-tl-days i { font-style: normal; font-size: 10px; font-weight: 400; color: var(--rnd-text-dim); margin-left: 2px; }
+  .bs-tl li.is-blk .bs-tl-days { color: var(--rnd-red); }
+  .bs-tl li.is-cur .bs-tl-days { color: var(--rnd-amber); }
+  .bs-tl li.is-todo .bs-tl-days { color: rgba(127, 146, 196, 0.5); }
+
+  /* ===== 超龄在制品清单（在制 > P85 周期） ===== */
+  .bs-over { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; overflow: hidden; }
+  .bs-over li {
+    flex: 1; min-height: 0; display: grid; grid-template-columns: 66px 1fr 34px 96px;
+    align-items: center; gap: 8px; padding: 0 8px; border-radius: 5px;
+    font-size: 11.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+  }
+  .bs-over li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .bs-over li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bs-over .bs-no { font: 700 11px/1 var(--bs-mono); color: rgba(127, 146, 196, 0.9); }
+  .bs-over .bs-ot { color: #dfe9ff; }
+  .bs-over .bs-oteam { font-size: 11px; color: var(--rnd-text-dim); }
+  .bs-over .bs-od { display: flex; align-items: baseline; justify-content: flex-end; gap: 5px; }
+  .bs-over .bs-od b { font: 700 13px/1 var(--bs-mono); color: var(--rnd-orange); }
+  .bs-over .bs-od em { font-style: normal; font-size: 10px; color: var(--rnd-red); }
+
+  /* ===== 底部滚动条 ===== */
+  .bs-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .bs-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange);
+  }
+  .bs-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: bs-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes bs-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .bs-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .bs-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .bs-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .bs-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .bs-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .bs-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="bs-stage" id="bs-stage">
+    <!-- mockflag:begin --><div class="bs-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="bs-error" id="bs-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="bs-header">
+      <div class="bs-head-left">
+        <div class="bs-crumb">
+          <a class="bs-crumb-up" href="大屏样板间-研发看板流动效率1920.html" title="返回上级专题页（Esc）">‹ 返回 看板流动效率</a>
+          <b>云麓智联科技</b><i>›</i><span>看板流动效率</span><i>›</i><em>阻塞与在制品台账</em>
+        </div>
+        <div class="bs-head-title-row">
+          <div class="bs-head-title">阻塞与在制品台账</div>
+          <div class="bs-head-meta">
+            <span>总盘阻塞卡 <b id="bs-meta-total">--</b> 张 · 本表样例 <b id="bs-meta-n">--</b> 张（抽样展示）</span><i>|</i>
+            <span><b>5</b> 类阻塞原因 · <b>12</b> 团队 · P85 周期 <b>14 天</b></span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="bs-head-right">
+        <div class="bs-chips">
+          <div class="bs-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="bs-chip is-key"><span id="bs-chip-key">阻塞总盘 · 全部</span><b id="bs-chip-val">--</b></div>
+        </div>
+        <div class="bs-clock" aria-label="实时时钟">
+          <span class="bs-clock-time" id="bs-clock-time">--:--:--</span>
+          <span class="bs-clock-date" id="bs-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 原因五卡（点击亦可筛选） -->
+    <div class="bs-cards" id="bs-cards"></div>
+
+    <!-- 原因筛选条 -->
+    <div class="bs-filters">
+      <span class="bs-filters-tag">原因筛选</span>
+      <div id="bs-fchips" style="display:flex;align-items:center;gap:10px;"></div>
+      <div class="bs-filters-state" id="bs-filters-state">--</div>
+    </div>
+
+    <!-- 左：阻塞卡明细主表 -->
+    <section class="bs-panel">
+      <div class="bs-panel-head">
+        <h2>阻塞卡明细（已阻塞天数降序）</h2>
+        <span class="bs-panel-tag" id="bs-table-tag">--</span>
+      </div>
+      <div class="bs-table">
+        <div class="bs-thead">
+          <span>卡编号</span><span>标题</span><span>团队</span><span>阻塞原因</span>
+          <span>已阻塞天数</span><span>解阻责任人</span>
+        </div>
+        <ul class="bs-tbody" id="bs-tbody"></ul>
+      </div>
+    </section>
+
+    <!-- 右：单卡时间轴 + 阻塞时长直方 + 超龄在制品 -->
+    <div class="bs-col">
+      <section class="bs-panel is-tl">
+        <div class="bs-panel-head">
+          <h2>单卡阻塞时间轴</h2>
+          <span class="bs-panel-tag" id="bs-tl-tag">--</span>
+        </div>
+        <div class="bs-tl-head" id="bs-tl-headbox"></div>
+        <ol class="bs-tl" id="bs-tl"></ol>
+      </section>
+      <section class="bs-panel is-hist">
+        <div class="bs-panel-head">
+          <h2>阻塞时长分布</h2>
+          <span class="bs-panel-tag" id="bs-hist-tag">--</span>
+        </div>
+        <div class="bs-chart" id="bs-chart-hist"></div>
+      </section>
+      <section class="bs-panel is-over">
+        <div class="bs-panel-head">
+          <h2>超龄在制品清单</h2>
+          <span class="bs-panel-tag">在制 &gt; P85 周期 <b>14 天</b>（与看板页控制图 85 分位线同源）</span>
+        </div>
+        <ul class="bs-over" id="bs-over"></ul>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="bs-foot">
+      <div class="bs-foot-tag">阻塞研判</div>
+      <div class="bs-foot-view"><div class="bs-foot-track" id="bs-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("bs-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("bs-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技）
+         ★ 与父页 P6「看板流动效率」严格同源（docs/RndIpdThemed.md §2.3）：
+           当前阻塞卡总盘 109 张 = 五类原因之和（跨域依赖 38 + 环境与资源 27 +
+           需求变更 21 + 外部供应 14 + 评审等待 9），契约逐字。
+         ★ 本表台账为**抽样样例**（109 张不逐张陈列），20 张样例的原因分布
+           与总盘结构大体成比例（7/5/4/2/2），筛选计数由样例数组现算；
+           原因卡上的均值/最长为**样例口径**，卡数为契约总盘口径，页内分别注明。
+         ★ P85 周期 14 天：与看板页「周期时间控制图」85 分位线同一口径，
+           超龄在制品清单即按该阈值圈出（在制天数 > 14 天）。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，样例行与原因/团队之间
+           一律用索引（ri / ti）关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 五类阻塞原因（契约 §2.3 逐字：名称与卡数均不改一字） */
+  const REASONS = [
+    { name: "跨域依赖", n: 38, color: C.blue },
+    { name: "环境与资源", n: 27, color: C.cyan },
+    { name: "需求变更", n: 21, color: C.violet },
+    { name: "外部供应", n: 14, color: C.amber },
+    { name: "评审等待", n: 9, color: C.orange }
+  ];
+  const BLOCK_TOTAL_REF = 109;
+  const P85_DAYS = 14;                                       /* 看板页控制图 85 分位线同源 */
+  const ESC_DAYS = 8;                                        /* 升级规则：阻塞满 8 天升级到域级例会 */
+
+  /* 4.2 12 个 Scrum 团队名（契约 §2.3 取样使用） */
+  const TEAMS = ["天枢", "天璇", "天玑", "天权", "玉衡", "开阳", "摇光", "青龙", "白虎", "朱雀", "玄武", "紫微"];
+
+  /* 4.3 阻塞卡样例 20 张（抽样展示，默认已按已阻塞天数降序陈列，渲染时仍程序化排序兜底）
+         ri=原因索引 ti=团队索引 blk=已阻塞天数 wd=建卡到受阻的在制天数
+         esc=阻塞第几天升级（阻塞 ≥ 8 天必升级，否则 null） plan=距解阻计划还有几天 ow=解阻责任人（自编）
+         日期全部由 DATA AS OF（2026-08-19）倒推现算，不复制日期字符串。 */
+  const ROWS = [
+    { no: "BLK-2311", t: "澜芯M60 射频驱动等待云端配额接口", ri: 0, ti: 3,  blk: 23, wd: 6, esc: 9,    plan: 3, ow: "沈既明" },
+    { no: "BLK-2286", t: "结构件二供开模延期，DVT 组装停线", ri: 3, ti: 7,  blk: 18, wd: 4, esc: 7,    plan: 5, ow: "顾丞" },
+    { no: "BLK-2297", t: "计费网关联调等待算法特征接口",     ri: 0, ti: 1,  blk: 14, wd: 5, esc: 6,    plan: 2, ow: "陆知行" },
+    { no: "BLK-2334", t: "系统测试床 GPU 池被评测任务占满",  ri: 1, ti: 10, blk: 11, wd: 3, esc: 5,    plan: 1, ow: "韩森" },
+    { no: "BLK-2350", t: "语音唤醒 SR 口径变更待重估工作量", ri: 2, ti: 0,  blk: 10, wd: 8, esc: 4,    plan: 2, ow: "宋映棠" },
+    { no: "BLK-2361", t: "板级电源方案等待软件功耗策略确认", ri: 0, ti: 8,  blk: 9,  wd: 5, esc: 3,    plan: 4, ow: "祁越" },
+    { no: "BLK-2375", t: "构建集群授权扩容审批流转中",       ri: 1, ti: 6,  blk: 8,  wd: 2, esc: 3,    plan: 2, ow: "白书宁" },
+    { no: "BLK-2382", t: "TR4 评审排期占满等待补位评审组",   ri: 4, ti: 2,  blk: 7,  wd: 6, esc: null, plan: 1, ow: "江晚舟" },
+    { no: "BLK-2394", t: "消息总线分区方案等硬件时钟同步",   ri: 0, ti: 9,  blk: 6,  wd: 4, esc: null, plan: 2, ow: "闻若谷" },
+    { no: "BLK-2401", t: "适老化场景 AR 拆分需求变更复核",   ri: 2, ti: 4,  blk: 6,  wd: 7, esc: null, plan: 3, ow: "程叙" },
+    { no: "BLK-2408", t: "预发环境数据脱敏工具版本冲突",     ri: 1, ti: 11, blk: 5,  wd: 3, esc: null, plan: 1, ow: "邵一苇" },
+    { no: "BLK-2415", t: "模型量化算子等待端侧内核适配",     ri: 0, ti: 5,  blk: 5,  wd: 5, esc: null, plan: 2, ow: "穆清" },
+    { no: "BLK-2422", t: "云监控指标口径随需求变更调整",     ri: 2, ti: 1,  blk: 4,  wd: 4, esc: null, plan: 2, ow: "凌澈" },
+    { no: "BLK-2429", t: "OTA 差分包联调等待模组固件基线",   ri: 0, ti: 4,  blk: 3,  wd: 6, esc: null, plan: 1, ow: "秦望舒" },
+    { no: "BLK-2437", t: "可靠性实验箱排队占用",             ri: 1, ti: 7,  blk: 3,  wd: 2, esc: null, plan: 2, ow: "池雨衡" },
+    { no: "BLK-2444", t: "架构决策评审等待跨域专家到位",     ri: 4, ti: 11, blk: 2,  wd: 5, esc: null, plan: 1, ow: "简聿" },
+    { no: "BLK-2452", t: "推荐策略需求变更等待 PO 确认",     ri: 2, ti: 6,  blk: 2,  wd: 3, esc: null, plan: 1, ow: "温野" },
+    { no: "BLK-2460", t: "全屋联动接口契约等待云端评审版",   ri: 0, ti: 0,  blk: 1,  wd: 2, esc: null, plan: 1, ow: "桑晚亭" },
+    { no: "BLK-2467", t: "传感器物料批次到货延期待验证",     ri: 3, ti: 8,  blk: 1,  wd: 1, esc: null, plan: 2, ow: "霍青" },
+    { no: "BLK-2473", t: "自动化用例执行机磁盘扩容中",       ri: 1, ti: 10, blk: 1,  wd: 2, esc: null, plan: 1, ow: "齐霁" }
+  ];
+
+  /* 4.4 超龄在制品 6 张（在制天数 > P85 周期 14 天；与阻塞卡是两份清单，独立编号） */
+  const OVERAGE = [
+    { no: "CRD-1180", t: "M60 射频校准自动化产测工装", ti: 3,  wip: 26 },
+    { no: "CRD-1236", t: "计费对账引擎重构二阶段",     ti: 1,  wip: 23 },
+    { no: "CRD-1174", t: "全量回归用例分层改造",       ti: 10, wip: 21 },
+    { no: "CRD-1291", t: "中控屏 OS 内存治理专项",     ti: 0,  wip: 19 },
+    { no: "CRD-1305", t: "端侧模型 A/B 评测框架接入",  ti: 5,  wip: 17 },
+    { no: "CRD-1322", t: "云盾租户隔离网关灰度",       ti: 9,  wip: 15 }
+  ];
+
+  /* 4.5 直方桶（阻塞时长四桶；桶计数由样例现算，Σ 恒等样例行数） */
+  const BUCKETS = ["<2 天", "2-5 天", "5-10 天", ">10 天"];
+  const BUCKET_COLORS = [C.cyan, C.blue, C.amber, C.red];
+  const bucketOf = (d) => (d < 2 ? 0 : d <= 5 ? 1 : d <= 10 ? 2 : 3);
+  const histOf = (rows) => {
+    const h = [0, 0, 0, 0];
+    rows.forEach((r) => { h[bucketOf(r.blk)] += 1; });
+    return h;
+  };
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+  D.total = sum(REASONS.map((r) => r.n));                    /* = 109，checks 里对契约验算 */
+  D.n = ROWS.length;
+  REASONS.forEach((r) => { r.share = 100 * r.n / D.total; });
+  /* 样例原因分布（筛选计数即由此现算）与逐原因样例统计 */
+  D.rowsByReason = REASONS.map((r, ri) => ROWS.filter((x) => x.ri === ri));
+  REASONS.forEach((r, ri) => {
+    const rs = D.rowsByReason[ri];
+    r.sn = rs.length;
+    r.avg = rs.length ? sum(rs.map((x) => x.blk)) / rs.length : 0;
+    r.maxRow = rs.slice().sort((a, b) => b.blk - a.blk)[0] || null;
+  });
+  D.maxRow = ROWS.slice().sort((a, b) => b.blk - a.blk)[0];
+  D.escRows = ROWS.filter((r) => r.esc != null);
+  D.soonRows = ROWS.filter((r) => r.plan <= 3);
+  D.avgAll = sum(ROWS.map((r) => r.blk)) / D.n;
+  D.topReason = REASONS.slice().sort((a, b) => b.n - a.n)[0];
+  D.overMax = OVERAGE.slice().sort((a, b) => b.wip - a.wip)[0];
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("bs-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("bs-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("bs-meta-total").textContent = fmtInt(D.total);
+  $("bs-meta-n").textContent = fmtInt(D.n);
+
+  /* ===== 7. 原因五卡：卡数翻牌（契约总盘）+ 占比 + 样例均值/最长（样例口径，点击即筛选） ===== */
+  const cards = $("bs-cards");
+  cards.innerHTML = REASONS.map((r, ri) => (
+    '<div class="bs-card" data-i="' + (ri + 1) + '" style="--bs-cc:' + r.color + '" title="点击筛选：' + r.name + '">' +
+      '<div class="bs-card-top"><span class="bs-card-name">' + r.name + '</span>' +
+        '<span class="bs-card-share">占比 <b>' + fmtDec(r.share, 1) + '%</b></span></div>' +
+      '<div class="bs-card-num"><b id="bs-card-n-' + ri + '">0</b><span>张（总盘）</span>' +
+        '<em>样例 <b>' + r.sn + '</b> 张 · 均 <b>' + fmtDec(r.avg, 1) + '</b> 天</em></div>' +
+      '<div class="bs-card-max">最长（样例）<u>' + (r.maxRow ? r.maxRow.no : "--") + '</u>' +
+        '<b>' + (r.maxRow ? r.maxRow.blk : 0) + ' 天</b><span>· ' + (r.maxRow ? TEAMS[r.maxRow.ti] : "--") + '</span></div>' +
+    '</div>'
+  )).join("");
+  const cardEls = Array.from(cards.children);
+
+  /* 卡数翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  REASONS.forEach((r, ri) => {
+    const el = $("bs-card-n-" + ri), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtInt(r.n * e);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmtInt(r.n);
+    })(t0);
+  });
+
+  /* ===== 8. 原因筛选 chip（全部 + 五原因；总盘卡数契约逐字，样例计数现算） ===== */
+  const FILTERS = [{ name: "全部", color: C.blue, n: D.total, cnt: D.n }]
+    .concat(REASONS.map((r, ri) => ({ name: r.name, color: r.color, n: r.n, cnt: D.rowsByReason[ri].length })));
+  const fbox = $("bs-fchips");
+  fbox.innerHTML = FILTERS.map((f, i) => (
+    '<button class="bs-fchip" type="button" data-i="' + i + '">' +
+      "<u>" + f.name + "</u><i>" + fmtInt(f.n) + " 张 · 样例 " + f.cnt + "</i>" +
+    "</button>"
+  )).join("");
+  const fchips = Array.from(fbox.children);
+
+  /* ===== 9. hash 契约：父页下钻「子页#encodeURIComponent(原因名)」，五原因名逐字匹配 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("全量", 0);
+  REASONS.forEach((r, ri) => { alias(r.name, ri + 1); alias(r.name + "阻塞", ri + 1); });
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                  /* trim + 全角空白剔除归一化 */
+    if (!raw) return -1;                                    /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(fi) {
+    const want = "#" + encodeURIComponent(FILTERS[fi].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 10. 台账主表渲染（行高 29px 写死、overflow hidden，台账区不撑破；默认按已阻塞天数降序） ===== */
+  const tbody = $("bs-tbody");
+  let view = ROWS.slice(), fIdx = 0, selPos = 0;
+  const AGE_MAX = 25;                                        /* 已阻塞天数条：0~25 天映射条宽 */
+
+  function rowHtml(r, k) {
+    const w = clamp(r.blk / AGE_MAX * 100, 4, 100);
+    const cAge = r.blk > 10 ? C.red : r.blk > 5 ? C.amber : C.cyan;
+    return "<li data-no=\"" + r.no + "\" style=\"animation-delay:" + (k * 14) + "ms\">" +
+      '<span class="bs-no">' + r.no + (r.esc != null ? '<i class="bs-esc-flag" title="已升级">▲</i>' : "") + "</span>" +
+      '<span class="bs-title">' + r.t + "</span>" +
+      "<span>" + TEAMS[r.ti] + "</span>" +
+      '<span class="bs-reason" style="color:' + REASONS[r.ri].color + '">' + REASONS[r.ri].name + "</span>" +
+      '<span class="bs-age"><span class="bs-age-t"><u style="width:' + fmtDec(w, 1) + "%;background:" + cAge + '"></u></span><em style="color:' + cAge + '">' + r.blk + " 天</em></span>" +
+      '<span class="bs-owner">' + r.ow + "</span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    $("bs-table-tag").textContent =
+      "抽样口径：总盘 " + fmtInt(D.total) + " 张，本表抽样 " + D.n + " 张 · 当前筛选样例 " + view.length + " 张";
+    const overN = view.filter((r) => r.blk > 10).length;
+    $("bs-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 张样例 / 共 " + D.n + " 张<i>|</i>阻塞 &gt; 10 天 <em>" + overN +
+      "</em> 张 · 已升级 <em>" + view.filter((r) => r.esc != null).length +
+      "</em> 张<i>|</i>行点击或轮巡联动右侧时间轴";
+  }
+
+  /* ===== 11. 单卡阻塞时间轴（纯 HTML/CSS；创建 → 进入阻塞 → 升级 → 解阻计划，选中行联动）
+         日期全部由 DATA AS OF 倒推/顺推现算：受阻日 = AS_OF − blk，建卡日 = 受阻日 − wd，
+         升级日 = 受阻日 + esc，解阻计划 = AS_OF + plan。 ===== */
+  const dAdd = (n) => new Date(2026, 7, 19 + n);             /* AS_OF = 2026-08-19 */
+  const fmtD = (d) => pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  function renderSel() {
+    if (!view.length) return;
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    Array.from(tbody.children).forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    $("bs-tl-tag").textContent = "创建 → 进入阻塞 → 升级 → 解阻计划";
+    $("bs-tl-headbox").innerHTML =
+      '<div class="bs-tl-no"><b>' + r.no + '</b>' +
+        '<span class="bs-tl-reason" style="background:' + REASONS[r.ri].color + '">' + REASONS[r.ri].name + "</span>" +
+        '<span class="bs-tl-team">' + TEAMS[r.ti] + "</span></div>" +
+      '<div class="bs-tl-title">' + r.t + "</div>" +
+      '<div class="bs-tl-sub">解阻责任人 <b>' + r.ow + "</b> · 已阻塞 <b>" + r.blk +
+        "</b> 天 · 建卡 <b>" + fmtD(dAdd(-(r.blk + r.wd))) + "</b></div>";
+    const nodes = [
+      { name: "创建", cls: "is-done",
+        body: fmtD(dAdd(-(r.blk + r.wd))) + " 建卡 · 顺行在制 " + r.wd + " 天后受阻",
+        days: r.wd + "<i>天在制</i>" },
+      { name: "进入阻塞", cls: "is-done is-blk",
+        body: fmtD(dAdd(-r.blk)) + " 受阻 · " + REASONS[r.ri].name,
+        days: r.blk + "<i>天已阻塞</i>" },
+      r.esc != null
+        ? { name: "升级", cls: "is-done",
+            body: fmtD(dAdd(-(r.blk - r.esc))) + " 升级域级例会 · 阻塞第 " + r.esc + " 天触发",
+            days: "+" + r.esc + "<i>天</i>" }
+        : { name: "升级", cls: "is-todo",
+            body: "未升级（阻塞未满 " + ESC_DAYS + " 天阈值）",
+            days: "--" },
+      { name: "解阻计划", cls: "is-cur",
+        body: "计划 " + fmtD(dAdd(r.plan)) + " 解阻 · 责任人 " + r.ow,
+        days: r.plan + "<i>天后</i>" }
+    ];
+    $("bs-tl").innerHTML = nodes.map((nd) => (
+      '<li class="' + nd.cls + '"><i class="bs-tl-dot"></i>' +
+        '<div class="bs-tl-body"><b>' + nd.name + "</b><span>" + nd.body + "</span></div>" +
+        '<em class="bs-tl-days">' + nd.days + "</em></li>"
+    )).join("");
+  }
+
+  /* ===== 12. 阻塞时长分布直方（四桶；桶计数随筛选由样例现算，Σ 恒等当前样例行数） ===== */
+  /* ★ 时间轴块与本图同属 .bs-col：三块全部写死高度且先填充再 init，图表高度不受挤压 */
+  function histOption(fi) {
+    const rows = fi === 0 ? ROWS : ROWS.filter((r) => r.ri === fi - 1);
+    const h = histOf(rows), n = rows.length;
+    $("bs-hist-tag").innerHTML = FILTERS[fi].name + " 样例 <b>" + n + "</b> 张 · 四桶 Σ = " + sum(h);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 8, top: 22, bottom: 0, containLabel: true },
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 },
+        formatter: (ps) => {
+          const p = ps[0];
+          return "<b>阻塞 " + BUCKETS[p.dataIndex] + "</b><br/>" + p.marker + "样例 <b>" + p.value +
+            "</b> 张 · 占 " + (n ? fmtDec(100 * p.value / n, 1) : "0.0") + "%";
+        }
+      },
+      xAxis: {
+        type: "category", data: BUCKETS,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 11 }
+      },
+      yAxis: {
+        type: "value", minInterval: 1,
+        axisLabel: { color: C.textDim, fontSize: 10 }, axisLine: { show: false },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      series: [{
+        type: "bar", barWidth: "52%",
+        label: {
+          show: true, position: "top", fontSize: 11, fontWeight: 700, color: C.text,
+          formatter: (p) => p.value + " 张"
+        },
+        data: h.map((v, k) => ({
+          value: v,
+          itemStyle: { color: BUCKET_COLORS[k], opacity: 0.92, borderRadius: [3, 3, 0, 0] }
+        }))
+      }]
+    };
+  }
+
+  /* ===== 13. 超龄在制品清单（静态 6 张，init 之前填充完毕） ===== */
+  $("bs-over").innerHTML = OVERAGE.map((o) => (
+    '<li><span class="bs-no">' + o.no + '</span>' +
+      '<span class="bs-ot">' + o.t + "</span>" +
+      '<span class="bs-oteam">' + TEAMS[o.ti] + "</span>" +
+      '<span class="bs-od"><b>' + o.wip + " 天</b><em>超 P85 " + (o.wip - P85_DAYS) + " 天</em></span></li>"
+  )).join("");
+
+  /* ===== 14. 筛选主流程：一次调用刷新 卡片/chip/表/时间轴/直方图/页头 chip ===== */
+  function applyFilter(fi, pushHash) {
+    fIdx = clamp(fi, 0, FILTERS.length - 1);
+    /* 默认排序：已阻塞天数降序（源数组已降序陈列，此处程序化排序兜底口径） */
+    view = (fIdx === 0 ? ROWS.slice() : ROWS.filter((r) => r.ri === fIdx - 1)).sort((a, b) => b.blk - a.blk);
+    selPos = 0;
+    fchips.forEach((el, i) => {
+      const on = i === fIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? FILTERS[i].color : "";
+      el.style.borderColor = on ? FILTERS[i].color : "";
+    });
+    cardEls.forEach((el, ri) => el.classList.toggle("is-on", fIdx === ri + 1));
+    $("bs-chip-key").textContent = "阻塞总盘 · " + FILTERS[fIdx].name;
+    $("bs-chip-val").textContent = fmtInt(FILTERS[fIdx].n) + " 张";
+    renderTable();
+    renderSel();
+    if (histChart) histChart.setOption(histOption(fIdx), true);
+    if (pushHash) syncHash(fIdx);
+  }
+
+  fchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), true)));
+  cardEls.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), true)));
+
+  /* hash 定位：命中原因则激活筛选 chip、闪烁对应原因卡，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyFilter(0, false); return; }
+    applyFilter(hit, false);
+    if (hit > 0) {
+      const card = cardEls[hit - 1];
+      card.classList.remove("is-hit");
+      void card.offsetWidth;                                 /* 重排以重启动画 */
+      card.classList.add("is-hit");
+      card.scrollIntoView({ block: "nearest" });
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发看板流动效率1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 15. kiosk 轮巡：台账行 3 秒逐行高亮并联动时间轴；hash 定位后暂停 20 秒 ===== */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 16. 初始渲染：先填充全部 DOM（表 + 时间轴 + 超龄清单），再 init 图表 ===== */
+  let histChart = null;
+  applyFilter(0, false);                                     /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  histChart = echarts.init($("bs-chart-hist"));
+  histChart.setOption(histOption(0));
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* 直方图轮播提示 */
+  let tipIdx = 0;
+  setInterval(() => {
+    histChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % BUCKETS.length;
+  }, 4200);
+
+  /* ===== 17. 底部阻塞研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "样例最长阻塞「" + D.maxRow.no + "」" + D.maxRow.t + "，已阻塞 " + D.maxRow.blk +
+        " 天（第 " + D.maxRow.esc + " 天已升级），计划 " + D.maxRow.plan + " 天后解阻，责任人 " + D.maxRow.ow },
+    { lv: "高", c: C.red, t: "「" + D.topReason.name + "」" + fmtInt(D.topReason.n) + " 张居五类之首（占 " +
+        fmtDec(D.topReason.share, 1) + "%），样例均阻塞 " + fmtDec(D.topReason.avg, 1) + " 天，建议跨域例会常态化清偿" },
+    { lv: "中", c: C.orange, t: "样例中已升级 " + D.escRows.length + " 张（阻塞满 " + ESC_DAYS +
+        " 天触发域级升级），其中 >10 天 " + ROWS.filter((r) => r.blk > 10).length + " 张需 IPMT 关注" },
+    { lv: "中", c: C.orange, t: "超龄在制 " + OVERAGE.length + " 张全部 > P85 周期 " + P85_DAYS + " 天（与看板页控制图同源），最长「" +
+        D.overMax.no + "」" + D.overMax.t + " 在制 " + D.overMax.wip + " 天" },
+    { lv: "低", c: C.amber, t: "3 天内计划解阻 " + D.soonRows.length + " 张，样例平均阻塞 " +
+        fmtDec(D.avgAll, 1) + " 天，桶分布 " + histOf(ROWS).map((v, k) => BUCKETS[k] + " " + v + " 张").join(" / ") },
+    { lv: "低", c: C.green, t: "勾稽：五类阻塞 Σ = " + fmtInt(D.total) + " 张（契约逐字）· 样例 " + D.n +
+        " 张原因分布 " + REASONS.map((r) => r.name + " " + r.sn).join(" / ") + " · 直方四桶 Σ = " + sum(histOf(ROWS)) }
+  ];
+  const track = $("bs-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="bs-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                   /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 18. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(histOption(0)); }
+  catch (e) { optAcyclic = false; console.error("[阻塞在制品台账] option 存在循环引用：", e.message); }
+
+  const checks = [
+    ["五类阻塞原因 Σ = 109（契约逐字：38+27+21+14+9）",
+      D.total === BLOCK_TOTAL_REF &&
+      REASONS[0].n === 38 && REASONS[1].n === 27 && REASONS[2].n === 21 &&
+      REASONS[3].n === 14 && REASONS[4].n === 9],
+    ["抽样行原因分布与筛选 chip 计数一致", FILTERS.every((f, i) =>
+      f.cnt === (i === 0 ? ROWS.length : ROWS.filter((r) => r.ri === i - 1).length))],
+    ["样例原因分布之和 = 样例总数 20", sum(REASONS.map((r) => r.sn)) === D.n && D.n === 20],
+    ["直方四桶 Σ = 抽样行数（全量与逐原因筛选均成立）",
+      sum(histOf(ROWS)) === D.n &&
+      REASONS.every((r, ri) => sum(histOf(D.rowsByReason[ri])) === r.sn)],
+    ["hash 五原因名均可解析（契约逐字）",
+      HASH_ALIAS["跨域依赖"] === 1 && HASH_ALIAS["环境与资源"] === 2 &&
+      HASH_ALIAS["需求变更"] === 3 && HASH_ALIAS["外部供应"] === 4 && HASH_ALIAS["评审等待"] === 5],
+    ["卡编号两两不重复且格式 BLK-XXXX", (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^BLK-\d{4}$/.test(r.no))],
+    ["默认视图按已阻塞天数降序", view.every((r, k) => k === 0 || view[k - 1].blk >= r.blk)],
+    ["升级规则自洽：阻塞 ≥ 8 天必升级且 0 < esc < blk",
+      ROWS.every((r) => (r.esc != null) === (r.blk >= ESC_DAYS)) &&
+      ROWS.every((r) => r.esc == null || (r.esc > 0 && r.esc < r.blk))],
+    ["在制/解阻天数为正（wd ≥ 1 且 plan ≥ 1）", ROWS.every((r) => r.wd >= 1 && r.plan >= 1)],
+    ["逐原因样例最长 = 该原因样例天数最大值", REASONS.every((r, ri) =>
+      !r.maxRow || r.maxRow.blk === Math.max.apply(null, D.rowsByReason[ri].map((x) => x.blk)))],
+    ["超龄清单 6 张全部在制 > P85（14 天）且降序陈列",
+      OVERAGE.length === 6 && OVERAGE.every((o) => o.wip > P85_DAYS) &&
+      OVERAGE.every((o, k) => k === 0 || OVERAGE[k - 1].wip >= o.wip)],
+    ["超龄清单编号两两不重复且格式 CRD-XXXX",
+      (new Set(OVERAGE.map((o) => o.no))).size === OVERAGE.length &&
+      OVERAGE.every((o) => /^CRD-\d{4}$/.test(o.no))],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[阻塞在制品台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
