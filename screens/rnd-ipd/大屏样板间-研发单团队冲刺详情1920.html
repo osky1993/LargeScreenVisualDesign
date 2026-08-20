@@ -412,6 +412,11 @@
   if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
 
   const $ = (id) => document.getElementById(id);
+  /* kiosk 轮换保持窗：从父页下钻进来（hash 命中）时先保持 20 秒不轮换。
+     ★ 声明必须早于任何 hold() 调用——初始 hash 解析就会调它，
+     若把 let 留在页尾的 kiosk 段，会因 TDZ 抛 ReferenceError 打断后续脚本。 */
+  let holdUntil = 0;
+  function hold() { holdUntil = Date.now() + 20000; }
 
   /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
   /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
@@ -1112,8 +1117,6 @@
   /* kiosk 常驻：每 12 秒切下一团队；鼠标停在切换器上时暂停。
      从父页下钻进来（hash 命中）时先保持 20 秒不轮换，否则读者还没看清这一队就被切走。 */
   let timer = null;
-  let holdUntil = 0;
-  function hold() { holdUntil = Date.now() + 20000; }
   function restart() {
     clearInterval(timer);
     timer = setInterval(() => { if (Date.now() < holdUntil) return; applyTeam(idx + 1); }, 12000);

@@ -87,6 +87,25 @@ PAGES = [
             {"rows": "#qa-tbody li", "names": DOMAINS4, "sub": SUB_QX},
         ],
     },
+    # ---- 三期 · 多域协同（W4）----
+    {
+        "file": "大屏样板间-研发软硬云AI集成协同1920.html",
+        "targets": [
+            {"rows": "#ct-tbody li", "names": BASELINES4, "sub": SUB_JX},
+        ],
+    },
+    {
+        "file": "大屏样板间-研发硬件与样机1920.html",
+        "targets": [
+            {"rows": "#hj-tbody li", "names": BATCHES5, "sub": SUB_PC},
+        ],
+    },
+    {
+        "file": "大屏样板间-研发AI模型迭代1920.html",
+        "targets": [
+            {"rows": "#ai-tbody li", "names": MODELS5, "sub": SUB_ML},
+        ],
+    },
 ]
 
 CSS_BEGIN = "  /* drill:begin —— 由 tools/inject_drilldown_rnd.py 注入，勿手改 */"

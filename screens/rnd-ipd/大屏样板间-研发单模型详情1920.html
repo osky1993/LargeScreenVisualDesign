@@ -1,0 +1,1196 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单模型详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --ml-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 表格列宽：评测明细（版本 / 准确率 / 召回率 / F1 / 时延 / 体积） */
+    --ml-tcols: 62px 1fr 1fr 1fr 62px 70px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .ml-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 560px 1fr 532px;
+    grid-template-rows: 84px 122px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .ml-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .ml-error.is-visible { display: block; }
+
+  /* ===== 顶栏 ===== */
+  .ml-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .ml-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .ml-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .ml-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .ml-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .ml-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .ml-crumb em { font-style: normal; color: #d3e2ff; }
+  .ml-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .ml-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .ml-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .ml-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .ml-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .ml-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .ml-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .ml-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 对象切换器：5 个 AI 模型 tab（← → 方向键 / 14s 自动轮换 / hash 直达） */
+  .ml-switcher { display: grid; grid-template-columns: repeat(5, auto); gap: 6px; }
+  .ml-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 74px; padding: 5px 10px 6px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .ml-sw-tab b { font-size: 13.5px; font-weight: 700; letter-spacing: 0.1em; }
+  .ml-sw-tab span { font-size: 10px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.9); }
+  .ml-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .ml-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .ml-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  .ml-chips { display: flex; align-items: center; gap: 9px; }
+  .ml-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 104px; padding: 7px 14px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .ml-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .ml-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .ml-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .ml-chip.is-key b { color: var(--rnd-blue); }
+  .ml-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .ml-clock-time { font: 700 26px/1 var(--ml-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .ml-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 带（6 枚单模型级） ===== */
+  .ml-band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; min-height: 0; }
+  .ml-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; align-items: center; gap: 13px; padding: 0 14px 0 16px;
+  }
+  .ml-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 46px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .ml-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .ml-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-orange), transparent); }
+  .ml-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 92, 0.14), transparent 68%); }
+  .ml-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .ml-kpi-icon {
+    flex: none; width: 44px; height: 44px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    background: linear-gradient(160deg, rgba(92, 157, 255, 0.26), rgba(70, 214, 200, 0.12));
+    border: 1px solid rgba(92, 157, 255, 0.35); box-shadow: inset 0 0 12px rgba(92, 157, 255, 0.14);
+  }
+  .ml-kpi.is-warn .ml-kpi-icon {
+    background: linear-gradient(160deg, rgba(255, 157, 92, 0.28), rgba(255, 194, 77, 0.12));
+    border-color: rgba(255, 157, 92, 0.4); box-shadow: inset 0 0 12px rgba(255, 157, 92, 0.16);
+  }
+  .ml-kpi.is-good .ml-kpi-icon {
+    background: linear-gradient(160deg, rgba(111, 224, 154, 0.26), rgba(70, 214, 200, 0.12));
+    border-color: rgba(111, 224, 154, 0.4); box-shadow: inset 0 0 12px rgba(111, 224, 154, 0.16);
+  }
+  .ml-kpi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .ml-kpi-label { font-size: 12.5px; letter-spacing: 0.1em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .ml-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .ml-kpi-val { font: 700 28px/1 var(--ml-mono); color: #eaf1ff; letter-spacing: 0.02em; white-space: nowrap; }
+  .ml-kpi-val.is-text { font-size: 21px; letter-spacing: 0.08em; }
+  .ml-kpi.is-warn .ml-kpi-val { color: #ffd9b0; }
+  .ml-kpi.is-good .ml-kpi-val { color: #b8f2cf; }
+  .ml-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .ml-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ml-kpi-sub b { font-weight: 700; color: #bcd2f8; }
+
+  /* ===== 三栏主体 ===== */
+  .ml-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .ml-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .ml-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .ml-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .ml-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .ml-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .ml-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ml-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .ml-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 版本谱系（CSS 横向时间轴，非 echarts；面板写死高度） ===== */
+  .ml-lineage { position: relative; flex: 1; min-height: 0; display: flex; align-items: stretch; padding-top: 16px; }
+  .ml-lineage::before {
+    content: ""; position: absolute; z-index: 0; top: 22px; height: 2px;
+    left: 7%; right: 7%;
+    background: linear-gradient(90deg, rgba(96, 140, 255, 0.15), rgba(92, 157, 255, 0.75) 62%, rgba(255, 194, 77, 0.9));
+  }
+  .ml-lg-item {
+    position: relative; z-index: 1; flex: 1; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 7px;
+  }
+  .ml-lg-item + .ml-lg-item::after {
+    content: "›"; position: absolute; left: -6px; top: -2px;
+    font-size: 17px; line-height: 1; color: rgba(92, 157, 255, 0.75);
+  }
+  /* 圆点是 item 的首个子元素：容器 padding-top:16 + 圆点半高 6.5 ≈ 轨道中心 22.5，两者对齐 */
+  .ml-lg-dot {
+    width: 13px; height: 13px; border-radius: 50%; flex: none;
+    border: 2px solid rgba(92, 157, 255, 0.8); background: #0b1738;
+    transition: box-shadow .3s, background .3s, border-color .3s;
+  }
+  .ml-lg-item.is-cur .ml-lg-dot { border-color: var(--rnd-amber); background: var(--rnd-amber); box-shadow: 0 0 14px rgba(255, 194, 77, 0.75); }
+  .ml-lg-item.is-scan .ml-lg-dot { box-shadow: 0 0 16px rgba(92, 157, 255, 0.85); background: var(--rnd-blue); }
+  .ml-lg-ver { font: 700 17px/1 var(--ml-mono); letter-spacing: 0.05em; color: #dbe8ff; margin-top: 5px; }
+  .ml-lg-item.is-cur .ml-lg-ver { color: var(--rnd-amber); text-shadow: 0 0 12px rgba(255, 194, 77, 0.45); }
+  .ml-lg-date { font: 11px/1 var(--ml-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.04em; }
+  .ml-lg-chg {
+    font-size: 11px; line-height: 1.5; color: #c2d4f6; text-align: center;
+    height: 33px; overflow: hidden; width: 100%;
+  }
+  .ml-lg-metric { font-size: 10.5px; color: rgba(127, 146, 196, 0.95); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+  .ml-lg-metric b { font-weight: 700; color: #9cc2ff; }
+  .ml-lg-card {
+    width: 100%; border-radius: 8px; padding: 5px 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    border: 1px solid transparent; transition: background .3s, border-color .3s;
+  }
+  .ml-lg-item.is-cur .ml-lg-card { border-color: rgba(255, 194, 77, 0.4); background: rgba(84, 62, 20, 0.24); }
+  .ml-lg-item.is-scan .ml-lg-card { border-color: rgba(92, 157, 255, 0.45); background: rgba(92, 157, 255, 0.12); }
+
+  .ml-badge {
+    display: inline-block; padding: 1px 9px; border-radius: 999px;
+    font-size: 10.5px; letter-spacing: 0.06em; line-height: 1.6;
+    border: 1px solid rgba(96, 140, 255, 0.3); color: #a9c4f5; background: rgba(24, 44, 104, 0.4);
+  }
+  .ml-badge.is-live { color: var(--rnd-green); border-color: rgba(111, 224, 154, 0.45); background: rgba(24, 74, 48, 0.32); }
+  .ml-badge.is-gray { color: var(--rnd-amber); border-color: rgba(255, 194, 77, 0.45); background: rgba(84, 62, 20, 0.32); }
+  .ml-badge.is-off  { color: var(--rnd-text-dim); border-color: rgba(127, 146, 196, 0.4); background: rgba(24, 34, 66, 0.4); }
+
+  /* ===== CSS grid 模拟表格：评测明细 ===== */
+  .ml-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .ml-thead, .ml-tbody li {
+    display: grid; grid-template-columns: var(--ml-tcols); align-items: center; gap: 8px;
+  }
+  .ml-thead {
+    flex: none; padding: 5px 10px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.06em; color: #8aa8e8;
+  }
+  .ml-thead span { text-align: right; }
+  .ml-thead span:first-child { text-align: left; }
+  .ml-tbody { flex: 1; min-height: 0; margin: 5px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .ml-tbody li {
+    padding: 0 10px; height: 30px; border-radius: 5px;
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    transition: background .25s, box-shadow .25s;
+  }
+  .ml-tbody li span { text-align: right; }
+  .ml-tbody li span:first-child { text-align: left; }
+  .ml-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .ml-tbody li.is-latest { background: rgba(255, 194, 77, 0.13); box-shadow: inset 0 0 0 1px rgba(255, 194, 77, 0.42); }
+  .ml-tbody li.is-active { background: rgba(92, 157, 255, 0.16); box-shadow: inset 0 0 0 1px rgba(92, 157, 255, 0.42); }
+  .ml-tbody li.is-latest.is-active { background: rgba(255, 194, 77, 0.2); }
+  .ml-tbody li b { font-weight: 700; color: #eaf1ff; }
+  .ml-tbody li .ml-cell-ver b { color: #ffe1a8; }
+  .ml-tfoot { flex: none; margin-top: 5px; padding-top: 5px; border-top: 1px dashed rgba(96, 140, 255, 0.22);
+    font-size: 10.5px; color: rgba(127, 146, 196, 0.85); letter-spacing: 0.03em; }
+  .ml-tfoot b { font-weight: 700; color: var(--rnd-amber); }
+
+  /* ===== 训练数据集台账（DOM，面板高度由 flex 决定，内容溢出裁切） ===== */
+  .ml-data { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 7px; overflow: hidden; }
+  /* 行 flex:1 均分「面板高 − 底部三宫格」的剩余空间：版本数 4~5 都不留空档、也撑不破 */
+  .ml-ds-row {
+    flex: 1; min-height: 0; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center; gap: 3px;
+    border-radius: 8px; padding: 5px 9px 6px;
+    background: rgba(10, 20, 52, 0.4); border: 1px solid rgba(96, 140, 255, 0.14);
+  }
+  .ml-ds-row.is-cur { border-color: rgba(255, 194, 77, 0.4); background: rgba(84, 62, 20, 0.2); }
+  .ml-ds-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .ml-ds-ver { font: 700 12.5px/1 var(--ml-mono); letter-spacing: 0.05em; color: #dbe8ff; }
+  .ml-ds-num { font: 700 14px/1 var(--ml-mono); color: #9cc2ff; font-variant-numeric: tabular-nums; }
+  .ml-ds-num i { font-style: normal; font-size: 10px; font-weight: 400; color: rgba(127, 146, 196, 0.85); margin-left: 2px; }
+  .ml-ds-bar { height: 8px; border-radius: 4px; background: rgba(96, 140, 255, 0.12); overflow: hidden; }
+  .ml-ds-bar i { display: block; height: 100%; border-radius: 4px; transition: width .5s; }
+  .ml-ds-sub { font-size: 10.5px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .ml-ds-sub b { font-weight: 700; color: #bcd2f8; }
+  .ml-ds-tiles { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: auto; }
+  .ml-ds-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 4px 8px;
+    border-radius: 9px; border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(18, 34, 78, 0.5);
+  }
+  .ml-ds-tile span { font-size: 10.5px; letter-spacing: 0.08em; color: #6079b0; }
+  .ml-ds-tile b { font: 700 17px/1 var(--ml-mono); color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  .ml-ds-tile b i { font-style: normal; font-size: 10.5px; font-weight: 400; color: var(--rnd-text-dim); margin-left: 2px; }
+
+  /* ===== 底部口径与要点滚动条 ===== */
+  .ml-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .ml-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-amber);
+  }
+  .ml-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-amber);
+    box-shadow: 0 0 10px var(--rnd-amber); animation: ml-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes ml-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .ml-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .ml-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .ml-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .ml-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .ml-foot-item b { font-weight: 700; color: #eaf1ff; }
+  .ml-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .ml-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="ml-stage" id="ml-stage">
+    <!-- mockflag:begin --><div class="ml-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="ml-error" id="ml-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容） -->
+    <header class="ml-header">
+      <div class="ml-head-left">
+        <div class="ml-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="ml-crumb-up" href="大屏样板间-研发AI模型迭代1920.html" title="返回上级专题页（Esc）">‹ 返回 AI模型迭代</a><i>›</i>
+          <em id="ml-crumb-obj">--</em>
+        </div>
+        <div class="ml-head-title-row">
+          <div class="ml-head-title" id="ml-title">-- · 模型详情</div>
+          <div class="ml-head-meta">
+            <span>责任团队 <b id="ml-meta-team">--</b></span><i>|</i>
+            <span>模型族 <b id="ml-meta-fam">--</b></span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="ml-head-right">
+        <div class="ml-switcher" id="ml-switcher" aria-label="模型切换"></div>
+        <div class="ml-chips">
+          <div class="ml-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="ml-chip is-key"><span>CURRENT VER</span><b id="ml-chip-ver">--</b></div>
+        </div>
+        <div class="ml-clock" aria-label="实时时钟">
+          <span class="ml-clock-time" id="ml-clock-time">--:--:--</span>
+          <span class="ml-clock-date" id="ml-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 带（随模型切换） -->
+    <div class="ml-band" id="ml-band"></div>
+
+    <!-- 左栏：训练曲线 + 训练算力 -->
+    <div class="ml-col">
+      <section class="ml-panel" style="flex: 1;">
+        <div class="ml-panel-head">
+          <h2>训练曲线 · Loss 与验证指标</h2>
+          <span class="ml-panel-tag">共 <b id="ml-tr-ep">--</b> 轮 · 最优 <b id="ml-tr-best">--</b></span>
+        </div>
+        <div class="ml-chart" id="ml-chart-train"></div>
+      </section>
+      <section class="ml-panel" style="flex: 1;">
+        <div class="ml-panel-head">
+          <h2>训练算力 · GPU 卡时与耗时</h2>
+          <span class="ml-panel-tag">累计 <b id="ml-cp-gpu">--</b> 卡时 · <b id="ml-cp-hour">--</b> 小时</span>
+        </div>
+        <div class="ml-chart" id="ml-chart-compute"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：版本谱系（写死高度）+ 线上推理指标 -->
+    <div class="ml-col">
+      <!-- 高度写死 258px：时间轴节点 + 关键改动两行不裁切；min-height:0 + overflow:hidden 防内容撑破 -->
+      <section class="ml-panel" style="flex: none; height: 258px; min-height: 0; overflow: hidden;">
+        <div class="ml-panel-head">
+          <h2>版本谱系 · 演进时间轴</h2>
+          <span class="ml-panel-tag">共 <b id="ml-lg-cnt">--</b> 版 · 生产版 <b id="ml-lg-cur">--</b> · 灰度 <b id="ml-lg-gray">--</b></span>
+        </div>
+        <div class="ml-lineage" id="ml-lineage"></div>
+      </section>
+      <section class="ml-panel" style="flex: 1;">
+        <div class="ml-panel-head">
+          <h2>线上推理指标 · 近 24 小时</h2>
+          <span class="ml-panel-tag">峰值 QPS <b id="ml-on-peak">--</b> · P99 SLO ≤ <b id="ml-on-slo">--</b> ms · 失败率 SLO ≤ <b id="ml-on-slof">--</b>%</span>
+        </div>
+        <div class="ml-chart" id="ml-chart-online"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：评测明细表（写死高度）+ 训练数据集台账 -->
+    <div class="ml-col">
+      <!-- 高度写死 244px：表头 + 最多 5 版行 + 口径脚注不裁切 -->
+      <section class="ml-panel" style="flex: none; height: 244px; min-height: 0; overflow: hidden;">
+        <div class="ml-panel-head">
+          <h2>评测明细 · 版本 × 指标</h2>
+          <span class="ml-panel-tag">最新版 <b id="ml-tb-latest">--</b> 高亮</span>
+        </div>
+        <div class="ml-table">
+          <div class="ml-thead">
+            <span>版本</span><span>准确率</span><span>召回率</span><span>F1</span><span>时延ms</span><span>体积MB</span>
+          </div>
+          <ul class="ml-tbody" id="ml-tbody"></ul>
+          <div class="ml-tfoot" id="ml-tfoot">--</div>
+        </div>
+      </section>
+      <section class="ml-panel" style="flex: 1;">
+        <div class="ml-panel-head">
+          <h2>训练数据集台账</h2>
+          <span class="ml-panel-tag">累计训练样本 <b id="ml-ds-sum">--</b> 万条</span>
+        </div>
+        <div class="ml-data" id="ml-data"></div>
+      </section>
+    </div>
+
+    <!-- 底部口径与要点 -->
+    <div class="ml-foot">
+      <div class="ml-foot-tag">口径与要点</div>
+      <div class="ml-foot-view"><div class="ml-foot-track" id="ml-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("ml-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("ml-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+  /* kiosk 轮换保持窗：从父页下钻进来（hash 命中）时先保持 20 秒不轮换。
+     ★ 声明必须早于任何 hold() 调用——初始 hash 解析就会调它，
+     若把 let 留在页尾的 kiosk 段，会因 TDZ 抛 ReferenceError 打断后续脚本。 */
+  let holdUntil = 0;
+  function hold() { holdUntil = Date.now() + 20000; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const r1 = (n) => Math.round(n * 10) / 10;
+  const r2 = (n) => Math.round(n * 100) / 100;
+  const r3 = (n) => Math.round(n * 1000) / 1000;
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技）
+         对象集与命名引契约 docs/RndIpdThemed.md §2.3 / §6 逐字：
+         5 个 AI 模型 = 灵犀（对话）、慧眼（视觉质检）、澜音（语音）、智荐（推荐）、御风（边缘）；
+         责任团队取自契约 §2.3 的 12 Scrum 团队（AI算法域 天玑 / 开阳，端侧协同 天权）。
+         本页二级数据（版本谱系 / 评测 / 训练曲线 / 线上 / 数据集）为自编，
+         但全部遵守：合计 = 分项之和、比率与派生指标一律现算、页面上不出现硬编码合计。
+         关键派生关系：
+           · F1 = 2 × 准确率 × 召回率 ÷ (准确率 + 召回率)           （评测表每行现算）
+           · KPI 当前版本 = 版本谱系末版 = 评测表高亮行             （单一版本数组派生）
+           · KPI 核心指标 = 最新版准确率 = 训练曲线最优点验证指标   （早停 checkpoint 口径）
+           · 日调用量 = Σ 近 24 小时 QPS × 3600 秒                  （不另写合计）
+           · 累计 GPU 卡时 = Σ 各版本卡时；累计样本 = Σ 各版本训练样本 ===== */
+
+  const PARENT = "大屏样板间-研发AI模型迭代1920.html";
+  const SLO_FAIL = 0.50;                 /* 线上失败率 SLO（%），五模型统一 */
+  const SEC_PER_HOUR = 3600;
+
+  /* 4.1 24 小时调用潮汐系数（五模型共用形状，幅度由各自基准 QPS 定） */
+  const DIURNAL = [
+    0.42, 0.31, 0.26, 0.24, 0.28, 0.38, 0.56, 0.78,
+    0.95, 1.08, 1.14, 1.10, 0.96, 1.02, 1.12, 1.18,
+    1.15, 1.06, 1.22, 1.35, 1.28, 1.02, 0.74, 0.55
+  ];
+  const HOURS = DIURNAL.map((_, h) => pad(h) + ":00");
+
+  /* 4.2 版本状态三态（末版恒为「生产」，其前一版为「灰度」，更早为「已下线」） */
+  const ST_CLS = { "已下线": "is-off", "灰度": "is-gray", "生产": "is-live" };
+
+  /* 4.3 五模型定义（name/kind 与契约 §2.3、§6 hash 键逐字一致） */
+  const MODELS = [
+    {
+      name: "灵犀", kind: "对话", team: "天玑", site: "上海中心", fam: "对话大模型 · MoE", quant: "INT8",
+      lossName: "训练交叉熵", metricName: "意图准确率",
+      train: { ep: 24, loss0: 2.86, lossEnd: 0.38, valStart: 71.5, bestAt: 21 },
+      qpsBase: 520, failBase: 0.24, storeUnit: 0.008,
+      vers: [
+        { v: "v1.0", date: "2025-03-18", chg: "首版意图识别 + FAQ 检索", prec: 88.2, rec: 84.6, lat: 480, size: 1280, gpu: 3200, hrs: 96, tr: 320, va: 18, te: 9 },
+        { v: "v1.1", date: "2025-07-04", chg: "多轮上下文 4K → 8K", prec: 90.4, rec: 87.1, lat: 430, size: 1280, gpu: 2600, hrs: 74, tr: 460, va: 24, te: 12 },
+        { v: "v1.2", date: "2025-11-12", chg: "指令微调 + 拒答策略", prec: 92.1, rec: 89.3, lat: 395, size: 1460, gpu: 3400, hrs: 88, tr: 610, va: 32, te: 16 },
+        { v: "v2.0", date: "2026-03-06", chg: "MoE 架构切换 · 工具调用", prec: 93.6, rec: 91.2, lat: 356, size: 2180, gpu: 9800, hrs: 216, tr: 980, va: 52, te: 26 },
+        { v: "v2.1", date: "2026-07-22", chg: "上下文 32K · INT8 量化", prec: 94.8, rec: 92.7, lat: 288, size: 1120, gpu: 6400, hrs: 148, tr: 1240, va: 66, te: 33 }
+      ]
+    },
+    {
+      name: "慧眼", kind: "视觉质检", team: "开阳", site: "成都中心", fam: "视觉检测 · 双头", quant: "INT8",
+      lossName: "训练总损失", metricName: "缺陷检出准确率",
+      train: { ep: 18, loss0: 1.94, lossEnd: 0.22, valStart: 74.2, bestAt: 16 },
+      qpsBase: 180, failBase: 0.16, storeUnit: 0.060,
+      vers: [
+        { v: "v1.0", date: "2025-04-09", chg: "首版缺陷分类 · ResNet 基线", prec: 91.5, rec: 89.7, lat: 62, size: 186, gpu: 2400, hrs: 68, tr: 86, va: 6, te: 3 },
+        { v: "v1.5", date: "2025-09-23", chg: "小样本增强 · 误检压降", prec: 93.8, rec: 92.4, lat: 54, size: 214, gpu: 3100, hrs: 82, tr: 152, va: 10, te: 5 },
+        { v: "v2.0", date: "2026-02-17", chg: "检测分割双头 · 多产线泛化", prec: 95.6, rec: 94.1, lat: 47, size: 268, gpu: 5600, hrs: 132, tr: 240, va: 15, te: 8 },
+        { v: "v2.2", date: "2026-06-30", chg: "INT8 部署 · 产线自适应", prec: 96.9, rec: 95.8, lat: 31, size: 96, gpu: 3800, hrs: 96, tr: 368, va: 22, te: 11 }
+      ]
+    },
+    {
+      name: "澜音", kind: "语音", team: "天玑", site: "上海中心", fam: "端到端 ASR", quant: "INT8 蒸馏",
+      lossName: "训练 CTC 损失", metricName: "识别准确率",
+      train: { ep: 20, loss0: 2.41, lossEnd: 0.31, valStart: 70.8, bestAt: 18 },
+      qpsBase: 340, failBase: 0.21, storeUnit: 0.045,
+      vers: [
+        { v: "v1.0", date: "2025-05-15", chg: "首版唤醒 + 命令词", prec: 90.8, rec: 88.4, lat: 210, size: 420, gpu: 2800, hrs: 74, tr: 210, va: 12, te: 6 },
+        { v: "v1.2", date: "2025-10-08", chg: "远场降噪 · 方言扩展", prec: 92.6, rec: 90.9, lat: 178, size: 468, gpu: 3300, hrs: 86, tr: 340, va: 19, te: 9 },
+        { v: "v2.0", date: "2026-04-11", chg: "端到端 ASR · 流式解码", prec: 95.1, rec: 93.5, lat: 142, size: 640, gpu: 7200, hrs: 168, tr: 620, va: 34, te: 17 },
+        { v: "v2.1", date: "2026-07-09", chg: "蒸馏小模型 · 端侧直出", prec: 96.2, rec: 94.9, lat: 96, size: 218, gpu: 4100, hrs: 104, tr: 810, va: 45, te: 22 }
+      ]
+    },
+    {
+      name: "智荐", kind: "推荐", team: "开阳", site: "成都中心", fam: "多场景排序", quant: "FP16",
+      lossName: "训练 LogLoss", metricName: "排序准确率",
+      train: { ep: 22, loss0: 0.86, lossEnd: 0.19, valStart: 66.4, bestAt: 19 },
+      qpsBase: 1260, failBase: 0.13, storeUnit: 0.004,
+      vers: [
+        { v: "v1.0", date: "2025-02-26", chg: "协同过滤基线上线", prec: 82.4, rec: 78.6, lat: 68, size: 320, gpu: 1900, hrs: 52, tr: 1520, va: 84, te: 42 },
+        { v: "v1.1", date: "2025-06-18", chg: "双塔召回 · 向量索引", prec: 85.1, rec: 81.9, lat: 61, size: 386, gpu: 2400, hrs: 66, tr: 2180, va: 120, te: 60 },
+        { v: "v1.3", date: "2025-12-03", chg: "多目标排序 · 位置去偏", prec: 87.9, rec: 85.2, lat: 54, size: 452, gpu: 3600, hrs: 94, tr: 3260, va: 180, te: 90 },
+        { v: "v2.0", date: "2026-04-28", chg: "序列建模 · 实时特征", prec: 90.3, rec: 88.1, lat: 42, size: 528, gpu: 6800, hrs: 158, tr: 4720, va: 262, te: 131 },
+        { v: "v2.2", date: "2026-08-05", chg: "多场景统一 · 冷启动增强", prec: 91.8, rec: 89.7, lat: 35, size: 296, gpu: 5200, hrs: 126, tr: 5860, va: 326, te: 163 }
+      ]
+    },
+    {
+      name: "御风", kind: "边缘", team: "天权", site: "深圳中心", fam: "端侧轻量视觉", quant: "INT4",
+      lossName: "训练总损失", metricName: "端侧识别准确率",
+      train: { ep: 16, loss0: 1.62, lossEnd: 0.27, valStart: 68.9, bestAt: 14 },
+      qpsBase: 96, failBase: 0.31, storeUnit: 0.050,
+      vers: [
+        { v: "v1.0", date: "2025-08-20", chg: "边缘视觉基线 · FP16", prec: 87.6, rec: 84.2, lat: 46, size: 128, gpu: 1600, hrs: 44, tr: 64, va: 5, te: 3 },
+        { v: "v1.2", date: "2026-01-15", chg: "剪枝 40% · 算子融合", prec: 89.9, rec: 87.3, lat: 38, size: 76, gpu: 2100, hrs: 58, tr: 118, va: 8, te: 4 },
+        { v: "v2.0", date: "2026-05-22", chg: "NPU 适配 · 动态分辨率", prec: 92.4, rec: 90.1, lat: 27, size: 92, gpu: 4300, hrs: 106, tr: 205, va: 14, te: 7 },
+        { v: "v2.1", date: "2026-08-12", chg: "INT4 量化 · 端侧自学习", prec: 93.7, rec: 91.6, lat: 18, size: 34, gpu: 2900, hrs: 78, tr: 296, va: 19, te: 10 }
+      ]
+    }
+  ];
+
+  /* 契约 §2.3 权威串（构造性断言用：MODELS 逐字拼接必须与其一致，防手滑改名） */
+  const AUTH_MODELS = "灵犀|对话;慧眼|视觉质检;澜音|语音;智荐|推荐;御风|边缘";
+  /* 契约 §2.3 的 12 团队名（责任团队合法性校验用） */
+  const AUTH_TEAMS = ["天枢", "天璇", "天玑", "天权", "玉衡", "开阳", "摇光", "青龙", "白虎", "朱雀", "玄武", "紫微"];
+
+  /* ===== 4.4 派生量：逐模型现算（版本状态 / F1 / 训练曲线 / 线上序列 / 数据集合计） ===== */
+  MODELS.forEach((m) => {
+    const n = m.vers.length;
+
+    /* —— 版本状态：末版生产、前一版灰度、更早已下线（单一规则派生，不逐条硬写）—— */
+    m.vers.forEach((v, k) => {
+      v.st = (k === n - 1) ? "生产" : (k === n - 2 ? "灰度" : "已下线");
+      v.f1 = r1(2 * v.prec * v.rec / (v.prec + v.rec));            /* F1 现算 */
+      v.ann = Math.round(v.tr * 1.6);                              /* 标注人时 ≈ 训练样本(万条) × 1.6 */
+    });
+    m.latest = m.vers[n - 1];
+    m.prev = m.vers[n - 2];
+    m.curVer = m.latest.v;
+    m.grayVer = m.vers[n - 2].v;
+    m.gpuSum = sum(m.vers.map((v) => v.gpu));
+    m.hrsSum = sum(m.vers.map((v) => v.hrs));
+    m.trSum = sum(m.vers.map((v) => v.tr));
+    m.annSum = sum(m.vers.map((v) => v.ann));
+    m.storeTB = r1(m.trSum * m.storeUnit);
+    m.trMax = Math.max.apply(null, m.vers.map((v) => v.tr));
+
+    /* —— 训练曲线：loss 逐点严格单调下降；验证指标升到最优轮（早停）后小幅回落 —— */
+    const ep = m.train.ep, bestAt = m.train.bestAt;
+    m.epochs = Array.from({ length: ep }, (_, k) => "E" + (k + 1));
+    const f = (t) => Math.exp(-3 * t);
+    m.loss = Array.from({ length: ep }, (_, k) => {
+      const t = k / (ep - 1);
+      const w = (f(t) - f(1)) / (f(0) - f(1));                     /* 1 → 0 严格递减 */
+      return r3(m.train.lossEnd + (m.train.loss0 - m.train.lossEnd) * w);
+    });
+    const valBest = m.latest.prec;                                 /* 最优点 = 最新版准确率（同一 checkpoint） */
+    m.val = Array.from({ length: ep }, (_, k) => {
+      const e = k + 1;
+      if (e === bestAt) return r2(valBest);
+      if (e < bestAt) {
+        const t = (e - 1) / (bestAt - 1);
+        const g = (1 - Math.exp(-2.6 * t)) / (1 - Math.exp(-2.6));
+        /* 波动项恒为负，保证最优点唯一且落在 bestAt */
+        return r2(m.train.valStart + (valBest - m.train.valStart) * g - 0.12 * Math.abs(Math.sin(e * 1.9)));
+      }
+      return r2(valBest - 0.06 * (e - bestAt) - 0.04 * Math.abs(Math.sin(e * 1.7)));
+    });
+    m.bestEp = bestAt;
+    m.bestVal = m.val[bestAt - 1];
+
+    /* —— 线上推理近 24 小时：QPS 潮汐、P99 时延、失败率；SLO 由离线时延基准派生 —— */
+    m.qps = DIURNAL.map((d) => Math.round(m.qpsBase * d));
+    m.p99 = DIURNAL.map((d) => r1(m.latest.lat * (0.95 + 0.60 * d)));
+    m.sloLat = r1(m.latest.lat * 1.72);
+    m.fail = DIURNAL.map((d, h) => r3(m.failBase * (0.72 + 0.50 * d) + (h === 19 ? 0.22 : 0)));
+    m.calls = sum(m.qps) * SEC_PER_HOUR;                           /* 日调用量 = Σ QPS × 3600 */
+    m.qpsPeak = Math.max.apply(null, m.qps);
+    m.qpsAvg = Math.round(sum(m.qps) / m.qps.length);
+    m.latOk = m.p99.filter((v) => v <= m.sloLat).length;
+    m.failOk = m.fail.filter((v) => v <= SLO_FAIL).length;
+    m.healthy = (m.latOk >= 23 && m.failOk >= 23);
+
+    /* —— 相对上一版的改善幅度（现算，供 KPI 与要点条使用）—— */
+    m.dPrec = r1(m.latest.prec - m.prev.prec);
+    m.dLat = r1((m.prev.lat - m.latest.lat) / m.prev.lat * 100);
+    m.dSize = r1((m.prev.size - m.latest.size) / m.prev.size * 100);
+  });
+
+  /* 五模型合计（呼应 AI 模型迭代页算力口径） */
+  const ALL = {
+    gpuSum: sum(MODELS.map((m) => m.gpuSum)),
+    hrsSum: sum(MODELS.map((m) => m.hrsSum)),
+    calls: sum(MODELS.map((m) => m.calls)),
+    verCnt: sum(MODELS.map((m) => m.vers.length))
+  };
+
+  /* ===== 5. 顶部时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("ml-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("ml-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 6. 模型切换器（对象切换器：tab 文本与契约 §6 hash 键逐字一致） ===== */
+  const switcher = $("ml-switcher");
+  switcher.innerHTML = MODELS.map((m, i) => (
+    '<button class="ml-sw-tab" type="button" data-i="' + i + '" title="切换到' + m.name + "（" + m.kind + "，← → 方向键）\">" +
+      "<b>" + m.name + "</b><span>" + m.kind + "</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".ml-sw-tab"));
+
+  /* ===== 7. 底部口径与要点（★ 图表 init 之前填充；全部由派生量现算） ===== */
+  const FOOT_ITEMS = [
+    { tag: "口径", t: "评测明细每行 F1 = 2 × 准确率 × 召回率 ÷ (准确率 + 召回率) 现算；准确率/召回率取各版本固定测试集，" +
+        "最新版指标 = 训练曲线最优轮（早停 checkpoint）的验证指标，二者同源不重复口径" },
+    { tag: "口径", t: "日调用量 = Σ 近 24 小时 QPS × " + SEC_PER_HOUR + " 秒（页面不写死合计）；" +
+        "线上 P99 为端到端时延，评测表「时延」为离线单次推理时延，两者口径不同、不勾稽" },
+    { tag: "口径", t: "五模型（" + MODELS.map((m) => m.name).join("、") + "）训练 Σ GPU 卡时 = " + fmtInt(ALL.gpuSum) +
+        " 卡时 / Σ 训练耗时 " + fmtInt(ALL.hrsSum) + " 小时，属年度「云资源与算力 3.1 亿元」投入口径（契约 §2.2），与 AI 模型迭代页同源" },
+    { tag: "要点", t: "五模型累计 " + ALL.verCnt + " 个版本在管：各模型末版为生产版、前一版为灰度回收版；" +
+        "五模型线上合计日调用 " + fmtDec(ALL.calls / 1e8, 2) + " 亿次" },
+    { tag: "要点", t: "版本晋级门槛：灰度版需连续 7 日 P99 与失败率双达 SLO 方可全量；" +
+        "失败率 SLO 统一 ≤ " + fmtDec(SLO_FAIL, 2) + "%，P99 SLO 按各模型离线时延基准 × 1.72 现算" }
+  ];
+  const track = $("ml-foot-track");
+  const footHtml = FOOT_ITEMS.map((a) => (
+    '<div class="ml-foot-item"><i style="color:' + (a.tag === "口径" ? C.amber : C.blue) + '">[' + a.tag + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = footHtml + footHtml;                          /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 8. 图表初始化 =====
+     ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize()
+     ★ 进 option 的一律是标量与数组（版本对象只在闭包里读，不塞进 series.data），杜绝循环引用 */
+  const makeChart = (id) => { const el = $(id); return el ? echarts.init(el) : null; };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = {
+    backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 }
+  };
+  const LEGEND = { show: true, top: 0, right: 2, itemWidth: 14, itemHeight: 8, textStyle: { color: C.textDim, fontSize: 11 } };
+  const trChart = makeChart("ml-chart-train");
+  const cpChart = makeChart("ml-chart-compute");
+  const onChart = makeChart("ml-chart-online");
+
+  /* 8.1 训练曲线：loss（左轴，严格下降）+ 验证指标（右轴，最优点 markPoint 早停标注） */
+  function trainOption(i) {
+    const m = MODELS[i];
+    const loss = m.loss.slice();
+    const val = m.val.slice();
+    const eps = m.epochs.slice();
+    const lossName = m.lossName;
+    const metricName = m.metricName;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 12, top: 36, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis",
+        formatter: (ps) => {
+          const k = ps[0].dataIndex;
+          return "<b>" + eps[k] + " 轮</b><br/>" + lossName + " <b style=\"color:" + C.amber + "\">" + fmtDec(loss[k], 3) + "</b>" +
+            "<br/>" + metricName + " <b style=\"color:" + C.blue + "\">" + fmtDec(val[k], 2) + "%</b>" +
+            (k + 1 === m.bestEp ? "<br/><span style=\"color:" + C.green + "\">最优 checkpoint（早停基线）</span>" : "");
+        }
+      }, TIP),
+      legend: Object.assign({ data: [lossName, metricName] }, LEGEND),
+      xAxis: {
+        type: "category", data: eps, boundaryGap: false,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: eps.length > 20 ? 2 : 1 })
+      },
+      yAxis: [
+        { type: "value", name: "Loss", min: 0, nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { formatter: (v) => fmtDec(v, 1) }),
+          splitLine: SPLIT_LINE, axisLine: { show: false } },
+        { type: "value", name: "验证 %", position: "right",
+          min: Math.floor(Math.min.apply(null, val) - 3), max: Math.ceil(Math.max.apply(null, val) + 1.5),
+          nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { formatter: (v) => fmtDec(v, 0) }),
+          splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: lossName, type: "line", yAxisIndex: 0, smooth: true, symbol: "none", z: 4,
+          data: loss,
+          lineStyle: { width: 2.4, color: C.amber },
+          itemStyle: { color: C.amber },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "rgba(255,194,77,.24)" }, { offset: 1, color: "rgba(255,194,77,.02)" }]) },
+          markPoint: {
+            symbol: "pin", symbolSize: 34, z: 8,
+            itemStyle: { color: C.orange },
+            label: { color: "#04101f", fontSize: 9.5, fontWeight: 700, formatter: (p) => fmtDec(p.value, 2) },
+            data: [{ type: "min", name: "最低 Loss" }]
+          } },
+        { name: metricName, type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 4, z: 5,
+          data: val,
+          lineStyle: { width: 2.6, color: C.blue }, itemStyle: { color: C.blue },
+          markPoint: {
+            symbol: "pin", symbolSize: 42, z: 9,
+            itemStyle: { color: C.green },
+            label: { color: "#04101f", fontSize: 10, fontWeight: 700, formatter: "最优 " + fmtDec(m.bestVal, 1) + "%" },
+            data: [{ coord: [m.bestEp - 1, m.bestVal] }]
+          },
+          markLine: {
+            silent: true, symbol: "none", z: 6,
+            lineStyle: { color: C.green, width: 1.2, type: "dashed" },
+            label: { show: true, position: "insideStartTop", color: C.green, fontSize: 10, formatter: "早停 E" + m.bestEp },
+            data: [{ xAxis: m.bestEp - 1 }]
+          } }
+      ]
+    };
+  }
+
+  /* 8.2 训练算力：GPU 卡时（柱，左轴）+ 训练耗时（线，右轴），x = 版本 */
+  function computeOption(i) {
+    const m = MODELS[i];
+    const vs = m.vers.map((v) => v.v);
+    const gpu = m.vers.map((v) => v.gpu);
+    const hrs = m.vers.map((v) => v.hrs);
+    const trs = m.vers.map((v) => v.tr);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 12, top: 36, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex;
+          return "<b>" + vs[k] + "</b><br/>GPU 卡时 <b style=\"color:" + C.violet + "\">" + fmtInt(gpu[k]) + "</b> 卡时" +
+            "<br/>训练耗时 <b style=\"color:" + C.cyan + "\">" + fmtInt(hrs[k]) + "</b> 小时" +
+            "<br/>训练样本 <b style=\"color:" + C.blue + "\">" + fmtInt(trs[k]) + "</b> 万条" +
+            "<br/>等效并行 <b>" + fmtDec(gpu[k] / hrs[k], 1) + "</b> 卡";
+        }
+      }, TIP),
+      legend: Object.assign({ data: ["GPU 卡时", "训练耗时"] }, LEGEND),
+      xAxis: {
+        type: "category", data: vs,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontWeight: 700, color: "#bcd2f8" })
+      },
+      yAxis: [
+        { type: "value", name: "卡时", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false } },
+        { type: "value", name: "小时", position: "right", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: AXIS_LABEL, splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "GPU 卡时", type: "bar", yAxisIndex: 0, barWidth: 26, z: 2,
+          data: gpu,
+          itemStyle: { borderRadius: [6, 6, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: C.violet }, { offset: 1, color: "rgba(47,111,214,.28)" }]) },
+          label: { show: true, position: "top", color: C.textDim, fontSize: 10,
+            formatter: (p) => fmtInt(p.value) } },
+        { name: "训练耗时", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 7, z: 5,
+          data: hrs,
+          lineStyle: { width: 2.4, color: C.cyan }, itemStyle: { color: C.cyan, borderColor: "#0b1738", borderWidth: 2 } }
+      ]
+    };
+  }
+
+  /* 8.3 线上推理：QPS 柱（左轴）+ P99 时延线（右轴，SLO 参考线）+ 失败率线（右轴 offset，SLO 参考线） */
+  function onlineOption(i) {
+    const m = MODELS[i];
+    const qps = m.qps.slice();
+    const p99 = m.p99.slice();
+    const fail = m.fail.slice();
+    const slo = m.sloLat;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 66, top: 36, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const k = ps[0].dataIndex;
+          const okLat = p99[k] <= slo, okFail = fail[k] <= SLO_FAIL;
+          return "<b>" + HOURS[k] + "</b><br/>QPS <b style=\"color:" + C.blue + "\">" + fmtInt(qps[k]) + "</b>" +
+            "　调用 <b>" + fmtInt(qps[k] * SEC_PER_HOUR / 10000) + "</b> 万次/时" +
+            "<br/>P99 时延 <b style=\"color:" + (okLat ? C.amber : C.red) + "\">" + fmtDec(p99[k], 1) + "</b> ms" +
+            "（SLO " + fmtDec(slo, 1) + "，" + (okLat ? "达标" : "超标") + "）" +
+            "<br/>失败率 <b style=\"color:" + (okFail ? C.green : C.red) + "\">" + fmtDec(fail[k], 3) + "</b>%" +
+            "（SLO " + fmtDec(SLO_FAIL, 2) + "，" + (okFail ? "达标" : "超标") + "）";
+        }
+      }, TIP),
+      legend: Object.assign({ data: ["QPS", "P99 时延", "失败率"] }, LEGEND),
+      xAxis: {
+        type: "category", data: HOURS,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 2, formatter: (v) => v.slice(0, 2) })
+      },
+      yAxis: [
+        { type: "value", name: "QPS", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false } },
+        { type: "value", name: "ms", position: "right",
+          min: 0, max: Math.ceil(Math.max(slo, Math.max.apply(null, p99)) * 1.18),
+          nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { formatter: (v) => fmtDec(v, 0) }),
+          splitLine: { show: false }, axisLine: { show: false } },
+        { type: "value", name: "%", position: "right", offset: 42,
+          min: 0, max: Math.ceil(Math.max(SLO_FAIL, Math.max.apply(null, fail)) * 1.4 * 100) / 100,
+          nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { formatter: (v) => fmtDec(v, 2) }),
+          splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "QPS", type: "bar", yAxisIndex: 0, barWidth: 10, z: 2,
+          data: qps,
+          itemStyle: { borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "rgba(92,157,255,.92)" }, { offset: 1, color: "rgba(92,157,255,.16)" }]) } },
+        { name: "P99 时延", type: "line", yAxisIndex: 1, smooth: true, symbol: "none", z: 5,
+          data: p99,
+          lineStyle: { width: 2.2, color: C.amber }, itemStyle: { color: C.amber },
+          markLine: {
+            silent: true, symbol: "none", z: 7,
+            lineStyle: { color: C.amber, width: 1.4, type: "dashed" },
+            label: { show: true, position: "insideEndTop", color: C.amber, fontSize: 10, fontWeight: 700,
+              formatter: "P99 SLO " + fmtDec(slo, 1) + " ms" },
+            data: [{ yAxis: slo }]
+          } },
+        { name: "失败率", type: "line", yAxisIndex: 2, smooth: true, symbol: "circle", symbolSize: 4, z: 6,
+          data: fail,
+          lineStyle: { width: 2, color: C.red }, itemStyle: { color: C.red },
+          markLine: {
+            silent: true, symbol: "none", z: 7,
+            lineStyle: { color: C.red, width: 1.4, type: "dotted" },
+            label: { show: true, position: "insideEndBottom", color: C.red, fontSize: 10, fontWeight: 700,
+              formatter: "失败率 SLO " + fmtDec(SLO_FAIL, 2) + "%" },
+            data: [{ yAxis: SLO_FAIL }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 9. KPI 带 / 版本谱系 / 评测表 / 数据集台账（随模型切换重绘） ===== */
+  function countUp(el, target, dec) {
+    const show = (x) => (dec === 0 ? fmtInt(x) : fmtDec(x, dec));   /* 整数走千分位，小数走定点 */
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = show(target * e);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = show(target);
+    })(t0);
+  }
+
+  const band = $("ml-band");
+  function renderKpi(i) {
+    const m = MODELS[i];
+    const defs = [
+      { icon: "◆", label: "当前版本", text: m.curVer, cls: "",
+        sub: m.latest.date + " 发布 · 状态 <b>" + m.latest.st + "</b> · 灰度版 <b>" + m.grayVer + "</b>" },
+      { icon: "◎", label: m.metricName, val: m.latest.prec, unit: "%", dec: 1, cls: "is-good",
+        sub: "较上版 <b>+" + fmtDec(m.dPrec, 1) + "</b> pct · 召回 <b>" + fmtDec(m.latest.rec, 1) + "%</b> · F1 <b>" + fmtDec(m.latest.f1, 1) + "</b>" },
+      { icon: "◉", label: "在线状态", text: m.healthy ? "生产 · 健康" : "生产 · 承压",
+        cls: m.healthy ? " is-good" : " is-warn",
+        sub: "P99 达标 <b>" + m.latOk + "/24</b> h · 失败率达标 <b>" + m.failOk + "/24</b> h" },
+      { icon: "⇅", label: "日调用量", val: m.calls / 10000, unit: "万次", dec: 0, cls: "",
+        sub: "峰值 QPS <b>" + fmtInt(m.qpsPeak) + "</b> · 均值 <b>" + fmtInt(m.qpsAvg) + "</b> · Σ 24h × 3600s" },
+      { icon: "▤", label: "模型体积", val: m.latest.size, unit: "MB", dec: 0, cls: "",
+        sub: m.quant + " · 较上版 <b>" + (m.dSize >= 0 ? "−" : "+") + fmtDec(Math.abs(m.dSize), 1) + "%</b> · 时延 <b>" + fmtInt(m.latest.lat) + " ms</b>" },
+      { icon: "⚙", label: "累计训练算力", val: m.gpuSum, unit: "卡时", dec: 0, cls: "",
+        sub: "耗时 <b>" + fmtInt(m.hrsSum) + "</b> h · 样本 <b>" + fmtInt(m.trSum) + "</b> 万条 · " + m.vers.length + " 版累计" }
+    ];
+    band.innerHTML = defs.map((k, j) => (
+      '<div class="ml-kpi' + k.cls + '">' +
+        '<div class="ml-kpi-icon">' + k.icon + "</div>" +
+        '<div class="ml-kpi-main">' +
+          '<div class="ml-kpi-label">' + k.label + "</div>" +
+          (k.text != null
+            ? '<div class="ml-kpi-num"><span class="ml-kpi-val is-text">' + k.text + "</span></div>"
+            : '<div class="ml-kpi-num"><span class="ml-kpi-val" id="ml-kpi-' + j + '">0</span><span class="ml-kpi-unit">' + k.unit + "</span></div>") +
+          '<div class="ml-kpi-sub">' + k.sub + "</div>" +
+        "</div>" +
+      "</div>"
+    )).join("");
+    defs.forEach((k, j) => { if (k.text == null) countUp($("ml-kpi-" + j), k.val, k.dec); });
+  }
+
+  const lineage = $("ml-lineage");
+  let lgItems = [];
+  function renderLineage(i) {
+    const m = MODELS[i];
+    const n = m.vers.length;
+    lineage.innerHTML = m.vers.map((v, k) => (
+      '<div class="ml-lg-item' + (k === n - 1 ? " is-cur" : "") + '" data-k="' + k + '">' +
+        '<div class="ml-lg-dot"></div>' +
+        '<div class="ml-lg-card">' +
+          '<div class="ml-lg-ver">' + v.v + "</div>" +
+          '<div class="ml-lg-date">' + v.date + "</div>" +
+          '<span class="ml-badge ' + ST_CLS[v.st] + '">' + v.st + "</span>" +
+          '<div class="ml-lg-chg">' + v.chg + "</div>" +
+          '<div class="ml-lg-metric">准确率 <b>' + fmtDec(v.prec, 1) + "%</b> · " + fmtInt(v.lat) + " ms</div>" +
+        "</div>" +
+      "</div>"
+    )).join("");
+    lgItems = Array.from(lineage.children);
+    $("ml-lg-cnt").textContent = String(n);
+    $("ml-lg-cur").textContent = m.curVer;
+    $("ml-lg-gray").textContent = m.grayVer;
+  }
+
+  const tbody = $("ml-tbody");
+  let tbRows = [];
+  function renderTable(i) {
+    const m = MODELS[i];
+    const n = m.vers.length;
+    tbody.innerHTML = m.vers.map((v, k) => (
+      '<li class="' + (k === n - 1 ? "is-latest" : "") + '" data-k="' + k + '">' +
+        '<span class="ml-cell-ver"><b>' + v.v + "</b></span>" +
+        "<span>" + fmtDec(v.prec, 1) + "%</span>" +
+        "<span>" + fmtDec(v.rec, 1) + "%</span>" +
+        "<span>" + fmtDec(v.f1, 1) + "</span>" +
+        "<span>" + fmtInt(v.lat) + "</span>" +
+        "<span>" + fmtInt(v.size) + "</span>" +
+      "</li>"
+    )).join("");
+    tbRows = Array.from(tbody.children);
+    $("ml-tb-latest").textContent = m.curVer;
+    $("ml-tfoot").innerHTML = "F1 = 2×准确率×召回率÷(准确率+召回率) 现算；" + m.curVer +
+      " 较首版 准确率 <b>+" + fmtDec(m.latest.prec - m.vers[0].prec, 1) + "</b> pct · 时延 <b>−" +
+      fmtDec((m.vers[0].lat - m.latest.lat) / m.vers[0].lat * 100, 1) + "%</b>";
+  }
+
+  const dataBox = $("ml-data");
+  function renderData(i) {
+    const m = MODELS[i];
+    const n = m.vers.length;
+    const rows = m.vers.map((v, k) => (
+      '<div class="ml-ds-row' + (k === n - 1 ? " is-cur" : "") + '">' +
+        '<div class="ml-ds-top">' +
+          '<span class="ml-ds-ver">' + v.v + " 数据集</span>" +
+          '<span class="ml-ds-num">' + fmtInt(v.tr) + "<i>万条训练</i></span>" +
+        "</div>" +
+        '<span class="ml-ds-bar"><i style="width:' + fmtDec(v.tr / m.trMax * 100, 1) +
+          "%; background: linear-gradient(90deg, " + (k === n - 1 ? C.amber : C.blue) + ", rgba(92,157,255,.22));\"></i></span>" +
+        '<div class="ml-ds-sub">验证 <b>' + fmtInt(v.va) + "</b> 万 · 测试 <b>" + fmtInt(v.te) +
+          "</b> 万 · 标注 <b>" + fmtInt(v.ann) + "</b> 人时 · 训练 <b>" + fmtInt(v.hrs) + "</b> h</div>" +
+      "</div>"
+    )).join("");
+    const tiles = (
+      '<div class="ml-ds-tiles">' +
+        '<div class="ml-ds-tile"><span>累计样本</span><b>' + fmtInt(m.trSum) + "<i>万条</i></b></div>" +
+        '<div class="ml-ds-tile"><span>累计标注</span><b>' + fmtInt(m.annSum) + "<i>人时</i></b></div>" +
+        '<div class="ml-ds-tile"><span>存储占用</span><b>' + fmtDec(m.storeTB, 1) + "<i>TB</i></b></div>" +
+      "</div>"
+    );
+    dataBox.innerHTML = rows + tiles;
+    $("ml-ds-sum").textContent = fmtInt(m.trSum);
+  }
+
+  /* ===== 10. 模型切换主流程 ===== */
+  let idx = 0;
+  let scanIdx = 0;
+  let rowIdx = 0;
+  function applyModel(i) {
+    const n = MODELS.length;
+    idx = ((i % n) + n) % n;
+    const m = MODELS[idx];
+
+    $("ml-title").textContent = m.name + " · 模型详情";
+    $("ml-crumb-obj").textContent = m.name + "（" + m.kind + "）";
+    $("ml-chip-ver").textContent = m.curVer;
+    $("ml-meta-team").textContent = m.team + " · " + m.site;
+    $("ml-meta-fam").textContent = m.fam;
+    swTabs.forEach((b, k) => b.classList.toggle("is-active", k === idx));
+
+    renderKpi(idx);
+    renderLineage(idx);
+    renderTable(idx);
+    renderData(idx);
+
+    trChart.setOption(trainOption(idx), true);                    /* 轮数/量纲随模型变化 → notMerge */
+    cpChart.setOption(computeOption(idx), true);
+    onChart.setOption(onlineOption(idx), true);
+
+    $("ml-tr-ep").textContent = String(m.train.ep);
+    $("ml-tr-best").textContent = "E" + m.bestEp + " · " + fmtDec(m.bestVal, 1) + "%";
+    $("ml-cp-gpu").textContent = fmtInt(m.gpuSum);
+    $("ml-cp-hour").textContent = fmtInt(m.hrsSum);
+    $("ml-on-peak").textContent = fmtInt(m.qpsPeak);
+    $("ml-on-slo").textContent = fmtDec(m.sloLat, 1);
+    $("ml-on-slof").textContent = fmtDec(SLO_FAIL, 2);
+
+    scanIdx = 0;
+    rowIdx = 0;
+    playScan();
+    playRow();
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(m.name));
+  }
+
+  /* 版本谱系节点 / 评测表行轮播高亮，制造"活性" */
+  function playScan() {
+    if (!lgItems.length) return;
+    lgItems.forEach((el, k) => el.classList.toggle("is-scan", k === scanIdx));
+    scanIdx = (scanIdx + 1) % lgItems.length;
+  }
+  setInterval(playScan, 2200);
+
+  function playRow() {
+    if (!tbRows.length) return;
+    tbRows.forEach((el, k) => el.classList.toggle("is-active", k === rowIdx));
+    rowIdx = (rowIdx + 1) % tbRows.length;
+  }
+  setInterval(playRow, 2600);
+
+  /* 线上曲线逐时轮播提示 */
+  let onIdx = 0;
+  setInterval(() => {
+    onChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: onIdx });
+    onIdx = (onIdx + 1) % HOURS.length;
+  }, 3000);
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 ===== */
+  swTabs.forEach((b) => b.addEventListener("click", () => { applyModel(Number(b.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyModel(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyModel(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* hash 契约：decodeURIComponent(location.hash.slice(1)) → trim + 全角空白剔除归一 → 匹配 5 模型名。
+     HASH_ALIAS 收「模型名（类型）」「灵犀模型」等常见别名，父页写 encodeURIComponent(对象名)。 */
+  const HASH_ALIAS = {};
+  MODELS.forEach((m) => {
+    HASH_ALIAS[m.name + "模型"] = m.name;
+    HASH_ALIAS[m.name + "（" + m.kind + "）"] = m.name;
+    HASH_ALIAS[m.name + "(" + m.kind + ")"] = m.name;
+    HASH_ALIAS[m.kind] = m.name;
+  });
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    if (HASH_ALIAS[s]) s = HASH_ALIAS[s];
+    return MODELS.findIndex((m) => m.name === s);
+  }
+  const hit = resolveHash(location.hash);
+  applyModel(hit >= 0 ? hit : 0);
+  if (hit >= 0) hold();
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applyModel(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 14 秒切下一模型；鼠标停在切换器上时暂停。
+     从父页下钻进来（hash 命中）时先保持 20 秒不轮换，否则读者还没看清这个模型就被切走。 */
+  let timer = null;
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyModel(idx + 1); }, 14000);
+  }
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 开发期自检：勾稽关系不成立时在控制台报出（不影响页面渲染） ===== */
+  const checks = [
+    ["五模型名/类型与契约 §2.3 逐字（构造性断言）",
+      MODELS.map((m) => m.name + "|" + m.kind).join(";") === AUTH_MODELS],
+    ["hash 五模型名均可解析（构造性断言）",
+      MODELS.every((m, i) => resolveHash("#" + encodeURIComponent(m.name)) === i)],
+    ["切换器 tab 数 = 5 且文本与契约 hash 键逐字",
+      swTabs.length === 5 && swTabs.every((b, i) => b.querySelector("b").textContent === MODELS[i].name)],
+    ["版本谱系末版 = KPI 当前版本 = 评测表高亮行 = 顶栏 chip",
+      MODELS.every((m) => {
+        const last = m.vers[m.vers.length - 1];
+        return last.v === m.curVer && last.v === m.latest.v && last.st === "生产";
+      }) && $("ml-chip-ver").textContent === MODELS[idx].curVer],
+    ["版本状态：每模型恰 1 个生产版 + 1 个灰度版，其余已下线",
+      MODELS.every((m) => m.vers.filter((v) => v.st === "生产").length === 1 &&
+        m.vers.filter((v) => v.st === "灰度").length === 1 &&
+        m.vers.filter((v) => v.st === "已下线").length === m.vers.length - 2)],
+    ["版本发布日期严格递增",
+      MODELS.every((m) => m.vers.every((v, k) => k === 0 || v.date > m.vers[k - 1].date))],
+    ["训练曲线 loss 逐点单调下降且末值 < 首值",
+      MODELS.every((m) => m.loss.every((v, k) => k === 0 || v < m.loss[k - 1]) &&
+        m.loss[m.loss.length - 1] < m.loss[0])],
+    ["训练曲线最优点唯一且 = 最新版准确率（早停 checkpoint 同源）",
+      MODELS.every((m) => {
+        const mx = Math.max.apply(null, m.val);
+        const cnt = m.val.filter((v) => v === mx).length;
+        return cnt === 1 && m.val[m.bestEp - 1] === mx && Number(fmtDec(mx, 1)) === m.latest.prec;
+      })],
+    ["评测表每版指标齐全（准确率/召回率/F1/时延/体积 皆为有限正数）",
+      MODELS.every((m) => m.vers.every((v) =>
+        [v.prec, v.rec, v.f1, v.lat, v.size].every((x) => Number.isFinite(x) && x > 0)))],
+    ["评测表 F1 = 2×准确率×召回率÷(准确率+召回率) 现算一致",
+      MODELS.every((m) => m.vers.every((v) => Math.abs(v.f1 - Math.round(2 * v.prec * v.rec / (v.prec + v.rec) * 10) / 10) < 1e-9))],
+    ["评测指标随版本单调改善（准确率↑ 召回率↑ 时延↓）",
+      MODELS.every((m) => m.vers.every((v, k) => k === 0 ||
+        (v.prec > m.vers[k - 1].prec && v.rec > m.vers[k - 1].rec && v.lat < m.vers[k - 1].lat)))],
+    ["线上日调用量 = Σ 24 小时 QPS × 3600（不写死合计）",
+      MODELS.every((m) => m.qps.length === 24 && m.calls === sum(m.qps) * SEC_PER_HOUR)],
+    ["线上三序列长度齐为 24 且 SLO 参考线为正",
+      MODELS.every((m) => m.p99.length === 24 && m.fail.length === 24 && m.sloLat > 0 && SLO_FAIL > 0)],
+    ["SLO 达标小时数落在 0~24 且至少 20 小时达标",
+      MODELS.every((m) => m.latOk >= 20 && m.latOk <= 24 && m.failOk >= 20 && m.failOk <= 24)],
+    ["累计 GPU 卡时 / 训练耗时 / 训练样本 = 各版本之和",
+      MODELS.every((m) => m.gpuSum === sum(m.vers.map((v) => v.gpu)) &&
+        m.hrsSum === sum(m.vers.map((v) => v.hrs)) && m.trSum === sum(m.vers.map((v) => v.tr)))],
+    ["数据集每版 训练 > 验证 > 测试 且逐版扩充",
+      MODELS.every((m) => m.vers.every((v, k) => v.tr > v.va && v.va > v.te &&
+        (k === 0 || v.tr > m.vers[k - 1].tr)))],
+    ["五模型合计卡时 = 各模型累计之和（AI 模型迭代页算力口径同源）",
+      ALL.gpuSum === sum(MODELS.map((m) => m.gpuSum)) && ALL.gpuSum > 0],
+    ["责任团队皆属契约 §2.3 的 12 个 Scrum 团队",
+      MODELS.every((m) => AUTH_TEAMS.indexOf(m.team) >= 0)]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单模型详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
