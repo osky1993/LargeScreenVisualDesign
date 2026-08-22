@@ -107,10 +107,22 @@ SUB_ZL = "大屏样板间-研发物料认证台账1920.html"
 SUB_GP = "大屏样板间-研发数据集与训练台账1920.html"
 
 
+# ---- 二期扩充 W9：C 型横向对比 ×4 + E 型关系图谱 ×3（第 3 个子页，锚点再避开前两个）----
+STAGES6 = ["概念", "计划", "开发", "验证", "发布", "周期"]
+SUB_ZC = "大屏样板间-研发四线组合对比1920.html"
+SUB_HP = "大屏样板间-研发阶段停留对比1920.html"
+SUB_HF = "大屏样板间-研发12团队效能对比1920.html"
+SUB_KJ = "大屏样板间-研发五群能力对比1920.html"
+SUB_MZ = "大屏样板间-研发四域依赖图谱1920.html"
+SUB_NV = "大屏样板间-研发跨站协作图谱1920.html"
+SUB_PV = "大屏样板间-研发技能图谱1920.html"
+
+
 PAGES = [
     {
         "file": "大屏样板间-研发产品组合与路标1920.html",
         "charts": [
+            {"chartId": "lb-chart-quad", "names": LINES4, "sub": SUB_ZC},
             {"chartId": "lb-chart-funnel", "names": CHARTER3, "match": CHARTER3_MATCH, "sub": SUB_CH},
         ],
         "targets": [
@@ -120,6 +132,7 @@ PAGES = [
     {
         "file": "大屏样板间-研发IPD管道与评审1920.html",
         "charts": [
+            {"chartId": "ip-chart-box", "names": STAGES6, "sub": SUB_HP},
             {"chartId": "ip-chart-tr", "names": TRPTS6, "sub": SUB_YV},
         ],
         "targets": [
@@ -135,6 +148,9 @@ PAGES = [
     # ---- 二期 · 敏捷执行（W3）----
     {
         "file": "大屏样板间-研发敏捷交付总览1920.html",
+        "charts": [
+            {"chartId": "ag-chart-vel", "names": TEAMS12, "sub": SUB_HF},
+        ],
         "panels": [
             {"panelTitle": "障碍清单", "label": "障碍台账", "sub": SUB_DM},
         ],
@@ -164,6 +180,7 @@ PAGES = [
     {
         "file": "大屏样板间-研发软硬云AI集成协同1920.html",
         "charts": [
+            {"chartId": "ct-chart-dep", "names": DOMAINS4, "sub": SUB_MZ},
             {"chartId": "ct-chart-if", "names": IFPAIRS6, "sub": SUB_RY},
         ],
         "targets": [
@@ -191,6 +208,9 @@ PAGES = [
     # ---- 四期 · 组织与资产（W5）----
     {
         "file": "大屏样板间-研发多中心布局1920.html",
+        "charts": [
+            {"chartId": "gq-chart-graph", "names": SITES6, "sub": SUB_NV},
+        ],
         "targets": [
             {"rows": "#gq-tbody li", "names": SITES6, "sub": SUB_BY},
         ],
@@ -214,6 +234,7 @@ PAGES = [
         # 该页无表格：走图表画布 click（覆盖率箱线，类目名即五域仓库群）+ 面板级入口兜底
         "file": "大屏样板间-研发工程效能1920.html",
         "charts": [
+            {"chartId": "dx-chart-xp", "names": REPOS5, "sub": SUB_KJ},
             {"chartId": "dx-chart-coverage", "names": REPOS5, "sub": SUB_GC},
         ],
         "panels": [
@@ -245,6 +266,7 @@ PAGES = [
         # 岗位只存在于图表里（rc-tbody 是六职能，不是岗位），故走画布 click + 面板入口
         "file": "大屏样板间-研发人才与能力1920.html",
         "charts": [
+            {"chartId": "rc-chart-cloud", "names": FUNCS6, "sub": SUB_PV},
             {"chartId": "rc-chart-post", "names": POSTS10, "sub": SUB_RL},
             {"chartId": "rc-chart-pyramid", "names": FUNCS6, "sub": SUB_XN},
         ],

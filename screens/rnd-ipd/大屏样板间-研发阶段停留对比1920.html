@@ -1,0 +1,1288 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发阶段停留对比</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --hp-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .hp-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 104px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .hp-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .hp-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .hp-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 8px 8px;
+  }
+  .hp-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .hp-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .hp-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .hp-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .hp-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .hp-crumb em { font-style: normal; color: #d3e2ff; }
+  .hp-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .hp-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .hp-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .hp-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .hp-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .hp-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .hp-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .hp-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .hp-chips { display: flex; align-items: center; gap: 9px; }
+  .hp-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 132px; padding: 7px 14px; border-radius: 9px;
+    border: 1px solid rgba(92, 157, 255, 0.34); background: linear-gradient(160deg, rgba(24, 44, 104, 0.6), rgba(18, 34, 78, 0.55));
+  }
+  .hp-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .hp-chip b { font: 700 15px/1 var(--hp-mono); letter-spacing: 0.05em; color: #cfe0ff; white-space: nowrap; }
+  .hp-chip.is-key { border-color: rgba(255, 194, 77, 0.5); background: linear-gradient(160deg, rgba(72, 52, 14, 0.55), rgba(18, 34, 78, 0.55)); }
+  .hp-chip.is-key b { color: #ffd489; }
+  .hp-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .hp-clock-time { font: 700 26px/1 var(--hp-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .hp-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（整行 6 枚，高度写死） ===== */
+  .hp-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .hp-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 8px 16px;
+  }
+  .hp-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .hp-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .hp-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .hp-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .hp-kpi.is-red::before { background: linear-gradient(90deg, var(--rnd-red), transparent); }
+  .hp-kpi.is-red::after { background: radial-gradient(circle, rgba(255, 95, 107, 0.15), transparent 68%); }
+  .hp-kpi-label { font-size: 12px; letter-spacing: 0.08em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .hp-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .hp-kpi-val { font: 700 28px/1 var(--hp-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .hp-kpi.is-amber .hp-kpi-val { color: #ffd489; }
+  .hp-kpi.is-red .hp-kpi-val { color: #ffb0b7; }
+  .hp-kpi-unit { font-size: 12px; color: var(--rnd-text-dim); }
+  .hp-kpi-sub { font-size: 10.5px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hp-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体 ===== */
+  .hp-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .hp-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .hp-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .hp-panel.is-hero::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); width: 96px; }
+  .hp-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .hp-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .hp-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .hp-panel.is-hero .hp-panel-head h2::before { color: var(--rnd-amber); }
+  .hp-panel-tag { font-size: 11.5px; letter-spacing: 0.05em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+  .hp-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .hp-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 卡壳诊断清单（★ 高度写死：JS 填充的兄弟块不得压矮同 flex 容器里的图表） ===== */
+  .hp-jamwrap { flex: none; height: 300px; }
+  .hp-jam { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 7px; overflow: hidden; }
+  .hp-jam li {
+    min-height: 0; display: grid; grid-template-columns: 46px 1fr 74px; align-items: center; gap: 10px;
+    padding: 5px 11px; border-radius: 9px; cursor: pointer;
+    border: 1px solid rgba(255, 95, 107, 0.24); background: linear-gradient(120deg, rgba(70, 24, 38, 0.44), rgba(14, 26, 66, 0.5));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .hp-jam li:hover { border-color: rgba(255, 95, 107, 0.7); box-shadow: 0 0 14px -3px rgba(255, 95, 107, 0.6); }
+  .hp-jam li.is-sel { border-color: rgba(255, 194, 77, 0.9); box-shadow: inset 0 0 0 1px rgba(255, 194, 77, 0.45), 0 0 16px -4px rgba(255, 194, 77, 0.7); }
+  .hp-jam-rank { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  .hp-jam-rank b { font: 700 17px/1 var(--hp-mono); color: #ffb0b7; }
+  .hp-jam-rank span { font-size: 9px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.9); }
+  .hp-jam-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .hp-jam-t1 { font-size: 12.5px; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hp-jam-t1 b { font-weight: 700; color: #fff; }
+  .hp-jam-t1 u { text-decoration: none; color: #ffd489; font-weight: 700; }
+  .hp-jam-t2 { font-size: 10.5px; color: rgba(200, 214, 242, 0.88); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hp-badge { display: inline-block; padding: 0 6px; border-radius: 5px; font-size: 9.5px; letter-spacing: 0.04em; margin-right: 5px; }
+  .hp-badge.is-queue { color: #ffd489; background: rgba(255, 194, 77, 0.16); border: 1px solid rgba(255, 194, 77, 0.4); }
+  .hp-badge.is-res { color: #9de3d9; background: rgba(70, 214, 200, 0.14); border: 1px solid rgba(70, 214, 200, 0.4); }
+  .hp-badge.is-req { color: #cbbcf7; background: rgba(169, 140, 245, 0.16); border: 1px solid rgba(169, 140, 245, 0.4); }
+  .hp-badge.is-tech { color: #ffb59a; background: rgba(255, 157, 92, 0.16); border: 1px solid rgba(255, 157, 92, 0.42); }
+  .hp-jam-num { text-align: right; font-variant-numeric: tabular-nums; }
+  .hp-jam-num b { display: block; font: 700 19px/1.1 var(--hp-mono); color: #ff8f99; }
+  .hp-jam-num span { font-size: 9.5px; color: var(--rnd-text-dim); }
+
+  /* ===== 底部口径滚动条 ===== */
+  .hp-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .hp-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .hp-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: hp-blink 1.6s ease-in-out infinite; }
+  @keyframes hp-blink { 50% { opacity: 0.35; } }
+  .hp-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .hp-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: hp-ticker 76s linear infinite; will-change: transform; }
+  .hp-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .hp-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes hp-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .hp-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="hp-stage" id="hp-stage">
+    <!-- mockflag:begin --><div class="hp-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="hp-error" id="hp-error" role="alert">ECharts 资源加载失败，KPI 与卡壳诊断清单不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（页头正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="hp-header">
+      <div class="hp-head-left">
+        <div class="hp-crumb">
+          <a class="hp-crumb-up" href="大屏样板间-研发IPD管道与评审1920.html" title="返回上级专题页（Esc）">‹ 返回 IPD管道与评审</a><i>›</i>
+          <b>云麓智联科技</b><i>›</i><span>IPD 管道与评审</span><i>›</i><em id="hp-crumb-obj">--</em>
+        </div>
+        <div class="hp-head-title-row">
+          <div class="hp-head-title">阶段停留对比</div>
+          <div class="hp-head-meta">
+            <span>六阶段 × <b>8</b> 个重点项目 · 横向 PK</span><i>|</i>
+            <span>轮巡 <b>4s</b> · ← → 切阶段 · Esc 返回</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="hp-head-right">
+        <div class="hp-chips">
+          <div class="hp-chip"><span>DATA AS OF</span><b>2026-08-20</b></div>
+          <div class="hp-chip is-key"><span>FOCUS</span><b id="hp-chip-focus">--</b></div>
+        </div>
+        <div class="hp-clock" aria-label="实时时钟">
+          <span class="hp-clock-time" id="hp-clock-time">--:--:--</span>
+          <span class="hp-clock-date" id="hp-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：六阶段 / Σ在研 / 停留最长阶段 / 最慢项目 / 离群组合 / 平均阶段周期 -->
+    <section class="hp-kpis" aria-label="阶段停留核心指标">
+      <div class="hp-kpi">
+        <div class="hp-kpi-label">IPD 阶段数</div>
+        <div class="hp-kpi-num"><span class="hp-kpi-val" id="hp-kpi-0">0</span><span class="hp-kpi-unit">个阶段</span></div>
+        <div class="hp-kpi-sub" id="hp-kpi-0s">--</div>
+      </div>
+      <div class="hp-kpi">
+        <div class="hp-kpi-label">Σ 在研项目</div>
+        <div class="hp-kpi-num"><span class="hp-kpi-val" id="hp-kpi-1">0</span><span class="hp-kpi-unit">个</span></div>
+        <div class="hp-kpi-sub" id="hp-kpi-1s">--</div>
+      </div>
+      <div class="hp-kpi is-amber">
+        <div class="hp-kpi-label">停留最长阶段（中位）</div>
+        <div class="hp-kpi-num"><span class="hp-kpi-val" id="hp-kpi-2">0</span><span class="hp-kpi-unit">天</span></div>
+        <div class="hp-kpi-sub" id="hp-kpi-2s">--</div>
+      </div>
+      <div class="hp-kpi is-red">
+        <div class="hp-kpi-label">最慢项目（累计停留）</div>
+        <div class="hp-kpi-num"><span class="hp-kpi-val" id="hp-kpi-3">0</span><span class="hp-kpi-unit">天</span></div>
+        <div class="hp-kpi-sub" id="hp-kpi-3s">--</div>
+      </div>
+      <div class="hp-kpi is-red">
+        <div class="hp-kpi-label">离群组合（卡壳）</div>
+        <div class="hp-kpi-num"><span class="hp-kpi-val" id="hp-kpi-4">0</span><span class="hp-kpi-unit">项目-阶段</span></div>
+        <div class="hp-kpi-sub" id="hp-kpi-4s">--</div>
+      </div>
+      <div class="hp-kpi">
+        <div class="hp-kpi-label">平均阶段周期</div>
+        <div class="hp-kpi-num"><span class="hp-kpi-val" id="hp-kpi-5">0</span><span class="hp-kpi-unit">天/阶段</span></div>
+        <div class="hp-kpi-sub" id="hp-kpi-5s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：阶段停留排行（中位 vs 行业参考带） + 阶段周转效率 -->
+    <div class="hp-col">
+      <section class="hp-panel" style="flex: 1;">
+        <div class="hp-panel-head">
+          <h2>阶段停留排行 · 中位对参考带</h2>
+          <span class="hp-panel-tag" id="hp-tag-rank">--</span>
+        </div>
+        <div class="hp-chart" id="hp-chart-rank"></div>
+      </section>
+      <section class="hp-panel" style="flex: 1;">
+        <div class="hp-panel-head">
+          <h2>阶段周转效率</h2>
+          <span class="hp-panel-tag" id="hp-tag-eff">--</span>
+        </div>
+        <div class="hp-chart" id="hp-chart-eff"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：★ 主视觉 六阶段箱线 + 八项目散点叠加；下方八项目阶段推进甘特 -->
+    <div class="hp-col">
+      <section class="hp-panel is-hero" style="flex: 1.16;">
+        <div class="hp-panel-head">
+          <h2>★ 六阶段停留箱线 × 八项目散点叠加</h2>
+          <span class="hp-panel-tag" id="hp-tag-box">--</span>
+        </div>
+        <div class="hp-chart" id="hp-chart-box"></div>
+      </section>
+      <section class="hp-panel" style="flex: 1;">
+        <div class="hp-panel-head">
+          <h2>八项目阶段推进甘特 · 同屏并置</h2>
+          <span class="hp-panel-tag" id="hp-tag-gantt">--</span>
+        </div>
+        <div class="hp-chart" id="hp-chart-gantt"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：停留矩阵热力 + 卡壳诊断 -->
+    <div class="hp-col">
+      <section class="hp-panel" style="flex: 1;">
+        <div class="hp-panel-head">
+          <h2>八项目 × 六阶段停留矩阵</h2>
+          <span class="hp-panel-tag" id="hp-tag-heat">--</span>
+        </div>
+        <div class="hp-chart" id="hp-chart-heat"></div>
+      </section>
+      <section class="hp-panel hp-jamwrap">
+        <div class="hp-panel-head">
+          <h2>卡壳诊断 · 离群组合</h2>
+          <span class="hp-panel-tag" id="hp-tag-jam">--</span>
+        </div>
+        <ul class="hp-jam" id="hp-jam-list"></ul>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="hp-foot" aria-label="阶段停留对比口径说明">
+      <div class="hp-foot-label"><span class="hp-foot-dot"></span>对比口径</div>
+      <div class="hp-foot-viewport"><div class="hp-foot-track" id="hp-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("hp-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 1.1 ★ kiosk 状态量前置声明（必须早于任何 pauseRotate() 调用） =====
+     let 有暂时性死区：带 hash 冷启动时若先调用再声明，会抛
+     ReferenceError: Cannot access 'pauseUntil' before initialization —— 主脚本整段中断，
+     而页面此时已渲染完，肉眼看不出问题（契约 §8 批次四实测坑）。
+     因此 sel / rotIdx / timer / pauseUntil / pauseRotate() / restartRotate() 全部提到这里，
+     首次 pauseRotate() 调用在下方第 12 节（boot 段），行号严格大于本块。 */
+  let sel = { kind: "stage", i: 0 };          /* 当前高亮对象：阶段序号 或 项目序号 */
+  let rotIdx = 0;                             /* kiosk 逐阶段轮巡游标 */
+  let timer = null;
+  let pauseUntil = 0;
+  let pauseCalls = 0;                         /* 供页尾自检做构造性断言 */
+  function pauseRotate(ms) { pauseCalls += 1; pauseUntil = Date.now() + (ms || 20000); }
+  function restartRotate() {
+    clearInterval(timer);
+    timer = setInterval(() => {
+      if (Date.now() < pauseUntil) return;
+      rotIdx = (rotIdx + 1) % 6;
+      applySel({ kind: "stage", i: rotIdx });
+    }, 4000);
+  }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层：单一数据源，六视图全部由此派生 =====
+     勾稽到契约基准盘（docs/RndIpdThemed.md §2.2 / §2.3）：
+     · IPD 六阶段在研项目数逐字：Concept 6 + Plan 8 + Develop 17 + Verify 9 + Launch 5 + LCM 3 = 48；
+     · 阶段停留五数（min/Q1/中位/Q3/max，单位天）与父页「IPD 管道与评审」箱线图**逐格相等**，
+       由下方 BOX_AUTH 做构造性硬校验；
+     · 八个重点项目名 / 产品线 / 当前阶段与契约 §2.3 逐字（PROJ_AUTH 硬校验）；
+     · 项目 × 阶段停留天数矩阵、行业参考带为二级自编，Σ 与判定规则全部由页尾自检现算校验。 */
+
+  const MS_D = 86400000;
+  const TODAY = new Date(2026, 7, 20);                       /* 业务口径日：与 DATA AS OF 一致 */
+  const TODAY_MS = TODAY.getTime();
+  const dFmt = (d) => String(d.getFullYear()).slice(2) + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const dAddD = (t0, days) => new Date(t0.getTime() + days * MS_D);
+
+  /* 3.1 IPD 六阶段（name/short/n 引契约；box 引父页五数；ref = 行业参考带，二级自编估算口径） */
+  const STAGES = [
+    { key: "Concept", name: "概念 Concept", short: "概念", n: 6,  box: [12, 18, 24, 31, 42],     ref: [18, 28] },
+    { key: "Plan",    name: "计划 Plan",    short: "计划", n: 8,  box: [16, 24, 30, 38, 52],     ref: [24, 34] },
+    { key: "Develop", name: "开发 Develop", short: "开发", n: 17, box: [58, 76, 92, 118, 150],   ref: [68, 86] },
+    { key: "Verify",  name: "验证 Verify",  short: "验证", n: 9,  box: [28, 38, 47, 58, 76],     ref: [34, 46] },
+    { key: "Launch",  name: "发布 Launch",  short: "发布", n: 5,  box: [14, 20, 26, 33, 46],     ref: [16, 26] },
+    { key: "LCM",     name: "周期 LCM",     short: "周期", n: 3,  box: [22, 30, 38, 48, 64],     ref: [26, 40] }
+  ];
+  const STAGE_COLOR = [C.violet, C.cyan, C.blue, C.amber, C.green, C.textDim];
+  /* 构造性断言串：六阶段名 + 在研数（契约 §2.2）与五数（父页 ip 页 STAGES.box 逐格） */
+  const STAGE_AUTH = "概念 Concept|6;计划 Plan|8;开发 Develop|17;验证 Verify|9;发布 Launch|5;周期 LCM|3";
+  const BOX_AUTH = "概念|12,18,24,31,42;计划|16,24,30,38,52;开发|58,76,92,118,150;" +
+    "验证|28,38,47,58,76;发布|14,20,26,33,46;周期|22,30,38,48,64";
+  const PROJ_ALL = 48;                                       /* 契约 §2.2 在研项目 */
+  const OTD_ALL = 87.2;                                      /* 契约 §2.2 按期交付率（%） */
+  /* 父页「IPD 管道与评审」箱线图上标出的离群点（已出阶段口径）：[阶段短名, 天] */
+  const PARENT_OUTLIERS = [["计划", 68], ["开发", 188], ["验证", 96]];
+
+  /* 3.2 八个重点项目（name/line/stage 与契约 §2.3 逐字；stay 为二级自编停留天数矩阵）
+         stay[j] 口径：
+           j < 当前阶段  —— 该阶段**实际停留**天数（已出阶段）；
+           j = 当前阶段  —— 截至口径日 2026-08-20 的**已停留**天数（在阶段中）；
+           j > 当前阶段  —— 未到阶段，留 null（矩阵留空）。
+         八个重点项目当前均未进入 LCM，故「周期」列整列为空；箱线的 LCM 分布来自全量 48 个在研项目。 */
+  const PROJECTS = [
+    { name: "星澜S3",   line: "智家终端",   stage: "开发", stay: [34, 68, 142, null, null, null] },
+    { name: "星澜Pro2", line: "智家终端",   stage: "验证", stay: [21, 29, 118, 79, null, null] },
+    { name: "云枢3.0",  line: "云平台服务", stage: "开发", stay: [18, 25, 96, null, null, null] },
+    { name: "云盾2.1",  line: "云平台服务", stage: "计划", stay: [26, 41, null, null, null, null] },
+    { name: "澜芯M60",  line: "AIoT模组",   stage: "开发", stay: [29, 44, 196, null, null, null] },
+    { name: "澜芯M80",  line: "AIoT模组",   stage: "概念", stay: [45, null, null, null, null, null] },
+    { name: "智楼5.0",  line: "行业方案",   stage: "发布", stay: [25, 36, 188, 96, 31, null] },
+    { name: "车联1.0",  line: "行业方案",   stage: "验证", stay: [23, 33, 131, 108, null, null] }
+  ];
+  /* 契约 §2.3 逐字：项目|产品线|当前阶段（英文阶段键） */
+  const PROJ_AUTH = "星澜S3|智家终端|Develop;星澜Pro2|智家终端|Verify;云枢3.0|云平台服务|Develop;" +
+    "云盾2.1|云平台服务|Plan;澜芯M60|AIoT模组|Develop;澜芯M80|AIoT模组|Concept;" +
+    "智楼5.0|行业方案|Launch;车联1.0|行业方案|Verify";
+  const LINES = ["智家终端", "云平台服务", "AIoT模组", "行业方案"];
+  const LINE_COLOR = { "智家终端": C.blue, "云平台服务": C.cyan, "AIoT模组": C.violet, "行业方案": C.green };
+
+  /* 3.3 卡壳原因（二级自编，键 = 项目|阶段短名；四类：评审排队 / 资源等待 / 需求变更 / 技术攻关） */
+  const JAM_REASON = {
+    "星澜S3|计划": { cls: "需求变更", css: "is-req",
+      txt: "全屋互联场景新增 3 条 SR，PDCP 前重排需求基线，计划期两度回炉" },
+    "智楼5.0|开发": { cls: "技术攻关", css: "is-tech",
+      txt: "楼宇边缘网关协议栈自研攻关跨 3 个 Sprint，TR3 详设两次返工" },
+    "智楼5.0|验证": { cls: "资源等待", css: "is-res",
+      txt: "首批灯塔局点现场环境 6 周才就位，验证用例被迫串行执行" },
+    "澜芯M60|开发": { cls: "资源等待", css: "is-res",
+      txt: "射频前端物料交期 14 周，EVT1 备料未到，硬件闭环挂起中" },
+    "车联1.0|验证": { cls: "评审排队", css: "is-queue",
+      txt: "TR4 否决后复审排队 15 天，实车路测车队与竞品对标共用档期" }
+  };
+
+  /* ===== 4. 派生量：全部现算，不复制数字 ===== */
+  const stageIdxOf = (short) => STAGES.findIndex((s) => s.short === short);
+  const fenceOf = (j) => STAGES[j].box[3] + 1.5 * (STAGES[j].box[3] - STAGES[j].box[1]);
+
+  STAGES.forEach((s, j) => {
+    s.min = s.box[0]; s.q1 = s.box[1]; s.med = s.box[2]; s.q3 = s.box[3]; s.max = s.box[4];
+    s.iqr = s.q3 - s.q1;
+    s.fence = fenceOf(j);
+    /* Little's Law 吞吐率：在研（WIP）÷ 中位停留（月），单位「项目/月」，30.4 天折一个月 */
+    s.eff = s.n / s.med * 30.4;
+    s.refHit = s.med >= s.ref[0] && s.med <= s.ref[1];
+  });
+
+  PROJECTS.forEach((p) => {
+    p.si = stageIdxOf(p.stage);                              /* 当前阶段序号 */
+    p.days = p.stay.map((v) => (v == null ? 0 : v));
+    p.total = sum(p.days);                                   /* 累计停留天数 = 行和 */
+    p.t0 = dAddD(TODAY, -p.total);                           /* 立项日由累计停留反推至口径日 */
+    /* 阶段窗口：起点 = 立项日 + 之前阶段实际停留之和；当前阶段窗口末 = max(口径日, 起点 + 计划窗 Q3) */
+    let acc = 0;
+    p.segStart = p.stay.map((v, j) => { const s0 = acc; if (v != null) acc += v; return s0; });
+    p.stageStart = dAddD(p.t0, p.segStart[p.si]);
+    const planEnd = dAddD(p.stageStart, STAGES[p.si].q3);
+    p.stageEnd = new Date(Math.max(TODAY_MS, planEnd.getTime()));
+    p.over = p.stay.map((v, j) => (v == null ? 0 : Math.max(0, v - STAGES[j].q3)));
+    p.overSum = sum(p.over);
+  });
+
+  /* 4.1 离群（卡壳）组合：现算 > Q3 + 1.5 × IQR，按超出量降序 */
+  const JAMS = [];
+  PROJECTS.forEach((p, pi) => {
+    p.stay.forEach((v, j) => {
+      if (v == null) return;
+      if (v > fenceOf(j)) {
+        JAMS.push({
+          pi: pi, sj: j, proj: p.name, line: p.line, stage: STAGES[j].short,
+          days: v, fence: fenceOf(j), excess: v - fenceOf(j),
+          inStage: j === p.si,                               /* true = 在阶段中；false = 已出阶段 */
+          key: p.name + "|" + STAGES[j].short
+        });
+      }
+    });
+  });
+  JAMS.sort((a, b) => b.excess - a.excess);
+  /* 已出阶段的离群点应与父页箱线图标出的离群点集合逐格一致（父页口径只含已出阶段） */
+  const jamExited = JAMS.filter((j) => !j.inStage)
+    .map((j) => j.stage + "|" + j.days).sort().join(";");
+  const parentExited = PARENT_OUTLIERS.map((o) => o[0] + "|" + o[1]).sort().join(";");
+
+  /* 4.2 全局派生 */
+  const D = {};
+  D.proj = sum(STAGES.map((s) => s.n));                      /* 在研项目 = 六阶段之和 = 48 */
+  D.medSum = sum(STAGES.map((s) => s.med));                  /* 全流程中位合计（天） */
+  D.medAvg = D.medSum / STAGES.length;                       /* 平均阶段周期（天/阶段） */
+  D.longest = STAGES.reduce((a, b) => (b.med > a.med ? b : a), STAGES[0]);
+  D.shortest = STAGES.reduce((a, b) => (b.med < a.med ? b : a), STAGES[0]);
+  D.slowest = PROJECTS.reduce((a, b) => (b.total > a.total ? b : a), PROJECTS[0]);
+  D.stayAll = sum(PROJECTS.map((p) => p.total));             /* 八项目累计停留天数之和 */
+  D.cells = sum(PROJECTS.map((p) => p.stay.filter((v) => v != null).length));
+  D.jamRate = JAMS.length / D.cells * 100;
+
+  /* 4.3 散点定位：同阶段多项目做确定性抖动，避免叠在同一条竖线上 */
+  const SCAT = [];
+  STAGES.forEach((s, j) => {
+    const hit = [];
+    PROJECTS.forEach((p, pi) => { if (p.stay[j] != null) hit.push(pi); });
+    hit.forEach((pi, k) => {
+      const off = hit.length === 1 ? 0 : (k / (hit.length - 1) - 0.5) * 0.58;
+      const p = PROJECTS[pi];
+      SCAT.push({
+        pi: pi, sj: j, x: j + off, y: p.stay[j],
+        proj: p.name, line: p.line, stage: s.short,
+        inStage: j === p.si, out: p.stay[j] > s.fence
+      });
+    });
+  });
+
+  /* ===== 5. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("hp-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("hp-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 6. 非图表区渲染（★ 全部在 echarts.init 之前完成首屏填充） ===== */
+  function countUp(el, target, fmt) {
+    const t0 = performance.now(), dur = 1400;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+  (function renderKpi() {
+    const defs = [
+      { v: STAGES.length, f: (x) => fmtInt(x),
+        sub: "Concept → Plan → Develop → Verify → Launch → <b>LCM</b>" },
+      { v: D.proj, f: (x) => fmtInt(x),
+        sub: "六阶段之和 <b>" + STAGES.map((s) => s.n).join(" + ") + "</b>（契约 §2.2）" },
+      { v: D.longest.med, f: (x) => fmtInt(x),
+        sub: "<b>" + D.longest.name + "</b> · 是最短阶段（" + D.shortest.short + " " + D.shortest.med + " 天）的 " +
+          fmtDec(D.longest.med / D.shortest.med, 1) + " 倍" },
+      { v: D.slowest.total, f: (x) => fmtInt(x),
+        sub: "<b>" + D.slowest.name + "</b>（" + D.slowest.line + "）· 已推进至 " + D.slowest.stage + " 阶段" },
+      { v: JAMS.length, f: (x) => fmtInt(x),
+        sub: "占 " + D.cells + " 个有值格 <b>" + fmtDec(D.jamRate, 1) + "%</b> · 判定 > Q3 + 1.5×IQR" },
+      { v: D.medAvg, f: (x) => fmtDec(x, 1),
+        sub: "六阶段中位合计 <b>" + D.medSum + "</b> 天 ÷ " + STAGES.length + " 现算" }
+    ];
+    defs.forEach((d, i) => {
+      countUp($("hp-kpi-" + i), d.v, d.f);
+      $("hp-kpi-" + i + "s").innerHTML = d.sub;
+    });
+  })();
+
+  /* 卡壳诊断清单（★ 在 echarts.init 之前填充，容器高度写死 300px） */
+  (function renderJam() {
+    $("hp-jam-list").innerHTML = JAMS.map((j, k) => {
+      const r = JAM_REASON[j.key] || { cls: "未归因", css: "is-queue", txt: "待补充" };
+      return '<li data-pi="' + j.pi + '" data-sj="' + j.sj + '" title="点击定位到 ' + j.proj + '">' +
+        '<span class="hp-jam-rank"><b>' + (k + 1) + '</b><span>' + (j.inStage ? "在阶段中" : "已出阶段") + "</span></span>" +
+        '<span class="hp-jam-main">' +
+          '<span class="hp-jam-t1"><b>' + j.proj + "</b> · <u>" + j.stage + "</u> 阶段 　超阈值 +" +
+            fmtDec(j.excess, 1) + " 天（阈值 " + fmtDec(j.fence, 1) + "）</span>" +
+          '<span class="hp-jam-t2"><span class="hp-badge ' + r.css + '">' + r.cls + "</span>" + r.txt + "</span>" +
+        "</span>" +
+        '<span class="hp-jam-num"><b>' + j.days + "</b><span>天停留</span></span>" +
+      "</li>";
+    }).join("");
+    $("hp-tag-jam").innerHTML = "<b>" + JAMS.length + "</b> 条 · 已出阶段 " +
+      JAMS.filter((j) => !j.inStage).length + " / 在阶段中 " + JAMS.filter((j) => j.inStage).length;
+  })();
+
+  /* 面板 tag（静态部分；随选中项变化的在 applySel 里刷新） */
+  $("hp-tag-rank").innerHTML = "中位降序 · 参考带为估算口径 · <b>" + STAGES.filter((s) => !s.refHit).length + "</b> 个阶段超上沿";
+  $("hp-tag-eff").innerHTML = "Little's Law：在研 ÷ 中位停留 · 单位 <b>项目/月</b>";
+  $("hp-tag-heat").innerHTML = "单位天 · 空白 = 未到阶段 · 末列 <b>累计</b>";
+  $("hp-tag-box").innerHTML = "箱线引父页五数 · 散点 = 八项目实际停留 · 菱形 = 在阶段中";
+  $("hp-tag-gantt").innerHTML = "今日线 <b>2026-08-20</b> · 红块 = 超计划窗（全量 Q3）";
+
+  /* 底部口径滚动（只建一次；★ 图表 init 之前填充） */
+  (function buildFoot() {
+    const items = [
+      ["口径", C.amber, "停留天数：项目进入该阶段到通过出阶段评审的日历天数。已出阶段取实际停留，" +
+        "当前阶段取截至口径日 2026-08-20 的已停留天数，未到阶段留空 —— 八项目累计 " + fmtInt(D.stayAll) +
+        " 天，覆盖 " + D.cells + " 个项目-阶段格"],
+      ["箱线", C.blue, "六阶段停留五数（min / Q1 / 中位 / Q3 / max）逐格引自父页「IPD 管道与评审」，本页不另立口径：" +
+        STAGES.map((s) => s.short + " " + s.box.join("/")).join("　") + "（单位天）；" +
+        "六阶段在研项目数 " + STAGES.map((s) => s.n).join(" + ") + " = " + D.proj + " 个（契约 §2.2 逐字）"],
+      ["离群", C.red, "卡壳判定 = 停留天数 > Q3 + 1.5 × IQR（逐阶段现算，阈值 " +
+        STAGES.map((s) => s.short + " " + fmtDec(s.fence, 1)).join(" / ") + " 天）；" +
+        "共 " + JAMS.length + " 个离群组合，其中 " + JAMS.filter((j) => !j.inStage).length +
+        " 个「已出阶段」与父页箱线图标出的离群点逐格一致（计划 68 / 开发 188 / 验证 96），" +
+        "另 " + JAMS.filter((j) => j.inStage).length + " 个是「在阶段中」尚未出阶段的当前停留 —— 父页箱线口径不含，为本页增量"],
+      ["甘特", C.cyan, "阶段推进甘特：立项日 = 口径日 − 累计停留天数（由停留矩阵反推，故甘特横轴与停留矩阵严格同源）；" +
+        "阶段计划窗 = 该阶段全量 Q3（75 分位），实际超出计划窗的部分标红；" +
+        "今日线 2026-08-20 落在各项目当前阶段窗口内 —— 与「单项目IPD详情」页排的「计划」窗口（月粒度）口径不同，本页排的是「实际停留」窗口（日粒度）"],
+      ["参考", C.violet, "行业参考带为估算口径（自编）：按同规模科技企业 IPD 阶段周期公开基准折算，" +
+        STAGES.map((s) => s.short + " " + s.ref[0] + "~" + s.ref[1]).join(" / ") + " 天；" +
+        "中位落在带内视为达标，" + STAGES.filter((s) => !s.refHit).map((s) => s.short).join("、") + " 超上沿"],
+      ["周转", C.green, "阶段周转效率 = 在研项目数（WIP）÷ 中位停留 × 30.4，单位项目/月 —— 即 Little's Law 的吞吐率形式；" +
+        "分子引契约在研盘、分母引父页箱线中位，两者皆非本页自编"],
+      ["分工", C.orange, "IPD 管道与评审（父页）三个子页的分工：本页「阶段停留对比」把六阶段与八项目摆在同屏做「横向 PK」，" +
+        "答「卡在哪个阶段、哪个项目最慢」；「单项目IPD详情」做「单个项目的 360 度」（档案 / 甘特 / 评审 / 预算）；" +
+        "「TR评审台账」做「全量评审记录的明细与穿透」（评审点 × 结论 × 遗留项）——一横比、一纵深、一明细，互不重复"],
+      ["基准", C.amber, "按期交付率 " + OTD_ALL + "%（契约 §2.2，TR/DCP 按期通过口径）为全量盘，" +
+        "本页八个重点项目为管道中的重点样本，不与全量口径直接相加"]
+    ];
+    const html = items.map((a) => '<span class="hp-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("hp-foot-track").innerHTML = html + html;               /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* ===== 7. hash 契约：六阶段名 + 八项目名两组键 ===== */
+  const norm = (s) => String(s == null ? "" : s).replace(/[\s　]+/g, "");
+  const HASH_ALIAS = {};
+  /* 阶段别名：中文短名 / 英文键 / 常见叫法 */
+  STAGES.forEach((s) => {
+    HASH_ALIAS[norm(s.short)] = norm(s.name);
+    HASH_ALIAS[norm(s.key)] = norm(s.name);
+    HASH_ALIAS[norm(s.key).toLowerCase()] = norm(s.name);
+  });
+  HASH_ALIAS["生命周期"] = norm("周期 LCM");
+  HASH_ALIAS["生命周期管理"] = norm("周期 LCM");
+  /* 项目简写别名 */
+  const PROJ_ALIAS = {
+    "S3": "星澜S3", "s3": "星澜S3", "Pro2": "星澜Pro2", "pro2": "星澜Pro2",
+    "云枢": "云枢3.0", "云盾": "云盾2.1", "M60": "澜芯M60", "m60": "澜芯M60",
+    "M80": "澜芯M80", "m80": "澜芯M80", "智楼": "智楼5.0", "车联": "车联1.0"
+  };
+  Object.keys(PROJ_ALIAS).forEach((k) => { HASH_ALIAS[norm(k)] = norm(PROJ_ALIAS[k]); });
+
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = norm(s);
+    if (!s) return null;
+    if (HASH_ALIAS[s]) s = HASH_ALIAS[s];
+    const si = STAGES.findIndex((x) => norm(x.name) === s || norm(x.short) === s);
+    if (si >= 0) return { kind: "stage", i: si };
+    const pi = PROJECTS.findIndex((x) => norm(x.name) === s);
+    if (pi >= 0) return { kind: "proj", i: pi };
+    return null;
+  }
+
+  /* ===== 8. 资源守卫（KPI / 卡壳清单 / 口径条已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("hp-error").classList.add("is-visible");
+
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+
+  const boxChart = hasEcharts ? echarts.init($("hp-chart-box")) : null;
+  const rankChart = hasEcharts ? echarts.init($("hp-chart-rank")) : null;
+  const effChart = hasEcharts ? echarts.init($("hp-chart-eff")) : null;
+  const ganttChart = hasEcharts ? echarts.init($("hp-chart-gantt")) : null;
+  const heatChart = hasEcharts ? echarts.init($("hp-chart-heat")) : null;
+
+  /* 当前高亮判定（★ 只读 sel 的标量字段，不把业务对象带进 option） */
+  const stageOn = (j) => (sel.kind === "stage" ? sel.i === j : PROJECTS[sel.i].stay[j] != null);
+  const projOn = (pi) => (sel.kind === "proj" ? sel.i === pi : PROJECTS[pi].stay[sel.i] != null);
+
+  /* ===== 9. option 构造（★ 只放标量与数组，阶段/项目对象一律不进 option，避免深拷贝循环引用） ===== */
+
+  /* 9.1 ★ 主视觉：六阶段箱线 + 八项目散点叠加（同一 grid，同一数值轴） */
+  function boxOption() {
+    const cats = STAGES.map((s) => s.short);
+    const boxData = STAGES.map((s, j) => {
+      const on = sel.kind === "stage" && sel.i === j;
+      return {
+        value: s.box.slice(),
+        itemStyle: {
+          color: on ? "rgba(255,194,77,.22)" : "rgba(92,157,255,.11)",
+          borderColor: on ? C.amber : (sel.kind === "stage" ? "rgba(92,157,255,.42)" : C.blue),
+          borderWidth: on ? 2.4 : 1.3,
+          shadowBlur: on ? 14 : 0, shadowColor: "rgba(255,194,77,.5)"
+        }
+      };
+    });
+    /* 四条散点系列（按产品线分组，legend 直接可用） */
+    const scatSeries = LINES.map((ln) => ({
+      name: ln, type: "scatter", z: 6,
+      symbolSize: (v) => v[3],
+      data: SCAT.filter((d) => d.line === ln).map((d) => {
+        const hot = (sel.kind === "proj" && sel.i === d.pi) || (sel.kind === "stage" && sel.i === d.sj);
+        const dim = !hot && ((sel.kind === "proj") || (sel.kind === "stage" && sel.i !== d.sj));
+        return {
+          value: [d.x, d.y, d.pi, d.out ? (hot ? 18 : 15) : (hot ? 13 : 9.5), d.sj],
+          symbol: d.inStage ? "diamond" : "circle",
+          itemStyle: {
+            color: dim ? hexMix(LINE_COLOR[ln], 0.62, 8) : LINE_COLOR[ln],
+            borderColor: d.out ? C.red : "rgba(220,232,255,.85)",
+            borderWidth: d.out ? 2.2 : 1,
+            opacity: dim ? 0.5 : 1,
+            shadowBlur: hot ? 14 : 0, shadowColor: LINE_COLOR[ln]
+          },
+          label: {
+            show: d.out || hot, position: "right", distance: 7,
+            fontSize: 10.5, fontWeight: 700,
+            color: d.out ? "#ffb0b7" : "#dce8ff",
+            formatter: PROJECTS[d.pi].name
+          }
+        };
+      })
+    }));
+    return {
+      backgroundColor: "transparent",
+      legend: {
+        top: 2, right: 4, itemWidth: 9, itemHeight: 9, itemGap: 12,
+        data: LINES.slice(), textStyle: { color: C.textDim, fontSize: 10.5 },
+        inactiveColor: "rgba(127,146,196,.35)"
+      },
+      grid: { left: 8, right: 74, top: 30, bottom: 26, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          if (p.seriesType === "boxplot") {
+            const s = STAGES[p.dataIndex];
+            return "<b>" + s.name + "</b>　在研 <b>" + s.n + "</b> 个<br/>" +
+              "停留（天）最短 <b>" + s.min + "</b> · 下四分位 <b>" + s.q1 + "</b> · 中位 <b style=\"color:" + C.amber + "\">" +
+              s.med + "</b> · 上四分位 <b>" + s.q3 + "</b> · 最长 <b>" + s.max + "</b><br/>" +
+              "IQR " + s.iqr + " · 卡壳阈值 Q3 + 1.5×IQR = <b style=\"color:" + C.red + "\">" + fmtDec(s.fence, 1) + "</b> 天<br/>" +
+              "口径：五数逐格引父页「IPD 管道与评审」";
+          }
+          const pi = p.value[2], sj = p.value[4], pr = PROJECTS[pi], s = STAGES[sj];
+          const v = pr.stay[sj];
+          return "<b>" + pr.name + "</b>（" + pr.line + "）　" + s.short + " 阶段<br/>" +
+            "停留 <b style=\"color:" + (v > s.fence ? C.red : C.amber) + "\">" + v + "</b> 天 · " +
+            (sj === pr.si ? "在阶段中（截至口径日）" : "已出阶段") + "<br/>" +
+            "对比中位 " + s.med + " 天 → " + (v >= s.med ? "+" : "") + fmtDec(v - s.med, 0) + " 天 · " +
+            "阈值 " + fmtDec(s.fence, 1) + " 天 → " + (v > s.fence ? "<b style=\"color:" + C.red + "\">离群卡壳</b>" : "未离群") + "<br/>" +
+            "该项目累计停留 <b>" + pr.total + "</b> 天";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: cats, boundaryGap: true,
+        axisLabel: {
+          color: C.text, fontSize: 12, fontWeight: 700,
+          formatter: (v, i) => (sel.kind === "stage" && sel.i === i ? "{on|" + v + "}" : v),
+          rich: { on: { color: "#ffd489", fontSize: 12.5, fontWeight: 700 } }
+        },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.34)" } }, axisTick: { show: false },
+        splitLine: { show: true, lineStyle: { color: "rgba(96,140,255,.07)" } }
+      },
+      yAxis: {
+        type: "value", name: "停留天数", nameTextStyle: { color: C.textDim, fontSize: 10.5, padding: [0, 0, 0, 26] },
+        min: 0, max: 215, interval: 40,
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        name: "六阶段停留分布", type: "boxplot", boxWidth: ["44%", "62%"], z: 2,
+        data: boxData,
+        emphasis: { disabled: true }
+      }].concat(scatSeries)
+    };
+  }
+
+  /* 9.2 阶段停留排行：中位条形 + 行业参考带（custom 画带，bar 画中位） */
+  function rankOption() {
+    const order = STAGES.map((s, j) => j).sort((a, b) => STAGES[b].med - STAGES[a].med);
+    const cats = order.map((j) => STAGES[j].short);
+    const bandData = order.map((j, k) => ({ value: [k, STAGES[j].ref[0], STAGES[j].ref[1], j] }));
+    const barData = order.map((j, k) => {
+      const on = stageOn(j);
+      return {
+        value: STAGES[j].med,
+        itemStyle: {
+          borderRadius: 6,
+          opacity: on ? 1 : 0.42,
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: darken(STAGES[j].refHit ? STAGE_COLOR[j] : C.red, 0.5) },
+            { offset: 1, color: STAGES[j].refHit ? STAGE_COLOR[j] : C.red }])
+        }
+      };
+    });
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 104, top: 14, bottom: 8, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = order[p.dataIndex], s = STAGES[j];
+          return "<b>" + s.name + "</b><br/>中位停留 <b style=\"color:" + C.amber + "\">" + s.med + "</b> 天 · " +
+            "四分位区间 " + s.q1 + "~" + s.q3 + " 天<br/>行业参考带 <b>" + s.ref[0] + "~" + s.ref[1] + "</b> 天（估算口径）→ " +
+            (s.refHit ? "带内达标" : "<b style=\"color:" + C.red + "\">超上沿 " + (s.med - s.ref[1]) + " 天</b>") +
+            "<br/>在研 " + s.n + " 个 · 周转 " + fmtDec(s.eff, 2) + " 项目/月";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max.apply(null, STAGES.map((s) => Math.max(s.med, s.ref[1]))) * 1.34 },
+      yAxis: {
+        type: "category", data: cats, inverse: false,
+        axisLabel: {
+          color: C.text, fontSize: 11.5, fontWeight: 700,
+          formatter: (v, i) => (stageOn(order[i]) ? "{on|" + v + "}" : "{off|" + v + "}"),
+          rich: { on: { color: "#ffd489", fontSize: 12, fontWeight: 700 }, off: { color: "rgba(200,214,242,.62)", fontSize: 11.5 } }
+        },
+        axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [
+        {
+          name: "行业参考带", type: "custom", z: 1, silent: true,
+          renderItem: (params, api) => {
+            const k = api.value(0), lo = api.value(1), hi = api.value(2);
+            const a = api.coord([lo, k]), b = api.coord([hi, k]);
+            const h = Math.max(10, api.size([0, 1])[1] * 0.68);
+            return {
+              type: "rect",
+              shape: { x: a[0], y: a[1] - h / 2, width: Math.max(2, b[0] - a[0]), height: h, r: 4 },
+              style: { fill: "rgba(96,140,255,.13)", stroke: "rgba(96,140,255,.42)", lineWidth: 1, lineDash: [3, 3] }
+            };
+          },
+          encode: { x: [1, 2], y: 0 },
+          data: bandData
+        },
+        {
+          name: "中位停留", type: "bar", barWidth: 11, z: 3, data: barData,
+          label: {
+            show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#dce8ff",
+            formatter: (p) => {
+              const j = order[p.dataIndex], s = STAGES[j];
+              return p.value + " 天 · " + (s.refHit ? "带内" : "超 " + (s.med - s.ref[1]));
+            }
+          }
+        }
+      ]
+    };
+  }
+
+  /* 9.3 阶段周转效率（Little's Law 吞吐率，阶段序） */
+  function effOption() {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 92, top: 14, bottom: 8, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const s = STAGES[p.dataIndex];
+          return "<b>" + s.name + "</b><br/>周转效率 <b style=\"color:" + C.cyan + "\">" + fmtDec(s.eff, 2) +
+            "</b> 项目/月<br/>= 在研 " + s.n + " ÷ 中位停留 " + s.med + " 天 × 30.4<br/>" +
+            "口径：Little's Law 吞吐率 = WIP ÷ 周期，分子引契约在研盘、分母引父页箱线中位";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max.apply(null, STAGES.map((s) => s.eff)) * 1.42 },
+      yAxis: {
+        type: "category", data: STAGES.map((s) => s.short),
+        axisLabel: {
+          color: C.text, fontSize: 11.5, fontWeight: 700,
+          formatter: (v, i) => (stageOn(i) ? "{on|" + v + "}" : "{off|" + v + "}"),
+          rich: { on: { color: "#ffd489", fontSize: 12, fontWeight: 700 }, off: { color: "rgba(200,214,242,.62)", fontSize: 11.5 } }
+        },
+        axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        name: "周转效率", type: "bar", barWidth: 12,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.07)", borderRadius: 6 },
+        data: STAGES.map((s, j) => ({
+          value: Number(fmtDec(s.eff, 2)),
+          itemStyle: {
+            borderRadius: 6, opacity: stageOn(j) ? 1 : 0.42,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(C.cyan, 0.55) }, { offset: 1, color: STAGE_COLOR[j] }])
+          }
+        })),
+        label: {
+          show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => fmtDec(p.value, 2) + " 项目/月"
+        }
+      }]
+    };
+  }
+
+  /* 9.4 八项目阶段推进甘特（custom；时间轴 + 今日线；超计划窗段标红） */
+  const GKIND = { base: 0, over: 1, plan: 2 };
+  function ganttData() {
+    const out = [];
+    PROJECTS.forEach((p, pi) => {
+      p.stay.forEach((v, j) => {
+        if (v == null) return;
+        const s0 = dAddD(p.t0, p.segStart[j]).getTime();
+        const q3 = STAGES[j].q3;
+        const baseEnd = s0 + Math.min(v, q3) * MS_D;
+        out.push({ value: [pi, s0, baseEnd, j, GKIND.base, Math.min(v, q3)] });
+        if (v > q3) out.push({ value: [pi, baseEnd, s0 + v * MS_D, j, GKIND.over, v - q3] });
+        else if (j === p.si && v < q3) out.push({ value: [pi, s0 + v * MS_D, s0 + q3 * MS_D, j, GKIND.plan, q3 - v] });
+      });
+    });
+    return out;
+  }
+  function ganttOption() {
+    const minT = Math.min.apply(null, PROJECTS.map((p) => p.t0.getTime())) - 10 * MS_D;
+    const maxT = Math.max.apply(null, PROJECTS.map((p) => p.stageEnd.getTime())) + 12 * MS_D;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 84, top: 12, bottom: 20, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const v = p.value, pr = PROJECTS[v[0]], s = STAGES[v[3]];
+          const kindTxt = v[4] === GKIND.over ? "<b style=\"color:" + C.red + "\">超计划窗</b>"
+            : (v[4] === GKIND.plan ? "剩余计划窗" : "计划窗内");
+          return "<b>" + pr.name + "</b>（" + pr.line + "）　" + s.short + " 阶段<br/>" +
+            dFmt(new Date(v[1])) + " → " + dFmt(new Date(v[2])) + " · <b>" + Math.round(v[5]) + "</b> 天 · " + kindTxt + "<br/>" +
+            "该阶段实际停留 <b>" + pr.stay[v[3]] + "</b> 天 · 计划窗（全量 Q3）" + s.q3 + " 天<br/>" +
+            "立项 " + dFmt(pr.t0) + " · 累计停留 " + pr.total + " 天";
+        }
+      }, TIP),
+      xAxis: {
+        type: "time", min: minT, max: maxT,
+        axisLabel: Object.assign({}, AXIS_LABEL, { formatter: { year: "{yy}-{MM}", month: "{yy}-{MM}", day: "{MM}-{dd}" } }),
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.3)" } }, splitLine: SPLIT_LINE
+      },
+      yAxis: {
+        type: "category", inverse: true, data: PROJECTS.map((p) => p.name),
+        axisLabel: {
+          fontSize: 11.5, fontWeight: 700,
+          formatter: (v, i) => (projOn(i) ? "{on|" + v + "}" : "{off|" + v + "}"),
+          rich: { on: { color: "#ffd489", fontSize: 12, fontWeight: 700 }, off: { color: "rgba(200,214,242,.6)", fontSize: 11.5 } }
+        },
+        axisLine: { show: false }, axisTick: { show: false },
+        splitLine: { show: true, lineStyle: { color: "rgba(96,140,255,.08)" } }
+      },
+      series: [{
+        name: "阶段推进", type: "custom",
+        renderItem: (params, api) => {
+          const pi = api.value(0), sj = api.value(3), kind = api.value(4);
+          const a = api.coord([api.value(1), pi]);
+          const b = api.coord([api.value(2), pi]);
+          const h = Math.max(7, api.size([0, 1])[1] * 0.5);
+          const rect = echarts.graphic.clipRectByRect(
+            { x: a[0], y: a[1] - h / 2, width: Math.max(1.5, b[0] - a[0]), height: h },
+            { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height }
+          );
+          if (!rect) return null;
+          const hot = projOn(pi) && stageOn(sj);
+          const soft = projOn(pi) || stageOn(sj);
+          const op = hot ? 1 : (soft ? 0.72 : 0.3);
+          if (kind === GKIND.plan) {
+            return { type: "rect", shape: Object.assign({ r: 3 }, rect),
+              style: { fill: "rgba(96,140,255,.06)", stroke: "rgba(127,146,196,.6)", lineWidth: 1, lineDash: [3, 3], opacity: op } };
+          }
+          const col = kind === GKIND.over ? C.red : STAGE_COLOR[sj];
+          return {
+            type: "rect", shape: Object.assign({ r: 3 }, rect),
+            style: {
+              fill: kind === GKIND.over ? col : hexMix(col, 0.2, 20), opacity: op,
+              stroke: hot ? "#ffd489" : "rgba(4,16,31,.55)", lineWidth: hot ? 1.6 : 0.8,
+              shadowBlur: kind === GKIND.over && soft ? 10 : 0, shadowColor: "rgba(255,95,107,.7)"
+            }
+          };
+        },
+        encode: { x: [1, 2], y: 0 },
+        data: ganttData(),
+        markLine: {
+          silent: true, symbol: "none", animation: false,
+          lineStyle: { color: C.amber, width: 1.6, type: "dashed", opacity: 0.9 },
+          label: { formatter: "今日 08-20", color: "#ffd489", fontSize: 10.5, fontWeight: 700, position: "insideEndTop" },
+          data: [{ xAxis: TODAY_MS }]
+        }
+      }]
+    };
+  }
+
+  /* 9.5 八项目 × 六阶段停留矩阵热力（末列「累计」走独立系列，不进 visualMap） */
+  function heatOption() {
+    const xs = STAGES.map((s) => s.short).concat(["累计"]);
+    const cells = [];
+    PROJECTS.forEach((p, pi) => {
+      p.stay.forEach((v, j) => {
+        if (v == null) return;
+        const hot = (sel.kind === "proj" && sel.i === pi) || (sel.kind === "stage" && sel.i === j);
+        cells.push({
+          value: [j, pi, v],
+          itemStyle: {
+            borderColor: v > STAGES[j].fence ? C.red : (hot ? "#ffd489" : "rgba(8,18,49,.75)"),
+            borderWidth: v > STAGES[j].fence ? 2 : (hot ? 1.8 : 1),
+            opacity: hot ? 1 : 0.62
+          }
+        });
+      });
+    });
+    const totals = PROJECTS.map((p, pi) => ({
+      value: [STAGES.length, pi, p.total],
+      itemStyle: {
+        color: sel.kind === "proj" && sel.i === pi ? "rgba(255,194,77,.42)" : "rgba(47,111,214,.34)",
+        borderColor: sel.kind === "proj" && sel.i === pi ? "#ffd489" : "rgba(96,140,255,.45)",
+        borderWidth: 1.4
+      }
+    }));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 10, top: 12, bottom: 40, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.value[0], pi = p.value[1], v = p.value[2], pr = PROJECTS[pi];
+          if (j === STAGES.length) {
+            return "<b>" + pr.name + "</b>（" + pr.line + "）<br/>累计停留 <b style=\"color:" + C.amber + "\">" + v +
+              "</b> 天 = " + pr.stay.filter((x) => x != null).join(" + ") + "<br/>" +
+              "立项 " + dFmt(pr.t0) + " · 当前 " + pr.stage + " 阶段 · 全量最慢 " + D.slowest.name + "（" + D.slowest.total + " 天）";
+          }
+          const s = STAGES[j];
+          return "<b>" + pr.name + "</b> × <b>" + s.short + "</b><br/>停留 <b>" + v + "</b> 天 · " +
+            (j === pr.si ? "在阶段中" : "已出阶段") + "<br/>中位 " + s.med + " · Q3 " + s.q3 + " · 阈值 " + fmtDec(s.fence, 1) +
+            (v > s.fence ? "<br/><b style=\"color:" + C.red + "\">▲ 离群卡壳</b>" : "");
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: xs, splitArea: { show: true, areaStyle: { color: ["rgba(96,140,255,.03)", "transparent"] } },
+        axisLabel: {
+          fontSize: 11, fontWeight: 700,
+          formatter: (v, i) => (i < STAGES.length && stageOn(i) ? "{on|" + v + "}" : "{off|" + v + "}"),
+          rich: { on: { color: "#ffd489", fontSize: 11.5, fontWeight: 700 }, off: { color: "rgba(200,214,242,.68)", fontSize: 11 } }
+        },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.3)" } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "category", inverse: true, data: PROJECTS.map((p) => p.name),
+        axisLabel: {
+          fontSize: 11, fontWeight: 700,
+          formatter: (v, i) => (projOn(i) ? "{on|" + v + "}" : "{off|" + v + "}"),
+          rich: { on: { color: "#ffd489", fontSize: 11.5, fontWeight: 700 }, off: { color: "rgba(200,214,242,.6)", fontSize: 11 } }
+        },
+        axisLine: { show: false }, axisTick: { show: false }
+      },
+      /* ★ piecewise 设了两端 text，必须显式补 showLabel: true，否则每档 label 被整体吞掉 */
+      visualMap: {
+        type: "piecewise", seriesIndex: 0, orient: "horizontal", left: "center", bottom: 2,
+        itemWidth: 13, itemHeight: 10, itemGap: 5, showLabel: true,
+        text: ["卡壳 ▲", "▼ 顺畅"], textStyle: { color: C.textDim, fontSize: 10 },
+        pieces: [
+          { max: 30, label: "≤30", color: "#1e3f7a" },
+          { min: 30, max: 60, label: "30~60", color: C.blueDeep },
+          { min: 60, max: 100, label: "60~100", color: C.blue },
+          { min: 100, max: 150, label: "100~150", color: C.amber },
+          { min: 150, label: ">150", color: C.red }
+        ]
+      },
+      series: [
+        {
+          name: "阶段停留", type: "heatmap", data: cells,
+          label: { show: true, fontSize: 10.5, fontWeight: 700, color: "#eaf1ff", formatter: (p) => String(p.value[2]) },
+          emphasis: { itemStyle: { borderColor: "#ffd489", borderWidth: 2 } }
+        },
+        {
+          name: "累计停留", type: "heatmap", data: totals,
+          label: { show: true, fontSize: 10.5, fontWeight: 700, color: "#ffd489", formatter: (p) => String(p.value[2]) },
+          emphasis: { itemStyle: { borderColor: "#ffd489", borderWidth: 2 } }
+        }
+      ]
+    };
+  }
+
+  /* ===== 10. 选中态应用（横向对比页不做整页重绘，只改高亮） ===== */
+  function applySel(next) {
+    if (!next) return;
+    sel = { kind: next.kind, i: next.i };
+    if (sel.kind === "stage") rotIdx = sel.i;
+    const isStage = sel.kind === "stage";
+    const s = isStage ? STAGES[sel.i] : null;
+    const p = isStage ? null : PROJECTS[sel.i];
+    const name = isStage ? s.name : p.name;
+
+    $("hp-crumb-obj").textContent = isStage
+      ? ("阶段 · " + s.name + "（在研 " + s.n + " 个）")
+      : ("项目 · " + p.name + " · " + p.line + " · " + p.stage + " 阶段");
+    $("hp-chip-focus").textContent = isStage ? s.short + " 阶段" : p.name;
+
+    if (isStage) {
+      const pts = SCAT.filter((d) => d.sj === sel.i);
+      const outs = pts.filter((d) => d.out);
+      $("hp-tag-box").innerHTML = "高亮 <b>" + s.short + "</b> · 中位 " + s.med + " 天 · 阈值 " +
+        fmtDec(s.fence, 1) + " 天 · 落点 " + pts.length + " 个（离群 " + outs.length + "）";
+      $("hp-tag-gantt").innerHTML = "今日线 <b>2026-08-20</b> · 高亮 " + s.short + " 段 · 红块 = 超计划窗（Q3 " + s.q3 + " 天）";
+    } else {
+      const mine = SCAT.filter((d) => d.pi === sel.i);
+      const outs = mine.filter((d) => d.out);
+      $("hp-tag-box").innerHTML = "高亮 <b>" + p.name + "</b> · " + mine.length + " 个阶段落点（离群 " +
+        outs.length + "）· 累计 " + p.total + " 天";
+      $("hp-tag-gantt").innerHTML = "今日线 <b>2026-08-20</b> · 高亮 " + p.name + " · 立项 " + dFmt(p.t0) +
+        " · 超计划窗合计 " + p.overSum + " 天";
+    }
+
+    Array.from(document.querySelectorAll("#hp-jam-list li")).forEach((li) => {
+      const on = isStage ? Number(li.dataset.sj) === sel.i : Number(li.dataset.pi) === sel.i;
+      li.classList.toggle("is-sel", on);
+    });
+
+    if (hasEcharts) {
+      boxChart.setOption(boxOption());
+      rankChart.setOption(rankOption());
+      effChart.setOption(effOption());
+      ganttChart.setOption(ganttOption());
+      heatChart.setOption(heatOption());
+    }
+    /* hash 回写：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(name));
+  }
+
+  /* ===== 11. 交互：图表点击 / 清单点击 / 键盘 / hash / 返回上级 ===== */
+  const PARENT = "大屏样板间-研发IPD管道与评审1920.html";
+
+  if (hasEcharts) {
+    boxChart.on("click", (p) => {
+      if (p.seriesType === "boxplot") applySel({ kind: "stage", i: p.dataIndex });
+      else if (p.value && p.value.length > 2) applySel({ kind: "proj", i: p.value[2] });
+      pauseRotate(20000);
+    });
+    rankChart.on("click", (p) => {
+      const order = STAGES.map((s, j) => j).sort((a, b) => STAGES[b].med - STAGES[a].med);
+      applySel({ kind: "stage", i: order[p.dataIndex] });
+      pauseRotate(20000);
+    });
+    effChart.on("click", (p) => { applySel({ kind: "stage", i: p.dataIndex }); pauseRotate(20000); });
+    ganttChart.on("click", (p) => { if (p.value) { applySel({ kind: "proj", i: p.value[0] }); pauseRotate(20000); } });
+    heatChart.on("click", (p) => { if (p.value) { applySel({ kind: "proj", i: p.value[1] }); pauseRotate(20000); } });
+  }
+  $("hp-jam-list").addEventListener("click", (e) => {
+    const li = e.target.closest("li");
+    if (!li) return;
+    applySel({ kind: "proj", i: Number(li.dataset.pi) });
+    pauseRotate(20000);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applySel({ kind: "stage", i: (rotIdx + 5) % 6 }); pauseRotate(20000); }
+    else if (e.key === "ArrowRight") { applySel({ kind: "stage", i: (rotIdx + 1) % 6 }); pauseRotate(20000); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* ===== 12. boot：hash 冷启动 + kiosk 轮巡 =====
+     ★ 本节只做「调用」，pauseUntil / pauseRotate() 已在第 1.1 节声明（行号严格更小，TDZ 防护）。 */
+  const bootHit = resolveHash(location.hash);
+  applySel(bootHit || { kind: "stage", i: 0 });
+  if (bootHit) pauseRotate(20000);                            /* 父页下钻进来：先保持 20 秒不轮巡 */
+
+  window.addEventListener("hashchange", () => {
+    const hit = resolveHash(location.hash);
+    if (hit && !(hit.kind === sel.kind && hit.i === sel.i)) { applySel(hit); pauseRotate(20000); }
+  });
+
+  restartRotate();                                            /* kiosk 常驻：每 4 秒轮巡下一个阶段 */
+  ["hp-chart-box", "hp-chart-gantt", "hp-chart-heat", "hp-jam-list"].forEach((id) => {
+    const el = $(id);
+    el.addEventListener("mouseenter", () => { pauseUntil = Date.now() + 8000; });
+  });
+
+  /* ===== 13. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const checks = [
+    ["六阶段名与在研项目数与契约 §2.2 逐字（构造性断言）",
+      STAGES.map((s) => s.name + "|" + s.n).join(";") === STAGE_AUTH],
+    ["六阶段在研项目 Σ = 48 个（6+8+17+9+5+3）",
+      D.proj === PROJ_ALL && D.proj === 48],
+    ["箱线五数与父页「IPD 管道与评审」逐格相等（构造性断言）",
+      STAGES.map((s) => s.short + "|" + s.box.join(",")).join(";") === BOX_AUTH],
+    ["箱线五数逐箱有序 min ≤ Q1 ≤ 中位 ≤ Q3 ≤ max",
+      STAGES.every((s) => s.box.every((v, i) => i === 0 || s.box[i - 1] <= v))],
+    ["停留中位数 Develop 最长（现算，非硬编码）",
+      D.longest.key === "Develop" && STAGES.every((s) => s.med <= D.longest.med)],
+    ["八项目名 / 产品线 / 当前阶段与契约 §2.3 逐字（构造性断言）",
+      PROJECTS.map((p) => [p.name, p.line, STAGES[p.si].key].join("|")).join(";") === PROJ_AUTH &&
+      PROJECTS.length === 8],
+    ["四产品线各 2 个重点项目，产品线名与契约 §2.1 逐字",
+      LINES.every((l) => PROJECTS.filter((p) => p.line === l).length === 2)],
+    ["停留矩阵形状合法：当前阶段及之前有值、之后留空；八项目均未进入 LCM（周期列整列为空）",
+      PROJECTS.every((p) => p.stay.every((v, j) => (j <= p.si ? v != null && v > 0 : v == null))) &&
+      PROJECTS.every((p) => p.stay[5] == null)],
+    ["停留矩阵行和 = 项目累计天数（逐项目现算）",
+      PROJECTS.every((p) => sum(p.stay.filter((v) => v != null)) === p.total) &&
+      D.stayAll === sum(PROJECTS.map((p) => p.total))],
+    ["各阶段落点数 = 该阶段有值格数，散点总数 = 矩阵有值格数",
+      SCAT.length === D.cells &&
+      STAGES.every((s, j) => SCAT.filter((d) => d.sj === j).length === PROJECTS.filter((p) => p.stay[j] != null).length)],
+    ["离群判定 = Q3 + 1.5 × IQR 逐阶段现算，且 JAMS 与重算集合完全一致",
+      (function () {
+        const re = [];
+        PROJECTS.forEach((p, pi) => p.stay.forEach((v, j) => {
+          if (v != null && v > STAGES[j].box[3] + 1.5 * (STAGES[j].box[3] - STAGES[j].box[1])) re.push(p.name + "|" + STAGES[j].short);
+        }));
+        return re.sort().join(";") === JAMS.map((j) => j.key).sort().join(";") && JAMS.length === re.length;
+      })()],
+    ["已出阶段离群点与父页箱线离群点逐格一致（计划 68 / 开发 188 / 验证 96）",
+      jamExited === parentExited && PARENT_OUTLIERS.length === 3],
+    ["每个离群组合都有归因（四类：评审排队 / 资源等待 / 需求变更 / 技术攻关）",
+      JAMS.every((j) => !!JAM_REASON[j.key]) &&
+      JAMS.every((j) => ["评审排队", "资源等待", "需求变更", "技术攻关"].indexOf(JAM_REASON[j.key].cls) >= 0)],
+    ["卡壳清单渲染条数 = 离群组合数，且按超阈值量降序",
+      document.querySelectorAll("#hp-jam-list li").length === JAMS.length &&
+      JAMS.every((j, k) => k === 0 || JAMS[k - 1].excess >= j.excess)],
+    ["立项日 = 口径日 − 累计停留天数（逐项目现算，甘特横轴与停留矩阵同源）",
+      PROJECTS.every((p) => Math.abs(TODAY_MS - p.t0.getTime() - p.total * MS_D) < 1000)],
+    ["甘特今日线 2026-08-20 落在各项目当前阶段窗口内",
+      PROJECTS.every((p) => p.stageStart.getTime() <= TODAY_MS && TODAY_MS <= p.stageEnd.getTime())],
+    ["甘特段总天数 = 各项目已发生停留天数（计划窗内段 + 超窗段，不含剩余计划虚段）",
+      (function () {
+        const acc = {};
+        ganttData().forEach((d) => {
+          if (d.value[4] === GKIND.plan) return;
+          acc[d.value[0]] = (acc[d.value[0]] || 0) + d.value[5];
+        });
+        return PROJECTS.every((p, pi) => Math.abs((acc[pi] || 0) - p.total) < 1e-9);
+      })()],
+    ["阶段周转效率 = 在研 ÷ 中位停留 × 30.4 现算（Little's Law），Develop 非最高",
+      STAGES.every((s) => Math.abs(s.eff - s.n / s.med * 30.4) < 1e-9) &&
+      STAGES[2].eff < Math.max.apply(null, STAGES.map((s) => s.eff))],
+    ["行业参考带合法（lo < hi）且中位达标判定现算，开发 / 验证 超上沿",
+      STAGES.every((s) => s.ref[0] < s.ref[1] && s.refHit === (s.med >= s.ref[0] && s.med <= s.ref[1])) &&
+      !STAGES[2].refHit && !STAGES[3].refHit],
+    ["平均阶段周期 = 六阶段中位合计 ÷ 6 现算（257 ÷ 6）",
+      D.medSum === sum(STAGES.map((s) => s.box[2])) && Math.abs(D.medAvg - D.medSum / 6) < 1e-9],
+    ["最慢项目 = 累计停留最大者（现算，非硬编码）",
+      PROJECTS.every((p) => p.total <= D.slowest.total) && D.slowest.name === "智楼5.0"],
+    ["hash 六阶段名均可解析为阶段（构造性断言）",
+      STAGES.every((s, i) => {
+        const r = resolveHash("#" + encodeURIComponent(s.name));
+        const r2 = resolveHash("#" + encodeURIComponent(s.short));
+        return r && r.kind === "stage" && r.i === i && r2 && r2.kind === "stage" && r2.i === i;
+      })],
+    ["hash 八项目名均可解析为项目（构造性断言）",
+      PROJECTS.every((p, i) => {
+        const r = resolveHash("#" + encodeURIComponent(p.name));
+        return r && r.kind === "proj" && r.i === i;
+      })],
+    ["hash 别名表覆盖阶段英文键与八项目简写",
+      STAGES.every((s) => { const r = resolveHash("#" + s.key); return r && r.kind === "stage"; }) &&
+      Object.keys(PROJ_ALIAS).every((k) => { const r = resolveHash("#" + encodeURIComponent(k)); return r && r.kind === "proj"; })],
+    /* ★ TDZ 防护的构造性断言：pauseUntil / pauseRotate() 声明在第 1.1 节（行号远小于第 12 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 pauseCalls ≥ 1」即证明声明早于首次调用。 */
+    ["pauseUntil 声明早于首次 pauseRotate() 调用（TDZ 防护，构造性断言）",
+      typeof pauseUntil === "number" && typeof pauseRotate === "function" &&
+      (bootHit ? (pauseCalls >= 1 && pauseUntil > Date.now()) : pauseCalls === 0)]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[阶段停留对比] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

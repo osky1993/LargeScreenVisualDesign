@@ -1,0 +1,1320 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发技能图谱</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --pv-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .pv-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.11), transparent 44%),
+      radial-gradient(circle at 88% 4%, rgba(169, 140, 245, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 400px 1fr 470px;
+    grid-template-rows: 84px 46px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .pv-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .pv-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .pv-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .pv-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(169, 140, 245, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(169, 140, 245, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .pv-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .pv-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .pv-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .pv-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .pv-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到人才与能力，琥珀描边与本页星蓝主色区分 */
+  .pv-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .pv-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .pv-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .pv-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .pv-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .pv-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .pv-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .pv-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .pv-chips { display: flex; align-items: center; gap: 9px; }
+  .pv-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 128px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .pv-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .pv-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .pv-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .pv-chip.is-key b { color: var(--rnd-blue); }
+  .pv-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .pv-clock-time { font: 700 26px/1 var(--pv-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .pv-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 大类筛选条（6 大类 + 全部；限定轮巡池与图谱高亮范围） ===== */
+  .pv-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .pv-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .pv-cchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 5px 12px 6px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 12.5px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .pv-cchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .pv-cchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .pv-cchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .pv-cchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .pv-cchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .pv-cchip.is-hit { animation: pv-hit 0.9s ease-in-out 2; }
+  @keyframes pv-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--pv-cc, rgba(92, 157, 255, 0.8)); } }
+  .pv-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .pv-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .pv-filters-state em { font-style: normal; color: #d3e2ff; }
+  .pv-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .pv-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .pv-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .pv-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--pv-kc, var(--rnd-blue)); }
+  .pv-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .pv-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .pv-kpi-v b { font: 700 24px/1 var(--pv-mono); color: var(--pv-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .pv-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .pv-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .pv-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .pv-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .pv-panel::before { content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .pv-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .pv-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .pv-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .pv-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pv-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .pv-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 主视觉（力导向网络）占中列大头；下方二部图写死高度，两者同属一个 flex 容器 */
+  .pv-panel.is-plink { flex: none; height: 250px; min-height: 0; overflow: hidden; }
+  /* ★ 稀缺预警清单由 JS 填充，与旭日图同属 .pv-col 一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .pv-panel.is-warn { flex: none; height: 320px; min-height: 0; overflow: hidden; }
+  .pv-panel.is-tier { flex: none; height: 230px; min-height: 0; overflow: hidden; }
+
+  /* ===== 稀缺技能预警清单（CSS grid 模拟表，非 <table>） ===== */
+  .pv-warn-head {
+    flex: none; display: grid; grid-template-columns: 1fr 74px 50px; align-items: center; gap: 8px;
+    padding: 5px 8px; border-radius: 6px; margin-bottom: 4px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .pv-warn-head span:nth-child(2), .pv-warn-head span:nth-child(3) { text-align: right; }
+  .pv-warn { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; overflow: hidden; }
+  .pv-warn li {
+    height: 40px; padding: 3px 8px; border-radius: 5px; cursor: pointer;
+    display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    animation: pv-rowin .34s ease both; transition: background .22s, box-shadow .22s;
+  }
+  @keyframes pv-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .pv-warn li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .pv-warn li:hover { background: rgba(92, 157, 255, 0.10); }
+  .pv-warn li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .pv-warn-r1 { display: grid; grid-template-columns: 1fr 74px 50px; align-items: center; gap: 8px; }
+  .pv-warn-r1 b { font-size: 12.5px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pv-warn-r1 em { font-style: normal; text-align: right; font: 700 12px/1 var(--pv-mono); color: var(--rnd-cyan); font-variant-numeric: tabular-nums; }
+  .pv-warn-r2 { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pv-warn-r2 u { text-decoration: none; color: #bfd2f6; }
+  .pv-warn-r2 s { text-decoration: none; color: rgba(127, 146, 196, 0.45); }
+  .pv-badge {
+    padding: 2px 6px; border-radius: 4px; text-align: center; justify-self: end;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .pv-badge.is-r0 { color: #3d060c; background: var(--rnd-red); }
+  .pv-badge.is-r1 { color: #3a2a05; background: var(--rnd-amber); }
+
+  /* ===== 底部滚动条 ===== */
+  .pv-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .pv-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange); }
+  .pv-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: pv-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes pv-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .pv-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .pv-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .pv-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .pv-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .pv-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .pv-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="pv-stage" id="pv-stage">
+    <!-- mockflag:begin --><div class="pv-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="pv-error" id="pv-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="pv-header">
+      <div class="pv-head-left">
+        <div class="pv-crumb">
+          <a class="pv-crumb-up" href="大屏样板间-研发人才与能力1920.html" title="返回上级专题页（Esc）">‹ 返回 人才与能力</a>
+          <b>云麓智联科技</b><i>›</i><span>人才与能力</span><i>›</i><em>技能图谱</em>
+        </div>
+        <div class="pv-head-title-row">
+          <div class="pv-head-title">技能图谱</div>
+          <div class="pv-head-meta">
+            <span><b>30</b> 技能 × <b>6</b> 职能 × <b>4</b> 产品线 · 关系连边 <b id="pv-meta-link">--</b> 条</span><i>|</i>
+            <span>Σ 掌握人次 <b id="pv-meta-cnt">--</b> · 研发人员 <b>3,860</b> 人</span><i>|</i>
+            <span>统计窗口 <b>FY2026（2025-09 ~ 2026-08）</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="pv-head-right">
+        <div class="pv-chips">
+          <div class="pv-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="pv-chip is-key"><span id="pv-chip-key">当前技能</span><b id="pv-chip-val">--</b></div>
+        </div>
+        <div class="pv-clock" aria-label="实时时钟">
+          <span class="pv-clock-time" id="pv-clock-time">--:--:--</span>
+          <span class="pv-clock-date" id="pv-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 大类筛选条（限定轮巡池与图谱高亮范围） -->
+    <div class="pv-filters">
+      <span class="pv-filters-tag">技能大类</span>
+      <div id="pv-cchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <div class="pv-filters-state" id="pv-filters-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="pv-kpis" id="pv-kpis"></div>
+
+    <!-- 左列：技能大类构成（旭日）+ 稀缺技能预警（写死高度 320px） -->
+    <div class="pv-col">
+      <section class="pv-panel" style="flex:1;">
+        <div class="pv-panel-head">
+          <h2>技能大类构成</h2>
+          <span class="pv-panel-tag" id="pv-cat-tag">--</span>
+        </div>
+        <div class="pv-chart" id="pv-chart-cat"></div>
+      </section>
+      <section class="pv-panel is-warn">
+        <div class="pv-panel-head">
+          <h2>稀缺技能预警 · 单点依赖</h2>
+          <span class="pv-panel-tag" id="pv-warn-tag">--</span>
+        </div>
+        <div class="pv-warn-head"><span>技能 · 主归属职能 · 建议</span><span>掌握人数</span><span>风险</span></div>
+        <ul class="pv-warn" id="pv-warn"></ul>
+      </section>
+    </div>
+
+    <!-- 中列：★主视觉 技能-职能二部关系网络 + 技能-产品线依赖二部图 -->
+    <div class="pv-col">
+      <section class="pv-panel" style="flex:1;">
+        <div class="pv-panel-head">
+          <h2>技能 — 职能二部关系网络（力导向 · 布局固定）</h2>
+          <span class="pv-panel-tag" id="pv-graph-tag">--</span>
+        </div>
+        <div class="pv-chart" id="pv-chart-graph"></div>
+      </section>
+      <section class="pv-panel is-plink">
+        <div class="pv-panel-head">
+          <h2>技能 — 产品线依赖二部图</h2>
+          <span class="pv-panel-tag" id="pv-plink-tag">--</span>
+        </div>
+        <div class="pv-chart" id="pv-chart-plink"></div>
+      </section>
+    </div>
+
+    <!-- 右列：技能 × 职能矩阵热力 + 选中技能的职级梯队 -->
+    <div class="pv-col">
+      <section class="pv-panel" style="flex:1;">
+        <div class="pv-panel-head">
+          <h2>技能 × 职能矩阵热力</h2>
+          <span class="pv-panel-tag" id="pv-heat-tag">--</span>
+        </div>
+        <div class="pv-chart" id="pv-chart-heat"></div>
+      </section>
+      <section class="pv-panel is-tier">
+        <div class="pv-panel-head">
+          <h2>技能梯队分布 · P4–P9</h2>
+          <span class="pv-panel-tag" id="pv-tier-tag">--</span>
+        </div>
+        <div class="pv-chart" id="pv-chart-tier"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="pv-foot">
+      <div class="pv-foot-tag">图谱研判</div>
+      <div class="pv-foot-view"><div class="pv-foot-track" id="pv-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("pv-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("pv-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const norm = (s) => String(s).replace(/[\s　]+/g, "");
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 能力资产视角）
+         ★ 与父页 P15「研发人才与能力」严格同源（docs/RndIpdThemed.md §2.2 / §5.3 P15）：
+           30 个技能名与掌握人数 = 父页「技能热词词云」SKILLS 表逐字（含主归属职能 f）；
+           六职能人数 = 契约 软件 1,460 / 硬件 620 / 云平台 540 / AI算法 420 / 测试 520 / PM与管理 300，Σ = 3,860；
+           职级 P4–P9 基准结构 = 父页 FUNCS[].mat 的列和 1180/1060/780/520/244/76（Σ = 3,860）。
+         ★ 本页口径声明（三页分工，页尾滚动条同款文案）：
+           · 本页（pv 技能图谱）= 技能 ↔ 职能 ↔ 产品线的**关系网络**，读的是「谁会什么、什么技能用在哪」；
+           · 兄弟页「研发单职能人才详情」（xn）= 单个职能的人才画像（职级 / 站点 / 技能 / 人效 / 进出）；
+           · 兄弟页「研发关键岗位与招聘台账」（rl）= 10 个关键岗位的缺口与五段招聘漏斗。三页口径不重复展开。
+         ★ 计数口径：掌握人数 = 持该技能标签的人数，一人可持多个标签，故 Σ人次 > 研发人数 3,860，
+           两者不做加总勾稽；本图谱内每人最多计 6 项技能（SKILL_CAP），职能列和以此为上界硬校验。
+         ★ 二级拆分（技能×职能矩阵、技能×职级梯队、技能×产品线分摊）全部由「权重 + 最大余数法」现算，
+           Σ 恒等于该技能掌握人数，绝不复制数字；全部进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的 nodes / links / categories 只放 name 与标量，
+           技能与职能之间一律用**名字与索引**关联，绝不用对象引用回指（力导向最易踩的坑）。 ===== */
+
+  /* 4.1 六职能（契约 §2.2 逐字；short 供热力图轴与网络标签用） */
+  const FUNCS = [
+    { name: "软件", short: "软件", hc: 1460, color: C.blue },
+    { name: "硬件", short: "硬件", hc: 620, color: C.amber },
+    { name: "云平台", short: "云平台", hc: 540, color: C.cyan },
+    { name: "AI算法", short: "AI", hc: 420, color: C.violet },
+    { name: "测试", short: "测试", hc: 520, color: C.green },
+    { name: "PM与管理", short: "PM", hc: 300, color: C.orange }
+  ];
+  const PEOPLE_ALL = 3860;                                   /* 契约 §2.2 研发人员 */
+  const FUNC_AUTH = "软件|1460;硬件|620;云平台|540;AI算法|420;测试|520;PM与管理|300";
+  const SKILL_CAP = 6;                                       /* 图谱内单人技能计数上限（列和上界口径） */
+
+  /* 4.2 职级（父页 rc LEVELS 逐字）与全公司职级基准结构（父页 FUNCS[].mat 列和） */
+  const TIERS = ["P4", "P5", "P6", "P7", "P8", "P9"];
+  const TIER_NAME = ["初级", "中级", "高级", "资深", "专家", "首席"];
+  const TIER_BASE = [1180, 1060, 780, 520, 244, 76];         /* Σ = 3,860 */
+
+  /* 4.3 四产品线（契约 §2.2）：wt = 年度研发投入（亿元），用作技能人次向产品线分摊的权重 */
+  const PLINES = [
+    { name: "智家终端", short: "智家", wt: 68, color: C.amber },
+    { name: "云平台服务", short: "云服务", wt: 59, color: C.cyan },
+    { name: "AIoT模组", short: "AIoT", wt: 46, color: C.violet },
+    { name: "行业方案", short: "行业", wt: 41, color: C.green }
+  ];
+
+  /* 4.4 技能主表 —— w / n / f 三列与父页 rc SKILLS 表逐字（顺序=父页掌握人数降序）
+         w  = 技能名（同时作 hash 键）
+         n  = 掌握人数（父页逐字）
+         f  = 主归属职能（父页逐字）
+         fw = 该技能在六职能上的分布权重（本页二级自编，经最大余数法折成整数人数，行和恒 = n）
+         pl = 依赖该技能的产品线索引集（本页二级自编，决定「单点依赖」判定）
+         sb = 职级偏斜系数（>1 越资深越集中；梯队 = TIER_BASE × sb^l 经最大余数法，Σ 恒 = n）
+         cat= 技能大类索引（6 大类全覆盖、互不重叠） */
+  const SKILLS = [
+    { w: "Java",       n: 1180, f: "软件",     fw: [64, 3, 16, 5, 10, 2], pl: [0, 1, 3],    sb: 1.00, cat: 0 },
+    { w: "Python",     n: 940,  f: "软件",     fw: [34, 6, 14, 24, 18, 4], pl: [0, 1, 2, 3], sb: 1.05, cat: 0 },
+    { w: "Go",         n: 860,  f: "软件",     fw: [56, 2, 30, 3, 8, 1],  pl: [1, 3],       sb: 1.10, cat: 0 },
+    { w: "SQL",        n: 780,  f: "云平台",   fw: [30, 1, 34, 8, 15, 12], pl: [0, 1, 2, 3], sb: 0.95, cat: 3 },
+    { w: "微服务",     n: 700,  f: "软件",     fw: [58, 1, 28, 3, 8, 2],  pl: [1, 3],       sb: 1.25, cat: 1 },
+    { w: "CI-CD",      n: 660,  f: "云平台",   fw: [28, 6, 38, 6, 20, 2], pl: [0, 1, 2, 3], sb: 1.05, cat: 2 },
+    { w: "C++",        n: 620,  f: "硬件",     fw: [22, 55, 3, 14, 5, 1], pl: [0, 2],       sb: 1.20, cat: 0 },
+    { w: "K8s",        n: 610,  f: "云平台",   fw: [24, 1, 58, 8, 8, 1],  pl: [1, 3],       sb: 1.20, cat: 2 },
+    { w: "Redis",      n: 560,  f: "云平台",   fw: [36, 1, 50, 4, 8, 1],  pl: [1, 3],       sb: 1.05, cat: 1 },
+    { w: "嵌入式C",    n: 540,  f: "硬件",     fw: [12, 76, 1, 5, 5, 1],  pl: [0, 2],       sb: 1.15, cat: 0 },
+    { w: "自动化测试", n: 520,  f: "测试",     fw: [22, 6, 8, 4, 58, 2],  pl: [0, 1, 2, 3], sb: 0.85, cat: 5 },
+    { w: "TypeScript", n: 480,  f: "软件",     fw: [78, 1, 8, 2, 9, 2],   pl: [1, 3],       sb: 0.90, cat: 0 },
+    { w: "PyTorch",    n: 430,  f: "AI算法",   fw: [10, 2, 6, 76, 5, 1],  pl: [0, 1, 3],    sb: 1.30, cat: 3 },
+    { w: "DevOps",     n: 430,  f: "云平台",   fw: [22, 4, 52, 5, 14, 3], pl: [1, 3],       sb: 1.20, cat: 2 },
+    { w: "Kafka",      n: 380,  f: "云平台",   fw: [32, 1, 52, 8, 6, 1],  pl: [1, 3],       sb: 1.20, cat: 1 },
+    { w: "可观测性",   n: 350,  f: "云平台",   fw: [24, 3, 54, 5, 12, 2], pl: [1, 3],       sb: 1.30, cat: 2 },
+    { w: "性能压测",   n: 340,  f: "测试",     fw: [24, 5, 16, 3, 50, 2], pl: [0, 1, 3],    sb: 1.10, cat: 5 },
+    { w: "安全合规",   n: 300,  f: "PM与管理", fw: [16, 8, 18, 4, 12, 42], pl: [0, 1, 2, 3], sb: 1.45, cat: 5 },
+    { w: "计算机视觉", n: 290,  f: "AI算法",   fw: [12, 6, 2, 74, 5, 1],  pl: [0, 3],       sb: 1.35, cat: 3 },
+    { w: "数据治理",   n: 280,  f: "PM与管理", fw: [14, 2, 24, 14, 4, 42], pl: [1, 3],       sb: 1.40, cat: 3 },
+    { w: "边缘计算",   n: 260,  f: "AI算法",   fw: [16, 22, 8, 48, 5, 1], pl: [0, 2, 3],    sb: 1.50, cat: 3 },
+    { w: "PCB Layout", n: 260,  f: "硬件",     fw: [1, 90, 1, 1, 6, 1],   pl: [0, 2],       sb: 1.30, cat: 4 },
+    { w: "大模型微调", n: 240,  f: "AI算法",   fw: [10, 1, 6, 78, 4, 1],  pl: [0, 1, 3],    sb: 1.90, cat: 3 },
+    { w: "低功耗设计", n: 220,  f: "硬件",     fw: [4, 84, 1, 4, 6, 1],   pl: [0, 2],       sb: 1.70, cat: 4 },
+    { w: "Rust",       n: 210,  f: "软件",     fw: [62, 16, 14, 4, 3, 1], pl: [1],          sb: 1.35, cat: 0 },
+    { w: "Terraform",  n: 190,  f: "云平台",   fw: [14, 1, 68, 4, 11, 2], pl: [1, 3],       sb: 1.55, cat: 2 },
+    { w: "信号完整性", n: 180,  f: "硬件",     fw: [1, 92, 1, 1, 4, 1],   pl: [0, 2],       sb: 1.80, cat: 4 },
+    { w: "结构仿真",   n: 170,  f: "硬件",     fw: [1, 90, 1, 2, 5, 1],   pl: [0],          sb: 1.45, cat: 4 },
+    { w: "语音识别",   n: 150,  f: "AI算法",   fw: [12, 4, 2, 76, 5, 1],  pl: [0, 3],       sb: 1.60, cat: 3 },
+    { w: "射频调试",   n: 130,  f: "硬件",     fw: [1, 88, 1, 1, 8, 1],   pl: [0, 2],       sb: 1.70, cat: 4 }
+  ];
+  /* 契约锚定串：父页 TOP30 词表逐字比对（仅供自检，展示一律用上表现值） */
+  const SKILL_AUTH =
+    "Java|1180|软件;Python|940|软件;Go|860|软件;SQL|780|云平台;微服务|700|软件;CI-CD|660|云平台;" +
+    "C++|620|硬件;K8s|610|云平台;Redis|560|云平台;嵌入式C|540|硬件;自动化测试|520|测试;TypeScript|480|软件;" +
+    "PyTorch|430|AI算法;DevOps|430|云平台;Kafka|380|云平台;可观测性|350|云平台;性能压测|340|测试;安全合规|300|PM与管理;" +
+    "计算机视觉|290|AI算法;数据治理|280|PM与管理;边缘计算|260|AI算法;PCB Layout|260|硬件;大模型微调|240|AI算法;" +
+    "低功耗设计|220|硬件;Rust|210|软件;Terraform|190|云平台;信号完整性|180|硬件;结构仿真|170|硬件;" +
+    "语音识别|150|AI算法;射频调试|130|硬件";
+
+  /* 4.5 六大类（技术形态维度，与「主归属职能」是两个正交口径；30 技能全覆盖、互不重叠） */
+  const CATS = [
+    { name: "编程语言", color: C.blue },
+    { name: "框架与中间件", color: C.cyan },
+    { name: "云原生与效能", color: C.green },
+    { name: "AI与数据", color: C.violet },
+    { name: "硬件与嵌入式", color: C.amber },
+    { name: "测试与质量安全", color: C.orange }
+  ];
+
+  /* 4.6 稀缺判定阈值与单点依赖口径（页面一律现算，不写死结论） */
+  const SCARCE_N = 250;        /* 掌握人数下限：< 250 人 */
+  const SCARCE_PL = 2;         /* 依赖产品线数下限：≥ 2 条 */
+  const SINGLE_SHARE = 0.80;   /* 单点依赖：主归属职能掌握占比 ≥ 80%（无跨职能备份） */
+  const LINK_SHARE = 0.06;     /* 网络连边门槛：该职能掌握占比 ≥ 6%（主归属职能恒连边） */
+
+  /* ===== 5. 派生层（全部现算；最大余数法保证 Σ 恒等于上级数） ===== */
+  /* 最大余数法：把 total 按权重 w 拆成整数向量，Σ 严格 == total（余数按小数部分降序、同序取小索引） */
+  function largestRemainder(total, w) {
+    const sw = sum(w);
+    if (sw <= 0) return w.map(() => 0);
+    const base = w.map((x) => Math.floor(total * x / sw));
+    let rem = total - sum(base);
+    const order = w.map((x, i) => i).sort((a, b) => {
+      const fa = total * w[a] / sw - Math.floor(total * w[a] / sw);
+      const fb = total * w[b] / sw - Math.floor(total * w[b] / sw);
+      return fb - fa || a - b;
+    });
+    for (let k = 0; k < rem; k++) base[order[k]] += 1;
+    return base;
+  }
+
+  const FN = FUNCS.map((f) => f.name);
+  SKILLS.forEach((s, i) => {
+    s.i = i;
+    s.fi = FN.indexOf(s.f);                                   /* 主归属职能索引（标量关联，不回指对象） */
+    s.mat = largestRemainder(s.n, s.fw);                      /* 技能 × 职能：行和 == s.n */
+    s.share = s.mat[s.fi] / s.n;                              /* 主归属职能占比 */
+    s.tier = largestRemainder(s.n, TIER_BASE.map((b, l) => b * Math.pow(s.sb, l)));
+    s.senior = (s.tier[3] + s.tier[4] + s.tier[5]) / s.n;     /* P7+ 占比 */
+    s.plw = PLINES.map((p, k) => (s.pl.indexOf(k) >= 0 ? p.wt : 0));
+    s.plv = largestRemainder(s.n, s.plw);                     /* 技能 × 产品线：行和 == s.n */
+    /* 连边：占比 ≥ 门槛的职能，主归属职能恒连（只存索引与标量） */
+    s.links = [];
+    for (let j = 0; j < FUNCS.length; j++) {
+      if (s.mat[j] >= s.n * LINK_SHARE || j === s.fi) s.links.push(j);
+    }
+    s.deg = s.links.length;
+    s.scarce = s.n < SCARCE_N && s.pl.length >= SCARCE_PL;
+    s.single = s.scarce && s.share >= SINGLE_SHARE;
+  });
+
+  const D = {};
+  D.cnt = sum(SKILLS.map((s) => s.n));                        /* Σ 掌握人次 */
+  D.avg = D.cnt / PEOPLE_ALL;                                 /* 人均技能数 */
+  D.colSum = FUNCS.map((f, j) => sum(SKILLS.map((s) => s.mat[j])));
+  D.colAvg = D.colSum.map((v, j) => v / FUNCS[j].hc);
+  D.plSum = PLINES.map((p, k) => sum(SKILLS.map((s) => s.plv[k])));
+  D.linkN = sum(SKILLS.map((s) => s.deg));
+  D.maxCell = Math.max.apply(null, SKILLS.map((s) => Math.max.apply(null, s.mat)));
+  D.scarce = SKILLS.filter((s) => s.scarce).sort((a, b) => a.n - b.n);
+  D.single = SKILLS.filter((s) => s.single);
+  D.widest = SKILLS.slice().sort((a, b) => b.deg - a.deg || b.n - a.n)[0];
+  D.tierBaseShare = TIER_BASE.map((b) => b / PEOPLE_ALL);
+  D.seniorAll = (TIER_BASE[3] + TIER_BASE[4] + TIER_BASE[5]) / PEOPLE_ALL;
+  D.catSum = CATS.map((c, k) => sum(SKILLS.filter((s) => s.cat === k).map((s) => s.n)));
+  D.catCnt = CATS.map((c, k) => SKILLS.filter((s) => s.cat === k).length);
+  D.top = SKILLS.slice().sort((a, b) => b.n - a.n)[0];
+
+  /* 二部图取样：TOP6 主力技能 + 全部稀缺技能（既看主干、又看单点依赖） */
+  const PLINK_IDX = SKILLS.slice().sort((a, b) => b.n - a.n).slice(0, 6).map((s) => s.i)
+    .concat(D.scarce.map((s) => s.i));
+  D.plinkSum = sum(PLINK_IDX.map((i) => SKILLS[i].n));
+
+  /* 建议文案（按风险与依赖现算拼装，不硬编码结论数字） */
+  function adviceOf(s) {
+    const lines = s.pl.map((k) => PLINES[k].short).join(" · ");
+    if (s.single) return "跨职能扩训 + 外部引入，打破「" + FUNCS[s.fi].name + "」单职能持有";
+    if (s.senior > 0.5) return "梯队倒挂（P7+ " + fmtDec(100 * s.senior, 0) + "%），补初中级并沉淀 CBB";
+    return "建 " + lines + " 共享池，season 内补齐第二梯队";
+  }
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("pv-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("pv-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("pv-meta-link").textContent = fmtInt(D.linkN);
+  $("pv-meta-cnt").textContent = fmtInt(D.cnt);
+
+  /* ===== 7. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "图谱技能数", v: SKILLS.length, dec: 0, unit: "项", color: C.blue,
+      s: "父页 TOP30 热词表逐字 · " + CATS.length + " 大类全覆盖" },
+    { k: "Σ 掌握人次", v: D.cnt, dec: 0, unit: "人次", color: C.cyan,
+      s: "一人多技能 · 人次 > 研发人数 " + fmtInt(PEOPLE_ALL) + " 人" },
+    { k: "人均技能数", v: D.avg, dec: 2, unit: "项/人", color: C.green,
+      s: fmtInt(D.cnt) + " ÷ " + fmtInt(PEOPLE_ALL) + " 现算 · 图谱内计数上限 " + SKILL_CAP + " 项/人" },
+    { k: "稀缺技能", v: D.scarce.length, dec: 0, unit: "项", color: C.amber,
+      s: "掌握 < " + SCARCE_N + " 人且被 ≥ " + SCARCE_PL + " 条产品线依赖" },
+    { k: "单点依赖技能", v: D.single.length, dec: 0, unit: "项", color: C.red,
+      s: "稀缺且主职能占比 ≥ " + fmtDec(100 * SINGLE_SHARE, 0) + "% · 无跨职能备份" },
+    { k: "覆盖最广技能", v: D.widest.deg, dec: 0, unit: "职能", color: C.violet,
+      s: D.widest.w + " · " + fmtInt(D.widest.n) + " 人 · 跨 " + D.widest.deg + " 个职能有连边" }
+  ];
+  $("pv-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="pv-kpi" style="--pv-kc:' + p.color + '">' +
+      '<div class="pv-kpi-k">' + p.k + "</div>" +
+      '<div class="pv-kpi-v"><b id="pv-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="pv-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("pv-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 大类筛选 chip（全部 + 6 大类；限定轮巡池） ===== */
+  const CFILTERS = [{ name: "全部", color: C.blue, cnt: SKILLS.length, n: D.cnt }]
+    .concat(CATS.map((c, k) => ({ name: c.name, color: c.color, cnt: D.catCnt[k], n: D.catSum[k] })));
+  const cbox = $("pv-cchips");
+  cbox.innerHTML = CFILTERS.map((f, i) => (
+    '<button class="pv-cchip" type="button" data-i="' + i + '" style="--pv-cc:' + f.color + '">' +
+      "<u>" + f.name + "</u><i>" + f.cnt + " 项 · " + fmtInt(f.n) + " 人次</i>" +
+    "</button>"
+  )).join("");
+  const cchips = Array.from(cbox.children);
+
+  /* ===== 9. hash 契约：父页 P15「技能热词词云」面板级入口 → 本页 #encodeURIComponent(技能名)
+         归一化（decodeURIComponent + trim + 全角空白剔除）后查表；
+         HASH_ALIAS 收大小写与常见简写（k8s / K8S / kubernetes / ci-cd / golang / cv / llm …）。 ===== */
+  const HASH_ALIAS = {};
+  let aliasDup = 0;
+  function alias(k, v) {
+    const key = norm(k);
+    if (!key) return;
+    if (Object.prototype.hasOwnProperty.call(HASH_ALIAS, key)) { if (HASH_ALIAS[key] !== v) aliasDup++; return; }
+    HASH_ALIAS[key] = v;
+  }
+  SKILLS.forEach((s, i) => {
+    alias(s.w, i);
+    alias(String(s.w).toLowerCase(), i);
+    alias(String(s.w).toUpperCase(), i);
+    alias(s.w + "技能", i);
+  });
+  const EXTRA = {
+    "Java": ["JAVA", "java开发"], "Python": ["py", "PY"], "Go": ["golang", "Golang", "GOLANG"],
+    "SQL": ["数据库", "关系数据库"], "微服务": ["微服务架构", "microservice", "Microservice"],
+    "CI-CD": ["CI/CD", "ci/cd", "cicd", "CICD", "持续集成", "持续交付"],
+    "C++": ["cpp", "CPP", "cplusplus"], "K8s": ["k8s", "K8S", "kubernetes", "Kubernetes", "容器编排"],
+    "Redis": ["缓存"], "嵌入式C": ["嵌入式", "嵌入式开发", "嵌入式软件"],
+    "自动化测试": ["自动化", "测试自动化"], "TypeScript": ["ts", "TS", "typescript"],
+    "PyTorch": ["torch", "pytorch", "深度学习框架"], "DevOps": ["devops", "研发运维"],
+    "Kafka": ["消息队列", "MQ", "mq"], "可观测性": ["可观测", "observability", "Observability"],
+    "性能压测": ["压测", "性能测试"], "安全合规": ["安全", "合规", "研发安全"],
+    "计算机视觉": ["CV", "cv", "视觉", "机器视觉"], "数据治理": ["数据", "数据管理"],
+    "边缘计算": ["边缘", "edge", "Edge", "端侧推理"], "PCB Layout": ["PCB", "pcb", "PCB布局", "Layout", "layout"],
+    "大模型微调": ["大模型", "LLM", "llm", "微调", "SFT", "sft"], "低功耗设计": ["低功耗", "功耗设计"],
+    "Rust": ["rust"], "Terraform": ["terraform", "IaC", "iac", "基础设施即代码"],
+    "信号完整性": ["SI", "si", "信号完整"], "结构仿真": ["结构", "仿真", "结构设计"],
+    "语音识别": ["语音", "ASR", "asr"], "射频调试": ["射频", "RF", "rf", "天线调试"]
+  };
+  SKILLS.forEach((s, i) => { (EXTRA[s.w] || []).forEach((k) => alias(k, i)); });
+  alias("全部", -1); alias("ALL", -1); alias("all", -1); alias("全量", -1); alias("技能图谱", -1);
+
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = norm(raw);
+    if (!raw) return -2;                                      /* 无 hash：走默认起点，不闪烁 */
+    let hit = HASH_ALIAS[raw];
+    if (hit === undefined) hit = HASH_ALIAS[raw.toLowerCase()];
+    return hit === undefined ? -2 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(i) {
+    const want = "#" + encodeURIComponent(i < 0 ? "全部" : SKILLS[i].w);
+    if (location.hash !== want) {
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退；
+         ★ replaceState 不触发 hashchange，故只有走 location.hash 兜底时才需要置门闩，
+           否则门闩会一直悬着，把下一次真正的 hashchange 静默吞掉。 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else { hashSuppress = true; location.hash = want; }
+    }
+  }
+
+  /* ===== 10. 稀缺技能预警清单（DOM，init 之前填充完毕；面板写死 320px 不撑破） ===== */
+  const warnBox = $("pv-warn");
+  warnBox.innerHTML = D.scarce.map((s, k) => {
+    const lines = s.pl.map((j) => PLINES[j].name).join(" · ");
+    return '<li data-i="' + s.i + '" style="animation-delay:' + (k * 40) + 'ms">' +
+      '<div class="pv-warn-r1">' +
+        "<b>" + s.w + "</b>" +
+        '<em>' + fmtInt(s.n) + " 人</em>" +
+        '<span class="pv-badge ' + (s.single ? "is-r0" : "is-r1") + '">' + (s.single ? "高危" : "关注") + "</span>" +
+      "</div>" +
+      '<div class="pv-warn-r2"><u>' + FUNCS[s.fi].name + " " + fmtDec(100 * s.share, 0) + "%</u><s>|</s>" +
+        "<u>" + s.pl.length + " 线：" + lines + "</u><s>|</s>" + adviceOf(s) + "</div>" +
+    "</li>";
+  }).join("");
+  const warnLis = Array.from(warnBox.children);
+  $("pv-warn-tag").innerHTML = "阈值 <b>&lt; " + SCARCE_N + " 人</b> 且 <b>≥ " + SCARCE_PL +
+    " 条产品线</b> · 命中 <b>" + D.scarce.length + "</b> 项（单点 " + D.single.length + "）";
+
+  /* ===== 11. ★ 力导向布局：一次性跑完固定（自实现 Fruchterman-Reingold，确定性、无随机）
+         为什么不用 series.force：初始坐标带随机性、布局动画期间反复重排，
+         kiosk 常驻场景下每次刷新构图都不同、且高亮切换会把布局抖散。
+         做法：环形确定性初值（职能内环 / 技能外环按主归属分组）→ 固定迭代次数的弹簧-斥力松弛
+         → 输出坐标喂给 layout:"none"，此后只改样式不改坐标。 ===== */
+  const LAY = { W: 1000, H: 520, iters: 420, t0: 92, cool: 0.985, grav: 0.012 };
+  const GN = SKILLS.length + FUNCS.length;                    /* 36 个节点：0..29 技能，30..35 职能 */
+  const gpos = new Array(GN);
+  (function seedLayout() {
+    /* 职能内环：按 FUNCS 序均匀分布 */
+    for (let j = 0; j < FUNCS.length; j++) {
+      const a = -Math.PI / 2 + j * 2 * Math.PI / FUNCS.length;
+      gpos[SKILLS.length + j] = { x: Math.cos(a) * 210, y: Math.sin(a) * 120 };
+    }
+    /* 技能外环：先按主归属职能分组、组内按掌握人数降序，落在该职能扇区内 */
+    const groups = FUNCS.map((f, j) => SKILLS.filter((s) => s.fi === j).sort((a, b) => b.n - a.n).map((s) => s.i));
+    groups.forEach((g, j) => {
+      const a0 = -Math.PI / 2 + j * 2 * Math.PI / FUNCS.length;
+      const span = 2 * Math.PI / FUNCS.length * 0.88;
+      g.forEach((idx, k) => {
+        const a = a0 + (g.length === 1 ? 0 : (k / (g.length - 1) - 0.5) * span);
+        const r = 1 + (k % 2) * 0.16;                          /* 交错双环，避免同心重叠 */
+        gpos[idx] = { x: Math.cos(a) * 420 * r, y: Math.sin(a) * 235 * r };
+      });
+    });
+  })();
+  const GLINKS = [];                                          /* 只存索引与标量，绝不回指对象 */
+  SKILLS.forEach((s) => s.links.forEach((j) => {
+    GLINKS.push({ s: s.i, t: SKILLS.length + j, v: s.mat[j], f: j });
+  }));
+  const GMAXV = Math.max.apply(null, GLINKS.map((l) => l.v));
+  (function relax() {
+    const k = Math.sqrt(LAY.W * LAY.H / GN);
+    const rep = new Array(GN);
+    for (let i = 0; i < SKILLS.length; i++) rep[i] = 0.72 + 0.5 * Math.sqrt(SKILLS[i].n / D.top.n);
+    for (let j = 0; j < FUNCS.length; j++) rep[SKILLS.length + j] = 1.9;
+    const dsp = new Array(GN);
+    let t = LAY.t0;
+    for (let it = 0; it < LAY.iters; it++) {
+      for (let i = 0; i < GN; i++) dsp[i] = { x: 0, y: 0 };
+      for (let i = 0; i < GN; i++) {
+        for (let j = i + 1; j < GN; j++) {
+          let dx = gpos[i].x - gpos[j].x, dy = gpos[i].y - gpos[j].y;
+          let d2 = dx * dx + dy * dy;
+          if (d2 < 1e-4) { dx = (i - j) * 0.011 + 0.017; dy = 0.013; d2 = dx * dx + dy * dy; }
+          const d = Math.sqrt(d2), f = (k * k / d) * rep[i] * rep[j];
+          dsp[i].x += dx / d * f; dsp[i].y += dy / d * f;
+          dsp[j].x -= dx / d * f; dsp[j].y -= dy / d * f;
+        }
+      }
+      for (let e = 0; e < GLINKS.length; e++) {
+        const l = GLINKS[e], i = l.s, j = l.t;
+        let dx = gpos[i].x - gpos[j].x, dy = gpos[i].y - gpos[j].y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        const wgt = 0.25 + 0.75 * (l.v / GMAXV);
+        const f = (d * d / k) * wgt;
+        dsp[i].x -= dx / d * f; dsp[i].y -= dy / d * f;
+        dsp[j].x += dx / d * f; dsp[j].y += dy / d * f;
+      }
+      for (let i = 0; i < GN; i++) { dsp[i].x -= gpos[i].x * LAY.grav; dsp[i].y -= gpos[i].y * LAY.grav * 1.9; }
+      for (let i = 0; i < GN; i++) {
+        const dl = Math.sqrt(dsp[i].x * dsp[i].x + dsp[i].y * dsp[i].y) || 1e-6;
+        const m = Math.min(dl, t);
+        gpos[i].x = clamp(gpos[i].x + dsp[i].x / dl * m, -LAY.W / 2, LAY.W / 2);
+        gpos[i].y = clamp(gpos[i].y + dsp[i].y / dl * m, -LAY.H / 2, LAY.H / 2);
+      }
+      t *= LAY.cool;
+    }
+  })();
+
+  /* ===== 12. 图表 option 构造（★ 只放 name 与标量；技能/职能一律用名字与索引关联） ===== */
+  const AXIS_TXT = { color: C.textDim, fontSize: 10 };
+  const TIP = {
+    backgroundColor: "rgba(8,18,49,.94)", borderColor: "rgba(96,140,255,.4)", borderWidth: 1,
+    textStyle: { color: C.text, fontSize: 12 }, padding: [8, 12], confine: true
+  };
+
+  /* 12.1 ★ 主视觉：技能 — 职能二部关系网络 */
+  function graphOption(sel, cat) {
+    const nodes = [], links = [];
+    const relFn = sel >= 0 ? SKILLS[sel].links : null;
+    SKILLS.forEach((s) => {
+      const inCat = cat < 0 || s.cat === cat;
+      const hot = sel >= 0 ? s.i === sel : inCat;
+      const dim = sel >= 0 ? s.i !== sel : !inCat;
+      nodes.push({
+        name: s.w, category: 0, x: gpos[s.i].x, y: gpos[s.i].y,
+        value: s.n,
+        symbolSize: clamp(7 + 30 * Math.sqrt(s.n / D.top.n), 8, 38),
+        itemStyle: {
+          color: s.single ? C.red : CATS[s.cat].color,
+          borderColor: hot ? "#ffffff" : "rgba(5,10,28,.65)",
+          borderWidth: hot ? 2 : 1,
+          opacity: dim ? 0.16 : 0.92,
+          shadowBlur: hot ? 18 : 0, shadowColor: CATS[s.cat].color
+        },
+        label: {
+          show: true, position: "right", distance: 4,
+          fontSize: hot ? 12 : 9.5, fontWeight: hot ? 700 : 400,
+          color: dim ? "rgba(127,146,196,.35)" : (hot ? "#ffffff" : "#c2d4f8")
+        }
+      });
+    });
+    FUNCS.forEach((f, j) => {
+      const hot = sel >= 0 ? relFn.indexOf(j) >= 0 : true;
+      nodes.push({
+        name: f.name, category: 1, x: gpos[SKILLS.length + j].x, y: gpos[SKILLS.length + j].y,
+        value: f.hc,
+        symbolSize: clamp(20 + 26 * Math.sqrt(f.hc / 1460), 20, 46),
+        itemStyle: {
+          color: f.color, borderColor: hot ? "#ffffff" : "rgba(5,10,28,.6)",
+          borderWidth: hot ? 2 : 1, opacity: hot ? 0.95 : 0.3,
+          shadowBlur: hot ? 16 : 0, shadowColor: f.color
+        },
+        label: { show: true, position: "inside", fontSize: 11, fontWeight: 700, color: "#071026" }
+      });
+    });
+    GLINKS.forEach((l) => {
+      const s = SKILLS[l.s];
+      const on = sel >= 0 ? l.s === sel : (cat < 0 || s.cat === cat);
+      links.push({
+        source: s.w, target: FUNCS[l.f].name, value: l.v,
+        lineStyle: {
+          color: FUNCS[l.f].color,
+          width: clamp(0.6 + 5.2 * Math.sqrt(l.v / GMAXV), 0.6, 6),
+          opacity: on ? (sel >= 0 ? 0.95 : 0.5) : 0.05,
+          curveness: 0.14
+        }
+      });
+    });
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({}, TIP, {
+        formatter: (p) => {
+          if (p.dataType === "edge") {
+            const nm = p.data.source, fn = p.data.target;
+            const s = SKILLS[SKILLS.map((x) => x.w).indexOf(nm)];
+            return "<b>" + nm + " → " + fn + "</b><br/>该职能掌握该技能 <b>" + fmtInt(p.data.value) +
+              "</b> 人<br/>占该技能 " + fmtDec(100 * p.data.value / s.n, 1) + "% · 占该职能人数 " +
+              fmtDec(100 * p.data.value / FUNCS[FN.indexOf(fn)].hc, 1) + "%";
+          }
+          if (p.data.category === 1) {
+            const j = FN.indexOf(p.name);
+            return "<b>" + p.name + "</b>（职能）<br/>人数 <b>" + fmtInt(FUNCS[j].hc) + "</b> 人<br/>图谱内持有 " +
+              fmtInt(D.colSum[j]) + " 人次 · 人均 " + fmtDec(D.colAvg[j], 2) + " 项";
+          }
+          const s = SKILLS[SKILLS.map((x) => x.w).indexOf(p.name)];
+          return "<b>" + p.name + "</b>（" + CATS[s.cat].name + "）<br/>掌握 <b>" + fmtInt(s.n) +
+            "</b> 人 · 主归属 " + FUNCS[s.fi].name + " " + fmtDec(100 * s.share, 0) + "%<br/>连边 " +
+            s.deg + " 个职能 · 依赖 " + s.pl.length + " 条产品线" + (s.single ? "<br/><b>单点依赖</b>" : "");
+        }
+      }),
+      legend: {
+        data: ["技能节点", "职能节点"], top: 0, left: 2, itemWidth: 10, itemHeight: 10,
+        textStyle: { color: C.textDim, fontSize: 11 }, selectedMode: false
+      },
+      series: [{
+        type: "graph", layout: "none", coordinateSystem: "view",
+        left: 70, right: 70, top: 40, bottom: 24,
+        roam: false, animation: false,
+        categories: [
+          { name: "技能节点", itemStyle: { color: C.blue } },
+          { name: "职能节点", itemStyle: { color: C.amber } }
+        ],
+        edgeSymbol: ["none", "none"],
+        labelLayout: { hideOverlap: true },
+        emphasis: { focus: "adjacency", lineStyle: { opacity: 1 } },
+        data: nodes, links: links
+      }]
+    };
+  }
+
+  /* 12.2 技能 × 职能矩阵热力（行 = 30 技能，列 = 6 职能；行和 == 掌握人数） */
+  function heatOption(sel, cat) {
+    const data = [];
+    SKILLS.forEach((s, i) => {
+      FUNCS.forEach((f, j) => {
+        data.push({
+          value: [j, SKILLS.length - 1 - i, s.mat[j]],
+          itemStyle: { opacity: (sel >= 0 && sel !== i) || (sel < 0 && cat >= 0 && s.cat !== cat) ? 0.22 : 1 }
+        });
+      });
+    });
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({}, TIP, {
+        formatter: (p) => {
+          const i = SKILLS.length - 1 - p.value[1], j = p.value[0], s = SKILLS[i];
+          return "<b>" + s.w + " × " + FUNCS[j].name + "</b><br/>掌握 <b>" + fmtInt(p.value[2]) +
+            "</b> 人<br/>占该技能 " + fmtDec(100 * p.value[2] / s.n, 1) + "% · 行和 " + fmtInt(sum(s.mat)) + " 人";
+        }
+      }),
+      grid: { left: 76, right: 10, top: 26, bottom: 6 },
+      xAxis: {
+        type: "category", position: "top", data: FUNCS.map((f) => f.short),
+        axisLine: { show: false }, axisTick: { show: false }, splitArea: { show: false },
+        axisLabel: { color: "#9cb4e8", fontSize: 10.5, fontWeight: 700 }
+      },
+      yAxis: {
+        type: "category", data: SKILLS.map((s) => s.w).slice().reverse(),
+        axisLine: { show: false }, axisTick: { show: false }, splitArea: { show: false },
+        axisLabel: {
+          fontSize: 9.5, margin: 6,
+          color: (v) => {
+            const s = SKILLS[SKILLS.map((x) => x.w).indexOf(v)];
+            if (sel >= 0) return sel === s.i ? "#ffffff" : "rgba(127,146,196,.5)";
+            if (cat >= 0) return s.cat === cat ? CATS[s.cat].color : "rgba(127,146,196,.4)";
+            return s.single ? C.red : "#a9bce4";
+          }
+        }
+      },
+      visualMap: {
+        min: 0, max: D.maxCell, calculable: false, orient: "horizontal",
+        right: 12, top: 2, itemWidth: 9, itemHeight: 70,
+        text: ["多", "少"], textStyle: { color: C.textDim, fontSize: 9 },
+        inRange: { color: ["rgba(20,38,96,.55)", C.blueDeep, C.blue, C.cyan, C.amber] }
+      },
+      series: [{
+        type: "heatmap", data: data, animation: false,
+        label: { show: true, fontSize: 8.5, color: "#0a1734", formatter: (p) => (p.value[2] >= 90 ? p.value[2] : "") },
+        itemStyle: { borderColor: "rgba(5,10,28,.55)", borderWidth: 0.6 },
+        emphasis: { itemStyle: { borderColor: "#ffffff", borderWidth: 1.4 } }
+      }]
+    };
+  }
+
+  /* 12.3 技能大类构成（旭日：大类 → 技能，Σ = Σ人次） */
+  function catOption(sel, cat) {
+    const children = CATS.map((c, k) => ({
+      name: c.name, value: D.catSum[k],
+      itemStyle: { color: c.color, opacity: cat < 0 || cat === k ? 0.92 : 0.24 },
+      label: { color: "#071026", fontSize: 10.5, fontWeight: 700, rotate: "tangential", minAngle: 12 },
+      children: SKILLS.filter((s) => s.cat === k).sort((a, b) => b.n - a.n).map((s) => ({
+        name: s.w, value: s.n,
+        itemStyle: {
+          color: s.single ? C.red : c.color,
+          opacity: (sel >= 0 ? (sel === s.i ? 1 : 0.3) : (cat < 0 || cat === k ? 0.62 : 0.16)),
+          borderColor: sel === s.i ? "#ffffff" : "rgba(5,10,28,.7)", borderWidth: sel === s.i ? 1.6 : 0.8
+        },
+        label: { color: "#dfe9ff", fontSize: 9, minAngle: 7 }
+      }))
+    }));
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({}, TIP, {
+        formatter: (p) => "<b>" + p.name + "</b><br/>" + fmtInt(p.value) + " 人次 · 占 Σ人次 " +
+          fmtDec(100 * p.value / D.cnt, 1) + "%"
+      }),
+      series: [{
+        type: "sunburst", radius: ["18%", "94%"], center: ["50%", "52%"],
+        sort: null, animation: false, nodeClick: false,
+        levels: [{}, { r0: "18%", r: "44%" }, { r0: "45%", r: "94%" }],
+        data: children
+      }]
+    };
+  }
+
+  /* 12.4 技能 — 产品线依赖二部图（小型二部网络：左 12 技能 / 右 4 产品线） */
+  function plinkOption(sel) {
+    const nodes = [], links = [];
+    const m = PLINK_IDX.length;
+    PLINK_IDX.forEach((idx, k) => {
+      const s = SKILLS[idx];
+      const hot = sel < 0 || sel === idx;
+      nodes.push({
+        name: s.w, x: 0, y: k * (100 / (m - 1)), value: s.n,
+        symbolSize: clamp(6 + 16 * Math.sqrt(s.n / D.top.n), 7, 20),
+        itemStyle: { color: s.scarce ? (s.single ? C.red : C.amber) : CATS[s.cat].color, opacity: hot ? 0.95 : 0.22 },
+        label: { show: true, position: "left", distance: 5, fontSize: 10, fontWeight: sel === idx ? 700 : 400,
+          color: hot ? (sel === idx ? "#ffffff" : "#c2d4f8") : "rgba(127,146,196,.35)" }
+      });
+    });
+    PLINES.forEach((p, k) => {
+      nodes.push({
+        name: p.name, x: 100, y: 12 + k * 25.5, value: D.plSum[k],
+        symbolSize: clamp(16 + 20 * Math.sqrt(D.plSum[k] / Math.max.apply(null, D.plSum)), 18, 34),
+        itemStyle: { color: p.color, opacity: 0.95 },
+        label: { show: true, position: "right", distance: 6, fontSize: 10.5, fontWeight: 700, color: "#dfe9ff" }
+      });
+    });
+    let maxv = 1;
+    PLINK_IDX.forEach((idx) => SKILLS[idx].plv.forEach((v) => { if (v > maxv) maxv = v; }));
+    PLINK_IDX.forEach((idx) => {
+      const s = SKILLS[idx];
+      s.plv.forEach((v, k) => {
+        if (v <= 0) return;
+        const on = sel < 0 || sel === idx;
+        links.push({
+          source: s.w, target: PLINES[k].name, value: v,
+          lineStyle: {
+            color: PLINES[k].color, width: clamp(0.8 + 5 * Math.sqrt(v / maxv), 0.8, 6),
+            opacity: on ? (sel === idx ? 0.95 : 0.5) : 0.05, curveness: 0.1
+          }
+        });
+      });
+    });
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({}, TIP, {
+        formatter: (p) => {
+          if (p.dataType === "edge") {
+            return "<b>" + p.data.source + " → " + p.data.target + "</b><br/>分摊 <b>" +
+              fmtInt(p.data.value) + "</b> 人次<br/>按产品线投入权重分摊（Σ = 该技能掌握人数）";
+          }
+          const k = PLINES.map((x) => x.name).indexOf(p.name);
+          if (k >= 0) return "<b>" + p.name + "</b>（产品线）<br/>全 30 技能分摊 <b>" + fmtInt(D.plSum[k]) +
+            "</b> 人次 · 占 " + fmtDec(100 * D.plSum[k] / D.cnt, 1) + "%";
+          const s = SKILLS[SKILLS.map((x) => x.w).indexOf(p.name)];
+          return "<b>" + p.name + "</b><br/>掌握 " + fmtInt(s.n) + " 人 · 依赖 " + s.pl.length + " 条产品线";
+        }
+      }),
+      series: [{
+        type: "graph", layout: "none", coordinateSystem: "view",
+        left: 96, right: 104, top: 12, bottom: 12,
+        roam: false, animation: false, edgeSymbol: ["none", "none"],
+        labelLayout: { hideOverlap: true },
+        emphasis: { focus: "adjacency" },
+        data: nodes, links: links
+      }]
+    };
+  }
+
+  /* 12.5 技能梯队分布（P4–P9；对照全公司职级基准结构，看「是不是只有专家会」） */
+  function tierOption(sel) {
+    const s = SKILLS[sel < 0 ? 0 : sel];
+    const base = D.tierBaseShare.map((r) => Math.round(r * s.n));
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({}, TIP, {
+        trigger: "axis",
+        formatter: (ps) => {
+          const l = ps[0].dataIndex;
+          return "<b>" + TIERS[l] + " " + TIER_NAME[l] + "</b><br/>" + s.w + " 掌握 <b>" + fmtInt(s.tier[l]) +
+            "</b> 人（" + fmtDec(100 * s.tier[l] / s.n, 1) + "%）<br/>全公司同职级结构折算 " + fmtInt(base[l]) + " 人";
+        }
+      }),
+      grid: { left: 34, right: 12, top: 22, bottom: 22 },
+      legend: { data: ["该技能梯队", "全公司结构折算"], top: 0, right: 0, itemWidth: 10, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 10 } },
+      xAxis: {
+        type: "category", data: TIERS.map((t, l) => t + " " + TIER_NAME[l]),
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.3)" } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5 }
+      },
+      yAxis: {
+        type: "value", splitLine: { lineStyle: { color: C.grid } },
+        axisLabel: Object.assign({}, AXIS_TXT, { fontSize: 9.5 })
+      },
+      series: [
+        { name: "该技能梯队", type: "bar", data: s.tier, barWidth: "48%", animationDuration: 420,
+          itemStyle: { color: (p) => (p.dataIndex >= 3 ? C.amber : C.blue), borderRadius: [3, 3, 0, 0] },
+          label: { show: true, position: "top", fontSize: 9.5, color: "#c9d8f8" } },
+        { name: "全公司结构折算", type: "line", data: base, smooth: true, symbolSize: 5,
+          lineStyle: { color: C.violet, width: 1.6, type: "dashed" }, itemStyle: { color: C.violet } }
+      ]
+    };
+  }
+
+  /* ===== 13. 选中态调度（技能维度单一选中 + 大类维度筛选） ===== */
+  let selIdx = 0, catIdx = -1;
+  let graphChart = null, heatChart = null, catChart = null, plinkChart = null, tierChart = null;
+
+  function catPool() {
+    return SKILLS.filter((s) => catIdx < 0 || s.cat === catIdx).map((s) => s.i);
+  }
+
+  function paintChips() {
+    cchips.forEach((el, i) => {
+      const on = i === catIdx + 1;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? CFILTERS[i].color : "";
+      el.style.borderColor = on ? CFILTERS[i].color : "";
+    });
+  }
+
+  function applySel(i, pushHash) {
+    selIdx = i;
+    const s = SKILLS[selIdx < 0 ? 0 : selIdx];
+    /* 头部 key chip */
+    $("pv-chip-key").textContent = "当前技能 · " + s.w;
+    $("pv-chip-val").textContent = fmtInt(s.n) + " 人 / " + s.deg + " 职能";
+    /* 筛选条状态行 */
+    $("pv-filters-state").innerHTML =
+      "大类口径 <em>" + CFILTERS[catIdx + 1].name + "</em>（" + CFILTERS[catIdx + 1].cnt + " 项 · " +
+      fmtInt(CFILTERS[catIdx + 1].n) + " 人次）<i>|</i>选中 <em>" + s.w + "</em> · 主归属 <b>" +
+      FUNCS[s.fi].name + "</b> " + fmtDec(100 * s.share, 1) + "%<i>|</i>P7+ <b>" +
+      fmtDec(100 * s.senior, 1) + "%</b>（全公司 " + fmtDec(100 * D.seniorAll, 1) + "%）";
+    /* 面板 tag */
+    $("pv-graph-tag").innerHTML = "节点 <b>" + GN + "</b>（30 技能 + 6 职能） · 连边 <b>" + D.linkN +
+      "</b> 条 · 门槛 ≥ " + fmtDec(100 * LINK_SHARE, 0) + "%";
+    $("pv-heat-tag").innerHTML = "行和 = 掌握人数 · 「" + s.w + "」Σ <b>" + fmtInt(sum(s.mat)) +
+      "</b> = " + fmtInt(s.n) + " 人";
+    $("pv-cat-tag").innerHTML = CATS.length + " 大类 Σ <b>" + fmtInt(D.cnt) + "</b> 人次（一人多技能，人次 > 人数 " +
+      fmtInt(PEOPLE_ALL) + "）";
+    $("pv-plink-tag").innerHTML = "TOP6 主力 + " + D.scarce.length + " 稀缺 · Σ <b>" + fmtInt(D.plinkSum) +
+      "</b> 人次 · 按投入权重分摊";
+    $("pv-tier-tag").innerHTML = "「" + s.w + "」Σ <b>" + fmtInt(sum(s.tier)) + "</b> 人 · P7+ <b>" +
+      fmtDec(100 * s.senior, 1) + "%</b> vs 全公司 " + fmtDec(100 * D.seniorAll, 1) + "%";
+    /* 清单选中态 */
+    warnLis.forEach((li) => li.classList.toggle("is-sel", Number(li.dataset.i) === selIdx));
+    /* 图表重绘（布局坐标不变，只改样式） */
+    if (graphChart) graphChart.setOption(graphOption(selIdx, catIdx), true);
+    if (heatChart) heatChart.setOption(heatOption(selIdx, catIdx), true);
+    if (catChart) catChart.setOption(catOption(selIdx, catIdx), true);
+    if (plinkChart) plinkChart.setOption(plinkOption(selIdx), true);
+    if (tierChart) tierChart.setOption(tierOption(selIdx), true);
+    if (pushHash) syncHash(selIdx);
+  }
+
+  function applyCat(k) {
+    catIdx = k;
+    paintChips();
+    const pool = catPool();
+    if (pool.length && pool.indexOf(selIdx) < 0) applySel(pool[0], true);
+    else applySel(selIdx, false);
+  }
+
+  cchips.forEach((el) => el.addEventListener("click", () => { applyCat(Number(el.dataset.i) - 1); pauseRotate(20000); }));
+  warnLis.forEach((li) => li.addEventListener("click", () => { applySel(Number(li.dataset.i), true); pauseRotate(20000); }));
+
+  /* ===== 14. 首绘：先把全部 DOM 填充完（KPI / chips / 清单 / 面板 tag），再 init 图表 ===== */
+  paintChips();
+  applySel(0, false);                                        /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  graphChart = echarts.init($("pv-chart-graph"));
+  heatChart = echarts.init($("pv-chart-heat"));
+  catChart = echarts.init($("pv-chart-cat"));
+  plinkChart = echarts.init($("pv-chart-plink"));
+  tierChart = echarts.init($("pv-chart-tier"));
+  graphChart.setOption(graphOption(selIdx, catIdx));
+  heatChart.setOption(heatOption(selIdx, catIdx));
+  catChart.setOption(catOption(selIdx, catIdx));
+  plinkChart.setOption(plinkOption(selIdx));
+  tierChart.setOption(tierOption(selIdx));
+
+  /* 图表点选：网络技能节点 / 热力行 / 旭日叶子 / 二部图技能节点 → 选中该技能 */
+  const nameIdx = (nm) => SKILLS.map((x) => x.w).indexOf(nm);
+  graphChart.on("click", (p) => {
+    if (p.dataType === "node" && p.data && p.data.category === 0) {
+      const i = nameIdx(p.name); if (i >= 0) { applySel(i, true); pauseRotate(20000); }
+    }
+  });
+  plinkChart.on("click", (p) => {
+    if (p.dataType === "node") { const i = nameIdx(p.name); if (i >= 0) { applySel(i, true); pauseRotate(20000); } }
+  });
+  catChart.on("click", (p) => { const i = nameIdx(p.name); if (i >= 0) { applySel(i, true); pauseRotate(20000); } });
+  heatChart.on("click", (p) => {
+    if (p.value && p.value.length === 3) {
+      const i = SKILLS.length - 1 - p.value[1];
+      if (i >= 0 && i < SKILLS.length) { applySel(i, true); pauseRotate(20000); }
+    }
+  });
+
+  /* ===== 15. hash 定位：命中技能则选中并高亮该技能节点及其所有连边 ===== */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit === -2) { applySel(selIdx, false); return; }      /* 无 hash / 无法解析：保持默认起点 */
+    if (hit < 0) { applyCat(-1); applySel(0, false); pauseRotate(20000); return; }
+    const s = SKILLS[hit];
+    if (catIdx >= 0 && s.cat !== catIdx) { catIdx = -1; paintChips(); }
+    applySel(hit, true);                                      /* 别名进来的 hash 就地归一化回写 */
+    const chip = cchips[s.cat + 1];
+    chip.classList.remove("is-hit");
+    void chip.offsetWidth;                                    /* 重排以重启动画 */
+    chip.classList.add("is-hit");
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+  locateByHash();                                             /* 初始解析 hash（无 hash 落 Java） */
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发人才与能力1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 16. kiosk 轮巡：逐技能高亮 3 秒（受大类筛选限定池）；hash 定位或手动点选后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil) return;
+    const pool = catPool();
+    if (!pool.length) return;
+    const at = pool.indexOf(selIdx);
+    applySel(pool[(at + 1) % pool.length], false);
+  }, 3000);
+
+  /* ===== 17. 底部图谱研判滚动条（文案数字全部由派生量现算） ===== */
+  const topCat = CATS.map((c, k) => ({ n: c.name, v: D.catSum[k] })).sort((a, b) => b.v - a.v)[0];
+  const busiest = FUNCS.map((f, j) => ({ n: f.name, v: D.colAvg[j] })).sort((a, b) => b.v - a.v)[0];
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "单点依赖 " + D.single.length + " 项（" + D.single.map((s) => s.w).join(" / ") +
+        "）：掌握人数均 < " + SCARCE_N + " 人且主归属职能占比 ≥ " + fmtDec(100 * SINGLE_SHARE, 0) +
+        "%，一个职能一走全线断供，须优先建跨职能备份" },
+    { lv: "高", c: C.red, t: "稀缺技能共 " + D.scarce.length + " 项（掌握 < " + SCARCE_N + " 人且被 ≥ " +
+        SCARCE_PL + " 条产品线依赖），Σ 仅 " + fmtInt(sum(D.scarce.map((s) => s.n))) + " 人次，占 Σ人次 " +
+        fmtDec(100 * sum(D.scarce.map((s) => s.n)) / D.cnt, 1) + "%，却横跨多条产品线交付" },
+    { lv: "中", c: C.orange, t: "梯队倒挂：稀缺技能 P7+ 平均占比 " +
+        fmtDec(100 * sum(D.scarce.map((s) => s.senior)) / D.scarce.length, 1) + "%，显著高于全公司 " +
+        fmtDec(100 * D.seniorAll, 1) + "%——「只有专家会」，初中级补位断层" },
+    { lv: "中", c: C.orange, t: "覆盖最广技能「" + D.widest.w + "」跨 " + D.widest.deg + " 个职能有连边（" +
+        fmtInt(D.widest.n) + " 人），是跨域协作的天然公共语言；掌握人数最多的是「" + D.top.w + "」" +
+        fmtInt(D.top.n) + " 人，两者口径不同" },
+    { lv: "低", c: C.amber, t: "职能持有密度：「" + busiest.n + "」人均 " + fmtDec(busiest.v, 2) +
+        " 项技能为六职能最高（上限口径 " + SKILL_CAP + " 项/人），技能面最宽也最易成为瓶颈" },
+    { lv: "低", c: C.green, t: "大类头名「" + topCat.n + "」" + fmtInt(topCat.v) + " 人次，占 Σ人次 " +
+        fmtDec(100 * topCat.v / D.cnt, 1) + "%；" + CATS.length + " 大类互不重叠、" + SKILLS.length +
+        " 技能全覆盖，Σ = " + fmtInt(D.cnt) + " 人次" },
+    { lv: "口径", c: C.cyan, t: "掌握人数 = 持该技能标签的人数，一人可持多标签，故 Σ人次 " + fmtInt(D.cnt) +
+        " > 研发人数 " + fmtInt(PEOPLE_ALL) + " 人，两者不做加总勾稽；人均 " + fmtDec(D.avg, 2) +
+        " 项，图谱内单人计数上限 " + SKILL_CAP + " 项" },
+    { lv: "分工", c: C.violet, t: "本页（技能图谱）= 技能 ↔ 职能 ↔ 产品线的关系网络，读「谁会什么、什么技能用在哪」；" +
+        "兄弟页「研发单职能人才详情」= 单职能人才画像（职级 / 站点 / 技能 / 人效 / 进出）；" +
+        "兄弟页「研发关键岗位与招聘台账」= 10 个关键岗位缺口与五段招聘漏斗。三页口径不重复展开" },
+    { lv: "导航", c: C.blue, t: "Esc 或左上角返回「人才与能力」；点网络节点 / 热力格 / 旭日扇区 / 二部图节点均可选中技能；" +
+        "hash 支持 30 个技能名（收 k8s / ci-cd / golang / cv / llm 等简写）；" + SKILLS.length +
+        " 项技能每 3 秒自动轮巡，手动交互后暂停 20 秒" }
+  ];
+  const track = $("pv-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="pv-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                    /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 18. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try {
+    JSON.stringify(graphOption(0, -1)); JSON.stringify(graphOption(22, 3));
+    JSON.stringify(heatOption(0, -1)); JSON.stringify(heatOption(5, 2));
+    JSON.stringify(catOption(0, -1)); JSON.stringify(plinkOption(0)); JSON.stringify(tierOption(29));
+  } catch (e) { optAcyclic = false; console.error("[技能图谱] option 存在循环引用：", e.message); }
+
+  const nodeNames = SKILLS.map((s) => s.w).concat(FN);
+  const gOpt = graphOption(0, -1), pOpt = plinkOption(-1);
+  const gNodeSet = {}, pNodeSet = {};
+  gOpt.series[0].data.forEach((d) => { gNodeSet[d.name] = 1; });
+  pOpt.series[0].data.forEach((d) => { pNodeSet[d.name] = 1; });
+
+  const checks = [
+    ["30 技能名 / 掌握人数 / 主归属职能与父页 TOP30 词表逐字",
+      SKILLS.length === 30 && SKILLS.map((s) => s.w + "|" + s.n + "|" + s.f).join(";") === SKILL_AUTH],
+    ["六职能人数与契约 §2.2 逐字且 Σ = 3,860",
+      FUNCS.map((f) => f.name + "|" + f.hc).join(";") === FUNC_AUTH && sum(FUNCS.map((f) => f.hc)) === PEOPLE_ALL],
+    ["技能 × 职能矩阵行和 == 该技能掌握人数（30 行逐行）",
+      SKILLS.every((s) => sum(s.mat) === s.n && s.mat.every((v) => v >= 0))],
+    ["矩阵总和 == Σ人次，且列和之和与行和之和一致",
+      sum(D.colSum) === D.cnt && D.cnt === sum(SKILLS.map((s) => s.n))],
+    ["主归属职能是该技能矩阵行的最大值（词表 f 列与分布自洽）",
+      SKILLS.every((s) => s.mat[s.fi] === Math.max.apply(null, s.mat))],
+    ["六职能列和 ≤ 该职能人数 × 计数上限 6（口径：图谱内单人最多计 6 项技能）",
+      D.colSum.every((v, j) => v <= FUNCS[j].hc * SKILL_CAP)],
+    ["人均技能数 = Σ人次 ÷ 3,860 现算（不硬编码）",
+      Math.abs(D.avg - D.cnt / PEOPLE_ALL) < 1e-12 && D.avg > 1 && D.avg < SKILL_CAP],
+    ["6 大类 Σ == Σ人次，且 30 技能归属无遗漏、无重复",
+      sum(D.catSum) === D.cnt && sum(D.catCnt) === SKILLS.length &&
+      SKILLS.every((s) => s.cat >= 0 && s.cat < CATS.length) &&
+      CATS.every((c, k) => D.catCnt[k] > 0)],
+    ["稀缺技能筛选条件现算（掌握 < 250 人 且 依赖产品线 ≥ 2 条）",
+      D.scarce.length >= 4 && D.scarce.length <= 6 &&
+      D.scarce.every((s) => s.n < SCARCE_N && s.pl.length >= SCARCE_PL) &&
+      SKILLS.filter((s) => s.n < SCARCE_N && s.pl.length >= SCARCE_PL).length === D.scarce.length],
+    ["单点依赖 ⊂ 稀缺，且主归属职能占比均 ≥ 80%",
+      D.single.length > 0 && D.single.every((s) => s.scarce && s.share >= SINGLE_SHARE) &&
+      D.single.length <= D.scarce.length],
+    ["技能 × 产品线分摊行和 == 掌握人数，且四线列和 Σ == Σ人次",
+      SKILLS.every((s) => sum(s.plv) === s.n &&
+        s.plv.every((v, k) => (s.pl.indexOf(k) >= 0 ? v > 0 : v === 0))) &&
+      sum(D.plSum) === D.cnt],
+    ["技能梯队 P4–P9 Σ == 掌握人数（30 行逐行，Σ = Σ人次）",
+      SKILLS.every((s) => sum(s.tier) === s.n && s.tier.every((v) => v >= 0)) &&
+      sum(SKILLS.map((s) => sum(s.tier))) === D.cnt],
+    ["职级基准结构 = 父页职能×职级矩阵列和，Σ = 3,860", sum(TIER_BASE) === PEOPLE_ALL],
+    ["稀缺技能 P7+ 占比高于全公司（梯队倒挂结论现算）",
+      sum(D.scarce.map((s) => s.senior)) / D.scarce.length > D.seniorAll],
+    ["网络连边数 == Σ 各技能连边数，且每技能主归属职能恒连边",
+      GLINKS.length === D.linkN && SKILLS.every((s) => s.links.indexOf(s.fi) >= 0 && s.deg >= 1 && s.deg <= 6)],
+    ["graph 的 links 端点均为已定义节点名（无悬空边）",
+      gOpt.series[0].data.length === GN &&
+      gOpt.series[0].links.every((l) => gNodeSet[l.source] === 1 && gNodeSet[l.target] === 1) &&
+      gOpt.series[0].links.every((l) => nodeNames.indexOf(l.source) >= 0 && nodeNames.indexOf(l.target) >= 0)],
+    ["二部图 links 端点均为已定义节点名（无悬空边）",
+      pOpt.series[0].links.length > 0 &&
+      pOpt.series[0].links.every((l) => pNodeSet[l.source] === 1 && pNodeSet[l.target] === 1)],
+    ["网络连边值 == 矩阵对应格（边即关系，不另造数）",
+      GLINKS.every((l) => l.v === SKILLS[l.s].mat[l.f])],
+    ["力导向坐标全部落在布局框内且无重合（布局跑完固定）",
+      gpos.length === GN && gpos.every((p) => isFinite(p.x) && isFinite(p.y) &&
+        Math.abs(p.x) <= LAY.W / 2 + 1e-6 && Math.abs(p.y) <= LAY.H / 2 + 1e-6) &&
+      gpos.every((p, i) => gpos.every((q, j) => i === j || Math.abs(p.x - q.x) + Math.abs(p.y - q.y) > 1))],
+    ["覆盖最广技能 = 连边数最大（并列时取掌握人数大者）",
+      SKILLS.every((s) => s.deg < D.widest.deg || (s.deg === D.widest.deg && s.n <= D.widest.n))],
+    ["hash 30 个技能名均可解析，且解析结果回指同一技能",
+      SKILLS.every((s, i) => resolveAlias(s.w) === i) && aliasDup === 0],
+    ["hash 常见简写可解析（k8s / ci-cd / golang / cv / llm / 全部）",
+      resolveAlias("k8s") === nameIdx("K8s") && resolveAlias("ci/cd") === nameIdx("CI-CD") &&
+      resolveAlias("golang") === nameIdx("Go") && resolveAlias("cv") === nameIdx("计算机视觉") &&
+      resolveAlias("LLM") === nameIdx("大模型微调") && resolveAlias("PCB Layout") === nameIdx("PCB Layout") &&
+      resolveAlias("全部") === -1],
+    ["大类筛选池非空且并集 = 30 技能",
+      CATS.every((c, k) => SKILLS.filter((s) => s.cat === k).length > 0) &&
+      sum(CATS.map((c, k) => SKILLS.filter((s) => s.cat === k).length)) === SKILLS.length],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  function resolveAlias(k) {
+    const key = norm(k);
+    let hit = HASH_ALIAS[key];
+    if (hit === undefined) hit = HASH_ALIAS[key.toLowerCase()];
+    return hit === undefined ? -2 : hit;
+  }
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[技能图谱] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
