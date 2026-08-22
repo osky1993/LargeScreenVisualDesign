@@ -1,0 +1,1264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发障碍与回顾行动台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --dm-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 障碍台账列宽：障碍号 / 团队 / 类型 / 障碍描述 / 提出 Sprint / 阻塞天数 / 影响点 / 责任人 / 状态 */
+    --dm-tcols: 98px 40px 72px 1fr 56px 96px 44px 52px 56px;
+    /* 回顾行动项列宽：行动项 / 团队 / 来源 Sprint / 负责人 / 目标 / 状态 */
+    --dm-acols: 1fr 40px 52px 50px 146px 52px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .dm-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 8% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 92% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    /* 1fr = 1884 - 620 - 396 - 28(gap) = 840px；主区 1fr = 1052 - 256 - 56(gap) = 740px */
+    grid-template-columns: 1fr 620px 396px;
+    grid-template-rows: 88px 50px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .dm-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .dm-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .dm-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .dm-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .dm-head-left { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .dm-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .dm-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .dm-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .dm-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到敏捷交付总览，琥珀描边与本页星蓝主色区分 */
+  .dm-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .dm-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .dm-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .dm-head-title {
+    font-size: 29px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .dm-head-meta { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--rnd-text-dim); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .dm-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .dm-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+  /* 口径分工条：与兄弟子页「阻塞在制品台账」划清视角边界 */
+  .dm-scope { font-size: 11.5px; letter-spacing: 0.03em; color: rgba(127, 146, 196, 0.9); white-space: nowrap; }
+  .dm-scope b { font-weight: 700; color: var(--rnd-amber); }
+  .dm-scope em { font-style: normal; color: #9cc2ff; }
+
+  .dm-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .dm-chips { display: flex; align-items: center; gap: 9px; }
+  .dm-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 128px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .dm-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: #6079b0; }
+  .dm-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .dm-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .dm-chip.is-key b { color: var(--rnd-blue); }
+  .dm-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .dm-clock-time { font: 700 26px/1 var(--dm-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .dm-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 筛选条：全部 + 12 团队（hash 契约目标） ===== */
+  .dm-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .dm-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: #8aa8e8; }
+  .dm-filters-tag s { text-decoration: none; font-weight: 400; color: rgba(127, 146, 196, 0.8); letter-spacing: 0.02em; }
+  .dm-tchip {
+    display: flex; align-items: baseline; gap: 5px; cursor: pointer;
+    padding: 6px 10px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13px; letter-spacing: 0.04em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .dm-tchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .dm-tchip b { font: 700 13.5px/1 var(--dm-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .dm-tchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .dm-tchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .dm-tchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .dm-tchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .dm-tchip.is-hit { animation: dm-hit 0.9s ease-in-out 2; }
+  @keyframes dm-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--dm-cc, rgba(92, 157, 255, 0.8)); } }
+  .dm-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .dm-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .dm-filters-state em { font-style: normal; color: #d3e2ff; }
+  .dm-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 7px; }
+
+  /* ===== KPI 条（五格，翻牌缓动；init 前填充完毕） ===== */
+  .dm-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; min-width: 0; }
+  .dm-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .dm-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--dm-kc, var(--rnd-blue)); }
+  .dm-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .dm-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .dm-kpi-v b { font: 700 24px/1 var(--dm-mono); color: var(--dm-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .dm-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .dm-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .dm-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .dm-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .dm-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .dm-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; min-height: 22px; margin-bottom: 6px; }
+  .dm-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .dm-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .dm-panel-tag { font-size: 11.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .dm-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .dm-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 三块由 JS 填充的 DOM 区一律写死高度 + min-height:0 + overflow:hidden：
+     它们与图表面板同属 flex 列，晚填充会把 flex:1 的图表容器压矮（见 CLAUDE.md「坑」）。
+     障碍台账 740 = 主区满高（26 行 × 25px + 表头）；
+     行动项 466 + gap 14 + 时间轴 260 = 740，中列两块恰好铺满主区。 */
+  .dm-panel.is-ledger { flex: none; height: 740px; min-height: 0; overflow: hidden; }
+  .dm-panel.is-act { flex: none; height: 466px; min-height: 0; overflow: hidden; }
+  .dm-panel.is-tl { flex: none; height: 260px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .dm-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .dm-thead, .dm-tbody li { display: grid; grid-template-columns: var(--dm-tcols); align-items: center; gap: 7px; }
+  .dm-athead, .dm-abody li { display: grid; grid-template-columns: var(--dm-acols); align-items: center; gap: 7px; }
+  .dm-thead, .dm-athead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.06em; color: #8aa8e8;
+  }
+  .dm-tbody, .dm-abody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .dm-tbody li, .dm-abody li {
+    padding: 0 8px; height: 25px; border-radius: 5px; cursor: pointer;
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: dm-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes dm-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .dm-tbody li:nth-child(odd), .dm-abody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .dm-tbody li:hover, .dm-abody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .dm-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .dm-abody li.is-link { background: rgba(255, 194, 77, 0.12); box-shadow: inset 2px 0 0 var(--rnd-amber); }
+  .dm-tbody li > span, .dm-abody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dm-no { font: 700 11px/1 var(--dm-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.02em; }
+  .dm-team { font-size: 12px; font-weight: 700; color: #dfe9ff; }
+  .dm-cat { font-size: 11px; }
+  .dm-txt { color: #dfe9ff; }
+  .dm-sp { font-size: 11px; color: #a9bce4; }
+  .dm-pts { text-align: right; font: 700 12px/1 var(--dm-mono); }
+  .dm-own { font-size: 11.5px; color: #bfd2f6; }
+  .dm-badge {
+    padding: 2px 6px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; white-space: nowrap;
+  }
+  /* 障碍状态三态 */
+  .dm-badge.is-s0 { color: #063a25; background: var(--rnd-green); }
+  .dm-badge.is-s1 { color: #3a2a05; background: var(--rnd-amber); }
+  .dm-badge.is-s2 { color: #3d060c; background: var(--rnd-red); }
+  /* 行动项状态三态 */
+  .dm-badge.is-a0 { color: #063a25; background: var(--rnd-green); }
+  .dm-badge.is-a1 { color: #3a2a05; background: var(--rnd-amber); }
+  .dm-badge.is-a2 { border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+  /* 阻塞天数：微条 + 数值 */
+  .dm-dur { display: flex; align-items: center; gap: 7px; }
+  .dm-dur-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .dm-dur-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .dm-dur em { flex: none; width: 40px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+  .dm-goal { font-size: 11px; color: #a9bce4; }
+  .dm-goal i { font-style: normal; margin-right: 5px; }
+
+  /* ===== 中列下：单条障碍四段处置时间轴（纯 HTML/CSS） ===== */
+  .dm-tl-head { flex: none; display: flex; flex-direction: column; gap: 4px; padding: 6px 10px 7px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 8px; min-height: 56px; }
+  .dm-tl-no { display: flex; align-items: center; gap: 8px; }
+  .dm-tl-no b { font: 700 12.5px/1 var(--dm-mono); color: var(--rnd-blue); letter-spacing: 0.03em; }
+  .dm-tl-title { font-size: 12.5px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dm-tl-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dm-tl-sub b { font-weight: 700; color: #c9d8f8; }
+  .dm-tl-bar { flex: none; display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; background: rgba(14, 26, 66, 0.5); }
+  .dm-tl-seg { position: relative; min-width: 14px; }
+  .dm-tl-seg + .dm-tl-seg { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .dm-tl-seg.is-cur {
+    background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px) !important;
+    animation: dm-breath 1.6s ease-in-out infinite;
+  }
+  @keyframes dm-breath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+  .dm-tl-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .dm-tl-row { flex: 1; display: grid; grid-template-columns: 56px 1fr 78px; align-items: center; gap: 10px; padding: 0 4px; border-radius: 5px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .dm-tl-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .dm-tl-row b { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.04em; }
+  .dm-tl-row b::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--dm-pc, var(--rnd-blue)); }
+  .dm-tl-row.is-todo b { color: rgba(127, 146, 196, 0.6); }
+  .dm-tl-row.is-todo b::before { opacity: 0.3; }
+  .dm-tl-row span { color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dm-tl-row em { font-style: normal; text-align: right; font: 700 12.5px/1 var(--dm-mono); color: var(--rnd-cyan); }
+  .dm-tl-row.is-cur em { color: var(--rnd-amber); }
+  .dm-tl-row.is-todo em { color: rgba(127, 146, 196, 0.5); }
+
+  /* ===== 底部滚动条 ===== */
+  .dm-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .dm-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange); }
+  .dm-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: dm-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes dm-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .dm-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .dm-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .dm-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .dm-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .dm-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .dm-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="dm-stage" id="dm-stage">
+    <!-- mockflag:begin --><div class="dm-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="dm-error" id="dm-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="dm-header">
+      <div class="dm-head-left">
+        <div class="dm-crumb">
+          <a class="dm-crumb-up" href="大屏样板间-研发敏捷交付总览1920.html" title="返回上级专题页（Esc）">‹ 返回 敏捷交付总览</a>
+          <b>云麓智联科技</b><i>›</i><span>敏捷交付总览</span><i>›</i><em>障碍与回顾行动台账</em>
+        </div>
+        <div class="dm-head-title-row">
+          <div class="dm-head-title">障碍与回顾行动台账</div>
+          <div class="dm-head-meta">
+            <span>近 6 Sprint 障碍 <b id="dm-meta-n">--</b> 条 · 回顾行动 <b id="dm-meta-a">--</b> 条</span><i>|</i>
+            <span><b>12</b> 个 Scrum 团队 · <b>5</b> 类阻塞原因 · <b>4</b> 段处置</span><i>|</i>
+            <span>窗口 <b>26-S12 ~ 26-S17</b>（当前 <b>2026-S17</b> 第 8/10 天）</span>
+          </div>
+        </div>
+        <div class="dm-scope">
+          口径分工：本页 = <b>Sprint 级障碍 + 回顾行动闭环</b>（团队 × 迭代视角，单位「条」）；
+          卡片级在制阻塞（<em>109 张阻塞卡</em>按五原因筛选）见姊妹子页「阻塞与在制品台账」，两页原因词汇同源、计数单位不同不可直接相加。
+        </div>
+      </div>
+      <div class="dm-head-right">
+        <div class="dm-chips">
+          <div class="dm-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="dm-chip is-key"><span id="dm-chip-key">障碍 · 全部</span><b id="dm-chip-val">--</b></div>
+        </div>
+        <div class="dm-clock" aria-label="实时时钟">
+          <span class="dm-clock-time" id="dm-clock-time">--:--:--</span>
+          <span class="dm-clock-date" id="dm-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 筛选条：全部 + 12 团队（hash 契约目标；chip 显示 障碍数 / 行动项数） -->
+    <div class="dm-filters">
+      <span class="dm-filters-tag">团队筛选 <s>障碍 / 行动</s></span>
+      <div id="dm-tchips" style="display:flex;align-items:center;gap:6px;"></div>
+      <div class="dm-filters-state" id="dm-filters-state">--</div>
+    </div>
+
+    <!-- KPI 五格 -->
+    <div class="dm-kpis" id="dm-kpis"></div>
+
+    <!-- 左主区：障碍台账（写死高度 740px = 26 行 × 25px + 表头） -->
+    <div class="dm-col">
+      <section class="dm-panel is-ledger">
+        <div class="dm-panel-head">
+          <h2>Sprint 级障碍台账</h2>
+          <span class="dm-panel-tag" id="dm-table-tag">--</span>
+        </div>
+        <div class="dm-table">
+          <div class="dm-thead">
+            <span>障碍号</span><span>团队</span><span>类型</span><span>障碍描述</span>
+            <span>提出</span><span>阻塞天数</span><span>影响点</span><span>责任人</span><span>状态</span>
+          </div>
+          <ul class="dm-tbody" id="dm-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中列：回顾行动项台账（上） + 单条障碍处置时间轴（下） -->
+    <div class="dm-col">
+      <section class="dm-panel is-act">
+        <div class="dm-panel-head">
+          <h2>回顾行动项台账</h2>
+          <span class="dm-panel-tag" id="dm-act-tag">--</span>
+        </div>
+        <div class="dm-table">
+          <div class="dm-athead">
+            <span>行动项</span><span>团队</span><span>来源</span><span>负责人</span><span>目标</span><span>状态</span>
+          </div>
+          <ul class="dm-abody" id="dm-abody"></ul>
+        </div>
+      </section>
+      <section class="dm-panel is-tl">
+        <div class="dm-panel-head">
+          <h2>单条障碍处置时间轴</h2>
+          <span class="dm-panel-tag" id="dm-tl-tag">--</span>
+        </div>
+        <div class="dm-tl-head" id="dm-tl-headbox"></div>
+        <div class="dm-tl-bar" id="dm-tl-bar"></div>
+        <div class="dm-tl-list" id="dm-tl-list"></div>
+      </section>
+    </div>
+
+    <!-- 右列：障碍类型帕累托 + 团队 × 类型热力 -->
+    <div class="dm-col">
+      <section class="dm-panel" style="flex: 1;">
+        <div class="dm-panel-head">
+          <h2>障碍类型帕累托</h2>
+          <span class="dm-panel-tag" id="dm-pareto-tag">--</span>
+        </div>
+        <div class="dm-chart" id="dm-chart-pareto"></div>
+      </section>
+      <section class="dm-panel" style="flex: 1;">
+        <div class="dm-panel-head">
+          <h2>团队 × 类型障碍热力</h2>
+          <span class="dm-panel-tag" id="dm-heat-tag">--</span>
+        </div>
+        <div class="dm-chart" id="dm-chart-heat"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="dm-foot">
+      <div class="dm-foot-tag">障碍研判</div>
+      <div class="dm-foot-view"><div class="dm-foot-track" id="dm-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("dm-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("dm-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · Scrum Master 视角）
+         ★ 与契约 docs/RndIpdThemed.md §2.3 严格同源：
+           12 团队名与速率逐字（天枢 82 … 紫微 45，Σ 速率 = 746 点/Sprint）；
+           五类阻塞原因名逐字（跨域依赖 / 环境与资源 / 需求变更 / 外部供应 / 评审等待）。
+         ★ 与父页 P5「敏捷交付总览」严格同源：当前 Sprint（2026-S17）在办障碍 7 条
+           = 父页 IMPEDIMENTS 七项逐字（团队 / 归因 / 滞留天数一字不改）。
+         ★ 口径分工（页内已注明，与姊妹子页「阻塞与在制品台账」bs 划清边界）：
+           - 本页单位是「条 Sprint 级障碍」（团队 × 迭代视角，近 6 个 Sprint 共 26 条），
+             外加 Retrospective 产出的 15 条改进行动项，做的是「障碍 → 回顾行动」闭环；
+           - bs 页单位是「张在制阻塞卡」（当前时点 109 张，卡片级、按五原因筛选）。
+           两者原因词汇同源、计数单位不同，不可直接相加；本页五类占比与 109 卡口径
+           偏差 ≤ 3 个百分点（进页尾自检）。
+         ★ 二级拆分（26 条障碍、15 条行动项、四段处置时长）为本页自编，
+           但 Σ 一律现算收敛，全部进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，障碍/行动项与团队、类型之间
+           一律用索引（ti / ci）关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 契约锚点（勿改，与 §2.3 逐字） */
+  const TEAM_REF = ["天枢", "天璇", "天玑", "天权", "玉衡", "开阳", "摇光", "青龙", "白虎", "朱雀", "玄武", "紫微"];
+  const VEL_REF  = [82, 76, 71, 68, 66, 63, 61, 58, 55, 52, 49, 45];
+  const VEL_SUM_REF = 746;
+  const CAUSE_REF = ["跨域依赖", "环境与资源", "需求变更", "外部供应", "评审等待"];
+  const CARD_REF  = [38, 27, 21, 14, 9];          /* bs 页当前阻塞卡总盘 Σ = 109（本页仅作比例参照） */
+  const CARD_SUM_REF = 109;
+
+  /* 4.2 12 个 Scrum 团队（名称 / 速率 / 站点 / 域 逐字引契约 §2.3） */
+  const TEAMS = [
+    { name: "天枢", vel: 82, site: "北京总部", dom: "软件" },
+    { name: "天璇", vel: 76, site: "北京总部", dom: "云平台" },
+    { name: "天玑", vel: 71, site: "上海中心", dom: "AI算法" },
+    { name: "天权", vel: 68, site: "深圳中心", dom: "硬件" },
+    { name: "玉衡", vel: 66, site: "上海中心", dom: "软件" },
+    { name: "开阳", vel: 63, site: "成都中心", dom: "AI算法" },
+    { name: "摇光", vel: 61, site: "成都中心", dom: "软件" },
+    { name: "青龙", vel: 58, site: "深圳中心", dom: "硬件" },
+    { name: "白虎", vel: 55, site: "西安中心", dom: "硬件" },
+    { name: "朱雀", vel: 52, site: "南京中心", dom: "云平台" },
+    { name: "玄武", vel: 49, site: "西安中心", dom: "测试" },
+    { name: "紫微", vel: 45, site: "北京总部", dom: "软件" }
+  ];
+
+  /* 4.3 五类阻塞原因（名称逐字；card = bs 页卡片口径总盘，仅供比例对照） */
+  const CAUSES = [
+    { name: "跨域依赖",   card: 38, color: C.red },
+    { name: "环境与资源", card: 27, color: C.orange },
+    { name: "需求变更",   card: 21, color: C.amber },
+    { name: "外部供应",   card: 14, color: C.violet },
+    { name: "评审等待",   card: 9,  color: C.cyan }
+  ];
+
+  /* 4.4 近 6 个 Sprint（双周迭代；start = 迭代首日，14 天窗口） */
+  const SPRINTS = [
+    { code: "26-S12", start: "2026-06-01" },
+    { code: "26-S13", start: "2026-06-15" },
+    { code: "26-S14", start: "2026-06-29" },
+    { code: "26-S15", start: "2026-07-13" },
+    { code: "26-S16", start: "2026-07-27" },
+    { code: "26-S17", start: "2026-08-10" }   /* 当前 Sprint，第 8/10 天 = 2026-08-19 */
+  ];
+  const AS_OF = "2026-08-19";
+  /* 障碍号段：每 Sprint 预留 12 个流水号（IMP-2026-0201 起），进自检 */
+  const SEQ_LO = [201, 213, 225, 237, 249, 261];
+  const SEQ_HI = [212, 224, 236, 248, 260, 272];
+
+  /* 4.5 障碍状态三态与四段处置节点 */
+  const ST_NAMES  = ["已解除", "处置中", "已升级"];
+  const ST_BADGE  = ["is-s0", "is-s1", "is-s2"];
+  const ST_COLORS = [C.green, C.amber, C.red];
+  /* 四节点 = 提出 → 分派 → 处置 → 解除（st=2 时末节点为「升级」）；三段停留时长 Σ = 阻塞天数 */
+  const NODES     = ["提出", "分派", "处置", "解除"];
+  const NODE_HINT = ["登记入册 → 等待分派责任人", "责任人到位 → 等待处置启动", "处置进行 → 解除或升级"];
+  const SEG_COLORS = [C.amber, C.cyan, C.blue];
+
+  /* 4.6 障碍台账 26 条（按提出日倒序陈列）
+         no  = IMP-2026-XXXX（落在所在 Sprint 号段内，进自检）
+         ti  = 团队索引  ci = 类型索引  sp = 来源 Sprint 索引  st = 状态索引
+         seg = 三段停留天数（提出/分派/处置），Σ = 阻塞天数（days 由 Σseg 现算，不复制数字）
+         pts = 该障碍影响的故事点
+         ★ 前 7 条 = 当前 Sprint 26-S17 在办障碍，与父页 P5「障碍清单」逐字：
+           团队 / 类型 / 滞留天数（6 / 8 / 4 / 5 / 3 / 3 / 2）一字不改，且
+           提出日 + 阻塞天数 == 数据日期 2026-08-19（未解除口径，进自检）。 */
+  const ROWS = [
+    { no: "IMP-2026-0270", d: "2026-08-17", ti: 11, ci: 4, sp: 5, st: 1, seg: [0, 1, 1], pts: 2,  ow: "卢清野",
+      t: "TR4 评审排期延后，2 个故事待验收关闭" },
+    { no: "IMP-2026-0269", d: "2026-08-16", ti: 10, ci: 1, sp: 5, st: 1, seg: [0, 1, 2], pts: 3,  ow: "尹禾",
+      t: "系统测试环境被集成基线 R26.6 占用" },
+    { no: "IMP-2026-0268", d: "2026-08-16", ti: 1,  ci: 2, sp: 5, st: 1, seg: [1, 1, 1], pts: 5,  ow: "桑晚亭",
+      t: "SR 拆分口径变更，3 条 AR 返工重估" },
+    { no: "IMP-2026-0266", d: "2026-08-15", ti: 2,  ci: 1, sp: 5, st: 1, seg: [1, 1, 2], pts: 5,  ow: "宋映棠",
+      t: "AI 训练集群算力排队，模型评测任务积压" },
+    { no: "IMP-2026-0265", d: "2026-08-14", ti: 8,  ci: 0, sp: 5, st: 1, seg: [1, 1, 3], pts: 8,  ow: "齐霁",
+      t: "御风边缘模型量化包未交付，联调窗口顺延" },
+    { no: "IMP-2026-0264", d: "2026-08-13", ti: 3,  ci: 0, sp: 5, st: 2, seg: [1, 2, 3], pts: 8,  ow: "沈既明",
+      t: "硬件驱动接口等待云枢3.0 云端联调排期" },
+    { no: "IMP-2026-0262", d: "2026-08-11", ti: 7,  ci: 3, sp: 5, st: 2, seg: [2, 2, 4], pts: 13, ow: "霍青",
+      t: "澜芯M60 样机物料到货延迟，DVT 用例被阻塞" },
+
+    { no: "IMP-2026-0258", d: "2026-08-05", ti: 6,  ci: 4, sp: 4, st: 0, seg: [1, 1, 1], pts: 3,  ow: "江晚舟",
+      t: "架构决策评审排期冲突，故事延后验收" },
+    { no: "IMP-2026-0256", d: "2026-08-03", ti: 9,  ci: 2, sp: 4, st: 0, seg: [1, 1, 2], pts: 5,  ow: "温野",
+      t: "计费口径变更，2 条 AR 重估工作量" },
+    { no: "IMP-2026-0253", d: "2026-07-30", ti: 4,  ci: 1, sp: 4, st: 0, seg: [1, 2, 3], pts: 8,  ow: "邵一苇",
+      t: "全屋联动回归环境被 R26.6 集成占用" },
+    { no: "IMP-2026-0251", d: "2026-07-29", ti: 5,  ci: 0, sp: 4, st: 0, seg: [1, 2, 4], pts: 8,  ow: "穆清",
+      t: "慧眼质检模型等待硬件 ISP 调优参数" },
+    { no: "IMP-2026-0250", d: "2026-07-28", ti: 0,  ci: 0, sp: 4, st: 0, seg: [2, 3, 4], pts: 13, ow: "陆知行",
+      t: "统一鉴权 SDK 升级等待云枢3.0 接口冻结" },
+
+    { no: "IMP-2026-0245", d: "2026-07-21", ti: 4,  ci: 2, sp: 3, st: 0, seg: [1, 1, 2], pts: 5,  ow: "程叙",
+      t: "适老化交互口径调整，3 个故事重切" },
+    { no: "IMP-2026-0244", d: "2026-07-20", ti: 0,  ci: 0, sp: 3, st: 0, seg: [1, 2, 2], pts: 8,  ow: "简聿",
+      t: "端云协议版本不一致致联调返工" },
+    { no: "IMP-2026-0241", d: "2026-07-16", ti: 7,  ci: 1, sp: 3, st: 0, seg: [2, 2, 4], pts: 5,  ow: "池雨衡",
+      t: "EMC 实验室排期占满，PVT 验证顺延" },
+    { no: "IMP-2026-0239", d: "2026-07-14", ti: 2,  ci: 0, sp: 3, st: 0, seg: [2, 4, 5], pts: 13, ow: "宋映棠",
+      t: "灵犀对话模型等待云端向量检索扩容" },
+    { no: "IMP-2026-0238", d: "2026-07-13", ti: 3,  ci: 3, sp: 3, st: 0, seg: [3, 4, 5], pts: 8,  ow: "顾丞",
+      t: "射频前端二供样片到货延期" },
+
+    { no: "IMP-2026-0231", d: "2026-07-02", ti: 9,  ci: 1, sp: 2, st: 0, seg: [1, 2, 2], pts: 5,  ow: "凌澈",
+      t: "多租户压测环境被安全评估任务独占" },
+    { no: "IMP-2026-0229", d: "2026-07-01", ti: 1,  ci: 2, sp: 2, st: 0, seg: [2, 2, 3], pts: 8,  ow: "桑晚亭",
+      t: "多租户隔离方案变更致设计返工" },
+    { no: "IMP-2026-0228", d: "2026-06-30", ti: 6,  ci: 0, sp: 2, st: 0, seg: [1, 2, 3], pts: 8,  ow: "闻若谷",
+      t: "行业方案网关依赖 AI 推理接口未冻结" },
+    { no: "IMP-2026-0226", d: "2026-06-29", ti: 5,  ci: 1, sp: 2, st: 0, seg: [2, 3, 4], pts: 8,  ow: "韩森",
+      t: "训练集群 GPU 配额被评测任务挤占" },
+
+    { no: "IMP-2026-0218", d: "2026-06-18", ti: 3,  ci: 0, sp: 1, st: 0, seg: [2, 2, 4], pts: 8,  ow: "祁越",
+      t: "模组固件基线未交付，OTA 差分联调阻塞" },
+    { no: "IMP-2026-0216", d: "2026-06-16", ti: 0,  ci: 2, sp: 1, st: 0, seg: [1, 2, 3], pts: 8,  ow: "秦望舒",
+      t: "智家终端首页信息架构变更返工" },
+    { no: "IMP-2026-0214", d: "2026-06-15", ti: 7,  ci: 3, sp: 1, st: 0, seg: [3, 5, 6], pts: 13, ow: "霍青",
+      t: "结构件模具厂交期延后，DVT 组装待料" },
+
+    { no: "IMP-2026-0203", d: "2026-06-03", ti: 2,  ci: 1, sp: 0, st: 0, seg: [2, 2, 3], pts: 5,  ow: "白书宁",
+      t: "标注数据回流管道故障，模型迭代停摆" },
+    { no: "IMP-2026-0202", d: "2026-06-02", ti: 8,  ci: 0, sp: 0, st: 0, seg: [2, 3, 5], pts: 8,  ow: "齐霁",
+      t: "边缘侧算子库等待 AI 平台版本对齐" }
+  ];
+
+  /* 4.7 回顾（Retrospective）改进行动项 15 条
+         ti = 团队索引  ci = 针对的障碍类型索引  sp = 来源 Sprint 索引
+         ast = 0 已闭环 / 1 进行中 / 2 未启动（闭环率 = 已闭环 ÷ 总数，现算）
+         ★ 联动设计：每条行动项的（团队, 类型）在障碍台账中必有对应障碍——
+           回顾行动是「某队某类障碍」复盘后的改进承诺，因此团队筛选一次同时
+           收敛左表（障碍）与本表（行动），进页尾自检。 */
+  const ACT_ST = ["已闭环", "进行中", "未启动"];
+  const ACT_BADGE = ["is-a0", "is-a1", "is-a2"];
+  const ACT_COLORS = [C.green, C.amber, C.blueDeep];
+  const ACTIONS = [
+    { t: "跨域接口冻结日历",   ti: 0,  ci: 0, sp: 4, ow: "陆知行", g: "依赖障碍 -40%",     ast: 0 },
+    { t: "端云协议对齐入 DoD", ti: 0,  ci: 0, sp: 3, ow: "简聿",   g: "联调返工 0 起",     ast: 0 },
+    { t: "口径变更走 CCB 管控", ti: 1, ci: 2, sp: 5, ow: "桑晚亭", g: "变更障碍 ≤1 条/迭代", ast: 1 },
+    { t: "训练集群配额预留",   ti: 2,  ci: 1, sp: 3, ow: "宋映棠", g: "排队等待 ≤1 天",     ast: 0 },
+    { t: "标注管道双活备份",   ti: 2,  ci: 1, sp: 0, ow: "白书宁", g: "故障恢复 ≤2 小时",   ast: 0 },
+    { t: "驱动接口提前一迭代", ti: 3,  ci: 0, sp: 5, ow: "沈既明", g: "联调等待 ≤2 天",     ast: 1 },
+    { t: "关键物料双供准入",   ti: 3,  ci: 3, sp: 3, ow: "顾丞",   g: "到货延期 -50%",     ast: 0 },
+    { t: "环境与基线错峰排期", ti: 4,  ci: 1, sp: 4, ow: "邵一苇", g: "环境冲突 0 起",      ast: 0 },
+    { t: "ISP 参数入交付清单",  ti: 5, ci: 0, sp: 4, ow: "穆清",   g: "联调一次通过",       ast: 0 },
+    { t: "常备补位评审组",     ti: 6,  ci: 4, sp: 4, ow: "江晚舟", g: "评审等待 ≤3 天",     ast: 0 },
+    { t: "EMC 实验室在线预约",  ti: 7, ci: 1, sp: 3, ow: "池雨衡", g: "排期等待 ≤3 天",     ast: 1 },
+    { t: "版本矩阵季度对齐",   ti: 8,  ci: 0, sp: 0, ow: "齐霁",   g: "版本错配 0 起",      ast: 0 },
+    { t: "计费口径同步验收标准", ti: 9, ci: 2, sp: 4, ow: "温野",  g: "口径返工 -60%",     ast: 0 },
+    { t: "测试环境专用槽位",   ti: 10, ci: 1, sp: 5, ow: "尹禾",   g: "环境被占 0 起",      ast: 1 },
+    { t: "TR4 排期对齐验收窗",  ti: 11, ci: 4, sp: 5, ow: "卢清野", g: "待验收故事 ≤1 个",   ast: 2 }
+  ];
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  const dayMs = 86400000;
+  function parseD(ds) { return new Date(Number(ds.slice(0, 4)), Number(ds.slice(5, 7)) - 1, Number(ds.slice(8, 10))); }
+  function addD(ds, n) { return new Date(parseD(ds).getTime() + n * dayMs); }
+  function fmtD(dt) { return pad(dt.getMonth() + 1) + "-" + pad(dt.getDate()); }
+  function diffD(a, b) { return Math.round((parseD(b).getTime() - parseD(a).getTime()) / dayMs); }
+
+  /* 5.1 逐行派生：阻塞天数 = Σseg（现算，不复制数字） */
+  ROWS.forEach((r) => {
+    r.days = sum(r.seg);
+    r.seq = Number(r.no.slice(-4));
+    r.open = r.st !== 0;                             /* 未解除 = 处置中 + 已升级 */
+    r.endD = fmtD(addD(r.d, r.days));                /* 解除 / 升级（或至今）日期 */
+  });
+
+  D.n = ROWS.length;
+  D.open = ROWS.filter((r) => r.open).length;
+  D.closed = D.n - D.open;
+  D.days = sum(ROWS.map((r) => r.days));
+  D.avgDays = D.days / D.n;
+  D.pts = sum(ROWS.map((r) => r.pts));
+  D.maxRow = ROWS.slice().sort((a, b) => b.days - a.days)[0];
+  D.durMax = D.maxRow.days;
+
+  /* 5.2 团队维度：障碍条数 / 行动项条数 / 影响点 / Σ 阻塞天数 */
+  TEAMS.forEach((t, ti) => {
+    t.imp = ROWS.filter((r) => r.ti === ti).length;
+    t.act = ACTIONS.filter((a) => a.ti === ti).length;
+    t.actDone = ACTIONS.filter((a) => a.ti === ti && a.ast === 0).length;
+    t.open = ROWS.filter((r) => r.ti === ti && r.open).length;
+    t.pts = sum(ROWS.filter((r) => r.ti === ti).map((r) => r.pts));
+    t.days = sum(ROWS.filter((r) => r.ti === ti).map((r) => r.days));
+    t.avgDays = t.imp ? t.days / t.imp : 0;
+    t.ptsShare = 100 * t.pts / t.vel;                /* 影响点占该队一个 Sprint 速率的比例 */
+  });
+  D.velSum = sum(TEAMS.map((t) => t.vel));
+  D.teamImpSum = sum(TEAMS.map((t) => t.imp));
+  D.teamActSum = sum(TEAMS.map((t) => t.act));
+  D.topTeam = TEAMS.slice().sort((a, b) => (b.imp - a.imp) || (b.days - a.days))[0];
+
+  /* 5.3 类型维度：条数 / 影响点 / Σ 阻塞天数；占比与 bs 页 109 卡口径对照 */
+  CAUSES.forEach((c, ci) => {
+    c.n = ROWS.filter((r) => r.ci === ci).length;
+    c.pts = sum(ROWS.filter((r) => r.ci === ci).map((r) => r.pts));
+    c.days = sum(ROWS.filter((r) => r.ci === ci).map((r) => r.days));
+    c.avgDays = c.n ? c.days / c.n : 0;
+    c.share = 100 * c.n / ROWS.length;
+    c.refShare = 100 * c.card / CARD_SUM_REF;
+    c.dev = Math.abs(c.share - c.refShare);
+  });
+  D.causeN = sum(CAUSES.map((c) => c.n));
+  D.causeCardSum = sum(CAUSES.map((c) => c.card));
+  D.maxDev = Math.max.apply(null, CAUSES.map((c) => c.dev));
+
+  /* 5.4 热力矩阵 12 团队 × 5 类型（由 ROWS 现算，行和 = 队障碍数、列和 = 类型条数） */
+  const HEAT = TEAMS.map((t, ti) => CAUSES.map((c, ci) =>
+    ROWS.filter((r) => r.ti === ti && r.ci === ci).length));
+  D.heatRowSum = HEAT.map((row) => sum(row));
+  D.heatColSum = CAUSES.map((c, ci) => sum(HEAT.map((row) => row[ci])));
+  D.heatMax = Math.max.apply(null, HEAT.map((row) => Math.max.apply(null, row)));
+
+  /* 5.5 行动项维度：闭环率现算 */
+  D.actN = ACTIONS.length;
+  D.actDone = ACTIONS.filter((a) => a.ast === 0).length;
+  D.actDoing = ACTIONS.filter((a) => a.ast === 1).length;
+  D.actTodo = ACTIONS.filter((a) => a.ast === 2).length;
+  D.actRate = 100 * D.actDone / D.actN;
+
+  /* 5.6 Sprint 维度 */
+  D.spN = SPRINTS.map((s, si) => ROWS.filter((r) => r.sp === si).length);
+  D.curImp = D.spN[SPRINTS.length - 1];              /* 当前 Sprint 在办 = 父页障碍清单条数 */
+  D.ptsShare = 100 * D.pts / (D.velSum * SPRINTS.length);
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("dm-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("dm-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("dm-meta-n").textContent = fmtInt(D.n);
+  $("dm-meta-a").textContent = fmtInt(D.actN);
+
+  /* ===== 7. KPI 五格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "障碍总数", v: D.n, dec: 0, unit: "条", color: C.blue,
+      s: "近 6 Sprint（26-S12 ~ 26-S17）· 五类原因 Σ 收敛" },
+    { k: "未解除", v: D.open, dec: 0, unit: "条", color: C.red,
+      s: "处置中 " + ROWS.filter((r) => r.st === 1).length + " + 已升级 " +
+         ROWS.filter((r) => r.st === 2).length + " · 均属当前 Sprint" },
+    { k: "平均阻塞天数", v: D.avgDays, dec: 1, unit: "天", color: C.amber,
+      s: fmtInt(D.days) + " 天 ÷ " + D.n + " 条 现算 · 最长 " + D.maxRow.days + " 天" },
+    { k: "影响故事点", v: D.pts, dec: 0, unit: "点", color: C.violet,
+      s: "≈ 6 Sprint 总承载（" + fmtInt(D.velSum * SPRINTS.length) + " 点）的 " + fmtDec(D.ptsShare, 1) + "%" },
+    { k: "行动项闭环率", v: D.actRate, dec: 1, unit: "%", color: C.green,
+      s: D.actDone + " / " + D.actN + " · 进行中 " + D.actDoing + " · 未启动 " + D.actTodo }
+  ];
+  $("dm-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="dm-kpi" style="--dm-kc:' + p.color + '">' +
+      '<div class="dm-kpi-k">' + p.k + "</div>" +
+      '<div class="dm-kpi-v"><b id="dm-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="dm-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("dm-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 团队筛选 chip（全部 + 12 团队；每 chip 带该队障碍数 / 行动项数） ===== */
+  const DOM_COLOR = { "软件": C.blue, "硬件": C.orange, "云平台": C.cyan, "AI算法": C.violet, "测试": C.green };
+  const TFILTERS = [{ name: "全部", color: C.blue, imp: D.n, act: D.actN }]
+    .concat(TEAMS.map((t) => ({ name: t.name, color: DOM_COLOR[t.dom], imp: t.imp, act: t.act })));
+  const tbox = $("dm-tchips");
+  tbox.innerHTML = TFILTERS.map((f, i) => (
+    '<button class="dm-tchip" type="button" data-i="' + i + '" style="--dm-cc:' + f.color + '"' +
+      ' title="' + f.name + "：障碍 " + f.imp + " 条 · 回顾行动 " + f.act + ' 条">' +
+      "<u>" + f.name + "</u><b>" + f.imp + "</b><i>/" + f.act + "</i>" +
+    "</button>"
+  )).join("");
+  const tchips = Array.from(tbox.children);
+
+  /* ===== 9. hash 契约：父页 P5「障碍清单」为面板级入口（无对象名），
+         本页 hash 键取 12 团队名，供分享与深链定位；归一化后（trim + 全角空白剔除）查表。 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("all", 0); alias("全量", 0);
+  TEAMS.forEach((t, ti) => {
+    alias(t.name, ti + 1);
+    alias(t.name + "团队", ti + 1);
+    alias(t.name + "队", ti + 1);
+    alias(t.name + "组", ti + 1);
+  });
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                      /* trim + 全角空白剔除归一化 */
+    if (!raw) return -1;                                     /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(ti) {
+    const want = "#" + encodeURIComponent(TFILTERS[ti].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 10. 障碍台账渲染（行高 25px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("dm-tbody");
+  const abody = $("dm-abody");
+  let view = ROWS, actView = ACTIONS, tIdx = 0, selPos = 0;
+
+  function rowHtml(r, k) {
+    const w = clamp(r.days / D.durMax * 100, 6, 100);
+    const cDur = r.days > 10 ? C.red : r.days > 6 ? C.amber : C.cyan;
+    return '<li data-no="' + r.no + '" title="' + r.t + '" style="animation-delay:' + (k * 12) + 'ms">' +
+      '<span class="dm-no">' + r.no + "</span>" +
+      '<span class="dm-team">' + TEAMS[r.ti].name + "</span>" +
+      '<span class="dm-cat" style="color:' + CAUSES[r.ci].color + '">' + CAUSES[r.ci].name + "</span>" +
+      '<span class="dm-txt">' + r.t + "</span>" +
+      '<span class="dm-sp">' + SPRINTS[r.sp].code + "</span>" +
+      '<span class="dm-dur"><span class="dm-dur-t"><u style="width:' + fmtDec(w, 1) + "%;background:" + cDur +
+        '"></u></span><em style="color:' + cDur + '">' + r.days + " 天</em></span>" +
+      '<span class="dm-pts" style="color:' + C.violet + '">' + r.pts + "</span>" +
+      '<span class="dm-own">' + r.ow + "</span>" +
+      '<span class="dm-badge ' + ST_BADGE[r.st] + '">' + ST_NAMES[r.st] + "</span>" +
+    "</li>";
+  }
+  function actHtml(a, k) {
+    return '<li title="' + a.t + " · 目标 " + a.g + '" data-ci="' + a.ci + '" data-ti="' + a.ti +
+        '" style="animation-delay:' + (k * 12) + 'ms">' +
+      '<span class="dm-txt">' + a.t + "</span>" +
+      '<span class="dm-team">' + TEAMS[a.ti].name + "</span>" +
+      '<span class="dm-sp">' + SPRINTS[a.sp].code + "</span>" +
+      '<span class="dm-own">' + a.ow + "</span>" +
+      '<span class="dm-goal"><i style="color:' + CAUSES[a.ci].color + '">●</i>' + a.g + "</span>" +
+      '<span class="dm-badge ' + ACT_BADGE[a.ast] + '">' + ACT_ST[a.ast] + "</span>" +
+    "</li>";
+  }
+
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      /* 手动点行 → 选中并暂停轮巡 20 秒（与 hash 定位同一门闩） */
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    abody.innerHTML = actView.map(actHtml).join("");
+    Array.from(abody.children).forEach((li) => {
+      li.addEventListener("click", () => pauseRotate(20000));
+    });
+
+    const scopeOpen = view.filter((r) => r.open).length;
+    const scopeDays = sum(view.map((r) => r.days));
+    const scopePts = sum(view.map((r) => r.pts));
+    const scopeDone = actView.filter((a) => a.ast === 0).length;
+    const scopeRate = actView.length ? 100 * scopeDone / actView.length : 0;
+
+    $("dm-table-tag").textContent =
+      "全量陈列：" + D.n + " 条 Sprint 级障碍（非 bs 页卡片口径）· 当前筛选 " + view.length +
+      " 条 · 未解除 " + scopeOpen + " · Σ 阻塞 " + fmtInt(scopeDays) + " 天 · 影响 " + fmtInt(scopePts) + " 点";
+    $("dm-act-tag").textContent =
+      "Retrospective 产出 · 当前筛选 " + actView.length + " 条 · 闭环 " + scopeDone +
+      " = " + fmtDec(scopeRate, 1) + "%（全盘 " + D.actDone + "/" + D.actN + " = " + fmtDec(D.actRate, 1) + "%）";
+    $("dm-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 条障碍<i>|</i>回顾行动 <em>" + actView.length +
+      "</em> 条 · 闭环 <em>" + fmtDec(scopeRate, 1) + "%</em><i>|</i>行点击或轮巡联动处置时间轴";
+  }
+
+  /* ===== 11. 单条障碍四段处置时间轴（纯 HTML/CSS；选中行联动，三段宽度 ∝ 停留天数）
+         各节点日期由提出日 + 累计天数现算；处置中的障碍末节点（解除）为空态。 ===== */
+  function renderSel() {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("dm-tl-tag").textContent = "当前筛选无障碍";
+      $("dm-tl-headbox").innerHTML = '<div class="dm-tl-sub">切换团队筛选后，此处展示选中障碍的四段处置过程。</div>';
+      $("dm-tl-bar").innerHTML = "";
+      $("dm-tl-list").innerHTML = "";
+      Array.from(abody.children).forEach((li) => li.classList.remove("is-link"));
+      return;
+    }
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+
+    /* 联动：把与选中障碍「同团队同类型」的回顾行动项点亮，直观呈现「障碍 → 行动」闭环 */
+    Array.from(abody.children).forEach((li) => {
+      li.classList.toggle("is-link",
+        Number(li.dataset.ti) === r.ti && Number(li.dataset.ci) === r.ci);
+    });
+    const linked = ACTIONS.filter((a) => a.ti === r.ti && a.ci === r.ci);
+
+    const endName = r.st === 2 ? "升级" : "解除";
+    $("dm-tl-tag").textContent = "提出 → 分派 → 处置 → " + endName + " · 各段停留天数 Σ = 阻塞天数";
+    $("dm-tl-headbox").innerHTML =
+      '<div class="dm-tl-no"><b>' + r.no + "</b>" +
+        '<span class="dm-badge ' + ST_BADGE[r.st] + '">' + ST_NAMES[r.st] + "</span>" +
+        '<span class="dm-tl-sub">' + TEAMS[r.ti].name + " · " + CAUSES[r.ci].name + " · " + SPRINTS[r.sp].code + "</span></div>" +
+      '<div class="dm-tl-title">' + r.t + "</div>" +
+      '<div class="dm-tl-sub">提出 <b>' + r.d + "</b> · 阻塞 <b>" + r.days + "</b> 天 · 影响 <b>" + r.pts +
+        "</b> 点 · 责任人 <b>" + r.ow + "</b> · 关联回顾行动 <b>" + linked.length + "</b> 条</div>";
+
+    $("dm-tl-bar").innerHTML = r.seg.map((v, k) => (
+      '<span class="dm-tl-seg' + (r.st === 1 && k === r.seg.length - 1 ? " is-cur" : "") +
+        '" style="flex:' + Math.max(v, 0.4) + ";background:" + SEG_COLORS[k] +
+        '" title="' + NODES[k] + "→" + NODES[k + 1] + " " + v + ' 天"></span>'
+    )).join("");
+
+    let acc = 0;
+    const html = [];
+    for (let k = 0; k < 4; k++) {
+      const isLast = k === 3;
+      const label = isLast ? endName : NODES[k];
+      let cls = "", body, val;
+      if (!isLast) {
+        const at = addD(r.d, acc);
+        const stay = r.seg[k];
+        acc += stay;
+        const cur = r.st === 1 && k === 2;
+        cls = cur ? "is-cur" : "";
+        body = fmtD(at) + " → " + fmtD(addD(r.d, acc)) + " · " + NODE_HINT[k] + (cur ? "（进行中）" : "");
+        val = stay + " 天";
+      } else if (r.st === 1) {
+        cls = "is-todo";
+        body = "尚未解除 · 截至 " + AS_OF + " 仍在处置中";
+        val = "--";
+      } else {
+        body = fmtD(addD(r.d, acc)) + " · " + (r.st === 2 ? "升级至 RTE / 教练组跟进" : "障碍解除并归档回顾");
+        val = "累计 " + r.days + " 天";
+      }
+      html.push('<div class="dm-tl-row ' + cls + '" style="--dm-pc:' + (isLast ? ST_COLORS[r.st] : SEG_COLORS[k]) + '">' +
+        "<b>" + label + "</b><span>" + body + "</span><em>" + val + "</em></div>");
+    }
+    $("dm-tl-list").innerHTML = html.join("");
+  }
+
+  /* ===== 12. 障碍类型帕累托（柱 = 条数降序，线 = 累计占比，末值恒为 100%）
+         全部口径用全表；选中团队时取该队所在行，两种口径的 Σ 都收敛。 ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function paretoData(ti) {
+    const items = CAUSES.map((c, ci) => ({
+      name: c.name, color: c.color, ci: ci,
+      n: ti === 0 ? c.n : HEAT[ti - 1][ci],
+      pts: ti === 0 ? c.pts : sum(ROWS.filter((r) => r.ti === ti - 1 && r.ci === ci).map((r) => r.pts))
+    }));
+    items.sort((a, b) => (b.n - a.n) || (a.ci - b.ci));
+    const total = sum(items.map((it) => it.n));
+    let acc = 0;
+    items.forEach((it) => { acc += it.n; it.cum = total ? 100 * acc / total : 0; });
+    return { items: items, total: total };
+  }
+  function paretoOption(ti) {
+    const pd = paretoData(ti);
+    /* ★ 只把标量与数组下发给 option，items 对象本身不进 series.data（避免任何回指） */
+    const names = pd.items.map((it) => it.name);
+    const vals = pd.items.map((it) => it.n);
+    const cols = pd.items.map((it) => it.color);
+    const cums = pd.items.map((it) => Number(fmtDec(it.cum, 1)));
+    const ptss = pd.items.map((it) => it.pts);
+    const total = pd.total;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 30, top: 26, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const share = total ? 100 * vals[i] / total : 0;
+          return "<b>" + names[i] + "</b><br/>障碍 <b>" + vals[i] + "</b> 条 · 占 <b>" +
+            fmtDec(share, 1) + "%</b><br/>累计占比 <b style=\"color:" + C.amber + "\">" +
+            fmtDec(cums[i], 1) + "%</b>" +
+            (ptss[i] ? "<br/><span style=\"color:" + C.textDim + "\">影响故事点 " + fmtInt(ptss[i]) + " 点</span>" : "");
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["障碍条数", "累计占比"]
+      },
+      xAxis: {
+        type: "category", data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10, interval: 0, rotate: 22 }
+      },
+      yAxis: [
+        { type: "value", name: "条", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          minInterval: 1, axisLabel: { color: C.textDim, fontSize: 10 },
+          splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+        { type: "value", name: "%", min: 0, max: 100, nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10, formatter: "{value}" },
+          splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "障碍条数", type: "bar", barWidth: "48%",
+          label: { show: true, position: "top", color: "#cfdcff", fontSize: 10, fontWeight: 700 },
+          data: vals.map((v, i) => ({ value: v, itemStyle: { color: cols[i], borderRadius: [3, 3, 0, 0] } })) },
+        { name: "累计占比", type: "line", yAxisIndex: 1, smooth: false,
+          symbol: "circle", symbolSize: 5, z: 5, data: cums.slice(),
+          lineStyle: { width: 2, color: C.amber }, itemStyle: { color: C.amber },
+          markLine: {
+            symbol: "none", silent: true,
+            lineStyle: { color: "rgba(255,157,92,.65)", type: "dashed", width: 1.4 },
+            label: { color: C.orange, fontSize: 10, position: "insideEndTop", formatter: "80% 线" },
+            data: [{ yAxis: 80 }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 13. 团队 × 类型障碍热力（12 行 × 5 列；列和 == 类型条数、行和 == 队障碍数）
+         全盘口径固定不随筛选变化，选中团队时用高亮描边定位。 ===== */
+  function heatOption(ti) {
+    const yNames = TEAMS.map((t) => t.name).slice().reverse();   /* 反转：天枢在顶 */
+    const xNames = CAUSES.map((c) => c.name);
+    const data = [];
+    TEAMS.forEach((t, r) => {
+      const y = TEAMS.length - 1 - r;
+      CAUSES.forEach((c, k) => {
+        const v = HEAT[r][k];
+        const on = ti > 0 && ti - 1 === r;
+        data.push({
+          value: [k, y, v],
+          itemStyle: on
+            ? { borderColor: C.amber, borderWidth: 1.6, opacity: 1 }
+            : { borderColor: "rgba(8,18,49,.85)", borderWidth: 1, opacity: ti > 0 ? 0.42 : 1 }
+        });
+      });
+    });
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 10, top: 22, bottom: 30, containLabel: true },
+      tooltip: Object.assign({
+        formatter: (p) => {
+          const k = p.value[0], y = p.value[1], r = TEAMS.length - 1 - y;
+          return "<b>" + TEAMS[r].name + " · " + CAUSES[k].name + "</b><br/>障碍 <b>" + p.value[2] +
+            "</b> 条<br/><span style=\"color:" + C.textDim + "\">该队合计 " + TEAMS[r].imp +
+            " 条 · 该类合计 " + CAUSES[k].n + " 条</span>";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: xNames.slice(), splitArea: { show: false },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5, interval: 0, rotate: 20 }
+      },
+      yAxis: {
+        type: "category", data: yNames, splitArea: { show: false },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10.5, interval: 0 }
+      },
+      visualMap: {
+        type: "continuous", min: 0, max: D.heatMax, calculable: false,
+        orient: "horizontal", left: "center", bottom: 0, itemWidth: 10, itemHeight: 96,
+        text: ["多", "少"], textStyle: { color: C.textDim, fontSize: 10 },
+        inRange: { color: ["rgba(24,44,104,.55)", C.blueDeep, C.blue, C.amber, C.red] }
+      },
+      series: [{
+        type: "heatmap", data: data,
+        label: {
+          show: true, fontSize: 10, fontWeight: 700,
+          color: "#08122e", formatter: (p) => (p.value[2] ? p.value[2] : "")
+        },
+        emphasis: { itemStyle: { borderColor: C.amber, borderWidth: 2 } }
+      }]
+    };
+  }
+
+  /* ===== 14. 筛选主流程：一次调用刷新 chip / 两张表 / 时间轴 / 帕累托 / 热力 / 页头 chip ===== */
+  function applyFilter(ti, pushHash) {
+    tIdx = clamp(ti, 0, TFILTERS.length - 1);
+    view = ROWS.filter((r) => tIdx === 0 || r.ti === tIdx - 1);
+    actView = ACTIONS.filter((a) => tIdx === 0 || a.ti === tIdx - 1);
+    selPos = 0;
+    tchips.forEach((el, i) => {
+      const on = i === tIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? TFILTERS[i].color : "";
+      el.style.borderColor = on ? TFILTERS[i].color : "";
+    });
+    const t = tIdx === 0 ? null : TEAMS[tIdx - 1];
+    $("dm-chip-key").textContent = "障碍 · " + TFILTERS[tIdx].name;
+    $("dm-chip-val").textContent = t
+      ? t.imp + " 条 / 均 " + fmtDec(t.avgDays, 1) + " 天"
+      : D.n + " 条 / 均 " + fmtDec(D.avgDays, 1) + " 天";
+
+    const pd = paretoData(tIdx);
+    $("dm-pareto-tag").innerHTML = "五类 Σ <b>" + pd.total + "</b> 条 · 累计末值 <b>" +
+      fmtDec(pd.items[pd.items.length - 1].cum, 0) + "%</b> · 口径 " + TFILTERS[tIdx].name;
+    $("dm-heat-tag").innerHTML = "12 × 5 矩阵 · Σ <b>" + D.n + "</b> 条 · 列和 = 类型条数 · 行和 = 队障碍数";
+
+    renderTable();
+    renderSel();
+    if (paretoChart) paretoChart.setOption(paretoOption(tIdx), true);
+    if (heatChart) heatChart.setOption(heatOption(tIdx), true);
+    if (pushHash) syncHash(tIdx);
+  }
+
+  tchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), true)));
+
+  /* hash 定位：命中团队则激活筛选 chip、闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyFilter(0, false); return; }
+    applyFilter(hit, false);
+    if (hit > 0) {
+      const chip = tchips[hit];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                 /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发敏捷交付总览1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 15. kiosk 轮巡：台账行 3 秒逐行高亮并联动处置时间轴与回顾行动项；
+         hash 定位或手动点行后暂停 20 秒（同一门闩 pauseUntil）。 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 16. 初始渲染：先填充全部 DOM（KPI + 两表 + 时间轴），再 init 图表 ===== */
+  let paretoChart = null, heatChart = null;
+  applyFilter(0, false);                                     /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  paretoChart = echarts.init($("dm-chart-pareto"));
+  paretoChart.setOption(paretoOption(0));
+  heatChart = echarts.init($("dm-chart-heat"));
+  heatChart.setOption(heatOption(0));
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* 帕累托轮播提示 */
+  let tipIdx = 0;
+  setInterval(() => {
+    paretoChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % CAUSES.length;
+  }, 4200);
+
+  /* ===== 17. 底部障碍研判滚动条（文案数字全部由派生量现算） ===== */
+  const topCause = CAUSES.slice().sort((a, b) => b.n - a.n)[0];
+  const longTeam = TEAMS.slice().sort((a, b) => b.avgDays - a.avgDays)[0];
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "未解除 " + D.open + " 条全部落在当前 Sprint " + SPRINTS[5].code + "，与父页「障碍清单」在办 " +
+        D.curImp + " 项逐条对齐；其中已升级 " + ROWS.filter((r) => r.st === 2).length + " 条需 RTE 介入" },
+    { lv: "高", c: C.red, t: "类型首位「" + topCause.name + "」" + topCause.n + " 条（占 " + fmtDec(topCause.share, 1) +
+        "%），Σ 阻塞 " + topCause.days + " 天、平均 " + fmtDec(topCause.avgDays, 1) + " 天，影响 " + topCause.pts + " 点" },
+    { lv: "中", c: C.orange, t: "最长一条「" + D.maxRow.no + "」" + D.maxRow.days + " 天（" + TEAMS[D.maxRow.ti].name +
+        " · " + CAUSES[D.maxRow.ci].name + "），提出 " + D.maxRow.d + " → " + D.maxRow.endD + "，影响 " + D.maxRow.pts + " 点" },
+    { lv: "中", c: C.orange, t: "障碍最多的团队是「" + D.topTeam.name + "」" + D.topTeam.imp + " 条 · Σ " + D.topTeam.days +
+        " 天，影响 " + D.topTeam.pts + " 点 ≈ 该队速率 " + D.topTeam.vel + " 点的 " + fmtDec(D.topTeam.ptsShare, 1) + "%" },
+    { lv: "中", c: C.amber, t: "平均阻塞最久的是「" + longTeam.name + "」" + fmtDec(longTeam.avgDays, 1) +
+        " 天/条，全盘均值 " + fmtDec(D.avgDays, 1) + " 天/条（" + fmtInt(D.days) + " 天 ÷ " + D.n + " 条）" },
+    { lv: "低", c: C.green, t: "回顾行动闭环 " + D.actDone + " / " + D.actN + " = " + fmtDec(D.actRate, 1) +
+        "%，进行中 " + D.actDoing + " 条、未启动 " + D.actTodo + " 条；每条行动均可回指同队同类型障碍" },
+    { lv: "低", c: C.green, t: "口径分工：本页 " + D.n + " 条 Sprint 级障碍（团队 × 迭代），与「阻塞与在制品台账」" +
+        CARD_SUM_REF + " 张在制阻塞卡（卡片级）为两套单位，五类占比最大偏差 " + fmtDec(D.maxDev, 1) + " 个百分点" },
+    { lv: "低", c: C.blue, t: "勾稽：团队 Σ = " + D.teamImpSum + " 条 · 类型 Σ = " + D.causeN + " 条 · 热力列和 Σ = " +
+        sum(D.heatColSum) + " 条，三口径同为 " + D.n + " 条；影响故事点 Σ = " + fmtInt(D.pts) + " 点" }
+  ];
+  const track = $("dm-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="dm-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                    /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 18. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try {
+    JSON.stringify(paretoOption(0)); JSON.stringify(paretoOption(1));
+    JSON.stringify(heatOption(0)); JSON.stringify(heatOption(3));
+  } catch (e) { optAcyclic = false; console.error("[障碍与回顾台账] option 存在循环引用：", e.message); }
+
+  const pd0 = paretoData(0);
+  const PARENT_IMP = [                                        /* 父页 P5 IMPEDIMENTS 七项逐字 */
+    ["天权", "跨域依赖", 6], ["青龙", "外部供应", 8], ["天玑", "环境与资源", 4],
+    ["白虎", "跨域依赖", 5], ["天璇", "需求变更", 3], ["玄武", "环境与资源", 3],
+    ["紫微", "评审等待", 2]
+  ];
+  const curRows = ROWS.filter((r) => r.sp === SPRINTS.length - 1);
+  const refRank = CAUSES.map((c, i) => i).sort((a, b) => CAUSES[b].card - CAUSES[a].card);
+  const pageRank = CAUSES.map((c, i) => i).sort((a, b) => (CAUSES[b].n - CAUSES[a].n) || (a - b));
+
+  const checks = [
+    ["12 团队名与契约 §2.3 逐字（天枢…紫微）",
+      TEAMS.length === 12 && TEAMS.every((t, i) => t.name === TEAM_REF[i])],
+    ["12 团队速率与契约逐字（82…45）且 Σ = 746",
+      TEAMS.every((t, i) => t.vel === VEL_REF[i]) && D.velSum === VEL_SUM_REF],
+    ["五类阻塞原因名与契约逐字（跨域依赖/环境与资源/需求变更/外部供应/评审等待）",
+      CAUSES.length === 5 && CAUSES.every((c, i) => c.name === CAUSE_REF[i])],
+    ["参照口径五类卡数与契约逐字（38+27+21+14+9 = 109）",
+      CAUSES.every((c, i) => c.card === CARD_REF[i]) && D.causeCardSum === CARD_SUM_REF],
+    ["帕累托 Σ = 障碍总数 " + D.n + " 条", pd0.total === D.n && D.causeN === D.n],
+    ["帕累托累计末值 = 100%", Math.abs(pd0.items[pd0.items.length - 1].cum - 100) < 1e-9],
+    ["帕累托柱按条数降序（累计线单调不减）",
+      pd0.items.every((it, i) => i === 0 || it.n <= pd0.items[i - 1].n)],
+    ["各团队口径下帕累托 Σ == 该队障碍数且末值 100%（有障碍时）",
+      TEAMS.every((t, i) => {
+        const p = paretoData(i + 1);
+        return p.total === t.imp &&
+          (t.imp === 0 || Math.abs(p.items[p.items.length - 1].cum - 100) < 1e-9);
+      })],
+    ["热力列和 == 各类型障碍条数（12 × 5 矩阵纵向收敛）",
+      D.heatColSum.every((v, i) => v === CAUSES[i].n)],
+    ["热力行和 == 各队障碍条数（横向收敛）",
+      D.heatRowSum.every((v, i) => v === TEAMS[i].imp)],
+    ["热力全表 Σ == 团队 Σ == 类型 Σ == " + D.n,
+      sum(D.heatColSum) === D.n && sum(D.heatRowSum) === D.n &&
+      D.teamImpSum === D.n && D.causeN === D.n],
+    ["抽样：各队障碍条数 == 该队 chip 计数（逐队比对）",
+      TFILTERS.every((f, i) => f.imp === (i === 0 ? ROWS.length : ROWS.filter((r) => r.ti === i - 1).length))],
+    ["抽样：各队行动项条数 == 该队 chip 计数（逐队比对）",
+      TFILTERS.every((f, i) => f.act === (i === 0 ? ACTIONS.length : ACTIONS.filter((a) => a.ti === i - 1).length))],
+    ["每个团队至少 1 条障碍与 1 条回顾行动（12 队全覆盖）",
+      TEAMS.every((t) => t.imp >= 1 && t.act >= 1)],
+    ["行动项闭环率 = 已闭环 ÷ 总数（" + D.actDone + " ÷ " + D.actN + "）",
+      D.actN === ACTIONS.length && D.actDone + D.actDoing + D.actTodo === D.actN &&
+      Math.abs(D.actRate - 100 * D.actDone / D.actN) < 1e-9],
+    ["行动项条数在 12~16 区间且团队 Σ 收敛", D.actN >= 12 && D.actN <= 16 && D.teamActSum === D.actN],
+    ["每条回顾行动的（团队, 类型）在障碍台账中均可追溯",
+      ACTIONS.every((a) => ROWS.some((r) => r.ti === a.ti && r.ci === a.ci))],
+    ["影响故事点 Σ 现算 = " + fmtInt(D.pts) + " 点（团队维度与类型维度双向收敛）",
+      D.pts === sum(TEAMS.map((t) => t.pts)) && D.pts === sum(CAUSES.map((c) => c.pts))],
+    ["Σ 阻塞天数现算收敛（行 / 队 / 类三口径同为 " + D.days + " 天）",
+      D.days === sum(TEAMS.map((t) => t.days)) && D.days === sum(CAUSES.map((c) => c.days))],
+    ["平均阻塞天数 = Σ 阻塞天数 ÷ 障碍总数",
+      Math.abs(D.avgDays - D.days / D.n) < 1e-9],
+    ["逐条：三段停留天数 Σ == 阻塞天数，各段 ≥ 0 且总数 > 0",
+      ROWS.every((r) => r.days === sum(r.seg) && r.seg.length === 3 &&
+        r.seg.every((v) => v >= 0) && r.days > 0)],
+    ["未解除条数 = 处置中 + 已升级，且全部落在当前 Sprint " + SPRINTS[5].code,
+      D.open === ROWS.filter((r) => r.st === 1).length + ROWS.filter((r) => r.st === 2).length &&
+      ROWS.filter((r) => r.open).every((r) => r.sp === SPRINTS.length - 1)],
+    ["未解除障碍：提出日 + 阻塞天数 == 数据日期 " + AS_OF,
+      ROWS.filter((r) => r.open).every((r) => diffD(r.d, AS_OF) === r.days)],
+    ["已解除障碍：提出日 + 阻塞天数 ≤ 数据日期",
+      ROWS.filter((r) => !r.open).every((r) => diffD(r.d, AS_OF) >= r.days)],
+    ["当前 Sprint 在办 7 条与父页「障碍清单」逐字（团队/类型/滞留天数）",
+      curRows.length === PARENT_IMP.length &&
+      PARENT_IMP.every((p) => curRows.some((r) =>
+        TEAMS[r.ti].name === p[0] && CAUSES[r.ci].name === p[1] && r.days === p[2]))],
+    ["障碍条数在 22~28 区间（Sprint 级口径，非 109 卡口径）", D.n >= 22 && D.n <= 28],
+    ["五类占比与 109 卡参照口径偏差 ≤ 3 个百分点且序位一致",
+      D.maxDev <= 3 && refRank.every((v, i) => v === pageRank[i])],
+    ["每条障碍的提出日落在其来源 Sprint 的 14 天窗口内",
+      ROWS.every((r) => {
+        const off = diffD(SPRINTS[r.sp].start, r.d);
+        return off >= 0 && off <= 13;
+      })],
+    ["障碍号唯一、格式 IMP-2026-XXXX 且落在所在 Sprint 号段内",
+      (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^IMP-2026-\d{4}$/.test(r.no)) &&
+      ROWS.every((r) => r.seq >= SEQ_LO[r.sp] && r.seq <= SEQ_HI[r.sp])],
+    ["台账按提出日倒序陈列且障碍号严格递减",
+      ROWS.every((r, i) => i === 0 || (r.d <= ROWS[i - 1].d && r.seq < ROWS[i - 1].seq))],
+    ["六个 Sprint 的障碍条数之和 = 障碍总数", sum(D.spN) === D.n && SPRINTS.length === 6],
+    ["hash：12 团队名均可解析（含「XX团队」「XX队」别名）",
+      TEAMS.every((t, i) => HASH_ALIAS[t.name] === i + 1 &&
+        HASH_ALIAS[t.name + "团队"] === i + 1 && HASH_ALIAS[t.name + "队"] === i + 1) &&
+      HASH_ALIAS["全部"] === 0],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[障碍与回顾台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1285 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发流水线运行台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --pt-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：构建号 / 仓库 / 分支 / 触发 / 触发人 / 开始时刻 / 耗时 / 结果 / 失败·中止阶段 */
+    --pt-tcols: 90px 132px 118px 46px 62px 84px 1fr 50px 74px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .pt-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 8% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 92% 6%, rgba(70, 214, 200, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 900px 1fr 1fr;
+    grid-template-rows: 84px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .pt-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .pt-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .pt-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .pt-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(70, 214, 200, 0.45) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(70, 214, 200, 0.45) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .pt-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .pt-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .pt-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .pt-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .pt-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到工程效能，琥珀描边与本页星蓝主色区分 */
+  .pt-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .pt-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .pt-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .pt-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .pt-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .pt-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .pt-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .pt-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .pt-chips { display: flex; align-items: center; gap: 9px; }
+  .pt-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 122px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .pt-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .pt-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .pt-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .pt-chip.is-key b { color: var(--rnd-blue); }
+  .pt-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .pt-clock-time { font: 700 26px/1 var(--pt-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .pt-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 两级筛选条：一级 = 仓库群（hash 契约目标）＋二级 = 构建结果 ===== */
+  .pt-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .pt-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .pt-gchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 6px 13px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13.5px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .pt-gchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .pt-gchip b { font: 700 14px/1 var(--pt-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .pt-gchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .pt-gchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .pt-gchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .pt-gchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .pt-gchip.is-hit { animation: pt-hit 0.9s ease-in-out 2; }
+  @keyframes pt-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--pt-cc, rgba(92, 157, 255, 0.8)); } }
+  .pt-fdiv { flex: none; width: 1px; height: 24px; margin: 0 4px; background: rgba(96, 140, 255, 0.28); }
+  .pt-rchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 4px 11px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .pt-rchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .pt-rchip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .pt-rchip.is-on { color: #071026; font-weight: 700; }
+  .pt-rchip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  .pt-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .pt-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .pt-filters-state em { font-style: normal; color: #d3e2ff; }
+  .pt-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .pt-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .pt-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .pt-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--pt-kc, var(--rnd-blue)); }
+  .pt-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .pt-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .pt-kpi-v b { font: 700 24px/1 var(--pt-mono); color: var(--pt-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .pt-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .pt-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .pt-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .pt-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .pt-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .pt-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .pt-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .pt-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .pt-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .pt-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .pt-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：24 行 × 27px + 表头，tbody overflow hidden 防撑破 */
+  .pt-panel.is-ledger { flex: none; height: 742px; min-height: 0; overflow: hidden; }
+  /* ★ 阶段耗时块由 JS 填充（选中行联动重绘），且与帕累托图同属 .pt-col 一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .pt-panel.is-stage { flex: none; height: 316px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .pt-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .pt-thead, .pt-tbody li { display: grid; grid-template-columns: var(--pt-tcols); align-items: center; gap: 8px; }
+  .pt-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .pt-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .pt-tbody li {
+    padding: 0 8px; height: 27px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: pt-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes pt-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .pt-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .pt-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .pt-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .pt-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pt-tbody li .pt-no { font: 700 11.5px/1 var(--pt-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.02em; }
+  .pt-tbody li .pt-repo { font-size: 11.5px; color: #dfe9ff; }
+  .pt-tbody li .pt-br { font-size: 11px; color: #a9bce4; }
+  .pt-tbody li .pt-tr { font-size: 11px; }
+  .pt-tbody li .pt-by { font-size: 11.5px; color: #bfd2f6; }
+  .pt-tbody li .pt-at { font-size: 11.5px; color: #a9bce4; }
+  .pt-tbody li .pt-fs { font-size: 11px; }
+  .pt-badge {
+    padding: 2px 6px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  /* 结果三态 */
+  .pt-badge.is-r0 { color: #063a25; background: var(--rnd-green); }
+  .pt-badge.is-r1 { color: #3d060c; background: var(--rnd-red); }
+  .pt-badge.is-r2 { border: 1px solid rgba(96, 140, 255, 0.45); color: #9cc2ff; background: rgba(24, 44, 104, 0.45); }
+  /* 耗时：微条 + 数值 */
+  .pt-dur { display: flex; align-items: center; gap: 8px; }
+  .pt-dur-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .pt-dur-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .pt-dur em { flex: none; width: 56px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+
+  /* ===== 中栏上：单次构建六段阶段耗时（纯 HTML/CSS） ===== */
+  .pt-sg-head { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 7px 10px 8px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 8px; min-height: 62px; }
+  .pt-sg-no { display: flex; align-items: center; gap: 9px; }
+  .pt-sg-no b { font: 700 13px/1 var(--pt-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .pt-sg-title { font-size: 12.5px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt-sg-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt-sg-sub b { font-weight: 700; color: #c9d8f8; }
+  .pt-sg-bar { flex: none; display: flex; height: 24px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; background: rgba(14, 26, 66, 0.5); }
+  .pt-sg-seg { position: relative; min-width: 10px; }
+  .pt-sg-seg + .pt-sg-seg { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  /* 失败截断段：斜纹 + 呼吸，红底 */
+  .pt-sg-seg.is-cut {
+    background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.2) 0 6px, transparent 6px 12px) !important;
+    animation: pt-breath 1.6s ease-in-out infinite;
+  }
+  /* 截断后的未执行区间：留白斜纹，宽度 = 该构建成功时本应耗费的余量 */
+  .pt-sg-rest { flex: none; position: relative; background-image: repeating-linear-gradient(-45deg, rgba(96, 140, 255, 0.16) 0 5px, transparent 5px 10px); border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  @keyframes pt-breath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.4); } }
+  .pt-sg-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .pt-sg-row { flex: 1; display: grid; grid-template-columns: 66px 1fr 78px; align-items: center; gap: 10px; padding: 0 4px; border-radius: 5px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .pt-sg-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .pt-sg-row b { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.04em; }
+  .pt-sg-row b::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--pt-pc, var(--rnd-blue)); }
+  .pt-sg-row.is-todo b { color: rgba(127, 146, 196, 0.6); }
+  .pt-sg-row.is-todo b::before { opacity: 0.3; }
+  .pt-sg-row.is-cut b { color: var(--rnd-red); }
+  .pt-sg-row span { color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt-sg-row em { font-style: normal; text-align: right; font: 700 13px/1 var(--pt-mono); color: var(--rnd-cyan); }
+  .pt-sg-row.is-cut em { color: var(--rnd-red); }
+  .pt-sg-row.is-todo em { color: rgba(127, 146, 196, 0.5); }
+
+  /* ===== 底部滚动条 ===== */
+  .pt-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .pt-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-cyan); }
+  .pt-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-cyan);
+    box-shadow: 0 0 10px var(--rnd-cyan); animation: pt-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes pt-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .pt-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .pt-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .pt-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .pt-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .pt-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .pt-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="pt-stage" id="pt-stage">
+    <!-- mockflag:begin --><div class="pt-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="pt-error" id="pt-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="pt-header">
+      <div class="pt-head-left">
+        <div class="pt-crumb">
+          <a class="pt-crumb-up" href="大屏样板间-研发工程效能1920.html" title="返回上级专题页（Esc）">‹ 返回 工程效能</a>
+          <b>云麓智联科技</b><i>›</i><span>工程效能</span><i>›</i><em>流水线运行台账</em>
+        </div>
+        <div class="pt-head-title-row">
+          <div class="pt-head-title">流水线运行台账</div>
+          <div class="pt-head-meta">
+            <span>年度构建 <b id="pt-meta-b">--</b> 次 · 本表样例 <b id="pt-meta-n">--</b> 条（<b id="pt-meta-p">--</b>）</span><i>|</i>
+            <span><b>5</b> 域仓库群 · <b>317</b> 仓 · <b>6</b> 段流水线</span><i>|</i>
+            <span>视角 <b>一次次构建运行</b>（仓库群 360° 见姊妹子页）</span>
+          </div>
+        </div>
+      </div>
+      <div class="pt-head-right">
+        <div class="pt-chips">
+          <div class="pt-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="pt-chip is-key"><span id="pt-chip-key">成功率 · 全部</span><b id="pt-chip-val">--</b></div>
+        </div>
+        <div class="pt-clock" aria-label="实时时钟">
+          <span class="pt-clock-time" id="pt-clock-time">--:--:--</span>
+          <span class="pt-clock-date" id="pt-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 两级筛选：一级 = 仓库群（hash 契约目标，五群逐字）→ 二级 = 构建结果 -->
+    <div class="pt-filters">
+      <span class="pt-filters-tag">仓库群</span>
+      <div id="pt-gchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="pt-fdiv"></span>
+      <span class="pt-filters-tag">构建结果</span>
+      <div id="pt-rchips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="pt-filters-state" id="pt-filters-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="pt-kpis" id="pt-kpis"></div>
+
+    <!-- 左：构建任务台账（写死高度 742px = 24 行 × 27px + 表头） -->
+    <div class="pt-col">
+      <section class="pt-panel is-ledger">
+        <div class="pt-panel-head">
+          <h2>构建任务台账（仓库群 × 构建结果）</h2>
+          <span class="pt-panel-tag" id="pt-table-tag">--</span>
+        </div>
+        <div class="pt-table">
+          <div class="pt-thead">
+            <span>构建号</span><span>仓库</span><span>分支</span><span>触发</span><span>触发人</span>
+            <span>开始时刻</span><span>耗时</span><span>结果</span><span>失败·中止阶段</span>
+          </div>
+          <ul class="pt-tbody" id="pt-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中：单次构建六段阶段耗时 + 失败原因帕累托 -->
+    <div class="pt-col">
+      <section class="pt-panel is-stage">
+        <div class="pt-panel-head">
+          <h2>单次构建阶段耗时</h2>
+          <span class="pt-panel-tag" id="pt-sg-tag">--</span>
+        </div>
+        <div class="pt-sg-head" id="pt-sg-headbox"></div>
+        <div class="pt-sg-bar" id="pt-sg-bar"></div>
+        <div class="pt-sg-list" id="pt-sg-list"></div>
+      </section>
+      <section class="pt-panel" style="flex: 1;">
+        <div class="pt-panel-head">
+          <h2>失败原因帕累托</h2>
+          <span class="pt-panel-tag" id="pt-pareto-tag">--</span>
+        </div>
+        <div class="pt-chart" id="pt-chart-pareto"></div>
+      </section>
+    </div>
+
+    <!-- 右：构建时长分布直方 + 24 周流水线成功率走势 -->
+    <div class="pt-col">
+      <section class="pt-panel" style="flex: 1;">
+        <div class="pt-panel-head">
+          <h2>构建时长分布 · 分钟桶</h2>
+          <span class="pt-panel-tag" id="pt-hist-tag">--</span>
+        </div>
+        <div class="pt-chart" id="pt-chart-hist"></div>
+      </section>
+      <section class="pt-panel" style="flex: 1;">
+        <div class="pt-panel-head">
+          <h2>流水线成功率 · 近 24 周</h2>
+          <span class="pt-panel-tag" id="pt-trend-tag">--</span>
+        </div>
+        <div class="pt-chart" id="pt-chart-trend"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="pt-foot">
+      <div class="pt-foot-tag">流水线研判</div>
+      <div class="pt-foot-view"><div class="pt-foot-track" id="pt-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("pt-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("pt-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const round1 = (n) => Math.round(n * 10) / 10;
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · CI 平台视角）
+         ★ 与父页 P7「研发工程效能」严格同源（docs/RndIpdThemed.md §2.2 / §6 P7→本页）：
+           - 五域仓库群名与仓库数引父页 COVERAGE 逐字：应用软件 84 / 嵌入式 37 / 云服务 96 /
+             AI 平台 42 / 工具链 58，Σ = 317 仓（hash 键即这五个名字，「AI 平台」含空格）；
+           - 全局流水线成功率 = 父页「流水线成功率日历热力」26 周 × 5 工作日格的均值，
+             本页复刻父页发生器（seed / LCG / 公式逐字）现算得 92.4%，不另抄一份数字；
+           - 平均构建耗时与父页「构建时长走势」24 周周均值（12.96 min）互为印证；
+           - DORA 变更失败率 8.4% 引契约 §2.2 逐字（与本页「构建失败率」不同口径，页内注明）。
+         ★ 与姊妹子页 S13「单仓库群工程详情」(gc) 的分工：
+           gc = 一个仓库群的**工程能力 360 度**（覆盖率总体 / 评审分位 / XP 采纳 / 代表仓库清单）；
+           本页 = **构建任务流水明细**，视角是「一次次构建运行」——谁在什么时刻、从哪个分支、
+           以什么方式触发了哪一次构建，跑了多久、卡在哪一段、为什么失败。两页仓库名同源不重复。
+         ★ 二级拆分（各群构建数/失败数/取消数、6 类失败原因 × 5 群矩阵、8 个时长桶 × 5 群矩阵、
+           24 条抽样流水）为本页自编，Σ 一律收敛到上级数，全部进页尾勾稽自检。
+         ★ 随机数据只有一处：复刻父页日历热力的确定性 LCG（seed 20260819 写死），刷新不跳变。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，行与群/原因之间一律用索引（g / 桶序）
+           关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 契约锚点（勿改，与父页 / 契约逐字） */
+  const REPO_REF   = [84, 37, 96, 42, 58];    /* 父页 COVERAGE.repos 逐字 */
+  const REPO_ALL   = 317;                     /* Σ 五群仓库数 */
+  const CHG_FAIL   = 8.4;                     /* DORA 变更失败率（契约 §2.2） */
+  const WORK_DAYS  = 252;                     /* 年工作日 = 5 工作日/周 × 52 周（父页日历热力节奏） */
+  const CAL_WEEKS  = 26;                      /* 父页日历热力周数 */
+  const TREND_WEEKS = 24;                     /* 本页成功率走势周数（父页构建时长走势同轴后 24 周） */
+
+  /* 4.2 五域仓库群（name / repos 与父页逐字；builds = 年度构建数、fail = 失败、cancel = 取消，
+         succ = builds − fail − cancel 现算，成功率 = succ ÷ (succ + fail)，取消不入分母）。 */
+  const GROUPS = [
+    { name: "应用软件", short: "应用", repos: 84, builds: 18620, fail: 1349, cancel: 386, color: C.blue,
+      note: "端侧多形态并行，回归用例重" },
+    { name: "嵌入式",   short: "嵌入", repos: 37, builds: 5780,  fail: 820,  cancel: 118, color: C.orange,
+      note: "交叉编译与固件打包耗时最长" },
+    { name: "云服务",   short: "云服", repos: 96, builds: 21840, fail: 920,  cancel: 452, color: C.cyan,
+      note: "构建量最大，缓存命中率最高" },
+    { name: "AI 平台",  short: "AI",   repos: 42, builds: 8240,  fail: 915,  cancel: 214, color: C.violet,
+      note: "依赖体积大、算力争用明显" },
+    { name: "工具链",   short: "工具", repos: 58, builds: 9860,  fail: 764,  cancel: 198, color: C.green,
+      note: "仓小步快，单次构建最短" }
+  ];
+
+  /* 4.3 六段流水线（顺序即执行序；失败/取消构建在所处段截断，其后各段不执行） */
+  const STAGES = ["拉取", "依赖", "编译", "单测", "打包", "制品上传"];
+  const STAGE_HINT = ["源码检出 + 子模块同步", "依赖解析与缓存拉取", "编译 + 静态检查",
+                      "单元测试 + 覆盖率采集", "产物打包与签名", "制品入库与索引"];
+  const STAGE_COLORS = [C.amber, C.cyan, C.blue, C.green, C.violet, C.orange];
+  /* 全量口径下的六段平均占比（用于把截断构建的「未执行余量」画成留白，Σ = 1） */
+  const STAGE_SHARE = [0.03, 0.18, 0.38, 0.26, 0.11, 0.04];
+
+  const RES_NAMES  = ["成功", "失败", "取消"];
+  const RES_BADGE  = ["is-r0", "is-r1", "is-r2"];
+  const RES_COLORS = [C.green, C.red, C.blueDeep];
+  const TRIGGERS = ["推送", "PR", "定时", "手动"];
+  const TRIG_COLORS = [C.blue, C.cyan, C.violet, C.amber];
+
+  /* 4.4 失败原因 × 仓库群矩阵（6 类 × 5 群，单位：次）
+         行和 = 该类失败次数（现算），列和 == 各群 fail，全表 Σ == 年度失败构建数。两个方向都进自检。 */
+  const CAUSES = [
+    { name: "单测失败",     m: [520, 210, 300, 256, 200], color: C.red },
+    { name: "编译错误",     m: [330, 300, 190, 204, 180], color: C.orange },
+    { name: "依赖拉取超时", m: [200, 120, 190, 152, 120], color: C.amber },
+    { name: "资源不足",     m: [130, 100, 120, 181,  80], color: C.violet },
+    { name: "静态检查",     m: [110,  60,  80,  79,  90], color: C.cyan },
+    { name: "其他",         m: [ 59,  30,  40,  43,  94], color: C.blueDeep }
+  ];
+
+  /* 4.5 构建时长分布：8 个分钟桶 × 5 群矩阵（单位：次）
+         桶界 HIST_EDGE（末桶闭口按 45 min 计尾）；行和 == 该群年度构建数，全表 Σ == 年度构建数。
+         中位 / P85 由累计频数在桶内**线性插值现算**（不写死）。 */
+  const HIST_EDGE = [0, 4, 6, 8, 10, 14, 20, 30, 45];
+  const HIST_LABELS = ["<4", "4–6", "6–8", "8–10", "10–14", "14–20", "20–30", "≥30"];
+  const HIST = [
+    /* 应用软件 */ [372, 1304, 2420, 2980, 4656, 3724, 2420, 744],
+    /* 嵌入式   */ [58,  116,  290,  404,  924,  1388, 1676, 924],
+    /* 云服务   */ [1310, 3058, 4368, 4150, 4804, 2620, 1202, 328],
+    /* AI 平台  */ [164, 330,  576,  824,  1566, 2060, 1896, 824],
+    /* 工具链   */ [1676, 2462, 2170, 1578, 1282, 494,  168,  30]
+  ];
+
+  /* 4.6 台账抽样 24 条（窗口 2026-08-19 当日，按开始时刻倒序；年度 64,340 次不可能逐条陈列）
+         ★ 抽样口径：按**结果分层抽样**——失败 6 条 / 取消 2 条刻意超采，便于查看截断阶段，
+           故样例失败占比（25.0%）远高于全盘构建失败率（7.4%），页内注明，不参与比率勾稽。
+         g = 仓库群索引  tr = 触发方式索引  res = 结果索引（0 成功 / 1 失败 / 2 取消）
+         seg = 各段耗时（**秒**，整数，避免浮点求和误差）：成功 6 段；失败/取消在所处段截断，
+               段数 = 截断段序 + 1；**耗时 = Σseg 现算**，页尾逐条硬校验。
+         ★ 仓库名与触发人引姊妹子页 gc 的代表仓库清单逐字，两页同一套仓库对象。 */
+  const ROWS = [
+    { no: "BLD-264318", g: 2, repo: "yunshu-api-gw",     br: "main",              tr: 0, by: "颜霁", at: "15:42", res: 0, seg: [26, 118, 264, 186, 74, 32] },
+    { no: "BLD-264317", g: 0, repo: "home-ui-kit",       br: "feature/ui-r266",   tr: 1, by: "苏晏", at: "15:28", res: 1, seg: [31, 142, 398, 264] },
+    { no: "BLD-264316", g: 4, repo: "ci-runner-agent",   br: "main",              tr: 2, by: "定时调度", at: "15:15", res: 0, seg: [18, 64, 142, 96, 48, 20] },
+    { no: "BLD-264315", g: 3, repo: "huiyan-train",      br: "release/R26.6",     tr: 0, by: "覃眙", at: "14:57", res: 0, seg: [34, 268, 612, 486, 214, 68] },
+    { no: "BLD-264314", g: 2, repo: "device-shadow",     br: "main",              tr: 0, by: "康偃", at: "14:41", res: 0, seg: [24, 132, 286, 204, 86, 34] },
+    { no: "BLD-264313", g: 1, repo: "lanxin-m60-fw",     br: "release/R26.6",     tr: 1, by: "褚彦", at: "14:22", res: 1, seg: [42, 214, 986] },
+    { no: "BLD-264312", g: 0, repo: "yunlu-home-app",    br: "main",              tr: 0, by: "沈舟", at: "14:06", res: 0, seg: [28, 186, 452, 318, 142, 46] },
+    { no: "BLD-264311", g: 2, repo: "rule-engine",       br: "feature/rule-dsl",  tr: 1, by: "路旸", at: "13:48", res: 0, seg: [22, 108, 238, 176, 68, 28] },
+    { no: "BLD-264310", g: 4, repo: "codegen-cli",       br: "main",              tr: 0, by: "华骕", at: "13:31", res: 0, seg: [16, 58, 124, 88, 42, 18] },
+    { no: "BLD-264309", g: 3, repo: "lingxi-serving",    br: "main",              tr: 0, by: "赫岚", at: "13:12", res: 1, seg: [30, 242, 538, 412, 196] },
+    { no: "BLD-264308", g: 0, repo: "yunlu-ios-home",    br: "hotfix/crash-1842", tr: 3, by: "崔可", at: "12:55", res: 0, seg: [26, 164, 406, 286, 128, 42] },
+    { no: "BLD-264307", g: 2, repo: "billing-svc",       br: "main",              tr: 2, by: "定时调度", at: "12:33", res: 2, seg: [20, 96, 212, 58] },
+    { no: "BLD-264306", g: 1, repo: "rtos-hal",          br: "feature/m60-lpm",   tr: 1, by: "毕澈", at: "12:10", res: 0, seg: [38, 236, 1048, 624, 268, 84] },
+    { no: "BLD-264305", g: 2, repo: "yunshu-core",       br: "release/R26.6",     tr: 0, by: "颜霁", at: "11:52", res: 0, seg: [24, 124, 272, 192, 78, 30] },
+    { no: "BLD-264304", g: 0, repo: "app-gateway-sdk",   br: "main",              tr: 0, by: "邵臻", at: "11:34", res: 1, seg: [27, 158, 486] },
+    { no: "BLD-264303", g: 3, repo: "dataset-hub",       br: "main",              tr: 2, by: "定时调度", at: "11:08", res: 0, seg: [32, 254, 566, 438, 202, 62] },
+    { no: "BLD-264302", g: 4, repo: "build-cache",       br: "main",              tr: 0, by: "鄢冽", at: "10:46", res: 1, seg: [19, 268] },
+    { no: "BLD-264301", g: 2, repo: "config-center",     br: "feature/hub-shard", tr: 1, by: "邢栾", at: "10:24", res: 0, seg: [23, 116, 254, 188, 72, 29] },
+    { no: "BLD-264300", g: 1, repo: "bootloader-secure", br: "main",              tr: 0, by: "鲁桉", at: "10:02", res: 0, seg: [36, 208, 912, 548, 232, 76] },
+    { no: "BLD-264299", g: 0, repo: "xinglan-launcher",  br: "main",              tr: 0, by: "何珩", at: "09:41", res: 0, seg: [29, 148, 388, 272, 118, 40] },
+    { no: "BLD-264298", g: 3, repo: "model-registry",    br: "main",              tr: 1, by: "范柘", at: "09:18", res: 2, seg: [28, 232, 164] },
+    { no: "BLD-264297", g: 2, repo: "yundun-auth",       br: "main",              tr: 0, by: "岳汀", at: "08:56", res: 0, seg: [21, 102, 226, 168, 64, 26] },
+    { no: "BLD-264296", g: 4, repo: "test-orchestrator", br: "main",              tr: 2, by: "定时调度", at: "08:34", res: 0, seg: [15, 52, 116, 82, 38, 16] },
+    { no: "BLD-264295", g: 0, repo: "ota-client",        br: "release/R26.6",     tr: 0, by: "岑野", at: "08:12", res: 1, seg: [30, 192, 468, 296] }
+  ];
+  const SAMPLE_DAY = "2026-08-19";
+
+  /* ===== 4.7 复刻父页「流水线成功率日历热力」发生器（seed / LCG / 公式与 dx 逐字一致），
+         得到逐周工作日成功率均值序列 → 本页 24 周走势与全局成功率的唯一来源。 ===== */
+  let dxSeed = 20260819;
+  const rnd = () => ((dxSeed = (dxSeed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const WEEK_LABELS = [];
+  (function () {
+    const d0 = new Date(2026, 7, 17);                     /* 末周周一 2026-08-17，往前推 25 周 */
+    d0.setDate(d0.getDate() - (CAL_WEEKS - 1) * 7);
+    for (let w = 0; w < CAL_WEEKS; w += 1) {
+      const d = new Date(d0.getTime());
+      d.setDate(d0.getDate() + w * 7);
+      WEEK_LABELS.push(pad(d.getMonth() + 1) + "-" + pad(d.getDate()));
+    }
+  })();
+  const CAL_WEEK_MEAN = [];                               /* 每周 5 个工作日格的成功率均值 */
+  for (let w = 0; w < CAL_WEEKS; w += 1) {
+    let s = 0;
+    for (let d = 0; d < 5; d += 1) s += Math.min(100, round1(84 + w * 0.35 + rnd() * 8));
+    CAL_WEEK_MEAN.push(s / 5);
+  }
+  const CAL_AVG = sum(CAL_WEEK_MEAN) / CAL_WEEKS;         /* 与父页 D.calAvg 同值 = 全局流水线成功率 */
+  /* 累计成功率：从窗口第 1 周起逐周累计的工作日均值，**末点必然回归父页全局成功率** */
+  const CAL_CUM = CAL_WEEK_MEAN.map((v, i, a) => sum(a.slice(0, i + 1)) / (i + 1));
+  const TREND_LABELS = WEEK_LABELS.slice(CAL_WEEKS - TREND_WEEKS);
+  const TREND_WEEK = CAL_WEEK_MEAN.slice(CAL_WEEKS - TREND_WEEKS);
+  const TREND_CUM = CAL_CUM.slice(CAL_WEEKS - TREND_WEEKS);
+  /* 父页「构建时长走势」24 周周均值（公式与 dx BUILD_MEAN 逐字），用于印证本页平均耗时 */
+  const BUILD_BASE = [];
+  for (let i = 0; i < TREND_WEEKS; i += 1) BUILD_BASE.push(round1(14.8 - 0.16 * i + 0.6 * Math.sin(i * 1.3)));
+  const BUILD_BASE_AVG = sum(BUILD_BASE) / TREND_WEEKS;
+  const BUILD_BASE_MIN = Math.min.apply(null, BUILD_BASE);
+  const BUILD_BASE_MAX = Math.max.apply(null, BUILD_BASE);
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 5.1 仓库群维度 */
+  GROUPS.forEach((g, gi) => {
+    g.succ = g.builds - g.fail - g.cancel;
+    g.eff = g.succ + g.fail;                              /* 有效构建（取消不入成功率分母） */
+    g.rate = 100 * g.succ / g.eff;
+    g.failRate = 100 * g.fail / g.builds;
+    g.cancelRate = 100 * g.cancel / g.builds;
+    g.perRepo = g.builds / g.repos;
+    g.hist = HIST[gi];
+  });
+  D.repoAll = sum(GROUPS.map((g) => g.repos));
+  D.builds = sum(GROUPS.map((g) => g.builds));
+  D.succ = sum(GROUPS.map((g) => g.succ));
+  D.fail = sum(GROUPS.map((g) => g.fail));
+  D.cancel = sum(GROUPS.map((g) => g.cancel));
+  D.eff = D.succ + D.fail;
+  D.rate = 100 * D.succ / D.eff;
+  D.failRate = 100 * D.fail / D.builds;
+  D.cancelRate = 100 * D.cancel / D.builds;
+  D.daily = D.builds / WORK_DAYS;
+  D.perRepo = D.builds / D.repoAll;
+  D.calWinBuilds = Math.round(D.daily * CAL_WEEKS * 5);   /* 父页日历热力窗口（26 周）对应构建量 */
+
+  /* 5.2 失败原因维度：行和现算，列和与各群失败数比对 */
+  CAUSES.forEach((c) => { c.n = sum(c.m); });
+  D.causeN = sum(CAUSES.map((c) => c.n));
+  D.causeColSum = GROUPS.map((g, gi) => sum(CAUSES.map((c) => c.m[gi])));
+
+  /* 5.3 时长直方：分位由累计频数在桶内线性插值现算（不写死） */
+  function histQuantile(counts, p) {
+    const n = sum(counts), t = n * p;
+    let acc = 0;
+    for (let i = 0; i < counts.length; i += 1) {
+      if (counts[i] > 0 && acc + counts[i] >= t) {
+        return HIST_EDGE[i] + (t - acc) / counts[i] * (HIST_EDGE[i + 1] - HIST_EDGE[i]);
+      }
+      acc += counts[i];
+    }
+    return HIST_EDGE[HIST_EDGE.length - 1];
+  }
+  const HIST_MID = HIST_EDGE.slice(0, -1).map((lo, i) => (lo + HIST_EDGE[i + 1]) / 2);
+  function histMean(counts) { return sum(counts.map((v, i) => v * HIST_MID[i])) / sum(counts); }
+  const HIST_ALL = HIST_LABELS.map((_, k) => sum(HIST.map((r) => r[k])));
+  GROUPS.forEach((g) => {
+    g.histN = sum(g.hist);
+    g.med = histQuantile(g.hist, 0.5);
+    g.p85 = histQuantile(g.hist, 0.85);
+    g.mean = histMean(g.hist);
+  });
+  D.histAll = HIST_ALL;
+  D.histN = sum(HIST_ALL);
+  D.med = histQuantile(HIST_ALL, 0.5);
+  D.p85 = histQuantile(HIST_ALL, 0.85);
+  D.mean = histMean(HIST_ALL);
+
+  /* 5.4 走势维度 */
+  D.trendFirst = TREND_WEEK[0];
+  D.trendLast = TREND_WEEK[TREND_WEEKS - 1];
+  D.cumLast = TREND_CUM[TREND_WEEKS - 1];                 /* == CAL_AVG，即父页全局成功率 */
+  D.trendGain = D.trendLast - D.trendFirst;
+
+  /* 5.5 抽样行派生：耗时 = Σseg（秒，现算，不复制数字） */
+  ROWS.forEach((r) => {
+    r.sec = sum(r.seg);
+    r.min = r.sec / 60;
+    r.cut = r.res === 0 ? -1 : r.seg.length - 1;           /* 截断段序（成功 = 无截断） */
+  });
+  D.n = ROWS.length;
+  D.rowsByG = GROUPS.map((g, gi) => ROWS.filter((r) => r.g === gi).length);
+  D.rowsByRes = RES_NAMES.map((s, si) => ROWS.filter((r) => r.res === si).length);
+  D.sampleShare = 100 * D.n / D.builds;
+  D.sampleFailShare = 100 * D.rowsByRes[1] / D.n;
+  D.durMax = Math.max.apply(null, ROWS.map((r) => r.sec));
+  D.longest = ROWS.slice().sort((a, b) => b.sec - a.sec)[0];
+  D.sampleSec = sum(ROWS.map((r) => r.sec));
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("pt-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("pt-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("pt-meta-b").textContent = fmtInt(D.builds);
+  $("pt-meta-n").textContent = fmtInt(D.n);
+  $("pt-meta-p").textContent = "抽样 " + fmtDec(D.sampleShare, 3) + "%";
+  $("pt-trend-tag").innerHTML = "父页日历热力周聚合 · 累计末点 <b>" + fmtDec(D.cumLast, 1) +
+    "%</b> 回归全局成功率";
+
+  /* ===== 7. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "年度构建数", v: D.builds, dec: 0, unit: "次", color: C.blue,
+      s: "五群 Σ · " + D.repoAll + " 仓 · 仓均 " + fmtDec(D.perRepo, 0) + " 次/年" },
+    { k: "流水线成功率", v: D.rate, dec: 1, unit: "%", color: C.green,
+      s: fmtInt(D.succ) + " ÷ " + fmtInt(D.eff) + " 现算 · 父页日历热力同源" },
+    { k: "平均构建耗时", v: D.mean, dec: 1, unit: "min", color: C.cyan,
+      s: "中位 " + fmtDec(D.med, 1) + " · P85 " + fmtDec(D.p85, 1) + " min（直方插值）" },
+    { k: "失败构建数", v: D.fail, dec: 0, unit: "次", color: C.red,
+      s: "构建失败率 " + fmtDec(D.failRate, 1) + "% · 六类原因 Σ 同数" },
+    { k: "变更失败率", v: CHG_FAIL, dec: 1, unit: "%", color: C.amber,
+      s: "DORA 契约值 · 上线后需修复占比，非构建失败率" },
+    { k: "日均构建", v: D.daily, dec: 1, unit: "次", color: C.violet,
+      s: fmtInt(D.builds) + " ÷ " + WORK_DAYS + " 工作日 · 取消 " + fmtDec(D.cancelRate, 1) + "%" }
+  ];
+  $("pt-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="pt-kpi" style="--pt-kc:' + p.color + '">' +
+      '<div class="pt-kpi-k">' + p.k + "</div>" +
+      '<div class="pt-kpi-v"><b id="pt-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="pt-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("pt-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 一级筛选：仓库群 chip（全部 + 五群；每 chip 带全盘构建数、成功率与样例条数） ===== */
+  const GFILTERS = [{ name: "全部", color: C.blue, builds: D.builds, rate: D.rate, cnt: D.n }]
+    .concat(GROUPS.map((g, gi) => ({ name: g.name, color: g.color, builds: g.builds, rate: g.rate, cnt: D.rowsByG[gi] })));
+  const gbox = $("pt-gchips");
+  gbox.innerHTML = GFILTERS.map((f, i) => (
+    '<button class="pt-gchip" type="button" data-i="' + i + '" style="--pt-cc:' + f.color + '">' +
+      "<u>" + f.name + "</u><b>" + fmtInt(f.builds) + "</b>" +
+      "<i>次 · 成功率 " + fmtDec(f.rate, 1) + "% · 样例 " + f.cnt + "</i>" +
+    "</button>"
+  )).join("");
+  const gchips = Array.from(gbox.children);
+
+  /* ===== 9. 二级筛选：构建结果 chip（全部 + 成功/失败/取消；计数随一级仓库群重算） ===== */
+  const rbox = $("pt-rchips");
+  function resScopeCnt(gi, ri) {
+    return ROWS.filter((r) => (gi === 0 || r.g === gi - 1) && (ri === 0 || r.res === ri - 1)).length;
+  }
+  function renderRChips(gi, ri) {
+    const items = [{ name: "全部", color: C.blue }]
+      .concat(RES_NAMES.map((n, k) => ({ name: n, color: RES_COLORS[k] })));
+    rbox.innerHTML = items.map((f, i) => (
+      '<button class="pt-rchip' + (i === ri ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === ri ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + resScopeCnt(gi, i) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(rbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(gIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 10. hash 契约：父页 P7「流水线成功率日历热力」面板级入口 → 本页 #encodeURIComponent(仓库群名)
+         ★ 五群名里「AI 平台」含空格，encodeURIComponent 后是 "AI%20平台"；
+           归一化必须**两侧同时做**：建表时把键归一化、解析时把 hash 归一化，才能命中。 ===== */
+  const normKey = (s) => String(s).replace(/[\s　]+/g, "").toLowerCase();
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[normKey(k)] = v; };   /* ★ 建表侧归一 */
+  alias("全部", 0); alias("ALL", 0); alias("全量", 0); alias("全部仓库群", 0);
+  GROUPS.forEach((g, gi) => {
+    alias(g.name, gi + 1);                                   /* 契约原文（可含空格） */
+    alias(g.name + "群", gi + 1);
+    alias(g.name + "仓库群", gi + 1);
+    alias(g.short, gi + 1);
+  });
+  alias("AI平台", 4); alias("ai 平台", 4); alias("AI-平台", 4);
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = normKey(raw);                                      /* ★ 解析侧归一（trim + 全角空白剔除 + 小写） */
+    if (!raw) return -1;                                     /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(gi) {
+    const want = "#" + encodeURIComponent(GFILTERS[gi].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 台账主表渲染（行高 27px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("pt-tbody");
+  let view = ROWS, gIdx = 0, rIdx = 0, selPos = 0;
+
+  const durText = (sec) => fmtDec(sec / 60, 1) + " min";
+  function rowHtml(r, k) {
+    const w = clamp(r.sec / D.durMax * 100, 6, 100);
+    const cDur = r.sec > 1500 ? C.red : r.sec > 800 ? C.amber : C.cyan;
+    const fs = r.res === 0 ? "—" : STAGES[r.cut];
+    return "<li data-no=\"" + r.no + "\" style=\"animation-delay:" + (k * 10) + "ms\">" +
+      '<span class="pt-no">' + r.no + "</span>" +
+      '<span class="pt-repo">' + r.repo + "</span>" +
+      '<span class="pt-br">' + r.br + "</span>" +
+      '<span class="pt-tr" style="color:' + TRIG_COLORS[r.tr] + '">' + TRIGGERS[r.tr] + "</span>" +
+      '<span class="pt-by">' + r.by + "</span>" +
+      '<span class="pt-at">' + SAMPLE_DAY.slice(5) + " " + r.at + "</span>" +
+      '<span class="pt-dur"><span class="pt-dur-t"><u style="width:' + fmtDec(w, 1) + "%;background:" + cDur +
+        '"></u></span><em style="color:' + cDur + '">' + durText(r.sec) + "</em></span>" +
+      '<span class="pt-badge ' + RES_BADGE[r.res] + '">' + RES_NAMES[r.res] + "</span>" +
+      '<span class="pt-fs" style="color:' + (r.res === 0 ? "rgba(127,146,196,.55)" : RES_COLORS[r.res]) + '">' + fs + "</span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      /* 手动点行 → 选中并暂停轮巡 20 秒（与 hash 定位同一门闩） */
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    const trigCnt = TRIGGERS.map((t, ti) => view.filter((r) => r.tr === ti).length);
+    $("pt-table-tag").textContent =
+      "分层抽样 " + D.n + " 条 / 年度 " + fmtInt(D.builds) + " 次（" + fmtDec(D.sampleShare, 3) +
+      "%）· 窗口 " + SAMPLE_DAY + " · 当前触发 " +
+      TRIGGERS.map((t, ti) => t + " " + trigCnt[ti]).join(" / ");
+    const g = gIdx === 0 ? null : GROUPS[gIdx - 1];
+    $("pt-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 条样例 / 共 " + D.n + " 条<i>|</i>全盘该口径 <em>" +
+      fmtInt(g ? g.builds : D.builds) + "</em> 次 · 成功 <em>" + fmtInt(g ? g.succ : D.succ) +
+      "</em> / 失败 <em>" + fmtInt(g ? g.fail : D.fail) + "</em> / 取消 <em>" +
+      fmtInt(g ? g.cancel : D.cancel) + "</em><i>|</i>行点击或轮巡联动阶段耗时";
+  }
+
+  /* ===== 12. 单次构建六段阶段耗时（纯 HTML/CSS；选中行联动，段宽 ∝ 耗时）
+         ★ Σ 各段 = 该次构建总耗时（硬校验）；失败/取消构建在所处段截断并标红，
+           其后各段不执行——条形图里按「全量六段平均占比」把余量画成留白斜纹，
+           读者一眼能看出这次构建卡在了全程的哪个位置。 ===== */
+  function renderSel() {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("pt-sg-tag").textContent = "当前筛选无样例行";
+      $("pt-sg-headbox").innerHTML = '<div class="pt-sg-sub">调整仓库群或构建结果筛选后，此处展示选中构建的六段耗时。</div>';
+      $("pt-sg-bar").innerHTML = "";
+      $("pt-sg-list").innerHTML = "";
+      return;
+    }
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    $("pt-sg-tag").textContent = "拉取→依赖→编译→单测→打包→制品上传 · Σ 各段 = 总耗时";
+    $("pt-sg-headbox").innerHTML =
+      '<div class="pt-sg-no"><b>' + r.no + "</b>" +
+        '<span class="pt-badge ' + RES_BADGE[r.res] + '">' + RES_NAMES[r.res] + "</span>" +
+        '<span class="pt-sg-sub">' + GROUPS[r.g].name + " · " + TRIGGERS[r.tr] + " · " + r.by + "</span></div>" +
+      '<div class="pt-sg-title">' + r.repo + " @ " + r.br + "</div>" +
+      '<div class="pt-sg-sub">开始 <b>' + SAMPLE_DAY + " " + r.at + "</b> · 总耗时 <b>" + durText(r.sec) +
+        "</b>（" + r.sec + " s，Σ " + r.seg.length + " 段）· " +
+        (r.res === 0 ? "六段跑满" : "截断于 <b>" + STAGES[r.cut] + "</b> 段") + "</div>";
+    /* 条形：已执行段按秒数分 flex；未执行余量按全量平均占比折算成同量纲的「虚拟秒」 */
+    const restShare = r.res === 0 ? 0 : sum(STAGE_SHARE.slice(r.seg.length));
+    const doneShare = 1 - restShare;
+    const restFlex = restShare > 0 ? r.sec * restShare / doneShare : 0;
+    $("pt-sg-bar").innerHTML =
+      r.seg.map((v, k) => (
+        '<span class="pt-sg-seg' + (k === r.cut ? " is-cut" : "") + '" style="flex:' + v + ";background:" +
+          (k === r.cut ? RES_COLORS[r.res] : STAGE_COLORS[k]) +
+          '" title="' + STAGES[k] + " " + v + ' s"></span>'
+      )).join("") +
+      (restFlex > 0 ? '<span class="pt-sg-rest" style="flex:' + fmtDec(restFlex, 2) +
+        '" title="未执行：' + STAGES.slice(r.seg.length).join(" / ") + '"></span>' : "");
+    let acc = 0;
+    $("pt-sg-list").innerHTML = STAGES.map((name, k) => {
+      const entered = k < r.seg.length;
+      const isCut = k === r.cut;
+      let body, val;
+      if (entered) {
+        const a = acc; acc += r.seg[k];
+        body = a + "s → " + acc + "s · " + (isCut ? (r.res === 1 ? "构建失败，流水线中止" : "人工取消，流水线中止") : STAGE_HINT[k]);
+        val = r.seg[k] + " s";
+      } else {
+        body = "未执行 · " + STAGE_HINT[k];
+        val = "--";
+      }
+      return '<div class="pt-sg-row ' + (entered ? (isCut ? "is-cut" : "") : "is-todo") +
+        '" style="--pt-pc:' + (isCut ? RES_COLORS[r.res] : STAGE_COLORS[k]) + '">' +
+        "<b>" + name + "</b><span>" + body + "</span><em>" + val + "</em></div>";
+    }).join("");
+  }
+
+  /* ===== 13. 失败原因帕累托（柱 = 次数降序，线 = 累计占比，末值恒为 100%）
+         全部口径用行和，选中仓库群时取该群列——两种口径的 Σ 都收敛到对应失败构建数。 ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function paretoData(gi) {
+    const items = CAUSES.map((c, ci) => ({
+      name: c.name, color: c.color, ci: ci,
+      n: gi === 0 ? c.n : c.m[gi - 1]
+    }));
+    items.sort((a, b) => (b.n - a.n) || (a.ci - b.ci));
+    const total = sum(items.map((it) => it.n));
+    let acc = 0;
+    items.forEach((it) => { acc += it.n; it.cum = total ? 100 * acc / total : 0; });
+    return { items: items, total: total };
+  }
+  function paretoOption(gi) {
+    const pd = paretoData(gi);
+    /* ★ 只把标量与数组下发给 option，items 对象本身不进 series.data（避免任何回指） */
+    const names = pd.items.map((it) => it.name);
+    const vals = pd.items.map((it) => it.n);
+    const cols = pd.items.map((it) => it.color);
+    const cums = pd.items.map((it) => Number(fmtDec(it.cum, 1)));
+    const total = pd.total;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 32, top: 26, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const share = total ? 100 * vals[i] / total : 0;
+          return "<b>" + names[i] + "</b><br/>失败 <b>" + fmtInt(vals[i]) + "</b> 次 · 占 <b>" +
+            fmtDec(share, 1) + "%</b><br/>累计占比 <b style=\"color:" + C.amber + "\">" +
+            fmtDec(cums[i], 1) + "%</b>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["失败次数", "累计占比"]
+      },
+      xAxis: {
+        type: "category", data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10, interval: 0, rotate: 24 }
+      },
+      yAxis: [
+        { type: "value", name: "次", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10 },
+          splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+        { type: "value", name: "%", min: 0, max: 100, nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10 }, splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "失败次数", type: "bar", barWidth: "48%",
+          label: { show: true, position: "top", color: "#cfdcff", fontSize: 10, fontWeight: 700 },
+          data: vals.map((v, i) => ({ value: v, itemStyle: { color: cols[i], borderRadius: [3, 3, 0, 0] } })) },
+        { name: "累计占比", type: "line", yAxisIndex: 1, smooth: false,
+          symbol: "circle", symbolSize: 5, z: 5, data: cums.slice(),
+          lineStyle: { width: 2, color: C.amber }, itemStyle: { color: C.amber },
+          markLine: {
+            symbol: "none", silent: true,
+            lineStyle: { color: "rgba(255,157,92,.65)", type: "dashed", width: 1.4 },
+            label: { color: C.orange, fontSize: 10, position: "insideEndTop", formatter: "80% 线" },
+            data: [{ yAxis: 80 }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 14. 构建时长分布直方（custom 真直方：矩形横跨 [lo, hi] 分钟，桶宽不等也不失真）
+         中位 / P85 标线由样本累计频数插值现算，落在数值轴的精确分钟位置。 ===== */
+  function histOption(gi) {
+    const counts = gi === 0 ? D.histAll : GROUPS[gi - 1].hist;
+    const med = histQuantile(counts, 0.5);
+    const p85 = histQuantile(counts, 0.85);
+    const n = sum(counts);
+    /* ★ 只放标量数组：每根柱 = [lo, hi, 次数] */
+    const bars = counts.map((v, i) => [HIST_EDGE[i], HIST_EDGE[i + 1], v]);
+    const color = gi === 0 ? C.blue : GROUPS[gi - 1].color;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 12, top: 24, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const i = p.dataIndex;
+          return "<b>" + HIST_LABELS[i] + " min</b><br/>构建 <b>" + fmtInt(counts[i]) + "</b> 次 · 占 <b>" +
+            fmtDec(100 * counts[i] / n, 1) + "%</b><br/><span style=\"color:" + C.textDim +
+            "\">桶界 [" + HIST_EDGE[i] + ", " + HIST_EDGE[i + 1] + ") min</span>";
+        }
+      }, TIP),
+      xAxis: {
+        type: "value", min: 0, max: HIST_EDGE[HIST_EDGE.length - 1], name: "min",
+        nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: "value", name: "次", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: { color: C.textDim, fontSize: 10, formatter: (v) => (v >= 1000 ? (v / 1000) + "k" : v) },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false }
+      },
+      series: [
+        { name: "构建时长分布", type: "custom", data: bars,
+          encode: { x: [0, 1], y: 2 },
+          itemStyle: { color: color, opacity: 0.82, borderColor: "rgba(8,18,49,.9)", borderWidth: 1 },
+          renderItem: (params, api) => {
+            const lo = api.value(0), hi = api.value(1), v = api.value(2);
+            const p0 = api.coord([lo, v]);
+            const p1 = api.coord([hi, 0]);
+            const cs = params.coordSys;
+            const rect = echarts.graphic.clipRectByRect(
+              { x: p0[0], y: p0[1], width: p1[0] - p0[0], height: p1[1] - p0[1] },
+              { x: cs.x, y: cs.y, width: cs.width, height: cs.height });
+            return rect ? { type: "rect", shape: rect, style: api.style() } : null;
+          } },
+        /* 空线系列专门承载两条分位标线（markLine 走数值轴，位置即精确分钟数） */
+        { name: "分位", type: "line", data: [], silent: true,
+          markLine: {
+            symbol: "none", silent: true,
+            label: { fontSize: 10, fontWeight: 700, formatter: (p) => p.name },
+            data: [
+              { xAxis: med, name: "中位 " + fmtDec(med, 1),
+                lineStyle: { color: C.amber, type: "dashed", width: 1.8 },
+                label: { color: C.amber, position: "insideStartTop" } },
+              { xAxis: p85, name: "P85 " + fmtDec(p85, 1),
+                lineStyle: { color: C.red, type: "dashed", width: 1.8 },
+                label: { color: C.red, position: "insideEndTop" } }
+            ]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 15. 近 24 周流水线成功率走势（与父页日历热力同源：周聚合值 + 逐周累计）
+         柱 = 该周工作日成功率均值；线 = 自窗口首周起的累计成功率，**末点回归父页全局成功率**。 ===== */
+  function trendOption() {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 8, top: 26, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>周一 " + TREND_LABELS[i] + "</b><br/>本周成功率 <b style=\"color:" + C.blue + "\">" +
+            fmtDec(TREND_WEEK[i], 1) + "%</b><br/>累计成功率 <b style=\"color:" + C.amber + "\">" +
+            fmtDec(TREND_CUM[i], 1) + "%</b>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["周成功率", "累计成功率"]
+      },
+      xAxis: {
+        type: "category", data: TREND_LABELS.slice(),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5, interval: 1, rotate: 30 }
+      },
+      yAxis: {
+        type: "value", name: "%", min: 84, max: 100,
+        nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false }
+      },
+      series: [
+        { name: "周成功率", type: "bar", barWidth: "56%",
+          data: TREND_WEEK.map((v) => Number(fmtDec(v, 1))),
+          itemStyle: { borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: C.blue }, { offset: 1, color: "rgba(47,111,214,.28)" }]) } },
+        { name: "累计成功率", type: "line", smooth: true, symbol: "circle", symbolSize: 4, z: 5,
+          data: TREND_CUM.map((v) => Number(fmtDec(v, 2))),
+          lineStyle: { width: 2.4, color: C.amber }, itemStyle: { color: C.amber },
+          markLine: {
+            symbol: "none", silent: true,
+            lineStyle: { color: C.green, type: "dashed", width: 1.6 },
+            label: { color: C.green, fontSize: 10.5, fontWeight: 700, position: "insideStartTop",
+              formatter: () => "父页全局 " + fmtDec(CAL_AVG, 1) + "%" },
+            data: [{ yAxis: Number(fmtDec(CAL_AVG, 2)) }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 16. 筛选主流程：一次调用刷新 chip / 表 / 阶段耗时 / 帕累托 / 直方 / 页头 chip（单一入口） ===== */
+  function applyFilter(gi, ri, pushHash) {
+    gIdx = clamp(gi, 0, GFILTERS.length - 1);
+    rIdx = clamp(ri, 0, RES_NAMES.length);
+    view = ROWS.filter((r) =>
+      (gIdx === 0 || r.g === gIdx - 1) && (rIdx === 0 || r.res === rIdx - 1));
+    selPos = 0;
+    gchips.forEach((el, i) => {
+      const on = i === gIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? GFILTERS[i].color : "";
+      el.style.borderColor = on ? GFILTERS[i].color : "";
+    });
+    renderRChips(gIdx, rIdx);
+    const g = gIdx === 0 ? null : GROUPS[gIdx - 1];
+    $("pt-chip-key").textContent = "成功率 · " + GFILTERS[gIdx].name;
+    $("pt-chip-val").textContent = fmtDec(g ? g.rate : D.rate, 1) + "%";
+    const pd = paretoData(gIdx);
+    $("pt-pareto-tag").innerHTML = "六类 Σ <b>" + fmtInt(pd.total) + "</b> 次 = 该口径失败构建数 · 累计末值 <b>" +
+      fmtDec(pd.items[pd.items.length - 1].cum, 0) + "%</b>";
+    const counts = gIdx === 0 ? D.histAll : g.hist;
+    $("pt-hist-tag").innerHTML = "Σ <b>" + fmtInt(sum(counts)) + "</b> 次 = 该口径构建数 · 均值 <b>" +
+      fmtDec(histMean(counts), 1) + "</b> min";
+    renderTable();
+    renderSel();
+    if (paretoChart) paretoChart.setOption(paretoOption(gIdx), true);
+    if (histChart) histChart.setOption(histOption(gIdx), true);
+    if (pushHash) syncHash(gIdx);
+  }
+
+  gchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), 0, true)));
+
+  /* hash 定位：命中仓库群则激活筛选 chip、闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyFilter(0, 0, false); return; }
+    applyFilter(hit, 0, false);
+    if (hit > 0) {
+      const chip = gchips[hit];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                 /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发工程效能1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 17. kiosk 轮巡：台账行 3 秒逐行高亮并联动阶段耗时；hash 定位或手动点行后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 18. 初始渲染：先填充全部 DOM（KPI + 表 + 阶段耗时），再 init 图表 ===== */
+  let paretoChart = null, histChart = null, trendChart = null;
+  applyFilter(0, 0, false);                                  /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  paretoChart = echarts.init($("pt-chart-pareto"));
+  paretoChart.setOption(paretoOption(0));
+  histChart = echarts.init($("pt-chart-hist"));
+  histChart.setOption(histOption(0));
+  trendChart = echarts.init($("pt-chart-trend"));
+  trendChart.setOption(trendOption());
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* 走势图轮播提示 */
+  let tipIdx = 0;
+  setInterval(() => {
+    trendChart.dispatchAction({ type: "showTip", seriesIndex: 1, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % TREND_LABELS.length;
+  }, 4200);
+
+  /* ===== 19. 底部流水线研判滚动条（文案数字全部由派生量现算） ===== */
+  const worst = GROUPS.slice().sort((a, b) => a.rate - b.rate)[0];
+  const slowest = GROUPS.slice().sort((a, b) => b.mean - a.mean)[0];
+  const topCause = CAUSES.slice().sort((a, b) => b.n - a.n)[0];
+  const ALERTS = [
+    { lv: "口径", c: C.amber, t: "本页视角 = 一次次**构建运行**的明细流水（谁、何时、从哪个分支、以何方式触发，跑多久、卡在哪一段）；" +
+        "仓库群的工程能力 360 度（覆盖率总体 / 评审分位 / XP 采纳 / 代表仓库清单）见姊妹子页「单仓库群工程详情」，两页仓库对象同源、指标不重复" },
+    { lv: "口径", c: C.amber, t: "年度构建 " + fmtInt(D.builds) + " 次 = 五群 Σ（" + D.repoAll +
+        " 仓 · 仓均 " + fmtDec(D.perRepo, 0) + " 次/年）；按父页日历热力节奏 " + WORK_DAYS +
+        " 个工作日折算日均 " + fmtDec(D.daily, 1) + " 次，父页 26 周热力窗口对应 " + fmtInt(D.calWinBuilds) + " 次" },
+    { lv: "高", c: C.red, t: "成功率最低「" + worst.name + "」" + fmtDec(worst.rate, 1) + "%（全盘 " +
+        fmtDec(D.rate, 1) + "%），失败 " + fmtInt(worst.fail) + " 次、首位原因占该群 " +
+        fmtDec(100 * Math.max.apply(null, CAUSES.map((c) => c.m[GROUPS.indexOf(worst)])) / worst.fail, 1) + "%" },
+    { lv: "高", c: C.red, t: "失败原因首位「" + topCause.name + "」" + fmtInt(topCause.n) + " 次，占全部失败 " +
+        fmtDec(100 * topCause.n / D.fail, 1) + "%；前三类累计已达 " +
+        fmtDec(paretoData(0).items[2].cum, 1) + "%，是流水线止血的第一批目标" },
+    { lv: "中", c: C.orange, t: "耗时最长「" + slowest.name + "」均值 " + fmtDec(slowest.mean, 1) +
+        " min · 中位 " + fmtDec(slowest.med, 1) + " · P85 " + fmtDec(slowest.p85, 1) +
+        " min（全盘均值 " + fmtDec(D.mean, 1) + " / 中位 " + fmtDec(D.med, 1) + " / P85 " + fmtDec(D.p85, 1) + " min）" },
+    { lv: "中", c: C.orange, t: "取消构建 " + fmtInt(D.cancel) + " 次（占 " + fmtDec(D.cancelRate, 1) +
+        "%）不入成功率分母；构建失败率 " + fmtDec(D.failRate, 1) + "% 与 DORA 变更失败率 " + fmtDec(CHG_FAIL, 1) +
+        "% 是两个口径——前者看 CI 流水线，后者看上线后需修复占比" },
+    { lv: "低", c: C.green, t: "近 24 周成功率由 " + fmtDec(D.trendFirst, 1) + "% 升到 " + fmtDec(D.trendLast, 1) +
+        "%（+" + fmtDec(D.trendGain, 1) + " pt），累计线末点 " + fmtDec(D.cumLast, 1) +
+        "% 精确回归父页日历热力全局均值" },
+    { lv: "低", c: C.green, t: "勾稽：成功 " + fmtInt(D.succ) + " + 失败 " + fmtInt(D.fail) + " + 取消 " +
+        fmtInt(D.cancel) + " = " + fmtInt(D.builds) + " 次；六类原因 Σ = " + fmtInt(D.causeN) +
+        " 次；八桶 Σ = " + fmtInt(D.histN) + " 次；平均耗时 " + fmtDec(D.mean, 1) +
+        " min 落在父页构建时长走势 [" + fmtDec(BUILD_BASE_MIN, 1) + ", " + fmtDec(BUILD_BASE_MAX, 1) + "] min 内" }
+  ];
+  const track = $("pt-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="pt-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' +
+      a.t.replace(/\*\*(.+?)\*\*/g, '<b style="color:#eaf1ff">$1</b>') + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                    /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 20. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try {
+    JSON.stringify(paretoOption(0)); JSON.stringify(paretoOption(3));
+    JSON.stringify(histOption(0)); JSON.stringify(histOption(4)); JSON.stringify(trendOption());
+  } catch (e) { optAcyclic = false; console.error("[流水线运行台账] option 存在循环引用：", e.message); }
+
+  const pd0 = paretoData(0);
+  const NAME_REF = ["应用软件", "嵌入式", "云服务", "AI 平台", "工具链"];
+  const checks = [
+    ["五域仓库群名与父页 COVERAGE 逐字（含带空格的「AI 平台」）",
+      GROUPS.length === 5 && GROUPS.every((g, i) => g.name === NAME_REF[i])],
+    ["五群仓库数与父页逐字（84/37/96/42/58）且 Σ = 317",
+      GROUPS.every((g, i) => g.repos === REPO_REF[i]) && D.repoAll === REPO_ALL],
+    ["成功 + 失败 + 取消 = 年度构建数（全盘）", D.succ + D.fail + D.cancel === D.builds],
+    ["成功 + 失败 + 取消 = 该群构建数（逐群）",
+      GROUPS.every((g) => g.succ + g.fail + g.cancel === g.builds && g.succ > 0)],
+    ["五群构建数 Σ = 年度构建数", sum(GROUPS.map((g) => g.builds)) === D.builds],
+    ["全盘成功率 ≈ 父页流水线成功率日历热力工作日均值（同源复刻，非另抄）",
+      Math.abs(D.rate - CAL_AVG) < 0.05],
+    ["24 周走势累计线末点 = 父页全局成功率（26 周工作日均值）",
+      Math.abs(D.cumLast - CAL_AVG) < 1e-9],
+    ["24 周走势与父页同轴同源（周标签取父页日历热力后 24 周）",
+      TREND_LABELS.length === TREND_WEEKS && TREND_LABELS[TREND_WEEKS - 1] === WEEK_LABELS[CAL_WEEKS - 1]],
+    ["帕累托六类 Σ = 失败构建数（全部口径）", D.causeN === D.fail && CAUSES.length === 6],
+    ["帕累托累计末值 = 100%（全部口径）",
+      Math.abs(pd0.items[pd0.items.length - 1].cum - 100) < 1e-9],
+    ["帕累托柱按次数降序（累计线单调不减）",
+      pd0.items.every((it, i) => i === 0 || it.n <= pd0.items[i - 1].n)],
+    ["各仓库群口径下帕累托 Σ == 该群失败数且累计末值 100%",
+      GROUPS.every((g, i) => {
+        const p = paretoData(i + 1);
+        return p.total === g.fail && Math.abs(p.items[p.items.length - 1].cum - 100) < 1e-9;
+      })],
+    ["失败原因 × 仓库群矩阵列和 == 各群失败数（二级拆分收敛）",
+      D.causeColSum.every((v, i) => v === GROUPS[i].fail)],
+    ["单次构建 Σ 各段耗时 = 该次总耗时（逐条，整数秒无浮点误差）",
+      ROWS.every((r) => r.sec === sum(r.seg) && r.seg.every((v) => v > 0))],
+    ["段数与结果自洽：成功跑满 6 段，失败/取消在 1~5 段截断",
+      ROWS.every((r) => (r.res === 0 ? r.seg.length === STAGES.length
+        : r.seg.length >= 1 && r.seg.length < STAGES.length))],
+    ["截断段序 = 最后一个已执行段（失败·中止阶段列取值即由此现算）",
+      ROWS.every((r) => (r.res === 0 ? r.cut === -1 : STAGES[r.cut] === STAGES[r.seg.length - 1]))],
+    ["六段平均占比 Σ = 1（截断构建的未执行余量按此折算）",
+      Math.abs(sum(STAGE_SHARE) - 1) < 1e-9 && STAGE_SHARE.length === STAGES.length],
+    ["时长直方 Σ = 样本数（全部口径 = 年度构建数）", D.histN === D.builds && HIST_ALL.length === 8],
+    ["时长直方逐群 Σ == 该群构建数（行和收敛）",
+      GROUPS.every((g) => g.histN === g.builds)],
+    ["直方中位 ≤ P85（全部口径 + 逐群共 6 个口径）",
+      D.med <= D.p85 && GROUPS.every((g) => g.med <= g.p85)],
+    ["中位 / P85 由累计频数插值现算（落在各自所属桶界内）",
+      D.med > HIST_EDGE[0] && D.med < HIST_EDGE[HIST_EDGE.length - 1] &&
+      D.p85 > D.med && D.p85 < HIST_EDGE[HIST_EDGE.length - 1]],
+    ["平均耗时落在父页 24 周构建时长走势区间内且与其均值偏差 < 0.5 min",
+      D.mean >= BUILD_BASE_MIN && D.mean <= BUILD_BASE_MAX && Math.abs(D.mean - BUILD_BASE_AVG) < 0.5],
+    ["抽样各群条数 == 一级 chip 计数", GFILTERS.every((f, i) =>
+      f.cnt === (i === 0 ? ROWS.length : ROWS.filter((r) => r.g === i - 1).length))],
+    ["二级 chip 计数随一级重算且分档 Σ == 该一级口径条数",
+      GFILTERS.every((f, i) => sum(RES_NAMES.map((s, k) => resScopeCnt(i, k + 1))) === resScopeCnt(i, 0))],
+    ["样例成功 + 失败 + 取消 = 样例总数 24", sum(D.rowsByRes) === D.n && D.n === 24],
+    ["样例各群条数之和 = 样例总数", sum(D.rowsByG) === D.n && D.rowsByG.every((v) => v > 0)],
+    ["构建号唯一、格式 BLD-XXXXXX 且按开始时刻严格倒序递减",
+      (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^BLD-\d{6}$/.test(r.no)) &&
+      ROWS.every((r, i) => i === 0 || Number(r.no.slice(4)) < Number(ROWS[i - 1].no.slice(4))) &&
+      ROWS.every((r, i) => i === 0 || r.at < ROWS[i - 1].at)],
+    ["样例触发方式与群索引合法，且四种触发方式全部出现",
+      ROWS.every((r) => r.tr >= 0 && r.tr < TRIGGERS.length && r.g >= 0 && r.g < GROUPS.length) &&
+      (new Set(ROWS.map((r) => r.tr))).size === TRIGGERS.length],
+    ["hash 五群名均可解析（两侧同时归一：「AI 平台」含空格亦命中）",
+      GROUPS.every((g, i) => HASH_ALIAS[normKey(g.name)] === i + 1) &&
+      HASH_ALIAS[normKey("AI 平台")] === 4 && HASH_ALIAS[normKey("AI平台")] === 4 &&
+      HASH_ALIAS[normKey("  AI　平台 ")] === 4 && HASH_ALIAS[normKey("全部")] === 0],
+    ["日均构建 = 年度构建数 ÷ 252 工作日（现算，非写死）",
+      Math.abs(D.daily - D.builds / WORK_DAYS) < 1e-9 && Math.abs(D.daily - 255.3) < 0.1],
+    ["DORA 变更失败率 8.4% 引契约逐字，且与构建失败率不同口径",
+      CHG_FAIL === 8.4 && Math.abs(D.failRate - CHG_FAIL) > 0.5],
+    ["返回上级 crumb 指向父页「工程效能」（Esc 同效）",
+      document.querySelector(".pt-crumb-up").getAttribute("href") === UP_HREF],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[流水线运行台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1293 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发预算执行台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --hg-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：预算单号 / 承担部门 / 关联项目 / 类别 / 年度预算 / 已执行 / 执行率 / 偏差 */
+    --hg-tcols: 100px 76px 84px 82px 76px 76px 1fr 58px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .hg-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 8% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 92% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 468px 448px;
+    grid-template-rows: 84px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .hg-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .hg-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .hg-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .hg-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .hg-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .hg-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .hg-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .hg-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .hg-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到投入与预算，琥珀描边与本页星蓝主色区分 */
+  .hg-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .hg-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .hg-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .hg-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .hg-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .hg-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .hg-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .hg-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .hg-chips { display: flex; align-items: center; gap: 9px; }
+  .hg-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 122px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .hg-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .hg-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .hg-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .hg-chip.is-key b { color: var(--rnd-blue); }
+  .hg-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .hg-clock-time { font: 700 26px/1 var(--hg-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .hg-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 筛选条：五类投入 chip（hash 契约目标）+ 偏差二级过滤 ===== */
+  .hg-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .hg-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .hg-cchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 6px 13px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13.5px; letter-spacing: 0.04em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .hg-cchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .hg-cchip b { font: 700 14px/1 var(--hg-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .hg-cchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .hg-cchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .hg-cchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .hg-cchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .hg-cchip.is-hit { animation: hg-hit 0.9s ease-in-out 2; }
+  @keyframes hg-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--hg-cc, rgba(92, 157, 255, 0.8)); } }
+  .hg-fdiv { flex: none; width: 1px; height: 24px; margin: 0 4px; background: rgba(96, 140, 255, 0.28); }
+  .hg-dchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 4px 11px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .hg-dchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .hg-dchip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .hg-dchip.is-on { color: #071026; font-weight: 700; }
+  .hg-dchip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  /* ★ 可收缩（flex:0 1 auto + ellipsis）：筛选条右端绝不把 chip 顶出容器，宽度不足时自己先截断 */
+  .hg-filters-state { margin-left: auto; flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .hg-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .hg-filters-state em { font-style: normal; color: #d3e2ff; }
+  .hg-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .hg-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .hg-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .hg-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--hg-kc, var(--rnd-blue)); }
+  .hg-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .hg-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .hg-kpi-v b { font: 700 24px/1 var(--hg-mono); color: var(--hg-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .hg-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .hg-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .hg-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .hg-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .hg-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .hg-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .hg-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .hg-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .hg-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .hg-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .hg-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：整列 742px，overflow hidden 防行数变化撑破 */
+  .hg-panel.is-ledger { flex: none; height: 742px; min-height: 0; overflow: hidden; }
+  /* ★ 详情区写死高度：头块与事项清单均由 JS 在选行后重绘，与 flex:1 的图表同属一个 flex 容器，
+     若不写死会在填充后把图表容器压矮（见 CLAUDE.md「兄弟块压矮」坑）。 */
+  .hg-panel.is-detail { flex: none; height: 440px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .hg-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .hg-thead, .hg-tbody li { display: grid; grid-template-columns: var(--hg-tcols); align-items: center; gap: 8px; }
+  .hg-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .hg-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .hg-tbody li {
+    padding: 0 8px; height: 28px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: hg-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes hg-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .hg-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .hg-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .hg-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .hg-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hg-tbody li .hg-no { font: 700 11.5px/1 var(--hg-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.02em; }
+  .hg-tbody li .hg-dept { font-size: 11.5px; color: #bfd2f6; }
+  .hg-tbody li .hg-proj { font-size: 11.5px; color: #dfe9ff; }
+  .hg-tbody li .hg-cat { font-size: 11.5px; }
+  .hg-tbody li .hg-amt { text-align: right; color: #cfdcff; }
+  .hg-tbody li .hg-exe { text-align: right; }
+  .hg-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  /* 偏差三态 */
+  .hg-badge.is-d0 { color: #3d060c; background: var(--rnd-red); }        /* 超支 */
+  .hg-badge.is-d1 { color: #063a25; background: var(--rnd-green); }      /* 正常 */
+  .hg-badge.is-d2 { color: #3a2a05; background: var(--rnd-amber); }      /* 滞后 */
+  /* 执行率：微条 + 100% 基准刻线 + 数值 */
+  .hg-rate { display: flex; align-items: center; gap: 8px; }
+  .hg-rate-t { position: relative; flex: 1; min-width: 0; height: 7px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .hg-rate-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .hg-rate-t s { position: absolute; top: -1px; bottom: -1px; width: 1px; background: rgba(255, 255, 255, 0.55); text-decoration: none; }
+  .hg-rate em { flex: none; width: 54px; text-align: right; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* ===== 单条预算执行详情：头块 + 关键支出事项（均写死高度） ===== */
+  .hg-dt-head {
+    flex: none; display: flex; flex-direction: column; gap: 4px; height: 54px;
+    padding: 6px 10px 7px; border-radius: 8px; margin-bottom: 8px;
+    background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2);
+    min-height: 0; overflow: hidden;
+  }
+  .hg-dt-no { display: flex; align-items: center; gap: 8px; }
+  .hg-dt-no b { font: 700 12.5px/1 var(--hg-mono); color: var(--rnd-blue); letter-spacing: 0.03em; }
+  .hg-dt-no span.hg-dt-name { font-size: 12.5px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hg-dt-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hg-dt-sub b { font-weight: 700; color: #c9d8f8; }
+  .hg-items { flex: none; height: 132px; min-height: 0; overflow: hidden; display: flex; flex-direction: column; margin-top: 6px; }
+  .hg-items-hd { flex: none; font-size: 11px; letter-spacing: 0.1em; color: #8aa8e8; padding: 0 4px 3px; }
+  .hg-items-hd b { font-weight: 700; color: var(--rnd-amber); }
+  .hg-item { flex: 1; display: grid; grid-template-columns: 1fr 84px 56px; align-items: center; gap: 8px; padding: 0 4px; border-radius: 5px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .hg-item:nth-child(even) { background: rgba(28, 48, 112, 0.22); }
+  .hg-item b { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 400; color: #dfe9ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hg-item b::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 2px; background: var(--hg-ic, var(--rnd-blue)); }
+  .hg-item em { font-style: normal; text-align: right; font: 700 12.5px/1 var(--hg-mono); color: var(--rnd-cyan); }
+  .hg-item span { text-align: right; color: var(--rnd-text-dim); }
+
+  /* ===== 底部滚动条 ===== */
+  .hg-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .hg-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange); }
+  .hg-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: hg-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes hg-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .hg-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .hg-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .hg-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .hg-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .hg-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .hg-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="hg-stage" id="hg-stage">
+    <!-- mockflag:begin --><div class="hg-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="hg-error" id="hg-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="hg-header">
+      <div class="hg-head-left">
+        <div class="hg-crumb">
+          <a class="hg-crumb-up" href="大屏样板间-研发投入与预算1920.html" title="返回上级专题页（Esc）">‹ 返回 投入与预算</a>
+          <b>云麓智联科技</b><i>›</i><span>投入与预算</span><i>›</i><em>预算执行台账</em>
+        </div>
+        <div class="hg-head-title-row">
+          <div class="hg-head-title">预算执行台账</div>
+          <div class="hg-head-meta">
+            <span>年度预算 <b id="hg-meta-bud">--</b> 亿 · 已执行 <b id="hg-meta-act">--</b> 亿 · 在册 <b id="hg-meta-n">--</b> 单</span><i>|</i>
+            <span><b>5</b> 类 × <b>6</b> 职能 × <b>8</b> 项目</span><i>|</i>
+            <span>预算年度 <b>FY2026</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="hg-head-right">
+        <div class="hg-chips">
+          <div class="hg-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="hg-chip is-key"><span id="hg-chip-key">执行率 · 全部</span><b id="hg-chip-rate">--</b></div>
+        </div>
+        <div class="hg-clock" aria-label="实时时钟">
+          <span class="hg-clock-time" id="hg-clock-time">--:--:--</span>
+          <span class="hg-clock-date" id="hg-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 筛选条：五类投入 chip（hash 契约目标，与父页子弹图 name 逐字）+ 偏差二级过滤 -->
+    <div class="hg-filters">
+      <span class="hg-filters-tag">类别筛选</span>
+      <div id="hg-cchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="hg-fdiv"></span>
+      <span class="hg-filters-tag">偏差状态</span>
+      <div id="hg-dchips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="hg-filters-state" id="hg-filters-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="hg-kpis" id="hg-kpis"></div>
+
+    <!-- 左：预算执行明细台账（写死高度 742px） -->
+    <div class="hg-col">
+      <section class="hg-panel is-ledger">
+        <div class="hg-panel-head">
+          <h2>预算执行明细台账</h2>
+          <span class="hg-panel-tag" id="hg-table-tag">--</span>
+        </div>
+        <div class="hg-table">
+          <div class="hg-thead">
+            <span>预算单号</span><span>承担部门</span><span>关联项目</span><span>类别</span>
+            <span style="text-align:right">年度预算/万</span><span style="text-align:right">已执行/万</span>
+            <span>执行率（虚线 = 100% 基准）</span><span>偏差</span>
+          </div>
+          <ul class="hg-tbody" id="hg-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中：单条预算执行详情 + 偏差归因 -->
+    <div class="hg-col">
+      <section class="hg-panel is-detail">
+        <div class="hg-panel-head">
+          <h2>单条预算执行详情</h2>
+          <span class="hg-panel-tag" id="hg-dt-tag">--</span>
+        </div>
+        <div class="hg-dt-head" id="hg-dt-headbox"></div>
+        <div class="hg-chart" id="hg-chart-detail"></div>
+        <div class="hg-items" id="hg-items"></div>
+      </section>
+      <section class="hg-panel" style="flex: 1;">
+        <div class="hg-panel-head">
+          <h2>偏差归因（超支 / 滞后）</h2>
+          <span class="hg-panel-tag" id="hg-dev-tag">--</span>
+        </div>
+        <div class="hg-chart" id="hg-chart-dev"></div>
+      </section>
+    </div>
+
+    <!-- 右：部门执行热力 + 月度执行节奏 -->
+    <div class="hg-col">
+      <section class="hg-panel" style="flex: 1.04;">
+        <div class="hg-panel-head">
+          <h2>部门执行热力 · 六职能 × 五类</h2>
+          <span class="hg-panel-tag" id="hg-heat-tag">--</span>
+        </div>
+        <div class="hg-chart" id="hg-chart-heat"></div>
+      </section>
+      <section class="hg-panel" style="flex: 0.96;">
+        <div class="hg-panel-head">
+          <h2>月度执行节奏 · 12 月</h2>
+          <span class="hg-panel-tag">Σ <b id="hg-mon-sum">--</b> 亿 · 末值 <b id="hg-mon-last">--</b>（全盘口径）</span>
+        </div>
+        <div class="hg-chart" id="hg-chart-month"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="hg-foot">
+      <div class="hg-foot-tag">预算研判</div>
+      <div class="hg-foot-view"><div class="hg-foot-track" id="hg-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("hg-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("hg-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，初始 hash 解析在页面中部
+     就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  /* 最大余额法整数分配：Σ 结果恒 == total，供「行 → 12 月」「行 → 支出事项」两处二级拆分用 */
+  function split(total, ws) {
+    const s = sum(ws);
+    const raw = ws.map((w) => total * w / s);
+    const fl = raw.map((v) => Math.floor(v));
+    let rem = total - sum(fl);
+    const ord = raw.map((v, i) => ({ i: i, f: v - fl[i] })).sort((a, b) => (b.f - a.f) || (a.i - b.i));
+    for (let k = 0; rem > 0; k++, rem--) fl[ord[k % ord.length].i] += 1;
+    return fl;
+  }
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 财经与研发管理视角）
+         ★ 与父页 P4「投入与预算」严格同源（docs/RndIpdThemed.md §2.2 / §6 P4→本页）：
+           五类投入名逐字 = 父页子弹图 yAxis 的 name（人力 / 样机物料 / 云资源算力 / 外协 / 工具与其他）；
+           五类年度预算 = 父页 CATS[].bud（13.0 / 2.6 / 2.9 / 1.8 / 1.3 亿，Σ = 21.6 亿）；
+           五类年度实际 = 父页 CATS[].m1 逐月序列求和（12.6 / 2.8 / 3.1 / 1.7 / 1.2 亿，Σ = 21.4 亿 = 契约年度投入）；
+           超支类（达成率 > 100%）恰 2 类 = 样机物料 / 云资源算力，与父页 D.overN 一致。
+         ★ 本页与姊妹页 S12「单投入类别详情」（yz）分工：yz 做「单类别 360 度 + 产品线×阶段双维矩阵」，
+           本页做「跨部门 / 跨项目的预算单执行明细」——粒度是预算单，维度是承担部门与关联项目，不重复双维矩阵。
+         ★ 二级拆分（22 张预算单、六职能×五类执行矩阵、六类偏差归因）为本页自编，
+           Σ 一律收敛到上级数，全部进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，预算单与类别/部门/项目之间一律用索引关联，
+           绝不用对象引用回指。
+         ★ 金额单位统一为「万元」整数（1 亿 = 10,000 万），保证勾稽精确、无浮点误差。 ===== */
+
+  /* 4.1 契约锚点（勿改，与父页逐字） */
+  const CAT_NAMES_REF = ["人力", "样机物料", "云资源算力", "外协", "工具与其他"];
+  const CAT_BUD_REF   = [130000, 26000, 29000, 18000, 13000];   /* 万元；Σ = 216,000 = 21.6 亿 */
+  const CAT_ACT_REF   = [126000, 28000, 31000, 17000, 12000];   /* 万元；Σ = 214,000 = 21.4 亿 */
+  const OVER_REF      = ["样机物料", "云资源算力"];              /* 父页两类超支，逐字 */
+
+  /* 4.2 五类投入（name/color/note 与父页 CATS 同源；m1 = 父页近 12 月序列，单位 0.01 亿）
+         ★ 单一数据源：本页「年度实际」不另写一份数字，一律由 m1 求和 ×100 现算成万元。 */
+  const MON_LABELS = ["25-09", "25-10", "25-11", "25-12", "26-01", "26-02",
+                      "26-03", "26-04", "26-05", "26-06", "26-07", "26-08"];
+  const CATS = [
+    { name: "人力",       color: C.blue,   bud: 130000, note: "六职能 3,860 人薪酬与激励",
+      m1: [100, 101, 102, 103, 104, 99, 105, 106, 107, 108, 111, 114] },
+    { name: "样机物料",   color: C.amber,  bud: 26000,  note: "EVT / DVT / PVT 试制与物料认证",
+      m1: [14, 38, 16, 12, 40, 10, 36, 15, 13, 34, 14, 38] },
+    { name: "云资源算力", color: C.cyan,   bud: 29000,  note: "训练集群 / CI 构建 / 测试环境",
+      m1: [20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 32] },
+    { name: "外协",       color: C.violet, bud: 18000,  note: "ODM 协同 / 外包测试 / 认证机构",
+      m1: [13, 14, 14, 15, 13, 12, 14, 15, 15, 14, 15, 16] },
+    { name: "工具与其他", color: C.green,  bud: 13000,  note: "研发工具链 / 实验室 / 专利维护",
+      m1: [10, 10, 9, 10, 11, 9, 10, 10, 11, 10, 10, 10] }
+  ];
+
+  /* 4.3 六职能（契约 §2.2 逐字）与八重点项目（契约 §2.3 逐字） */
+  const DEPTS = ["软件", "硬件", "云平台", "AI算法", "测试", "PM与管理"];
+  const PROJS = ["星澜S3", "星澜Pro2", "云枢3.0", "云盾2.1", "澜芯M60", "澜芯M80", "智楼5.0", "车联1.0"];
+
+  /* 4.4 六职能 × 五类 预算 / 执行矩阵（万元）
+         列和 == 五类年度预算 / 年度实际（进自检），行和 = 该职能全年预算 / 执行（现算）。 */
+  const DEPT_BUD = [
+    [49000,   500,  4500, 4200, 4200],   /* 软件 */
+    [20000, 20000,  1200, 5200, 2100],   /* 硬件 */
+    [19000,   300,  9000, 2100, 1800],   /* 云平台 */
+    [16000,  1200, 11000, 1500, 1500],   /* AI算法 */
+    [16000,  3500,  3000, 4200, 2400],   /* 测试 */
+    [10000,   500,   300,  800, 1000]    /* PM与管理 */
+  ];
+  const DEPT_EXE = [
+    [47600,   520,  4700, 3900, 3900],
+    [19300, 21800,  1250, 5000, 1900],
+    [18500,   300,  9600, 1950, 1650],
+    [15800,  1250, 12000, 1400, 1400],
+    [15300,  3620,  3130, 4000, 2230],
+    [ 9500,   510,   320,  750,  920]
+  ];
+
+  /* 4.5 偏差归因（万元）：over[j] / lag[j] = 第 j 类投入由该原因造成的超支 / 滞后额。
+         逐类净偏差 over[j] − lag[j] 必须恰等于「年度实际 − 年度预算」（进自检）；
+         Σover = 4,000（两个超支类），Σlag = 6,000（三个滞后类），合计 = 偏差总额 10,000 万 = 1.0 亿。 */
+  const CAUSES = [
+    { name: "需求变更",   color: C.orange, over: [0, 900, 600, 0, 0], lag: [500, 0, 0, 200, 100] },
+    { name: "资源涨价",   color: C.red,    over: [0, 800, 600, 0, 0], lag: [0, 0, 0, 0, 0] },
+    { name: "汇率与关税", color: C.amber,  over: [0, 300, 400, 0, 0], lag: [0, 0, 0, 0, 0] },
+    { name: "进度延后",   color: C.blue,   over: [0, 0, 0, 0, 0],     lag: [1800, 0, 0, 500, 300] },
+    { name: "招聘节奏",   color: C.cyan,   over: [0, 0, 0, 0, 0],     lag: [1700, 0, 0, 0, 200] },
+    { name: "范围缩减",   color: C.violet, over: [0, 0, 400, 0, 0],   lag: [0, 0, 0, 300, 400] }
+  ];
+
+  /* 4.6 预算计划进度权重（%/月，Σ = 100）：Q4 冲刺、春节月回落，用于「预算进度线」 */
+  const PLAN_W = [8, 8, 8, 8, 9, 7, 9, 8, 8, 9, 9, 9];
+
+  /* 4.7 关键支出事项名目（按类别，行按 w.length 取前 N 条；金额由 split(已执行, w) 现算，Σ == 已执行） */
+  const ITEM_NAMES = [
+    ["研发工资与社保", "绩效与项目奖金", "外派与差旅", "培训与认证"],
+    ["EVT 试制批物料", "DVT 试制批物料", "结构件与模具", "可靠性与认证检测"],
+    ["训练集群 GPU 卡时", "CI 构建与制品存储", "测试环境云主机", "数据存储与带宽"],
+    ["ODM 协同开发", "外包测试人力", "第三方认证机构", "专项技术咨询"],
+    ["研发工具链订阅", "实验室仪器折旧", "专利申请与维护", "标准与情报订阅"]
+  ];
+
+  /* 4.8 预算单台账 22 条（抽样，非全量：五类年度预算 21.6 亿不可能逐单陈列）
+         ct = 类别索引 dp = 部门索引 pj = 项目索引 bud/exe = 万元整数
+         执行率、偏差态、12 月执行曲线、关键支出事项一律由这两个整数现算。
+         ★ 逐类 Σbud ≤ 该类年度预算（进自检）；抽样占比在台账面板 tag 内注明。 */
+  const ROWS = [
+    { no: "BG-2026-H01", ct: 0, dp: 0, pj: 0, bud: 12800, exe: 12420, w: [64, 22, 8, 6],
+      sm: "星澜S3 软件研发团队人力包" },
+    { no: "BG-2026-H02", ct: 0, dp: 2, pj: 2, bud: 10600, exe: 10180, w: [66, 20, 8, 6],
+      sm: "云枢3.0 云平台研发人力包" },
+    { no: "BG-2026-H03", ct: 0, dp: 3, pj: 4, bud: 9400,  exe: 8460,  w: [68, 18, 8, 6],
+      sm: "澜芯M60 算法团队人力包（编制未满）" },
+    { no: "BG-2026-H04", ct: 0, dp: 1, pj: 1, bud: 7800,  exe: 7620,  w: [65, 21, 9, 5],
+      sm: "星澜Pro2 硬件研发人力包" },
+    { no: "BG-2026-H05", ct: 0, dp: 4, pj: 7, bud: 5400,  exe: 5180,  w: [70, 16, 8, 6],
+      sm: "车联1.0 测试团队人力包" },
+    { no: "BG-2026-M01", ct: 1, dp: 1, pj: 0, bud: 4600,  exe: 5120,  w: [38, 34, 18, 10],
+      sm: "星澜S3 EVT2/DVT1 试制物料" },
+    { no: "BG-2026-M02", ct: 1, dp: 1, pj: 1, bud: 4200,  exe: 4680,  w: [30, 40, 20, 10],
+      sm: "星澜Pro2 DVT2/PVT1 试制物料" },
+    { no: "BG-2026-M03", ct: 1, dp: 1, pj: 4, bud: 3200,  exe: 3410,  w: [46, 26, 18, 10],
+      sm: "澜芯M60 EVT1 模组样片" },
+    { no: "BG-2026-M04", ct: 1, dp: 4, pj: 6, bud: 2300,  exe: 2380,  w: [26, 24, 20, 30],
+      sm: "智楼5.0 现场验证样机与配件" },
+    { no: "BG-2026-M05", ct: 1, dp: 3, pj: 5, bud: 1500,  exe: 1360,  w: [40, 20, 16, 24],
+      sm: "澜芯M80 概念样片（阶段未启）" },
+    { no: "BG-2026-C01", ct: 2, dp: 3, pj: 4, bud: 5600,  exe: 6180,  w: [62, 14, 14, 10],
+      sm: "澜芯M60 端侧模型训练卡时" },
+    { no: "BG-2026-C02", ct: 2, dp: 2, pj: 2, bud: 4200,  exe: 4520,  w: [22, 34, 26, 18],
+      sm: "云枢3.0 构建与压测资源池" },
+    { no: "BG-2026-C03", ct: 2, dp: 2, pj: 3, bud: 2800,  exe: 2940,  w: [18, 30, 30, 22],
+      sm: "云盾2.1 安全靶场与回归环境" },
+    { no: "BG-2026-C04", ct: 2, dp: 4, pj: 7, bud: 2000,  exe: 1980,  w: [16, 26, 40, 18],
+      sm: "车联1.0 车端仿真测试资源" },
+    { no: "BG-2026-O01", ct: 3, dp: 1, pj: 1, bud: 3200,  exe: 2950,  w: [54, 16, 20, 10],
+      sm: "星澜Pro2 ODM 协同开发外协" },
+    { no: "BG-2026-O02", ct: 3, dp: 4, pj: 6, bud: 2400,  exe: 2110,  w: [18, 50, 22, 10],
+      sm: "智楼5.0 外包测试与现场服务" },
+    { no: "BG-2026-O03", ct: 3, dp: 0, pj: 7, bud: 1900,  exe: 1840,  w: [24, 40, 22, 14],
+      sm: "车联1.0 车规软件外协开发" },
+    { no: "BG-2026-O04", ct: 3, dp: 2, pj: 3, bud: 1400,  exe: 1230,  w: [20, 22, 44, 14],
+      sm: "云盾2.1 等保与合规认证外协" },
+    { no: "BG-2026-T01", ct: 4, dp: 0, pj: 0, bud: 1800,  exe: 1720,  w: [56, 18, 16, 10],
+      sm: "星澜S3 研发工具链与许可" },
+    { no: "BG-2026-T02", ct: 4, dp: 5, pj: 2, bud: 1400,  exe: 1250,  w: [44, 14, 28, 14],
+      sm: "云枢3.0 项目管理与知识平台" },
+    { no: "BG-2026-T03", ct: 4, dp: 4, pj: 1, bud: 1200,  exe: 1130,  w: [22, 46, 20, 12],
+      sm: "星澜Pro2 可靠性实验室仪器" },
+    { no: "BG-2026-T04", ct: 4, dp: 0, pj: 5, bud: 900,   exe: 780,   w: [30, 16, 40, 14],
+      sm: "澜芯M80 专利布局与情报订阅" }
+  ];
+
+  /* 偏差三态判定口径（页内唯一入口，台账徽章与统计口径共用） */
+  const DEV_NAMES  = ["超支", "正常", "滞后"];
+  const DEV_BADGE  = ["is-d0", "is-d1", "is-d2"];
+  const DEV_COLORS = [C.red, C.green, C.amber];
+  const OVER_LINE = 100, LAG_LINE = 92;                 /* > 100% 超支；< 92% 滞后；其余正常 */
+  const devOf = (rate) => (rate > OVER_LINE ? 0 : (rate < LAG_LINE ? 2 : 1));
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 5.1 类别维度：年度实际由 m1 求和现算（0.01 亿 → 万元），达成率 = 实际 ÷ 预算 */
+  CATS.forEach((c) => {
+    c.act = sum(c.m1) * 100;                            /* 万元 */
+    c.rate = c.act / c.bud * 100;
+    c.dev = c.act - c.bud;                              /* 净偏差（正 = 超支） */
+  });
+  D.bud = sum(CATS.map((c) => c.bud));
+  D.act = sum(CATS.map((c) => c.act));
+  D.rate = D.act / D.bud * 100;
+  D.overCats = CATS.filter((c) => c.rate > OVER_LINE);
+  D.overN = D.overCats.length;
+  D.devTotal = sum(CATS.map((c) => Math.abs(c.dev)));   /* 偏差总额 = Σ|实际 − 预算| */
+  D.devOver = sum(CATS.filter((c) => c.dev > 0).map((c) => c.dev));
+  D.devLag = sum(CATS.filter((c) => c.dev < 0).map((c) => -c.dev));
+
+  /* 5.2 月度维度：全盘月度执行额 = 五类逐月之和（万元），累计执行率 = 累计执行 ÷ 年度预算 */
+  D.monExe = MON_LABELS.map((_, i) => sum(CATS.map((c) => c.m1[i])) * 100);
+  D.monSum = sum(D.monExe);
+  const CUM_EXE = [];
+  (function () { let a = 0; D.monExe.forEach((v) => { a += v; CUM_EXE.push(a); }); })();
+  const CUM_RATE = CUM_EXE.map((v) => v / D.bud * 100);
+  D.cumLast = CUM_RATE[CUM_RATE.length - 1];
+  const PLAN_CUM = [];
+  (function () { let a = 0; PLAN_W.forEach((v) => { a += v; PLAN_CUM.push(a); }); })();
+
+  /* 5.3 部门维度：行和 / 列和现算，列和与五类预算/实际比对 */
+  D.deptBud = DEPT_BUD.map((r) => sum(r));
+  D.deptExe = DEPT_EXE.map((r) => sum(r));
+  D.deptRate = D.deptBud.map((b, i) => D.deptExe[i] / b * 100);
+  D.colBud = CATS.map((_, j) => sum(DEPT_BUD.map((r) => r[j])));
+  D.colExe = CATS.map((_, j) => sum(DEPT_EXE.map((r) => r[j])));
+  D.heatRate = DEPT_BUD.map((r, i) => r.map((b, j) => DEPT_EXE[i][j] / b * 100));
+  D.deptTop = D.deptRate.indexOf(Math.max.apply(null, D.deptRate));
+  D.deptLow = D.deptRate.indexOf(Math.min.apply(null, D.deptRate));
+
+  /* 5.4 偏差归因：逐因 Σ、逐类 Σ，与类别净偏差比对 */
+  CAUSES.forEach((c) => { c.overSum = sum(c.over); c.lagSum = sum(c.lag); c.total = c.overSum + c.lagSum; });
+  D.causeOver = sum(CAUSES.map((c) => c.overSum));
+  D.causeLag = sum(CAUSES.map((c) => c.lagSum));
+  D.causeTotal = D.causeOver + D.causeLag;
+  D.catOver = CATS.map((_, j) => sum(CAUSES.map((c) => c.over[j])));
+  D.catLag = CATS.map((_, j) => sum(CAUSES.map((c) => c.lag[j])));
+  D.causeTop = CAUSES.slice().sort((a, b) => b.total - a.total)[0];
+
+  /* 5.5 台账行派生：执行率 / 偏差态 / 12 月执行曲线 / 关键支出事项，全部现算 */
+  ROWS.forEach((r) => {
+    r.rate = r.exe / r.bud * 100;                                  /* 执行率 = 已执行 ÷ 预算 */
+    r.dv = devOf(r.rate);
+    r.gap = r.exe - r.bud;
+    /* 12 月执行额：按所属类别的月度节奏（父页 m1）加权分配，Σ 恒 == 已执行 */
+    r.mon = split(r.exe, CATS[r.ct].m1);
+    r.cum = []; (function () { let a = 0; r.mon.forEach((v) => { a += v; r.cum.push(a); }); })();
+    /* 预算进度线：按 PLAN_W 累计，Σ 恒 == 年度预算 */
+    r.planMon = split(r.bud, PLAN_W);
+    r.planCum = []; (function () { let a = 0; r.planMon.forEach((v) => { a += v; r.planCum.push(a); }); })();
+    r.overMon = r.cum.map((v, i) => v > r.planCum[i]);             /* 超支月（累计执行越过预算进度） */
+    r.overMonN = r.overMon.filter(Boolean).length;
+    /* 关键支出事项：Σ 恒 == 已执行 */
+    r.items = split(r.exe, r.w);
+  });
+  D.n = ROWS.length;
+  D.ledBud = sum(ROWS.map((r) => r.bud));
+  D.ledExe = sum(ROWS.map((r) => r.exe));
+  D.ledShare = D.ledBud / D.bud * 100;
+  D.catLedBud = CATS.map((_, j) => sum(ROWS.filter((r) => r.ct === j).map((r) => r.bud)));
+  D.catLedExe = CATS.map((_, j) => sum(ROWS.filter((r) => r.ct === j).map((r) => r.exe)));
+  D.rowsByCat = CATS.map((_, j) => ROWS.filter((r) => r.ct === j).length);
+  D.rowsByDev = DEV_NAMES.map((_, k) => ROWS.filter((r) => r.dv === k).length);
+  D.worst = ROWS.slice().sort((a, b) => b.rate - a.rate)[0];       /* 执行率最高（超支最重） */
+  D.slowest = ROWS.slice().sort((a, b) => a.rate - b.rate)[0];     /* 执行率最低（滞后最重） */
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("hg-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("hg-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("hg-meta-bud").textContent = fmtDec(D.bud / 10000, 1);
+  $("hg-meta-act").textContent = fmtDec(D.act / 10000, 1);
+  $("hg-meta-n").textContent = fmtInt(D.n);
+  $("hg-mon-sum").textContent = fmtDec(D.monSum / 10000, 1);
+  $("hg-mon-last").textContent = fmtDec(D.cumLast, 2) + "%";
+
+  /* ===== 7. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "年度研发预算", v: D.bud / 10000, dec: 1, unit: "亿元", color: C.blue,
+      s: "五类之和 · 父页子弹图底槽口径 · " + fmtInt(D.bud) + " 万元" },
+    { k: "已执行", v: D.act / 10000, dec: 1, unit: "亿元", color: C.cyan,
+      s: "= 契约年度研发投入 · 12 月执行 Σ 现算" },
+    { k: "整体执行率", v: D.rate, dec: 2, unit: "%", color: C.green,
+      s: fmtInt(D.act) + " ÷ " + fmtInt(D.bud) + " 万元 现算 · 结余 " + fmtDec((D.bud - D.act) / 10000, 1) + " 亿" },
+    { k: "超支类数", v: D.overN, dec: 0, unit: "类", color: C.red,
+      s: D.overCats.map((c) => c.name + " " + fmtDec(c.rate, 1) + "%").join(" · ") },
+    { k: "偏差总额", v: D.devTotal / 10000, dec: 1, unit: "亿元", color: C.amber,
+      s: "超支 " + fmtInt(D.devOver) + " 万 + 滞后 " + fmtInt(D.devLag) + " 万 · Σ|实际−预算|" },
+    { k: "台账在册", v: D.n, dec: 0, unit: "单", color: C.violet,
+      s: "超支 " + D.rowsByDev[0] + " / 正常 " + D.rowsByDev[1] + " / 滞后 " + D.rowsByDev[2] + " 单" }
+  ];
+  $("hg-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="hg-kpi" style="--hg-kc:' + p.color + '">' +
+      '<div class="hg-kpi-k">' + p.k + "</div>" +
+      '<div class="hg-kpi-v"><b id="hg-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="hg-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("hg-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 类别筛选 chip（全部 + 五类；chip 内显示该类预算与达成率，与父页子弹图逐字同源） ===== */
+  const CFILTERS = [{ name: "全部", color: C.blue, bud: D.bud, rate: D.rate, cnt: D.n }]
+    .concat(CATS.map((c, j) => ({ name: c.name, color: c.color, bud: c.bud, rate: c.rate, cnt: D.rowsByCat[j] })));
+  const cbox = $("hg-cchips");
+  /* chip 文案刻意压到「名称 + 预算 + 达成率」三段：筛选条还要留位置给 subnav 注入的页头标签，
+     完整口径（在册单数）放 title 悬浮与下方台账 tag。 */
+  cbox.innerHTML = CFILTERS.map((f, i) => (
+    '<button class="hg-cchip" type="button" data-i="' + i + '" style="--hg-cc:' + f.color + '"' +
+      ' title="' + f.name + "：年度预算 " + fmtDec(f.bud / 10000, 1) + " 亿 · 达成率 " +
+      fmtDec(f.rate, 1) + "% · 台账在册 " + f.cnt + ' 单">' +
+      "<u>" + f.name + "</u><b>" + fmtDec(f.bud / 10000, 1) + "</b>" +
+      "<i>亿 · 达成 " + fmtDec(f.rate, 1) + "%</i>" +
+    "</button>"
+  )).join("");
+  const cchips = Array.from(cbox.children);
+
+  /* ===== 9. 偏差状态二级过滤 chip（全部 + 三态；计数随类别筛选联动重算） ===== */
+  const dbox = $("hg-dchips");
+  function devScopeCnt(ci, di) {
+    return ROWS.filter((r) => (ci === 0 || r.ct === ci - 1) && (di === 0 || r.dv === di - 1)).length;
+  }
+  function renderDChips(ci, di) {
+    const items = [{ name: "全部", color: C.blue }]
+      .concat(DEV_NAMES.map((n, k) => ({ name: n, color: DEV_COLORS[k] })));
+    dbox.innerHTML = items.map((f, i) => (
+      '<button class="hg-dchip' + (i === di ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === di ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + devScopeCnt(ci, i) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(dbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(cIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 10. hash 契约：父页 P4 预算达成子弹图下钻「本页#encodeURIComponent(五类投入名)」，
+         五类名逐字匹配；HASH_ALIAS 另收「算力」「物料」「云资源与算力」等别名。 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("all", 0); alias("全量", 0); alias("五类", 0);
+  CATS.forEach((c, j) => alias(c.name, j + 1));
+  /* 别名表：父页/契约在不同段落对同一类的口头称呼 */
+  alias("人力投入", 1); alias("人力成本", 1); alias("人力费用", 1);
+  alias("物料", 2); alias("样机", 2); alias("样机与物料", 2); alias("样机物料费", 2);
+  alias("算力", 3); alias("云资源", 3); alias("云资源与算力", 3); alias("云算力", 3); alias("云资源算力费", 3);
+  alias("外协投入", 4); alias("外包", 4); alias("外协费用", 4);
+  alias("工具", 5); alias("其他", 5); alias("工具及其他", 5); alias("工具与其它", 5);
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                      /* trim + 全角空白剔除归一化 */
+    if (!raw) return -1;                                     /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(ci) {
+    const want = "#" + encodeURIComponent(CFILTERS[ci].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 台账主表渲染（行高 28px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("hg-tbody");
+  let view = ROWS, cIdx = 0, dIdx = 0, selPos = 0;
+  const RATE_MAX = 116;                                     /* 微条量程上限（%），100% 刻线按同一量程定位 */
+
+  function rowHtml(r, k) {
+    const w = clamp(r.rate / RATE_MAX * 100, 4, 100);
+    const col = DEV_COLORS[r.dv];
+    return "<li data-no=\"" + r.no + "\" style=\"animation-delay:" + (k * 12) + "ms\">" +
+      '<span class="hg-no">' + r.no + "</span>" +
+      '<span class="hg-dept">' + DEPTS[r.dp] + "</span>" +
+      '<span class="hg-proj">' + PROJS[r.pj] + "</span>" +
+      '<span class="hg-cat" style="color:' + CATS[r.ct].color + '">' + CATS[r.ct].name + "</span>" +
+      '<span class="hg-amt">' + fmtInt(r.bud) + "</span>" +
+      '<span class="hg-exe" style="color:' + col + '">' + fmtInt(r.exe) + "</span>" +
+      '<span class="hg-rate"><span class="hg-rate-t"><u style="width:' + fmtDec(w, 1) + "%;background:" + col +
+        '"></u><s style="left:' + fmtDec(100 / RATE_MAX * 100, 1) + '%"></s></span>' +
+        '<em style="color:' + col + '">' + fmtDec(r.rate, 1) + "%</em></span>" +
+      '<span class="hg-badge ' + DEV_BADGE[r.dv] + '">' + DEV_NAMES[r.dv] + "</span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      /* 手动点行 → 选中并暂停轮巡 20 秒（与 hash 定位同一门闩） */
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    const scopeBud = cIdx === 0 ? D.bud : CATS[cIdx - 1].bud;
+    const scopeLed = cIdx === 0 ? D.ledBud : D.catLedBud[cIdx - 1];
+    /* 抽样占比在此注明：台账不是全量，Σ预算 只占年度预算的一部分（当前筛选口径同步给出） */
+    $("hg-table-tag").textContent =
+      "抽样 " + D.n + " 单 · Σ预算 " + fmtDec(D.ledBud / 10000, 2) + " 亿 = 年度预算 " +
+      fmtDec(D.bud / 10000, 1) + " 亿的 " + fmtDec(D.ledShare, 1) + "% ｜ 当前口径 " +
+      CFILTERS[cIdx].name + " 预算 " + fmtDec(scopeBud / 10000, 1) + " 亿 · 达成 " +
+      fmtDec(CFILTERS[cIdx].rate, 1) + "% · 抽样 " + fmtDec(scopeLed / scopeBud * 100, 1) + "%";
+    $("hg-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 单 / 共 " + D.n + " 单<i>|</i>行点击或轮巡联动执行详情";
+  }
+
+  /* ===== 12. 单条预算执行详情：头块 + 关键支出事项（纯 HTML/CSS，写死高度） ===== */
+  function renderSel() {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("hg-dt-tag").textContent = "当前筛选无预算单";
+      $("hg-dt-headbox").innerHTML = '<div class="hg-dt-sub">调整类别或偏差状态筛选后，此处展示选中预算单的 12 月执行曲线。</div>';
+      $("hg-items").innerHTML = '<div class="hg-items-hd">关键支出事项</div>';
+      if (detailChart) detailChart.setOption(detailOption(null), true);
+      return;
+    }
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    $("hg-dt-tag").textContent = "累计执行 vs 预算进度 · 超支月标红 · Σ 月度 = 已执行";
+    $("hg-dt-headbox").innerHTML =
+      '<div class="hg-dt-no"><b>' + r.no + "</b>" +
+        '<span class="hg-badge ' + DEV_BADGE[r.dv] + '">' + DEV_NAMES[r.dv] + "</span>" +
+        '<span class="hg-dt-name">' + r.sm + "</span></div>" +
+      '<div class="hg-dt-sub">' + DEPTS[r.dp] + " · " + PROJS[r.pj] + " · " + CATS[r.ct].name +
+        " ｜ 预算 <b>" + fmtInt(r.bud) + "</b> 万 · 已执行 <b>" + fmtInt(r.exe) +
+        "</b> 万 · 执行率 <b>" + fmtDec(r.rate, 1) + "%</b> · " +
+        (r.gap >= 0 ? "超支 <b>" + fmtInt(r.gap) : "结余 <b>" + fmtInt(-r.gap)) + "</b> 万 · 超支月 <b>" +
+        r.overMonN + "</b> 个</div>";
+    const names = ITEM_NAMES[r.ct];
+    $("hg-items").innerHTML =
+      '<div class="hg-items-hd">关键支出事项 · ' + r.items.length + " 条 · Σ <b>" + fmtInt(r.exe) + "</b> 万（= 已执行）</div>" +
+      r.items.map((v, k) => (
+        '<div class="hg-item" style="--hg-ic:' + CATS[r.ct].color + '">' +
+          "<b>" + names[k] + "</b><em>" + fmtInt(v) + " 万</em><span>" + fmtDec(100 * v / r.exe, 1) + "%</span>" +
+        "</div>"
+      )).join("");
+    if (detailChart) detailChart.setOption(detailOption(r), true);
+  }
+
+  /* ===== 13. 图表 option（★ 只把标量与数组下发，行/类别对象一律不进 series.data，杜绝循环引用） ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const AXIS_LB = { color: C.textDim, fontSize: 10 };
+  const SPLIT_L = { lineStyle: { color: C.grid, type: "dashed" } };
+
+  /* 13.1 单条 12 月执行曲线：柱 = 月度执行额，实线 = 累计执行，虚线 = 累计预算进度，超支月点标红 */
+  function detailOption(r) {
+    const mon = r ? r.mon.slice() : MON_LABELS.map(() => 0);
+    const cum = r ? r.cum.slice() : MON_LABELS.map(() => 0);
+    const plan = r ? r.planCum.slice() : MON_LABELS.map(() => 0);
+    const over = r ? r.overMon.slice() : MON_LABELS.map(() => false);
+    const col = r ? DEV_COLORS[r.dv] : C.blue;
+    const cumPts = cum.map((v, i) => ({
+      value: v,
+      itemStyle: { color: over[i] ? C.red : C.cyan, borderColor: over[i] ? C.red : C.cyan,
+        borderWidth: over[i] ? 2 : 0 },
+      symbolSize: over[i] ? 8 : 5
+    }));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 4, top: 24, bottom: 0, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>20" + MON_LABELS[i] + "</b><br/>当月执行 <b>" + fmtInt(mon[i]) + "</b> 万<br/>" +
+            "累计执行 <b style=\"color:" + (over[i] ? C.red : C.cyan) + "\">" + fmtInt(cum[i]) + "</b> 万<br/>" +
+            "预算进度 <b style=\"color:" + C.textDim + "\">" + fmtInt(plan[i]) + "</b> 万" +
+            (over[i] ? "<br/><b style=\"color:" + C.red + "\">超支月：累计执行已越过预算进度</b>" : "");
+        }
+      }, TIP),
+      legend: { top: 0, right: 0, itemWidth: 12, itemHeight: 8, itemGap: 8,
+        textStyle: { color: C.textDim, fontSize: 10 }, data: ["月度执行", "累计执行", "预算进度"] },
+      xAxis: { type: "category", data: MON_LABELS.slice(),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5, interval: 0, rotate: 30 } },
+      yAxis: [
+        { type: "value", name: "月/万", nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: AXIS_LB, splitLine: SPLIT_L, axisLine: { show: false } },
+        { type: "value", name: "累计/万", nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: AXIS_LB, splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "月度执行", type: "bar", barWidth: "44%", data: mon,
+          itemStyle: { borderRadius: [3, 3, 0, 0], color: "rgba(92,157,255,.34)" } },
+        { name: "预算进度", type: "line", yAxisIndex: 1, smooth: false, symbol: "none", z: 4,
+          data: plan, lineStyle: { width: 1.6, color: "rgba(127,146,196,.85)", type: "dashed" } },
+        { name: "累计执行", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", z: 6,
+          data: cumPts, lineStyle: { width: 2.4, color: col }, itemStyle: { color: col } }
+      ]
+    };
+  }
+
+  /* 13.2 偏差归因：六原因对称条形（右 = 超支，左 = 滞后），Σ 恒 = 偏差总额（或该类偏差） */
+  function devData(ci) {
+    const items = CAUSES.map((c, k) => ({
+      name: c.name, color: c.color, k: k,
+      over: ci === 0 ? c.overSum : c.over[ci - 1],
+      lag: ci === 0 ? c.lagSum : c.lag[ci - 1]
+    }));
+    items.forEach((it) => { it.total = it.over + it.lag; });
+    items.sort((a, b) => (b.total - a.total) || (a.k - b.k));
+    return {
+      names: items.map((it) => it.name),
+      over: items.map((it) => it.over),
+      lag: items.map((it) => it.lag),
+      cols: items.map((it) => it.color),
+      sumOver: sum(items.map((it) => it.over)),
+      sumLag: sum(items.map((it) => it.lag))
+    };
+  }
+  function devOption(ci) {
+    const dd = devData(ci);
+    const names = dd.names, ov = dd.over, lg = dd.lag;
+    const tot = dd.sumOver + dd.sumLag;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 22, top: 24, bottom: 0, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const t = ov[i] + lg[i];
+          return "<b>" + names[i] + "</b><br/>超支 <b style=\"color:" + C.red + "\">" + fmtInt(ov[i]) +
+            "</b> 万 · 滞后 <b style=\"color:" + C.amber + "\">" + fmtInt(lg[i]) + "</b> 万<br/>" +
+            "小计 <b>" + fmtInt(t) + "</b> 万 · 占偏差总额 <b>" + fmtDec(tot ? 100 * t / tot : 0, 1) + "%</b>";
+        }
+      }, TIP),
+      legend: { top: 0, right: 0, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10 }, data: ["滞后", "超支"] },
+      xAxis: { type: "value", name: "万元", nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+        axisLabel: Object.assign({}, AXIS_LB, { formatter: (v) => fmtInt(Math.abs(v)) }),
+        splitLine: SPLIT_L, axisLine: { show: false } },
+      yAxis: { type: "category", inverse: true, data: names.slice(),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: "#bcd2f8", fontSize: 11 } },
+      series: [
+        { name: "滞后", type: "bar", stack: "dev", barWidth: 15,
+          data: lg.map((v) => -v),
+          itemStyle: { color: "rgba(255,194,77,.85)", borderRadius: [3, 0, 0, 3] },
+          label: { show: true, position: "left", fontSize: 10, color: C.amber,
+            formatter: (p) => (p.value ? fmtInt(-p.value) : "") } },
+        { name: "超支", type: "bar", stack: "dev", barWidth: 15,
+          data: ov.slice(),
+          itemStyle: { color: "rgba(255,95,107,.9)", borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: "right", fontSize: 10, color: C.red,
+            formatter: (p) => (p.value ? fmtInt(p.value) : "") } }
+      ]
+    };
+  }
+
+  /* 13.3 部门执行热力：六职能 × 五类 执行率矩阵
+         ★ piecewise 一旦设了两端 text，showLabel 默认变 false、各档 label 会被整体吞掉 —— 显式补 true。 */
+  function heatOption() {
+    const data = [];
+    D.heatRate.forEach((row, i) => row.forEach((v, j) => data.push([j, i, Number(fmtDec(v, 1))])));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 8, top: 20, bottom: 34, containLabel: true },
+      tooltip: Object.assign({
+        position: "top",
+        formatter: (p) => {
+          const j = p.data[0], i = p.data[1];
+          return "<b>" + DEPTS[i] + " × " + CATS[j].name + "</b><br/>预算 <b>" + fmtInt(DEPT_BUD[i][j]) +
+            "</b> 万 · 执行 <b>" + fmtInt(DEPT_EXE[i][j]) + "</b> 万<br/>执行率 <b style=\"color:" +
+            (p.data[2] > 100 ? C.red : C.green) + "\">" + fmtDec(p.data[2], 1) + "%</b>";
+        }
+      }, TIP),
+      xAxis: { type: "category", data: CATS.map((c) => c.name), splitArea: { show: true },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10, interval: 0, rotate: 18 } },
+      yAxis: { type: "category", data: DEPTS.slice(), splitArea: { show: true },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: "#bcd2f8", fontSize: 10.5 } },
+      visualMap: {
+        type: "piecewise", orient: "horizontal", left: "center", bottom: 0,
+        itemWidth: 12, itemHeight: 10, itemGap: 6,
+        textStyle: { color: C.textDim, fontSize: 9.5 },
+        text: ["超支", "滞后"],
+        showLabel: true,                                    /* ★ 设了 text 必须显式补，否则各档 label 全丢 */
+        pieces: [
+          { max: 95, label: "<95", color: "#26407e" },
+          { min: 95, max: 100, label: "95~100", color: C.blueDeep },
+          { min: 100, max: 105, label: "100~105", color: C.amber },
+          { min: 105, label: "≥105", color: C.red }
+        ]
+      },
+      series: [{
+        name: "执行率", type: "heatmap", data: data,
+        label: { show: true, fontSize: 9.5, color: "#eaf1ff", formatter: (p) => fmtDec(p.data[2], 0) },
+        itemStyle: { borderColor: "rgba(8,18,49,.75)", borderWidth: 1.5, borderRadius: 3 },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: "rgba(0,0,0,.5)" } }
+      }]
+    };
+  }
+
+  /* 13.4 月度执行节奏：柱 = 全盘月度执行额，线 = 累计执行率，末值回归整体执行率 */
+  function monthOption() {
+    const rates = CUM_RATE.map((v) => Number(fmtDec(v, 2)));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 4, top: 24, bottom: 0, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>20" + MON_LABELS[i] + "</b><br/>当月执行 <b style=\"color:" + C.blue + "\">" +
+            fmtInt(D.monExe[i]) + "</b> 万<br/>累计执行 <b>" + fmtInt(CUM_EXE[i]) + "</b> 万<br/>" +
+            "累计执行率 <b style=\"color:" + C.orange + "\">" + fmtDec(CUM_RATE[i], 2) + "%</b>" +
+            "<br/><span style=\"color:" + C.textDim + "\">计划进度 " + fmtDec(PLAN_CUM[i], 1) + "%</span>";
+        }
+      }, TIP),
+      legend: { top: 0, right: 0, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10 }, data: ["月度执行额", "累计执行率"] },
+      xAxis: { type: "category", data: MON_LABELS.slice(),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5, interval: 0, rotate: 30 } },
+      yAxis: [
+        { type: "value", name: "万元", nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: AXIS_LB, splitLine: SPLIT_L, axisLine: { show: false } },
+        { type: "value", name: "%", min: 0, max: 100, nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: AXIS_LB, splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "月度执行额", type: "bar", barWidth: "44%", data: D.monExe.slice(),
+          itemStyle: { borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: C.blue }, { offset: 1, color: "rgba(47,111,214,.28)" }]) } },
+        { name: "累计执行率", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", symbolSize: 5, z: 5,
+          data: rates, lineStyle: { width: 2.4, color: C.orange }, itemStyle: { color: C.orange },
+          markLine: {
+            symbol: "none", silent: true,
+            lineStyle: { color: C.amber, type: "dashed", width: 1.6 },
+            label: { color: C.amber, fontSize: 10, fontWeight: 700, position: "insideEndTop",
+              formatter: () => "年度执行率 " + fmtDec(D.rate, 2) + "%" },
+            data: [{ yAxis: Number(fmtDec(D.rate, 2)) }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 14. 筛选主流程：一次调用刷新 chip / 表 / 详情 / 归因 / 热力 tag / 页头 chip（单一入口） ===== */
+  function applyFilter(ci, di, pushHash) {
+    cIdx = clamp(ci, 0, CFILTERS.length - 1);
+    dIdx = clamp(di, 0, DEV_NAMES.length);
+    view = ROWS.filter((r) => (cIdx === 0 || r.ct === cIdx - 1) && (dIdx === 0 || r.dv === dIdx - 1));
+    selPos = 0;
+    cchips.forEach((el, i) => {
+      const on = i === cIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? CFILTERS[i].color : "";
+      el.style.borderColor = on ? CFILTERS[i].color : "";
+    });
+    renderDChips(cIdx, dIdx);
+    $("hg-chip-key").textContent = "执行率 · " + CFILTERS[cIdx].name;
+    $("hg-chip-rate").textContent = fmtDec(CFILTERS[cIdx].rate, 1) + "%";
+    const dd = devData(cIdx);
+    $("hg-dev-tag").innerHTML = "六因 Σ <b>" + fmtInt(dd.sumOver + dd.sumLag) + "</b> 万（超支 " +
+      fmtInt(dd.sumOver) + " / 滞后 " + fmtInt(dd.sumLag) + "）· 口径 " + CFILTERS[cIdx].name;
+    if (cIdx === 0) {
+      $("hg-heat-tag").innerHTML = "行和 Σ = <b>" + fmtDec(sum(D.deptExe) / 10000, 1) +
+        "</b> 亿 · 最高 " + DEPTS[D.deptTop] + " " + fmtDec(D.deptRate[D.deptTop], 1) +
+        "% · 最低 " + DEPTS[D.deptLow] + " " + fmtDec(D.deptRate[D.deptLow], 1) + "%";
+    } else {
+      const j = cIdx - 1;
+      $("hg-heat-tag").innerHTML = CATS[j].name + " 列和 = <b>" + fmtInt(D.colExe[j]) + "</b> 万 / 预算 " +
+        fmtInt(D.colBud[j]) + " 万 · 达成 " + fmtDec(CATS[j].rate, 1) + "%";
+    }
+    renderTable();
+    renderSel();
+    if (devChart) devChart.setOption(devOption(cIdx), true);
+    if (pushHash) syncHash(cIdx);
+  }
+
+  cchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), 0, true)));
+
+  /* hash 定位：命中类别则激活筛选 chip、闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyFilter(0, 0, false); return; }
+    applyFilter(hit, 0, false);
+    if (hit > 0) {
+      const chip = cchips[hit];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                 /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发投入与预算1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 15. kiosk 轮巡：台账行 3 秒逐行高亮并联动执行详情；hash 定位或手动点行后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 16. 初始渲染：先填充全部 DOM（KPI + chip + 台账 + 详情头块 + 事项清单），再 init 图表
+         ★ 详情头块与事项清单与 flex:1 的图表同属一个 flex 容器，容器已写死高度，
+           且此处保证 init 前它们已填充完毕（见 CLAUDE.md「兄弟块压矮」坑）。 ===== */
+  let detailChart = null, devChart = null, heatChart = null, monthChart = null;
+  applyFilter(0, 0, false);                                  /* 先立骨架 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  detailChart = echarts.init($("hg-chart-detail"));
+  devChart = echarts.init($("hg-chart-dev"));
+  heatChart = echarts.init($("hg-chart-heat"));
+  monthChart = echarts.init($("hg-chart-month"));
+  devChart.setOption(devOption(0));
+  heatChart.setOption(heatOption());
+  monthChart.setOption(monthOption());
+  renderSel();                                               /* 图表就绪后回填选中行的详情曲线 */
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* 热力逐格巡检 + 月度图轮播提示 */
+  let heatIdx = 0;
+  const heatCells = DEPTS.length * CATS.length;
+  setInterval(() => {
+    heatChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: heatIdx });
+    heatIdx = (heatIdx + 1) % heatCells;
+  }, 2200);
+  let monIdx = 0;
+  setInterval(() => {
+    monthChart.dispatchAction({ type: "showTip", seriesIndex: 1, dataIndex: monIdx });
+    monIdx = (monIdx + 1) % MON_LABELS.length;
+  }, 4200);
+
+  /* ===== 17. 底部预算研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "超支 " + D.overN + " 类：" +
+        D.overCats.map((c) => c.name + " 达成 " + fmtDec(c.rate, 1) + "%（超预算 " + fmtInt(c.dev) + " 万）").join("、") +
+        "，与父页预算达成子弹图口径一致" },
+    { lv: "高", c: C.red, t: "台账超支 " + D.rowsByDev[0] + " 单全部落在上述两类内，最重一单「" + D.worst.no +
+        "」" + fmtDec(D.worst.rate, 1) + "%（" + DEPTS[D.worst.dp] + " · " + PROJS[D.worst.pj] +
+        "），超支月 " + D.worst.overMonN + " 个" },
+    { lv: "中", c: C.orange, t: "偏差归因首位「" + D.causeTop.name + "」" + fmtInt(D.causeTop.total) +
+        " 万（占偏差总额 " + fmtDec(100 * D.causeTop.total / D.causeTotal, 1) + "%），超支向 " +
+        fmtInt(D.causeTop.overSum) + " 万 / 滞后向 " + fmtInt(D.causeTop.lagSum) + " 万" },
+    { lv: "中", c: C.orange, t: "滞后 " + D.rowsByDev[2] + " 单合计结余 " +
+        fmtInt(sum(ROWS.filter((r) => r.dv === 2).map((r) => r.bud - r.exe))) + " 万，最低一单「" +
+        D.slowest.no + "」仅 " + fmtDec(D.slowest.rate, 1) + "%（" + CATS[D.slowest.ct].name + "）" },
+    { lv: "中", c: C.amber, t: "部门口径：" + DEPTS[D.deptTop] + " 执行率 " + fmtDec(D.deptRate[D.deptTop], 1) +
+        "% 居首（预算 " + fmtInt(D.deptBud[D.deptTop]) + " 万），" + DEPTS[D.deptLow] + " " +
+        fmtDec(D.deptRate[D.deptLow], 1) + "% 垫底；六职能行和 Σ = 年度预算" },
+    { lv: "低", c: C.cyan, t: "月度节奏：末月执行 " + fmtInt(D.monExe[11]) + " 万为全年峰值，累计执行率由首月 " +
+        fmtDec(CUM_RATE[0], 1) + "% 收敛到 " + fmtDec(D.cumLast, 2) + "%，即整体执行率" },
+    { lv: "低", c: C.green, t: "抽样口径：台账在册 " + D.n + " 单 · Σ预算 " + fmtDec(D.ledBud / 10000, 2) +
+        " 亿 = 年度预算 " + fmtDec(D.bud / 10000, 1) + " 亿的 " + fmtDec(D.ledShare, 1) +
+        "%，逐类 Σ 均未超该类年度预算（非全量陈列）" },
+    { lv: "低", c: C.green, t: "勾稽：五类预算 Σ = " + fmtDec(D.bud / 10000, 1) + " 亿 · 五类执行 Σ = " +
+        fmtDec(D.act / 10000, 1) + " 亿 = 12 月执行 Σ = 六职能矩阵 Σ；偏差归因 Σ = " +
+        fmtInt(D.causeTotal) + " 万 = 偏差总额" }
+  ];
+  const track = $("hg-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="hg-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                    /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 18. 开发期勾稽自检：不成立时控制台报出（不影响页面渲染）
+         金额以「万元」整数参与运算，比较用整数或 1e-9 容差。 ===== */
+  let optAcyclic = true;
+  try {
+    JSON.stringify(detailOption(ROWS[0])); JSON.stringify(detailOption(null));
+    JSON.stringify(devOption(0)); JSON.stringify(devOption(2));
+    JSON.stringify(heatOption()); JSON.stringify(monthOption());
+  } catch (e) { optAcyclic = false; console.error("[预算执行台账] option 存在循环引用：", e.message); }
+
+  const checks = [
+    ["五类投入名与父页子弹图逐字（人力/样机物料/云资源算力/外协/工具与其他）",
+      CATS.length === 5 && CATS.every((c, j) => c.name === CAT_NAMES_REF[j])],
+    ["五类年度预算逐项 = 父页 13.0/2.6/2.9/1.8/1.3 亿",
+      CATS.every((c, j) => c.bud === CAT_BUD_REF[j])],
+    ["五类年度实际逐项 = 契约 12.6/2.8/3.1/1.7/1.2 亿（由父页 m1 月序列求和现算）",
+      CATS.every((c, j) => c.act === CAT_ACT_REF[j])],
+    ["年度预算 Σ = 21.6 亿（容差 1e-9）", Math.abs(D.bud / 10000 - 21.6) < 1e-9],
+    ["年度已执行 Σ = 21.4 亿 = 契约年度研发投入（容差 1e-9）", Math.abs(D.act / 10000 - 21.4) < 1e-9],
+    ["整体执行率 = 已执行 ÷ 预算 现算 ≈ 99.07%",
+      Math.abs(D.rate - D.act / D.bud * 100) < 1e-9 && Math.abs(D.rate - 99.074074074074074) < 1e-6],
+    ["逐类达成率 = 实际 ÷ 预算（五类现算复核）",
+      CATS.every((c) => Math.abs(c.rate - c.act / c.bud * 100) < 1e-9)],
+    ["超支恰 2 类且与父页一致（样机物料 / 云资源算力）",
+      D.overN === 2 && D.overCats.map((c) => c.name).join() === OVER_REF.join()],
+    ["偏差总额 = Σ|实际 − 预算| = 1.0 亿 = 超支 4,000 万 + 滞后 6,000 万",
+      D.devTotal === 10000 && D.devOver === 4000 && D.devLag === 6000 && D.devOver + D.devLag === D.devTotal],
+    ["台账在册 22 单，单号唯一且格式 BG-2026-XNN",
+      D.n === 22 && (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^BG-2026-[HMCOT]\d{2}$/.test(r.no))],
+    ["台账执行率 = 已执行 ÷ 年度预算（逐行现算复核）",
+      ROWS.every((r) => Math.abs(r.rate - r.exe / r.bud * 100) < 1e-9)],
+    ["台账逐类 Σ 预算 ≤ 该类年度预算（抽样不越上级）",
+      D.catLedBud.every((v, j) => v <= CATS[j].bud) &&
+      D.catLedBud.join() === "46000,15800,14600,8900,5300"],
+    ["台账 Σ 预算 = 9.06 亿 = 年度预算的 41.9%（抽样占比，页内已注明）",
+      D.ledBud === 90600 && Math.abs(D.ledShare - 90600 / 216000 * 100) < 1e-9],
+    ["偏差徽章判定与执行率自洽（>100 超支 / <92 滞后 / 其余正常）",
+      ROWS.every((r) => r.dv === devOf(r.rate)) &&
+      D.rowsByDev[0] === 7 && D.rowsByDev[1] === 9 && D.rowsByDev[2] === 6 &&
+      sum(D.rowsByDev) === D.n],
+    ["超支单只出现在两个超支类内（与类别口径不打架）",
+      ROWS.filter((r) => r.dv === 0).every((r) => CATS[r.ct].rate > OVER_LINE)],
+    ["台账部门取自六职能、项目取自八重点项目（契约集逐字，且各自全覆盖）",
+      ROWS.every((r) => DEPTS[r.dp] !== undefined && PROJS[r.pj] !== undefined) &&
+      DEPTS.join() === "软件,硬件,云平台,AI算法,测试,PM与管理" &&
+      PROJS.join() === "星澜S3,星澜Pro2,云枢3.0,云盾2.1,澜芯M60,澜芯M80,智楼5.0,车联1.0" &&
+      (new Set(ROWS.map((r) => r.dp))).size === DEPTS.length &&
+      (new Set(ROWS.map((r) => r.pj))).size === PROJS.length],
+    ["六职能 × 五类 预算矩阵列和 == 五类年度预算（列向收敛）",
+      D.colBud.every((v, j) => v === CATS[j].bud)],
+    ["六职能 × 五类 执行矩阵列和 == 五类年度实际（列向收敛）",
+      D.colExe.every((v, j) => v === CATS[j].act)],
+    ["六职能矩阵行和 Σ = 年度预算 / 年度实际（行向收敛，双向自洽）",
+      sum(D.deptBud) === D.bud && sum(D.deptExe) === D.act &&
+      D.deptBud.join() === "62400,48500,32200,31200,29100,12600"],
+    ["热力逐格执行率 = 该格执行 ÷ 该格预算（30 格现算复核）",
+      D.heatRate.every((row, i) => row.every((v, j) => Math.abs(v - DEPT_EXE[i][j] / DEPT_BUD[i][j] * 100) < 1e-9)) &&
+      D.heatRate.length === 6 && D.heatRate[0].length === 5],
+    ["12 月执行额 Σ = 年度已执行 21.4 亿（月度与类别维度双向收敛）",
+      D.monSum === D.act && D.monExe.length === 12],
+    ["累计执行率末值 = 整体执行率（末值回归）",
+      Math.abs(D.cumLast - D.rate) < 1e-9 && CUM_EXE[11] === D.act],
+    ["预算计划进度权重 Σ = 100%", sum(PLAN_W) === 100 && PLAN_W.length === 12],
+    ["偏差归因逐类净额 = 该类实际 − 预算（六因 × 五类矩阵收敛）",
+      CATS.every((c, j) => D.catOver[j] - D.catLag[j] === c.dev)],
+    ["偏差归因 Σ = 偏差总额 10,000 万（超支 4,000 + 滞后 6,000）",
+      D.causeTotal === D.devTotal && D.causeOver === D.devOver && D.causeLag === D.devLag && CAUSES.length === 6],
+    ["各类别口径下偏差归因 Σ == 该类偏差绝对额",
+      CATS.every((c, j) => { const dd = devData(j + 1); return dd.sumOver + dd.sumLag === Math.abs(c.dev); })],
+    ["逐单 12 月执行 Σ == 该单已执行（二级拆分收敛）",
+      ROWS.every((r) => sum(r.mon) === r.exe && r.mon.length === 12)],
+    ["逐单 12 月预算进度 Σ == 该单年度预算",
+      ROWS.every((r) => sum(r.planMon) === r.bud && r.planCum[11] === r.bud)],
+    ["逐单关键支出事项 3~5 条且 Σ == 该单已执行",
+      ROWS.every((r) => r.items.length >= 3 && r.items.length <= 5 && sum(r.items) === r.exe &&
+        r.items.length <= ITEM_NAMES[r.ct].length)],
+    /* ★ 中途超支月与全年偏差是两个口径：样机物料按 EVT/DVT 批次脉冲前置支出，
+       个别单会在批次月越过线性预算进度，但年末仍收在预算内（本页 BG-2026-M05 即此形态）。
+       故只对「超支单必有超支月」与「末月标记 ⇔ 全年超支」硬校验，
+       并约束中途越线的非超支单只可能出现在样机物料类。 */
+    ["超支月判定 = 累计执行越过累计预算进度；超支单必有超支月，末月标记 ⇔ 全年超支",
+      ROWS.every((r) => r.overMon.every((b, i) => b === (r.cum[i] > r.planCum[i]))) &&
+      ROWS.filter((r) => r.dv === 0).every((r) => r.overMonN > 0) &&
+      ROWS.every((r) => r.overMon[11] === (r.exe > r.bud)) &&
+      ROWS.filter((r) => r.dv !== 0 && r.overMonN > 0).every((r) => r.ct === 1)],
+    ["chip 显示的类别预算与达成率取自同一派生量（六枚 chip 现算复核）",
+      CFILTERS.every((f, i) => (i === 0 ? (f.bud === D.bud && Math.abs(f.rate - D.rate) < 1e-9)
+        : (f.bud === CATS[i - 1].bud && Math.abs(f.rate - CATS[i - 1].rate) < 1e-9)))],
+    ["hash 五类投入名均可解析（契约逐字，含「算力」「物料」等别名）",
+      CAT_NAMES_REF.every((n, j) => HASH_ALIAS[n] === j + 1) &&
+      HASH_ALIAS["算力"] === 3 && HASH_ALIAS["物料"] === 2 && HASH_ALIAS["云资源与算力"] === 3 &&
+      HASH_ALIAS["工具"] === 5 && HASH_ALIAS["外包"] === 4 && HASH_ALIAS["全部"] === 0],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[预算执行台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

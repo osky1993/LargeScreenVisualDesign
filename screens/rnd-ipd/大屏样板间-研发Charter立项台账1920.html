@@ -1,0 +1,1152 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发 Charter 立项台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --ch-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：编号 / Charter 名称 / 产品线 / 提案人 / 提案日 / 当前阶段 / 投入预估 / 结论 */
+    --ch-tcols: 104px 1fr 92px 72px 88px 92px 104px 76px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .ch-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(70, 214, 200, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 640px;
+    grid-template-rows: 84px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .ch-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .ch-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .ch-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .ch-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(70, 214, 200, 0.45) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(70, 214, 200, 0.45) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .ch-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .ch-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .ch-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .ch-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .ch-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到产品组合与路标，琥珀描边与本页星蓝主色区分 */
+  .ch-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .ch-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .ch-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .ch-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .ch-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .ch-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .ch-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .ch-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .ch-chips { display: flex; align-items: center; gap: 9px; }
+  .ch-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 122px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .ch-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .ch-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .ch-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .ch-chip.is-key b { color: var(--rnd-blue); }
+  .ch-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .ch-clock-time { font: 700 26px/1 var(--ch-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .ch-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 筛选条：漏斗三段 chip（hash 契约目标，名称与父页逐字）+ 产品线二级过滤 ===== */
+  .ch-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .ch-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .ch-fchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 6px 13px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13.5px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .ch-fchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .ch-fchip b { font: 700 14px/1 var(--ch-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .ch-fchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .ch-fchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .ch-fchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .ch-fchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .ch-fchip.is-hit { animation: ch-hit 0.9s ease-in-out 2; }
+  @keyframes ch-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--ch-cc, rgba(92, 157, 255, 0.8)); } }
+  .ch-fdiv { flex: none; width: 1px; height: 24px; margin: 0 4px; background: rgba(96, 140, 255, 0.28); }
+  .ch-lchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 4px 11px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .ch-lchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .ch-lchip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .ch-lchip.is-on { color: #071026; font-weight: 700; }
+  .ch-lchip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  .ch-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .ch-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .ch-filters-state em { font-style: normal; color: #d3e2ff; }
+  .ch-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .ch-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .ch-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .ch-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ch-kc, var(--rnd-blue)); }
+  .ch-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .ch-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .ch-kpi-v b { font: 700 24px/1 var(--ch-mono); color: var(--ch-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .ch-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .ch-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .ch-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .ch-row2 { flex: none; height: 188px; display: flex; gap: 14px; min-height: 0; min-width: 0; }
+  .ch-row2 > .ch-panel { flex: 1; min-width: 0; }
+  .ch-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .ch-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .ch-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .ch-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .ch-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .ch-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ch-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .ch-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：行高 25px × 18 行 + 表头，tbody overflow hidden 防撑破 */
+  .ch-panel.is-ledger { flex: none; height: 540px; min-height: 0; overflow: hidden; }
+  /* ★ 时间轴块由 JS 填充（选中行联动重绘），且与漏斗图同属 .ch-col 一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .ch-panel.is-tl { flex: none; height: 300px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .ch-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .ch-thead, .ch-tbody li { display: grid; grid-template-columns: var(--ch-tcols); align-items: center; gap: 8px; }
+  .ch-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .ch-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .ch-tbody li {
+    padding: 0 8px; height: 25px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: ch-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes ch-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .ch-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .ch-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .ch-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .ch-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ch-tbody li .ch-no { font: 700 11.5px/1 var(--ch-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.03em; }
+  .ch-tbody li .ch-nm { color: #dfe9ff; }
+  .ch-tbody li .ch-ln { font-size: 11.5px; }
+  .ch-tbody li .ch-who { font-size: 11.5px; color: #a9bce4; }
+  .ch-tbody li .ch-day { font-size: 11.5px; color: #a9bce4; }
+  .ch-tbody li .ch-stg { font-size: 11.5px; color: #bfd2f6; }
+  .ch-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  /* 结论四态徽章 */
+  .ch-badge.is-o0 { color: #063a25; background: var(--rnd-green); }   /* 已立项 */
+  .ch-badge.is-o1 { color: #3d060c; background: var(--rnd-red); }     /* 驳回 */
+  .ch-badge.is-o2 { color: #3a2a05; background: var(--rnd-amber); }   /* 评审中 */
+  .ch-badge.is-o3 { border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); } /* 在途预审 */
+  /* 投入预估：微条 + 数值 */
+  .ch-est { display: flex; align-items: center; gap: 8px; }
+  .ch-est-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .ch-est-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .ch-est em { flex: none; width: 46px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+
+  /* ===== 右上：单条 Charter 评审流转（纯 HTML/CSS 竖轴四节点） ===== */
+  .ch-tl-head { flex: none; display: flex; flex-direction: column; gap: 4px; padding: 6px 10px 7px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 8px; min-height: 58px; }
+  .ch-tl-no { display: flex; align-items: center; gap: 9px; }
+  .ch-tl-no b { font: 700 13px/1 var(--ch-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .ch-tl-title { font-size: 13px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ch-tl-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ch-tl-sub b { font-weight: 700; color: #c9d8f8; }
+  .ch-tl-bar { flex: none; display: flex; height: 16px; border-radius: 5px; overflow: hidden; margin-bottom: 8px; background: rgba(14, 26, 66, 0.5); }
+  .ch-tl-seg { position: relative; min-width: 14px; }
+  .ch-tl-seg + .ch-tl-seg { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .ch-tl-seg.is-cur {
+    background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px) !important;
+    animation: ch-breath 1.6s ease-in-out infinite;
+  }
+  @keyframes ch-breath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+  /* 竖轴：左侧导轨 + 四节点 */
+  .ch-tl-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ch-tl-row {
+    position: relative; flex: 1; display: grid; grid-template-columns: 22px 96px 1fr 64px;
+    align-items: center; gap: 8px; padding: 0 4px; border-radius: 5px;
+    font-size: 11.5px; font-variant-numeric: tabular-nums;
+  }
+  .ch-tl-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  /* 竖轴导轨：节点圆点 + 上下连线（末节点不画下连线） */
+  .ch-tl-rail { position: relative; height: 100%; overflow: visible; }
+  .ch-tl-rail::before {
+    content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px;
+    background: linear-gradient(180deg, rgba(96, 140, 255, 0.42), rgba(96, 140, 255, 0.42));
+  }
+  .ch-tl-row:first-child .ch-tl-rail::before { top: 50%; }
+  .ch-tl-row:last-child .ch-tl-rail::before { bottom: 50%; }
+  .ch-tl-rail::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px;
+    border-radius: 50%; background: var(--ch-pc, var(--rnd-blue)); box-shadow: 0 0 0 3px rgba(8, 18, 49, 0.9);
+  }
+  .ch-tl-row.is-cur .ch-tl-rail::after { animation: ch-pulse 1.5s ease-in-out infinite; }
+  @keyframes ch-pulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(8, 18, 49, 0.9), 0 0 0 4px rgba(255, 194, 77, 0.5); } 50% { box-shadow: 0 0 0 3px rgba(8, 18, 49, 0.9), 0 0 0 9px rgba(255, 194, 77, 0.05); } }
+  .ch-tl-row.is-todo .ch-tl-rail::after { background: rgba(127, 146, 196, 0.32); }
+  .ch-tl-row b { font-size: 12px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.04em; }
+  .ch-tl-row.is-todo b { color: rgba(127, 146, 196, 0.6); }
+  .ch-tl-row span { color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ch-tl-row em { font-style: normal; text-align: right; font: 700 13px/1 var(--ch-mono); color: var(--rnd-cyan); }
+  .ch-tl-row.is-cur em { color: var(--rnd-amber); }
+  .ch-tl-row.is-todo em { color: rgba(127, 146, 196, 0.5); }
+
+  /* ===== 底部滚动条 ===== */
+  .ch-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .ch-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-cyan); }
+  .ch-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-cyan);
+    box-shadow: 0 0 10px var(--rnd-cyan); animation: ch-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes ch-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .ch-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .ch-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .ch-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .ch-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .ch-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .ch-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="ch-stage" id="ch-stage">
+    <!-- mockflag:begin --><div class="ch-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="ch-error" id="ch-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="ch-header">
+      <div class="ch-head-left">
+        <div class="ch-crumb">
+          <a class="ch-crumb-up" href="大屏样板间-研发产品组合与路标1920.html" title="返回上级专题页（Esc）">‹ 返回 产品组合与路标</a>
+          <b>云麓智联科技</b><i>›</i><span>产品组合与路标</span><i>›</i><em>Charter 立项台账</em>
+        </div>
+        <div class="ch-head-title-row">
+          <div class="ch-head-title">Charter 立项评审台账</div>
+          <div class="ch-head-meta">
+            <span>年度提案 <b id="ch-meta-prop">--</b> 条 · 本表样例 <b id="ch-meta-n">--</b> 条（抽样 <b id="ch-meta-rate">--</b>）</span><i>|</i>
+            <span><b>3</b> 段漏斗 · <b>4</b> 节点流转 · <b>4</b> 条产品线</span><i>|</i>
+            <span>统计窗口 <b>FY2026（2025-09 ~ 2026-08）</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="ch-head-right">
+        <div class="ch-chips">
+          <div class="ch-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="ch-chip is-key"><span id="ch-chip-key">转化 · 全部</span><b id="ch-chip-val">--</b></div>
+        </div>
+        <div class="ch-clock" aria-label="实时时钟">
+          <span class="ch-clock-time" id="ch-clock-time">--:--:--</span>
+          <span class="ch-clock-date" id="ch-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 筛选条：漏斗三段 chip（hash 契约目标，名称与父页逐字）+ 产品线二级过滤 -->
+    <div class="ch-filters">
+      <span class="ch-filters-tag">漏斗分段</span>
+      <div id="ch-fchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="ch-fdiv"></span>
+      <span class="ch-filters-tag">产品线</span>
+      <div id="ch-lchips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="ch-filters-state" id="ch-filters-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="ch-kpis" id="ch-kpis"></div>
+
+    <!-- 左：Charter 提案台账（540px 写死）+ 产品线分布 / 投入预估对比 -->
+    <div class="ch-col">
+      <section class="ch-panel is-ledger">
+        <div class="ch-panel-head">
+          <h2>Charter 提案台账（漏斗分段 × 产品线）</h2>
+          <span class="ch-panel-tag" id="ch-table-tag">--</span>
+        </div>
+        <div class="ch-table">
+          <div class="ch-thead">
+            <span>编号</span><span>Charter 名称</span><span>产品线</span><span>提案人</span>
+            <span>提案日</span><span>当前阶段</span><span>投入预估(万元)</span><span>结论</span>
+          </div>
+          <ul class="ch-tbody" id="ch-tbody"></ul>
+        </div>
+      </section>
+      <div class="ch-row2">
+        <section class="ch-panel">
+          <div class="ch-panel-head">
+            <h2>产品线 Charter 分布</h2>
+            <span class="ch-panel-tag" id="ch-line-tag">--</span>
+          </div>
+          <div class="ch-chart" id="ch-chart-line"></div>
+        </section>
+        <section class="ch-panel">
+          <div class="ch-panel-head">
+            <h2>投入预估 vs 实际立项额</h2>
+            <span class="ch-panel-tag" id="ch-cost-tag">--</span>
+          </div>
+          <div class="ch-chart" id="ch-chart-cost"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- 右：单条 Charter 评审流转（竖轴四节点）+ 立项转化漏斗 -->
+    <div class="ch-col">
+      <section class="ch-panel is-tl">
+        <div class="ch-panel-head">
+          <h2>单条 Charter 评审流转</h2>
+          <span class="ch-panel-tag" id="ch-tl-tag">--</span>
+        </div>
+        <div class="ch-tl-head" id="ch-tl-headbox"></div>
+        <div class="ch-tl-bar" id="ch-tl-bar"></div>
+        <div class="ch-tl-list" id="ch-tl-list"></div>
+      </section>
+      <section class="ch-panel" style="flex: 1;">
+        <div class="ch-panel-head">
+          <h2>立项转化漏斗 · 年度累计</h2>
+          <span class="ch-panel-tag" id="ch-funnel-tag">--</span>
+        </div>
+        <div class="ch-chart" id="ch-chart-funnel"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="ch-foot">
+      <div class="ch-foot-tag">立项研判</div>
+      <div class="ch-foot-view"><div class="ch-foot-track" id="ch-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("ch-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("ch-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const DAY = 86400000;
+  const ts = (s) => +new Date(s + "T00:00:00");
+  const fmtDay = (t) => { const d = new Date(t); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  const dayDiff = (a, b) => Math.round((b - a) / DAY);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · IPMT Charter 评审视角）
+         ★ 与父页 P1「产品组合与路标」严格同源（docs/RndIpdThemed.md §6 P1，父页 CHARTER 常量逐字）：
+           年度 Charter 漏斗 创意提案 286 → Charter 评审 124 → 正式立项 52；三段名即 hash 键，逐字不可改。
+           四条产品线名（智家终端 / 云平台服务 / AIoT模组 / 行业方案）取契约 §2.2 逐字。
+         ★ 口径声明：漏斗为**年度累计**口径，与「时点在研 48 个项目」是两个口径，不相加；
+           投入预估为 Charter **申报预估**口径（万元），与年度研发投入 21.4 亿元的**执行口径**不同源、不相加。
+         ★ 二级拆分（四线 × 三段矩阵、预估/批复额、18 条抽样行、四节点流转天数）为本页自编，
+           Σ 一律收敛到上级数（列和 = 286 / 124 / 52），全部进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，行与产品线/结论之间一律用索引（ln / out）
+           关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 契约锚点（勿改，与父页 CHARTER 逐字：名称 + 数值） */
+  const STAGE_REF = ["创意提案", "Charter 评审", "正式立项"];
+  const FUNNEL_REF = [286, 124, 52];
+  const LINE_REF = ["智家终端", "云平台服务", "AIoT模组", "行业方案"];
+  const DATA_TS = ts("2026-08-19");                 /* 数据日（页头 DATA AS OF） */
+  const WIN_LO = ts("2025-09-01"), WIN_HI = ts("2026-08-31");
+
+  /* 4.2 四线 × 三段矩阵（本页自编二级拆分；列和必须 == 漏斗三段，进自检）
+         [创意提案, Charter 评审, 正式立项]，逐行递减。 */
+  const LINE_MTX = [
+    { name: "智家终端",   v: [86, 39, 17], est: 12860, apr: 3420 },
+    { name: "云平台服务", v: [74, 34, 15], est: 10940, apr: 3060 },
+    { name: "AIoT模组",   v: [68, 28, 11], est: 8720,  apr: 2180 },
+    { name: "行业方案",   v: [58, 23, 9],  est: 7180,  apr: 1640 }
+  ];
+
+  /* 4.3 全盘平均分段天数（提案→预审→IPMT 评审→立项/驳回；平均评审周期 = Σ 现算） */
+  const POP_DAYS = [8.6, 16.4, 13.2];
+
+  /* 4.4 四节点与结论口径 */
+  const NODES = ["提案登记", "预审", "IPMT 评审", "立项决议"];
+  const NODE_HINT = ["立项申请提交 → 组合办受理", "组合办预审 → 排入 IPMT 议程",
+                     "IPMT 评审会 → 形成决议", "决议归档 → 立项号下发 / 驳回反馈"];
+  const NODE_COLORS = [C.blue, C.cyan, C.amber, C.green];
+  /* out：0 已立项 / 1 评审驳回 / 2 预审驳回 / 3 评审中 / 4 预审中 / 5 待预审
+     reach：0 未入评审 · 1 已入评审 · 2 已立项（漏斗分段归属由 reach 现算） */
+  const OUTS = [
+    { name: "已立项", badge: "is-o0", color: C.green,    done: true,  reach: 2 },
+    { name: "评审驳回", badge: "is-o1", color: C.red,    done: true,  reach: 1 },
+    { name: "预审驳回", badge: "is-o1", color: C.red,    done: true,  reach: 0 },
+    { name: "评审中", badge: "is-o2", color: C.amber,    done: false, reach: 1 },
+    { name: "预审中", badge: "is-o3", color: C.blue,     done: false, reach: 0 },
+    { name: "待预审", badge: "is-o3", color: C.blueDeep, done: false, reach: 0 }
+  ];
+
+  /* 4.5 台账抽样 18 行（按提案日倒序；286 条不可能逐条陈列）
+         no  = 年度流水号 CHT-2026-0001~0286（唯一，按提案时序递增）
+         ln  = 产品线索引  out = 结论索引
+         seg = 已完成节点的停留天数（天）：提案 / 预审 / IPMT 评审，长度 = 已走完的节点数
+         评审周期 = 结论行 Σseg；在途行 = 提案日 → 数据日的自然日数（在途天数 = 周期 − Σseg）
+         apr = 立项批复额（仅已立项行；万元） */
+  const ROWS = [
+    { no: "CHT-2026-0284", pd: "2026-08-10", ln: 0, who: "沈宇航", nm: "星澜S5 全屋中控旗舰",       seg: [],         out: 5, est: 1480 },
+    { no: "CHT-2026-0279", pd: "2026-08-04", ln: 1, who: "陆知微", nm: "云枢多租户配额中台",         seg: [6],        out: 4, est: 960 },
+    { no: "CHT-2026-0271", pd: "2026-07-27", ln: 2, who: "韩子墨", nm: "澜芯M90 低功耗蜂窝模组",     seg: [7, 14],    out: 3, est: 2240 },
+    { no: "CHT-2026-0263", pd: "2026-07-18", ln: 3, who: "江月白", nm: "智慧园区能碳管理套件",       seg: [6, 13, 9], out: 0, est: 1860, apr: 1520 },
+    { no: "CHT-2026-0258", pd: "2026-07-09", ln: 0, who: "苏见川", nm: "星澜Pro3 影音底座",          seg: [5, 12, 11],out: 0, est: 1240, apr: 1080 },
+    { no: "CHT-2026-0251", pd: "2026-06-30", ln: 1, who: "何清野", nm: "云盾零信任网关 2.0",         seg: [8, 15, 12],out: 1, est: 2680 },
+    { no: "CHT-2026-0244", pd: "2026-06-21", ln: 2, who: "韩子墨", nm: "澜芯M60 车规级衍生型",       seg: [7, 18],    out: 2, est: 1960 },
+    { no: "CHT-2026-0236", pd: "2026-06-12", ln: 3, who: "江月白", nm: "车联V2X 路侧协同单元",       seg: [6, 14, 10],out: 0, est: 2420, apr: 2050 },
+    { no: "CHT-2026-0227", pd: "2026-05-29", ln: 0, who: "沈宇航", nm: "星澜 睡眠健康感知模组",      seg: [9, 17, 13],out: 0, est: 1120, apr: 940 },
+    { no: "CHT-2026-0219", pd: "2026-05-18", ln: 1, who: "陆知微", nm: "云枢边缘编排调度器",         seg: [7, 16, 14],out: 1, est: 3150 },
+    { no: "CHT-2026-0208", pd: "2026-04-27", ln: 2, who: "罗时予", nm: "澜芯 UWB 精定位模组",        seg: [8, 19, 12],out: 0, est: 1680, apr: 1380 },
+    { no: "CHT-2026-0197", pd: "2026-04-09", ln: 3, who: "秦淮舟", nm: "智楼 数字孪生运维平台",      seg: [10, 21],   out: 2, est: 2860 },
+    { no: "CHT-2026-0186", pd: "2026-03-24", ln: 0, who: "苏见川", nm: "星澜 厨房场景联动套件",      seg: [6, 15, 11],out: 0, est: 890,  apr: 760 },
+    { no: "CHT-2026-0172", pd: "2026-03-05", ln: 1, who: "何清野", nm: "云枢 SaaS 计量计费引擎",     seg: [9, 18, 15],out: 0, est: 2340, apr: 1960 },
+    { no: "CHT-2026-0158", pd: "2026-02-11", ln: 2, who: "罗时予", nm: "澜芯 卫星物联透传模组",      seg: [11, 23, 16],out: 1, est: 4120 },
+    { no: "CHT-2026-0141", pd: "2026-01-16", ln: 3, who: "秦淮舟", nm: "智慧医养 康养终端方案",      seg: [8, 20],    out: 2, est: 1540 },
+    { no: "CHT-2026-0117", pd: "2025-12-08", ln: 0, who: "沈宇航", nm: "星澜 户外储能伴侣",          seg: [12, 26],   out: 2, est: 2180 },
+    { no: "CHT-2026-0086", pd: "2025-10-21", ln: 1, who: "陆知微", nm: "云枢 多云成本优化中心",      seg: [7, 16, 12],out: 0, est: 1760, apr: 1450 }
+  ];
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 5.1 漏斗三段：由四线矩阵列和现算（与父页数值比对进自检） */
+  D.funnel = STAGE_REF.map((s, si) => sum(LINE_MTX.map((l) => l.v[si])));
+  D.prop = D.funnel[0];
+  D.rev = D.funnel[1];
+  D.appr = D.funnel[2];
+  D.rateAccept = 100 * D.rev / D.prop;                 /* 提案 → 评审 受理率 */
+  D.ratePass = 100 * D.appr / D.rev;                   /* 评审 → 立项 通过率 */
+  D.rateAll = 100 * D.appr / D.prop;                   /* 端到端立项率 */
+  D.convs = [100, D.rateAccept, D.ratePass];           /* 逐段转化率（首段 = 入口基线） */
+  D.funnelDesc = D.funnel.every((v, i) => i === 0 || v < D.funnel[i - 1]);
+
+  /* 5.2 产品线维度：三态互斥拆分（止步预审 / 评审未立项 / 已立项），行和 = 该线提案数 */
+  LINE_MTX.forEach((l) => {
+    l.stop0 = l.v[0] - l.v[1];                         /* 未进入 IPMT 评审 */
+    l.stop1 = l.v[1] - l.v[2];                         /* 进入评审未立项 */
+    l.win = l.v[2];                                    /* 已立项 */
+    l.total = l.stop0 + l.stop1 + l.win;               /* == l.v[0] */
+    l.rate = 100 * l.v[2] / l.v[0];
+    l.aprRate = 100 * l.apr / l.est;
+  });
+  D.lineTotal = sum(LINE_MTX.map((l) => l.total));
+  D.est = sum(LINE_MTX.map((l) => l.est));
+  D.apr = sum(LINE_MTX.map((l) => l.apr));
+  D.aprAvg = D.apr / D.appr;                           /* 平均单条立项额（万元） */
+  D.aprRate = 100 * D.apr / D.est;
+  D.lineTop = LINE_MTX.slice().sort((a, b) => b.v[2] - a.v[2])[0];
+  D.lineWorst = LINE_MTX.slice().sort((a, b) => a.rate - b.rate)[0];
+
+  /* 5.3 评审周期：全盘三段均值 Σ 现算 */
+  D.cycleAvg = sum(POP_DAYS);
+
+  /* 5.4 抽样行派生：节点日期、停留天数、评审周期全部由「提案日 + 各段天数」现算 */
+  ROWS.forEach((r) => {
+    r.pdTs = ts(r.pd);
+    r.segSum = sum(r.seg);
+    r.done = OUTS[r.out].done;
+    r.reach = OUTS[r.out].reach;
+    r.endTs = r.pdTs + r.segSum * DAY;                 /* 结论日（结论行）/ 当前节点进入日（在途行） */
+    r.cycle = r.done ? r.segSum : dayDiff(r.pdTs, DATA_TS);
+    r.wait = r.cycle - r.segSum;                       /* 在途天数（结论行恒为 0） */
+    r.cur = r.done ? NODES.length - 1 : r.seg.length;  /* 当前节点索引 */
+    r.stage = r.done ? NODES[NODES.length - 1] : NODES[r.seg.length];
+  });
+  D.n = ROWS.length;
+  D.sampleRate = 100 * D.n / D.prop;
+  D.estMax = Math.max.apply(null, ROWS.map((r) => r.est));
+  D.sampleBySeg = STAGE_REF.map((s, si) => ROWS.filter((r) => r.reach >= si).length);
+  D.sampleByLine = LINE_MTX.map((l, li) => ROWS.filter((r) => r.ln === li).length);
+  D.sampleWin = ROWS.filter((r) => r.out === 0);
+  D.sampleDoneCycle = ROWS.filter((r) => r.done);
+  D.sampleCycleAvg = sum(D.sampleDoneCycle.map((r) => r.cycle)) / D.sampleDoneCycle.length;
+  D.sampleEst = sum(ROWS.map((r) => r.est));
+  D.longest = ROWS.slice().sort((a, b) => b.cycle - a.cycle)[0];
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("ch-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("ch-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("ch-meta-prop").textContent = fmtInt(D.prop);
+  $("ch-meta-n").textContent = fmtInt(D.n);
+  $("ch-meta-rate").textContent = fmtDec(D.sampleRate, 1) + "%";
+
+  /* ===== 7. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "创意提案总数", v: D.prop, dec: 0, unit: "条", color: C.blue,
+      s: "四产品线 Σ " + LINE_MTX.map((l) => l.v[0]).join(" + ") + " · 与父页漏斗同源" },
+    { k: "正式立项", v: D.appr, dec: 0, unit: "个", color: C.green,
+      s: "评审 " + D.rev + " 条中通过 " + fmtDec(D.ratePass, 1) + "% · 四线 Σ 现算" },
+    { k: "端到端立项率", v: D.rateAll, dec: 1, unit: "%", color: C.amber,
+      s: D.appr + " ÷ " + D.prop + " 现算 · 受理率 " + fmtDec(D.rateAccept, 1) + "%" },
+    { k: "平均评审周期", v: D.cycleAvg, dec: 1, unit: "天", color: C.cyan,
+      s: "三段均值 " + POP_DAYS.join(" + ") + " · 样例均值 " + fmtDec(D.sampleCycleAvg, 1) + " 天" },
+    { k: "Σ 投入预估", v: D.est, dec: 0, unit: "万元", color: C.violet,
+      s: "≈ " + fmtDec(D.est / 10000, 2) + " 亿元 · 申报预估口径（非执行口径）" },
+    { k: "平均立项额", v: D.aprAvg, dec: 1, unit: "万元/项", color: C.orange,
+      s: fmtInt(D.apr) + " ÷ " + D.appr + " 现算 · 批复/预估 " + fmtDec(D.aprRate, 1) + "%" }
+  ];
+  $("ch-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="ch-kpi" style="--ch-kc:' + p.color + '">' +
+      '<div class="ch-kpi-k">' + p.k + "</div>" +
+      '<div class="ch-kpi-v"><b id="ch-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="ch-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("ch-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 漏斗分段筛选 chip（全部 + 三段，段名与父页逐字）
+         口径 = 漏斗「已达该段」：创意提案 = 全量、Charter 评审 = reach≥1、正式立项 = reach≥2。 ===== */
+  const STAGE_COLORS = [C.blue, C.cyan, C.amber];      /* 与父页 FUNNEL_COLORS 同源 */
+  const FILTERS = [{ name: "全部", color: C.blue, n: D.prop, conv: null, cnt: D.n }]
+    .concat(STAGE_REF.map((s, si) => ({
+      name: s, color: STAGE_COLORS[si], n: D.funnel[si],
+      conv: si === 0 ? null : D.convs[si], cnt: D.sampleBySeg[si]
+    })));
+  const fbox = $("ch-fchips");
+  fbox.innerHTML = FILTERS.map((f, i) => (
+    '<button class="ch-fchip" type="button" data-i="' + i + '" style="--ch-cc:' + f.color + '">' +
+      "<u>" + f.name + "</u><b>" + fmtInt(f.n) + "</b>" +
+      "<i>条 · " + (f.conv === null ? (i === 0 ? "全量口径" : "入口基线") : "转化 " + fmtDec(f.conv, 1) + "%") +
+        " · 样例 " + f.cnt + "</i>" +
+    "</button>"
+  )).join("");
+  const fchips = Array.from(fbox.children);
+
+  /* ===== 9. 产品线二级过滤 chip（全部 + 四线；计数随分段筛选联动重算） ===== */
+  const lbox = $("ch-lchips");
+  function lineScopeCnt(fi, li) {
+    return ROWS.filter((r) => (fi === 0 || r.reach >= fi - 1) && (li === 0 || r.ln === li - 1)).length;
+  }
+  function renderLChips(fi, li) {
+    const items = [{ name: "全部", color: C.blue }]
+      .concat(LINE_MTX.map((l, k) => ({ name: l.name, color: C.series[k] })));
+    lbox.innerHTML = items.map((f, i) => (
+      '<button class="ch-lchip' + (i === li ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === li ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + lineScopeCnt(fi, i) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(lbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(fIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 10. hash 契约：父页 P1 漏斗下钻「子页#encodeURIComponent(段名)」，三段名逐字匹配
+         归一化后（trim + 全角空白剔除）查表——注意「Charter 评审」含半角空格，
+         归一化后为「Charter评审」，别名表按归一化键登记；HASH_ALIAS 另收大小写与常见别名。 ===== */
+  const norm = (s) => String(s).replace(/[\s　]+/g, "");
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[norm(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("all", 0); alias("全量", 0);
+  STAGE_REF.forEach((s, si) => {
+    alias(s, si + 1);
+    alias(s.toLowerCase(), si + 1);
+    alias(s.toUpperCase(), si + 1);
+  });
+  alias("提案", 1); alias("创意", 1); alias("Charter提案", 1);
+  alias("评审", 2); alias("Charter", 2); alias("charter", 2); alias("Charter评审会", 2); alias("IPMT评审", 2);
+  alias("立项", 3); alias("已立项", 3); alias("Charter立项", 3);
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = norm(raw);                                       /* trim + 全角/半角空白剔除归一化 */
+    if (!raw) return -1;                                   /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(fi) {
+    const want = "#" + encodeURIComponent(FILTERS[fi].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 台账主表渲染（行高 25px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("ch-tbody");
+  let view = ROWS, fIdx = 0, lIdx = 0, selPos = 0;
+
+  function rowHtml(r, k) {
+    const w = clamp(r.est / D.estMax * 100, 8, 100);
+    const cEst = r.est > 2500 ? C.orange : r.est > 1500 ? C.amber : C.cyan;
+    const o = OUTS[r.out];
+    return "<li data-no=\"" + r.no + "\" style=\"animation-delay:" + (k * 12) + "ms\">" +
+      '<span class="ch-no">' + r.no + "</span>" +
+      '<span class="ch-nm">' + r.nm + "</span>" +
+      '<span class="ch-ln" style="color:' + C.series[r.ln] + '">' + LINE_MTX[r.ln].name + "</span>" +
+      '<span class="ch-who">' + r.who + "</span>" +
+      '<span class="ch-day">' + r.pd + "</span>" +
+      '<span class="ch-stg">' + r.stage + "</span>" +
+      '<span class="ch-est"><span class="ch-est-t"><u style="width:' + fmtDec(w, 1) + "%;background:" + cEst +
+        '"></u></span><em style="color:' + cEst + '">' + fmtInt(r.est) + "</em></span>" +
+      '<span class="ch-badge ' + o.badge + '">' + o.name + "</span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      /* 手动点行 → 选中并暂停轮巡 20 秒（与 hash 定位同一门闩） */
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    const scopeN = fIdx === 0 ? D.prop : D.funnel[fIdx - 1];
+    $("ch-table-tag").textContent =
+      "抽样展示：年度 " + fmtInt(D.prop) + " 条不逐条陈列 · 样例 " + D.n +
+      " 条（占 " + fmtDec(D.sampleRate, 1) + "%，四线全覆盖）";
+    $("ch-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 条样例 / 共 " + D.n + " 条<i>|</i>全盘该口径 <em>" + fmtInt(scopeN) +
+      "</em> 条" + (fIdx > 1 ? " · 转化 <em>" + fmtDec(D.convs[fIdx - 1], 1) + "%</em>" : "") +
+      "<i>|</i>行点击或 3 秒轮巡联动评审流转";
+  }
+
+  /* ===== 12. 单条 Charter 评审流转（纯 HTML/CSS 竖轴四节点；选中行联动）
+         节点日期 = 提案日 + 各段天数累计（现算）；三态 is-done / is-cur / is-todo。 ===== */
+  function renderSel() {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("ch-tl-tag").textContent = "当前筛选无样例行";
+      $("ch-tl-headbox").innerHTML = '<div class="ch-tl-sub">调整漏斗分段或产品线筛选后，此处展示选中 Charter 的四节点流转。</div>';
+      $("ch-tl-bar").innerHTML = "";
+      $("ch-tl-list").innerHTML = "";
+      return;
+    }
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    const o = OUTS[r.out];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    $("ch-tl-tag").textContent = "提案→预审→IPMT 评审→立项/驳回 · 各段停留天数 Σ = 评审周期";
+    $("ch-tl-headbox").innerHTML =
+      '<div class="ch-tl-no"><b>' + r.no + "</b>" +
+        '<span class="ch-badge ' + o.badge + '">' + o.name + "</span>" +
+        '<span class="ch-tl-sub">' + LINE_MTX[r.ln].name + " · 提案人 " + r.who + "</span></div>" +
+      '<div class="ch-tl-title">' + r.nm + "</div>" +
+      '<div class="ch-tl-sub">提案 <b>' + r.pd + "</b> · 评审周期 <b>" + r.cycle + "</b> 天" +
+        (r.done ? "（已闭环 Σ " + r.seg.length + " 段）" : "（在途 " + r.wait + " 天）") +
+        " · 投入预估 <b>" + fmtInt(r.est) + "</b> 万元" +
+        (r.apr ? " → 批复 <b>" + fmtInt(r.apr) + "</b> 万元（压降 " +
+          fmtDec(100 * (1 - r.apr / r.est), 1) + "%）" : "") + "</div>";
+    /* 顶部微条：各段停留天数占比（在途段做呼吸态） */
+    const barSegs = r.seg.map((v, k) => (
+      '<span class="ch-tl-seg" style="flex:' + v + ";background:" + NODE_COLORS[k] +
+        '" title="' + NODES[k] + " 停留 " + v + ' 天"></span>'
+    ));
+    if (!r.done && r.wait > 0) {
+      barSegs.push('<span class="ch-tl-seg is-cur" style="flex:' + r.wait + ";background:" + NODE_COLORS[r.cur] +
+        '" title="' + NODES[r.cur] + " 在途 " + r.wait + ' 天"></span>');
+    }
+    $("ch-tl-bar").innerHTML = barSegs.join("");
+    /* 竖轴四节点：日期与停留天数全部由提案日 + 各段天数现算 */
+    let acc = 0;
+    $("ch-tl-list").innerHTML = NODES.map((name, k) => {
+      let cls = "is-todo", body, val, dt = null;
+      if (k < r.seg.length) {                              /* 已走完的节点 */
+        cls = "is-done";
+        dt = r.pdTs + acc * DAY;
+        acc += r.seg[k];
+        body = fmtDay(dt) + " 进入 · " + NODE_HINT[k];
+        val = r.seg[k] + " 天";
+      } else if (!r.done && k === r.cur) {                 /* 在途：当前停留节点 */
+        cls = "is-cur";
+        dt = r.pdTs + acc * DAY;
+        body = fmtDay(dt) + " 进入 · 在途中（截至数据日 " + fmtDay(DATA_TS) + "）";
+        val = r.wait + " 天";
+      } else if (r.done && k === NODES.length - 1) {       /* 结论节点 */
+        cls = "is-done";
+        body = fmtDay(r.endTs) + " · " + (r.out === 0 ? "IPMT 通过，下发立项号" :
+          r.out === 1 ? "IPMT 评审驳回，退回提案人" : "组合办预审驳回，未排入 IPMT");
+        val = o.name;
+      } else if (r.done) {                                 /* 结论行未走到的节点（如预审驳回跳过 IPMT） */
+        body = "未进入（" + o.name + "，流程提前终止）";
+        val = "--";
+      } else {                                             /* 在途行的后续节点 */
+        body = "待进入 · " + NODE_HINT[k];
+        val = "--";
+      }
+      return '<div class="ch-tl-row ' + cls + '" style="--ch-pc:' + NODE_COLORS[k] + '">' +
+        '<span class="ch-tl-rail"></span><b>' + name + "</b><span>" + body + "</span><em>" + val + "</em></div>";
+    }).join("");
+  }
+
+  /* ===== 13. 立项转化漏斗（三段，与父页 CHARTER 同源同值；转化率现算） ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function funnelOption() {
+    /* ★ 只把标量与数组下发给 option，LINE_MTX 等业务对象一律不进 series.data */
+    const names = STAGE_REF.slice();
+    const vals = D.funnel.slice();
+    const cols = STAGE_COLORS.slice();
+    const convs = D.convs.slice();
+    const samples = D.sampleBySeg.slice();
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const i = p.dataIndex;
+          return "<b>" + names[i] + "</b>　<b style=\"color:" + cols[i] + "\">" + vals[i] + "</b> 条/年<br/>" +
+            (i === 0 ? "入口基线 · 占提案 100%"
+              : "较上一段转化 <b style=\"color:" + C.amber + "\">" + fmtDec(convs[i], 1) + "%</b>" +
+                "<br/>占提案总数 " + fmtDec(100 * vals[i] / vals[0], 1) + "%") +
+            "<br/><span style=\"color:" + C.textDim + "\">本表样例 " + samples[i] + " 条 · 年度累计口径</span>";
+        }
+      }, TIP),
+      series: [{
+        type: "funnel", sort: "descending",
+        left: "6%", right: "6%", top: 16, bottom: 26,
+        min: 0, max: vals[0], minSize: "26%", gap: 10,
+        label: {
+          position: "inside", color: "#07152e", fontSize: 13, fontWeight: 700, lineHeight: 17,
+          formatter: (p) => {
+            const i = p.dataIndex;
+            const rate = i === 0 ? "" : "\n转化 " + fmtDec(convs[i], 1) + "%";
+            return names[i] + "  " + vals[i] + " 条" + rate;
+          }
+        },
+        labelLine: { show: false },
+        itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 2 },
+        emphasis: { label: { fontSize: 14 } },
+        data: vals.map((v, i) => ({ name: names[i], value: v, itemStyle: { color: cols[i] } }))
+      }]
+    };
+  }
+
+  /* ===== 14. 产品线 Charter 分布（横向堆叠：止步预审 / 评审未立项 / 已立项；行和 = 该线提案数） ===== */
+  function lineOption(hi) {
+    const names = LINE_MTX.map((l) => l.name);
+    const s0 = LINE_MTX.map((l) => l.stop0);
+    const s1 = LINE_MTX.map((l) => l.stop1);
+    const s2 = LINE_MTX.map((l) => l.win);
+    const tot = LINE_MTX.map((l) => l.total);
+    const rate = LINE_MTX.map((l) => Number(fmtDec(l.rate, 1)));
+    const op = (i) => (hi === 0 || hi - 1 === i ? 1 : 0.34);
+    const mk = (name, arr, color, last) => ({
+      name: name, type: "bar", stack: "s", barWidth: "56%",
+      itemStyle: { color: color },
+      label: last ? {
+        show: true, position: "right", color: "#cfdcff", fontSize: 10.5, fontWeight: 700,
+        formatter: (p) => tot[p.dataIndex] + " 条 · 立项率 " + rate[p.dataIndex] + "%"
+      } : { show: false },
+      data: arr.map((v, i) => ({ value: v, itemStyle: { color: color, opacity: op(i) } }))
+    });
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 96, top: 22, bottom: 0, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + names[i] + "</b>　提案 <b>" + tot[i] + "</b> 条<br/>" +
+            "止步预审 <b>" + s0[i] + "</b> · 评审未立项 <b>" + s1[i] + "</b> · 已立项 <b style=\"color:" +
+            C.green + "\">" + s2[i] + "</b><br/><span style=\"color:" + C.textDim +
+            "\">立项率 " + rate[i] + "% · 本表样例 " + D.sampleByLine[i] + " 条</span>";
+        }
+      }, TIP),
+      legend: { top: 0, right: 2, itemWidth: 11, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10 }, data: ["止步预审", "评审未立项", "已立项"] },
+      xAxis: { type: "value", name: "条", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+      yAxis: { type: "category", data: names, inverse: true,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10.5 } },
+      series: [
+        mk("止步预审", s0, C.blueDeep, false),
+        mk("评审未立项", s1, C.violet, false),
+        mk("已立项", s2, C.green, true)
+      ]
+    };
+  }
+
+  /* ===== 15. 投入预估 vs 实际立项额（分组条形；★ 预估口径，与年度投入执行口径不同源） ===== */
+  function costOption(hi) {
+    const names = LINE_MTX.map((l) => l.name);
+    const est = LINE_MTX.map((l) => l.est);
+    const apr = LINE_MTX.map((l) => l.apr);
+    const rate = LINE_MTX.map((l) => Number(fmtDec(l.aprRate, 1)));
+    const cnt = LINE_MTX.map((l) => l.v[2]);
+    const op = (i) => (hi === 0 || hi - 1 === i ? 1 : 0.34);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 62, top: 22, bottom: 0, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + names[i] + "</b><br/>提案投入预估 <b>" + fmtInt(est[i]) + "</b> 万元" +
+            "<br/>立项批复额 <b style=\"color:" + C.green + "\">" + fmtInt(apr[i]) + "</b> 万元（" +
+            cnt[i] + " 个立项）<br/><span style=\"color:" + C.textDim +
+            "\">批复/预估 " + rate[i] + "% · 均 " + fmtDec(apr[i] / cnt[i], 1) + " 万元/项</span>";
+        }
+      }, TIP),
+      legend: { top: 0, right: 2, itemWidth: 11, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10 }, data: ["提案投入预估", "立项批复额"] },
+      xAxis: { type: "value", name: "万元", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+      yAxis: { type: "category", data: names, inverse: true,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10.5 } },
+      series: [
+        { name: "提案投入预估", type: "bar", barWidth: "30%",
+          itemStyle: { borderRadius: [0, 3, 3, 0] },
+          data: est.map((v, i) => ({ value: v, itemStyle: { color: C.blue, opacity: op(i) } })) },
+        { name: "立项批复额", type: "bar", barWidth: "30%",
+          itemStyle: { borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: "right", color: "#cfdcff", fontSize: 10, fontWeight: 700,
+            formatter: (p) => rate[p.dataIndex] + "%" },
+          data: apr.map((v, i) => ({ value: v, itemStyle: { color: C.green, opacity: op(i) } })) }
+      ]
+    };
+  }
+
+  /* ===== 16. 筛选主流程：一次调用刷新 chip / 表 / 流转 / 两图强调 / 页头 chip（单一入口） ===== */
+  function applyFilter(fi, li, pushHash) {
+    fIdx = clamp(fi, 0, FILTERS.length - 1);
+    lIdx = clamp(li, 0, LINE_MTX.length);
+    view = ROWS.filter((r) =>
+      (fIdx === 0 || r.reach >= fIdx - 1) && (lIdx === 0 || r.ln === lIdx - 1));
+    selPos = 0;
+    fchips.forEach((el, i) => {
+      const on = i === fIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? FILTERS[i].color : "";
+      el.style.borderColor = on ? FILTERS[i].color : "";
+    });
+    renderLChips(fIdx, lIdx);
+    $("ch-chip-key").textContent = "转化 · " + FILTERS[fIdx].name;
+    $("ch-chip-val").textContent = fIdx <= 1
+      ? fmtDec(D.rateAll, 1) + "%"
+      : fmtDec(D.convs[fIdx - 1], 1) + "%";
+    $("ch-funnel-tag").innerHTML = "创意提案 <b>" + D.prop + "</b> → 评审 <b>" + D.rev + "</b>（受理 " +
+      fmtDec(D.rateAccept, 1) + "%）→ 立项 <b>" + D.appr + "</b>（通过 " + fmtDec(D.ratePass, 1) + "%）";
+    $("ch-line-tag").innerHTML = "四线 Σ <b>" + fmtInt(D.lineTotal) + "</b> 条 = 提案总数 · 三态互斥拆分";
+    $("ch-cost-tag").innerHTML = "Σ 预估 <b>" + fmtInt(D.est) + "</b> → 批复 <b>" + fmtInt(D.apr) +
+      "</b> 万元 · 申报预估口径";
+    renderTable();
+    renderSel();
+    if (lineChart) lineChart.setOption(lineOption(lIdx), true);
+    if (costChart) costChart.setOption(costOption(lIdx), true);
+    if (pushHash) syncHash(fIdx);
+  }
+
+  fchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), 0, true)));
+
+  /* hash 定位：命中分段则激活筛选 chip、闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyFilter(0, 0, false); return; }
+    applyFilter(hit, 0, false);
+    if (hit > 0) {
+      const chip = fchips[hit];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                 /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发产品组合与路标1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 17. kiosk 轮巡：台账行 3 秒逐行高亮并联动评审流转；hash 定位或手动点行后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 18. 初始渲染：先填充全部 DOM（KPI + 表 + 流转），再 init 图表 ===== */
+  let funnelChart = null, lineChart = null, costChart = null;
+  applyFilter(0, 0, false);                                  /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  funnelChart = echarts.init($("ch-chart-funnel"));
+  funnelChart.setOption(funnelOption());
+  lineChart = echarts.init($("ch-chart-line"));
+  lineChart.setOption(lineOption(0));
+  costChart = echarts.init($("ch-chart-cost"));
+  costChart.setOption(costOption(0));
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* 漏斗高亮轮播 */
+  let funIdx = 0;
+  setInterval(() => {
+    funnelChart.dispatchAction({ type: "downplay", seriesIndex: 0 });
+    funnelChart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: funIdx });
+    funIdx = (funIdx + 1) % STAGE_REF.length;
+  }, 4200);
+
+  /* ===== 19. 底部立项研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "年度漏斗 " + STAGE_REF[0] + " " + D.prop + " → " + STAGE_REF[1] + " " + D.rev +
+        "（受理 " + fmtDec(D.rateAccept, 1) + "%）→ " + STAGE_REF[2] + " " + D.appr + "（通过 " +
+        fmtDec(D.ratePass, 1) + "%），端到端立项率 " + fmtDec(D.rateAll, 1) + "%，与父页组合路标同源" },
+    { lv: "中", c: C.orange, t: "立项率最低产品线「" + D.lineWorst.name + "」" + D.lineWorst.v[2] + " / " +
+        D.lineWorst.v[0] + " = " + fmtDec(D.lineWorst.rate, 1) + "%，止步预审 " + D.lineWorst.stop0 +
+        " 条，建议前移市场与可行性论证" },
+    { lv: "中", c: C.orange, t: "立项数首位「" + D.lineTop.name + "」" + D.lineTop.v[2] + " 个（占全量 " +
+        fmtDec(100 * D.lineTop.v[2] / D.appr, 1) + "%），批复额 " + fmtInt(D.lineTop.apr) +
+        " 万元，批复/预估 " + fmtDec(D.lineTop.aprRate, 1) + "%" },
+    { lv: "低", c: C.amber, t: "平均评审周期 " + fmtDec(D.cycleAvg, 1) + " 天 = 提案 " + POP_DAYS[0] +
+        " + 预审 " + POP_DAYS[1] + " + 评审 " + POP_DAYS[2] + " 天；样例最长「" + D.longest.no + "」" +
+        D.longest.cycle + " 天" },
+    { lv: "低", c: C.cyan, t: "Σ 投入预估 " + fmtInt(D.est) + " 万元 → 立项批复 " + fmtInt(D.apr) +
+        " 万元（" + fmtDec(D.aprRate, 1) + "%），平均单项 " + fmtDec(D.aprAvg, 1) +
+        " 万元；★ 申报预估口径，与年度研发投入 21.4 亿元执行口径不同源、不相加" },
+    { lv: "低", c: C.green, t: "本表样例 " + D.n + " 条（占年度提案 " + fmtDec(D.sampleRate, 1) +
+        "%），四线全覆盖 " + D.sampleByLine.join(" / ") + " 条，其中已立项 " + D.sampleWin.length + " 条" },
+    { lv: "低", c: C.green, t: "勾稽：四线 Σ 提案 " + fmtInt(D.lineTotal) + " 条 = 漏斗首段 " +
+        fmtInt(D.prop) + " 条；三态互斥拆分列和 " + D.funnel.join(" / ") + " 与父页 CHARTER 逐字一致" }
+  ];
+  const track = $("ch-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="ch-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                    /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 20. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(funnelOption()); JSON.stringify(lineOption(0)); JSON.stringify(costOption(2)); }
+  catch (e) { optAcyclic = false; console.error("[Charter立项台账] option 存在循环引用：", e.message); }
+
+  const segCnt = (fi) => ROWS.filter((r) => r.reach >= fi - 1).length;   /* 独立于 chip 的重算口径 */
+  const checks = [
+    ["漏斗三段名与父页逐字（创意提案 / Charter 评审 / 正式立项）",
+      STAGE_REF.length === 3 && STAGE_REF[0] === "创意提案" &&
+      STAGE_REF[1] === "Charter 评审" && STAGE_REF[2] === "正式立项"],
+    ["漏斗三段值与父页 CHARTER 逐字（286 / 124 / 52）",
+      D.funnel.every((v, i) => v === FUNNEL_REF[i])],
+    ["漏斗逐级递减（286 > 124 > 52）", D.funnelDesc],
+    ["转化率现算：受理 124÷286、通过 52÷124、端到端 52÷286",
+      Math.abs(D.rateAccept - 100 * 124 / 286) < 1e-9 &&
+      Math.abs(D.ratePass - 100 * 52 / 124) < 1e-9 &&
+      Math.abs(D.rateAll - 100 * 52 / 286) < 1e-9],
+    ["产品线四线 Σ 提案 = 提案总数 286（一级拆分收敛）",
+      D.lineTotal === D.prop && LINE_MTX.length === 4],
+    ["四线名与契约逐字（智家终端 / 云平台服务 / AIoT模组 / 行业方案）",
+      LINE_MTX.every((l, i) => l.name === LINE_REF[i])],
+    ["四线 × 三段矩阵列和 == 漏斗三段（二级拆分双向收敛）",
+      STAGE_REF.every((s, si) => sum(LINE_MTX.map((l) => l.v[si])) === FUNNEL_REF[si])],
+    ["各线三段逐级递减且三态互斥拆分 Σ == 该线提案数",
+      LINE_MTX.every((l) => l.v[0] > l.v[1] && l.v[1] > l.v[2] &&
+        l.stop0 + l.stop1 + l.win === l.v[0] && l.stop0 >= 0 && l.stop1 >= 0)],
+    ["Σ 投入预估 = 39,700 万元、Σ 立项批复 = 10,300 万元（四线 Σ 现算）",
+      D.est === 39700 && D.apr === 10300],
+    ["平均立项额 = Σ批复 ÷ 立项数（10,300 ÷ 52）",
+      Math.abs(D.aprAvg - 10300 / 52) < 1e-9],
+    ["各线批复额 < 预估额（申报预估口径压降为正）",
+      LINE_MTX.every((l) => l.apr > 0 && l.apr < l.est)],
+    ["平均评审周期 = Σ 三段均值（8.6 + 16.4 + 13.2 = 38.2 天）",
+      Math.abs(D.cycleAvg - 38.2) < 1e-9 && POP_DAYS.length === NODES.length - 1],
+    ["台账编号唯一、格式 CHT-2026-XXXX 且落在 1~286 号段内",
+      (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^CHT-2026-\d{4}$/.test(r.no)) &&
+      ROWS.every((r) => { const q = Number(r.no.slice(-4)); return q >= 1 && q <= D.prop; })],
+    ["台账按提案日倒序且编号同向严格递减",
+      ROWS.every((r, i) => i === 0 ||
+        (r.pdTs < ROWS[i - 1].pdTs && Number(r.no.slice(-4)) < Number(ROWS[i - 1].no.slice(-4))))],
+    ["样例提案日均落在统计窗口 FY2026 内",
+      ROWS.every((r) => r.pdTs >= WIN_LO && r.pdTs <= WIN_HI)],
+    ["各段抽样条数 = 对应 chip 计数（全部 / 三段独立重算一致）",
+      FILTERS.every((f, i) => f.cnt === (i === 0 ? ROWS.length : segCnt(i)))],
+    ["抽样条数 = 18 且分段计数逐级递减（18 / 18 / 12 / 8）",
+      D.n === 18 && D.sampleBySeg[0] === D.n &&
+      D.sampleBySeg[0] >= D.sampleBySeg[1] && D.sampleBySeg[1] >= D.sampleBySeg[2]],
+    ["样例四线全覆盖且分线 Σ = 样例总数", sum(D.sampleByLine) === D.n &&
+      D.sampleByLine.every((v) => v > 0)],
+    ["抽样占比 = 18 ÷ 286 现算（页内注明）",
+      Math.abs(D.sampleRate - 100 * 18 / 286) < 1e-9],
+    ["单条流转 Σ 各段停留天数 = 评审周期（结论行）",
+      ROWS.filter((r) => r.done).every((r) => r.cycle === sum(r.seg) && r.wait === 0)],
+    ["在途行：Σ 各段 + 在途天数 = 评审周期，且在途天数 ≥ 0",
+      ROWS.filter((r) => !r.done).every((r) => sum(r.seg) + r.wait === r.cycle && r.wait >= 0)],
+    ["各段停留天数为正、节点数不超过 4，且最后节点日期不晚于数据日",
+      ROWS.every((r) => r.seg.every((v) => v > 0) && r.seg.length <= NODES.length - 1 &&
+        r.endTs <= DATA_TS)],
+    ["结论与漏斗分段归属自洽（已立项⇒reach2 · 评审系⇒reach1 · 预审系⇒reach0）",
+      ROWS.every((r) => r.reach === OUTS[r.out].reach) &&
+      ROWS.filter((r) => r.out === 0).every((r) => r.reach === 2 && r.seg.length === 3) &&
+      ROWS.filter((r) => r.out === 1 || r.out === 3).every((r) => r.reach === 1 && r.seg.length >= 2) &&
+      ROWS.filter((r) => r.out >= 4).every((r) => r.reach === 0 && r.seg.length <= 1)],
+    ["已立项样例均带批复额且批复 ≤ 预估",
+      D.sampleWin.every((r) => r.apr > 0 && r.apr <= r.est) &&
+      ROWS.filter((r) => r.out !== 0).every((r) => r.apr === undefined)],
+    ["当前阶段取自四节点表（结论行落「立项决议」）",
+      ROWS.every((r) => NODES.indexOf(r.stage) >= 0) &&
+      ROWS.filter((r) => r.done).every((r) => r.stage === NODES[3])],
+    ["hash 三段名均可解析（含「Charter 评审」空格归一化与大小写别名）",
+      HASH_ALIAS[norm("创意提案")] === 1 && HASH_ALIAS[norm("Charter 评审")] === 2 &&
+      HASH_ALIAS[norm("正式立项")] === 3 && HASH_ALIAS["全部"] === 0 &&
+      HASH_ALIAS[norm("charter 评审")] === 2 && HASH_ALIAS["立项"] === 3],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[Charter立项台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

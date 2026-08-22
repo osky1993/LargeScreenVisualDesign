@@ -74,15 +74,36 @@ DIMS6 = ["交付", "质量", "效率", "投入产出", "协同", "人才"]
 
 # ---- 父页接线配置（锚点均实测于页面源码；rows 是 CSS 选择器，names 是 §6 对象名） ----
 # 分波追加：W2 先接一期三对「表格行级」下钻，图表画布级与面板级入口视各波页面实况扩充。
+# ---- 二期扩充 W7：每个专题页的第 2 个子页 ----
+# 锚点一律避开已被首个子页占用的行锚（同一批 li 挂两条 target 会互相覆盖 dataset.drillSub）
+CHARTER3 = ["创意提案", "Charter 评审", "正式立项"]
+CHARTER3_MATCH = [n.replace(" ", "") for n in CHARTER3]   # ★ 匹配前会剔空白，含空格名须另给 match
+TRPTS6 = ["TR1", "TR2", "TR3", "TR4", "TR5", "TR6"]
+IFPAIRS6 = ["软件↔硬件", "软件↔云端", "软件↔AI", "硬件↔云端", "硬件↔AI", "云端↔AI"]
+
+SUB_CH = "大屏样板间-研发Charter立项台账1920.html"
+SUB_YV = "大屏样板间-研发TR评审台账1920.html"
+SUB_HG = "大屏样板间-研发预算执行台账1920.html"
+SUB_DM = "大屏样板间-研发障碍与回顾台账1920.html"
+SUB_PT = "大屏样板间-研发流水线运行台账1920.html"
+SUB_RY = "大屏样板间-研发跨域接口台账1920.html"
+
+
 PAGES = [
     {
         "file": "大屏样板间-研发产品组合与路标1920.html",
+        "charts": [
+            {"chartId": "lb-chart-funnel", "names": CHARTER3, "match": CHARTER3_MATCH, "sub": SUB_CH},
+        ],
         "targets": [
             {"rows": "#lb-tbody li", "names": LINES4, "sub": SUB_DL},
         ],
     },
     {
         "file": "大屏样板间-研发IPD管道与评审1920.html",
+        "charts": [
+            {"chartId": "ip-chart-tr", "names": TRPTS6, "sub": SUB_YV},
+        ],
         "targets": [
             {"rows": "#ip-tbody li", "names": PROJECTS8, "sub": SUB_DJ},
         ],
@@ -96,6 +117,9 @@ PAGES = [
     # ---- 二期 · 敏捷执行（W3）----
     {
         "file": "大屏样板间-研发敏捷交付总览1920.html",
+        "panels": [
+            {"panelTitle": "障碍清单", "label": "障碍台账", "sub": SUB_DM},
+        ],
         "targets": [
             {"rows": "#ag-tbody li", "names": TEAMS12, "sub": SUB_CQ},
         ],
@@ -115,6 +139,9 @@ PAGES = [
     # ---- 三期 · 多域协同（W4）----
     {
         "file": "大屏样板间-研发软硬云AI集成协同1920.html",
+        "charts": [
+            {"chartId": "ct-chart-if", "names": IFPAIRS6, "sub": SUB_RY},
+        ],
         "targets": [
             {"rows": "#ct-tbody li", "names": BASELINES4, "sub": SUB_JX},
         ],
@@ -146,6 +173,9 @@ PAGES = [
     # ---- 二期补齐（S12–S18）：7 个原本没有子页的专题页 ----
     {
         "file": "大屏样板间-研发投入与预算1920.html",
+        "charts": [
+            {"chartId": "ty-chart-bullet", "names": COSTS5, "sub": SUB_HG},
+        ],
         "targets": [
             {"rows": "#ty-tbody li", "names": COSTS5, "sub": SUB_YZ},
         ],
@@ -158,6 +188,7 @@ PAGES = [
         ],
         "panels": [
             {"panelTitle": "单测覆盖率箱线", "label": "仓库群详情", "sub": SUB_GC},
+            {"panelTitle": "流水线成功率日历热力", "label": "流水线台账", "sub": SUB_PT},
         ],
     },
     {

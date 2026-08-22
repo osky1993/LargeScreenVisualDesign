@@ -1,0 +1,1324 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发TR评审台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --yv-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：评审编号 / 评审点 / 项目 / 产品线 / 评审议题 / 计划日 / 实际日 / 逾期 / 结论 / 遗留项 */
+    --yv-tcols: 116px 54px 88px 92px 1fr 78px 78px 56px 84px 62px;
+    /* 遗留项追踪列宽：事项 / 责任人 / 计划关闭日 / 状态 */
+    --yv-lcols: 1fr 62px 74px 60px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .yv-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 640px;
+    grid-template-rows: 84px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .yv-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .yv-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .yv-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .yv-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .yv-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .yv-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .yv-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .yv-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .yv-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到 IPD管道与评审，琥珀描边与本页星蓝主色区分 */
+  .yv-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .yv-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .yv-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .yv-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .yv-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .yv-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .yv-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .yv-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .yv-chips { display: flex; align-items: center; gap: 9px; }
+  .yv-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 122px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .yv-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .yv-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .yv-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .yv-chip.is-key b { color: var(--rnd-blue); }
+  .yv-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .yv-clock-time { font: 700 26px/1 var(--yv-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .yv-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 两级筛选条：一级 = 评审类型（全部 / TR1–TR6 / DCP，hash 契约目标）+ 二级 = 结论 ===== */
+  .yv-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .yv-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  /* 一级 chip 走两行紧凑版：8 枚 + 二级 4 枚 + 状态行要塞进 1884px，单行版必溢出 */
+  .yv-rchip {
+    display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: pointer;
+    padding: 4px 10px 5px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13px; letter-spacing: 0.05em; white-space: nowrap;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .yv-rchip-t { display: flex; align-items: baseline; gap: 5px; }
+  .yv-rchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .yv-rchip b { font: 700 13.5px/1 var(--yv-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .yv-rchip i { font-style: normal; font-size: 10px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .yv-rchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .yv-rchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .yv-rchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .yv-rchip.is-hit { animation: yv-hit 0.9s ease-in-out 2; }
+  @keyframes yv-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--yv-cc, rgba(92, 157, 255, 0.8)); } }
+  .yv-fdiv { flex: none; width: 1px; height: 24px; margin: 0 3px; background: rgba(96, 140, 255, 0.28); }
+  .yv-cchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 4px 10px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .yv-cchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .yv-cchip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .yv-cchip.is-on { color: #071026; font-weight: 700; }
+  .yv-cchip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  /* 状态行吃掉剩余宽度并允许收缩（flex:none 会把筛选条顶溢出） */
+  .yv-filters-state { margin-left: auto; flex: 1 1 auto; min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; color: var(--rnd-text-dim); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .yv-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .yv-filters-state em { font-style: normal; color: #d3e2ff; }
+  .yv-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 7px; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .yv-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .yv-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .yv-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--yv-kc, var(--rnd-blue)); }
+  .yv-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .yv-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .yv-kpi-v b { font: 700 24px/1 var(--yv-mono); color: var(--yv-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .yv-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .yv-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .yv-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .yv-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .yv-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .yv-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .yv-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .yv-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .yv-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .yv-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .yv-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：22 行 × 28px + 表头 + 抽样脚注，overflow hidden 防撑破 */
+  .yv-panel.is-ledger { flex: none; height: 742px; min-height: 0; overflow: hidden; }
+  /* ★ 详情区由 JS 填充（选中行联动重绘），与两块图表同属 .yv-col 一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .yv-panel.is-detail { flex: none; height: 316px; min-height: 0; overflow: hidden; }
+  .yv-row2 { flex: none; height: 196px; display: flex; gap: 14px; min-height: 0; min-width: 0; }
+  .yv-row2 > .yv-panel { flex: 1; min-width: 0; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .yv-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .yv-thead, .yv-tbody li { display: grid; grid-template-columns: var(--yv-tcols); align-items: center; gap: 8px; }
+  .yv-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .yv-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .yv-tbody li {
+    padding: 0 8px; height: 28px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: yv-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes yv-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .yv-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .yv-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .yv-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .yv-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .yv-tbody li .yv-no { font: 700 11.5px/1 var(--yv-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.03em; }
+  .yv-tbody li .yv-rp { font: 700 11.5px/1 var(--yv-mono); letter-spacing: 0.03em; }
+  .yv-tbody li .yv-proj { color: #dfe9ff; font-size: 12px; }
+  .yv-tbody li .yv-line { font-size: 11.5px; color: #bfd2f6; }
+  .yv-tbody li .yv-topic { color: #c4d4f4; font-size: 12px; }
+  .yv-tbody li .yv-day { font-size: 11.5px; color: #a9bce4; }
+  .yv-tbody li .yv-late { font: 700 12px/1 var(--yv-mono); text-align: right; padding-right: 6px; }
+  .yv-tbody li .yv-left { display: flex; align-items: center; gap: 6px; justify-content: flex-end; padding-right: 4px; }
+  .yv-tbody li .yv-left u { text-decoration: none; font: 700 12px/1 var(--yv-mono); color: #dfe9ff; }
+  .yv-tbody li .yv-left s { text-decoration: none; font-size: 10px; color: rgba(127, 146, 196, 0.8); }
+  .yv-tfoot { flex: none; margin-top: 6px; padding: 5px 8px 0; border-top: 1px dashed rgba(96, 140, 255, 0.22); font-size: 11.5px; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .yv-tfoot b { font-weight: 700; color: var(--rnd-amber); }
+  .yv-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  /* 结论三态 */
+  .yv-badge.is-r0 { color: #063a25; background: var(--rnd-green); }
+  .yv-badge.is-r1 { color: #3a2a05; background: var(--rnd-amber); }
+  .yv-badge.is-r2 { color: #3d060c; background: var(--rnd-red); }
+  /* 遗留项状态三态 */
+  .yv-badge.is-s0 { color: #063a25; background: var(--rnd-green); }
+  .yv-badge.is-s1 { color: #041b3a; background: var(--rnd-blue); }
+  .yv-badge.is-s2 { color: #3d060c; background: var(--rnd-red); }
+
+  /* ===== 右上：单场评审详情（评审要素清单 + 遗留项闭环追踪；纯 HTML/CSS） ===== */
+  .yv-dt-head { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 7px 10px 8px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 7px; min-height: 58px; }
+  .yv-dt-no { display: flex; align-items: center; gap: 9px; }
+  .yv-dt-no b { font: 700 13px/1 var(--yv-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .yv-dt-title { font-size: 12.5px; color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .yv-dt-title b { font-weight: 700; color: #eaf1ff; }
+  .yv-dt-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .yv-dt-sub b { font-weight: 700; color: #c9d8f8; }
+  .yv-el { flex: none; display: flex; flex-direction: column; gap: 3px; margin-bottom: 7px; }
+  .yv-el-row { display: grid; grid-template-columns: 62px 1fr; align-items: center; gap: 8px; padding: 3px 4px; border-radius: 5px; font-size: 11.5px; }
+  .yv-el-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .yv-el-row b { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #9cc2ff; letter-spacing: 0.06em; }
+  .yv-el-row b::before { content: ""; width: 6px; height: 6px; border-radius: 2px; background: var(--yv-pc, var(--rnd-blue)); }
+  .yv-el-row span { color: #c9d8f8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .yv-lf-tag { flex: none; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 3px; font-size: 11px; color: rgba(127, 146, 196, 0.9); letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+  .yv-lf-tag u { text-decoration: none; font-weight: 700; color: #9cc2ff; letter-spacing: 0.08em; }
+  .yv-lf-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .yv-lf { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+  .yv-lf-row { flex: none; display: grid; grid-template-columns: var(--yv-lcols); align-items: center; gap: 8px; height: 21px; padding: 0 4px; border-radius: 4px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .yv-lf-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .yv-lf-row span { color: #dfe9ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .yv-lf-row em { font-style: normal; color: var(--rnd-text-dim); }
+  .yv-lf-row .yv-badge { font-size: 10px; padding: 1px 6px; }
+
+  /* ===== 底部滚动条 ===== */
+  .yv-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .yv-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-amber); }
+  .yv-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-amber);
+    box-shadow: 0 0 10px var(--rnd-amber); animation: yv-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes yv-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .yv-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .yv-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .yv-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .yv-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .yv-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .yv-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="yv-stage" id="yv-stage">
+    <!-- mockflag:begin --><div class="yv-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="yv-error" id="yv-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="yv-header">
+      <div class="yv-head-left">
+        <div class="yv-crumb">
+          <a class="yv-crumb-up" href="大屏样板间-研发IPD管道与评审1920.html" title="返回上级专题页（Esc）">‹ 返回 IPD管道与评审</a>
+          <b>云麓智联科技</b><i>›</i><span>IPD管道与评审</span><i>›</i><em>TR / DCP 评审台账</em>
+        </div>
+        <div class="yv-head-title-row">
+          <div class="yv-head-title">TR / DCP 评审台账</div>
+          <div class="yv-head-meta">
+            <span>全年 <b id="yv-meta-rv">--</b> 场 · 本表样例 <b id="yv-meta-n">--</b> 场（抽样展示）</span><i>|</i>
+            <span><b>6</b> 道 TR · <b>4</b> 类 DCP · <b>3</b> 态结论</span><i>|</i>
+            <span>统计窗口 <b>FY2026（2025-09 ~ 2026-08）</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="yv-head-right">
+        <div class="yv-chips">
+          <div class="yv-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="yv-chip is-key"><span id="yv-chip-key">一次通过率 · 全部</span><b id="yv-chip-rate">--</b></div>
+        </div>
+        <div class="yv-clock" aria-label="实时时钟">
+          <span class="yv-clock-time" id="yv-clock-time">--:--:--</span>
+          <span class="yv-clock-date" id="yv-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 两级筛选：一级 = 评审类型（hash 契约目标 TR1–TR6 / DCP）+ 二级 = 结论 -->
+    <div class="yv-filters">
+      <span class="yv-filters-tag">评审点</span>
+      <div id="yv-rchips" style="display:flex;align-items:center;gap:8px;"></div>
+      <span class="yv-fdiv"></span>
+      <span class="yv-filters-tag">结论</span>
+      <div id="yv-cchips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="yv-filters-state" id="yv-filters-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="yv-kpis" id="yv-kpis"></div>
+
+    <!-- 左：评审记录台账（写死高度 742px = 22 行 × 28px + 表头 + 抽样脚注） -->
+    <div class="yv-col">
+      <section class="yv-panel is-ledger">
+        <div class="yv-panel-head">
+          <h2>评审记录台账（评审点 × 结论）</h2>
+          <span class="yv-panel-tag" id="yv-table-tag">--</span>
+        </div>
+        <div class="yv-table">
+          <div class="yv-thead">
+            <span>评审编号</span><span>评审点</span><span>项目</span><span>产品线</span><span>评审议题</span>
+            <span>计划日</span><span>实际日</span><span>逾期</span><span>结论</span><span>遗留项</span>
+          </div>
+          <ul class="yv-tbody" id="yv-tbody"></ul>
+        </div>
+        <div class="yv-tfoot" id="yv-tfoot">--</div>
+      </section>
+    </div>
+
+    <!-- 右：单场评审详情 + 一次通过率矩阵 + 逾期分布 / 遗留项闭环 -->
+    <div class="yv-col">
+      <section class="yv-panel is-detail">
+        <div class="yv-panel-head">
+          <h2>单场评审详情 · 要素与遗留项</h2>
+          <span class="yv-panel-tag" id="yv-detail-tag">--</span>
+        </div>
+        <div class="yv-dt-head" id="yv-dt-headbox"></div>
+        <div class="yv-el" id="yv-dt-elements"></div>
+        <div class="yv-lf-tag" id="yv-lf-tag"></div>
+        <div class="yv-lf" id="yv-lf-list"></div>
+      </section>
+      <section class="yv-panel" style="flex:1;">
+        <div class="yv-panel-head">
+          <h2>TR 一次通过率矩阵 · 6 × 4</h2>
+          <span class="yv-panel-tag" id="yv-matrix-tag">--</span>
+        </div>
+        <div class="yv-chart" id="yv-chart-matrix"></div>
+      </section>
+      <div class="yv-row2">
+        <section class="yv-panel">
+          <div class="yv-panel-head">
+            <h2>按期 / 逾期分布</h2>
+            <span class="yv-panel-tag" id="yv-ontime-tag">--</span>
+          </div>
+          <div class="yv-chart" id="yv-chart-ontime"></div>
+        </section>
+        <section class="yv-panel">
+          <div class="yv-panel-head">
+            <h2>遗留项闭环</h2>
+            <span class="yv-panel-tag" id="yv-left-tag">--</span>
+          </div>
+          <div class="yv-chart" id="yv-chart-left"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="yv-foot">
+      <div class="yv-foot-tag">评审研判</div>
+      <div class="yv-foot-view"><div class="yv-foot-track" id="yv-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("yv-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("yv-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · IPD 评审视角）
+         ★ 与父页 P2「IPD管道与评审」严格同源（docs/RndIpdThemed.md §2.2 / §6 P2）：
+           年度评审总数 297 = TR 230 + DCP 67；按期 259，按期交付率 = 259 ÷ 297 = 87.2%（契约值）；
+           TR1–TR6 年度场次 48 / 44 / 42 / 38 / 32 / 26（父页 TRS 逐字，Σ = 230）；
+           DCP 四决策点三态 CDCP 14/5/3、PDCP 13/6/2、ADCP 10/4/1、LDCP 6/2/1（父页 DCP 逐字，Σ = 67）；
+           TR 一次通过率矩阵 4 产品线 × 6 TR 共 24 格与父页 TR_RATE 逐格相等（页尾字符串比对硬校验）。
+         ★ 本页二级拆分（自编，Σ 一律收敛到上级数，全部进页尾勾稽自检）：
+           ① TR_SPLIT：每道 TR 的年度场次按四产品线拆分，列和 == 父页 TR 场次、行和 == 该线年度 TR 场次；
+           ② TR 通过场次由矩阵反解：pass(TR) = Σ_产品线 round(场次 × 一次通过率)，必须等于 cnt − cond − rej；
+           ③ 逐评审点按期/逾期场次，Σ 按期 == 259；④ 遗留项四元组 [总数, 已闭环, 进行中, 超期未闭]，
+           全盘 Σ = 418 / 363 / 39 / 16，闭环率现算；⑤ 22 行抽样台账。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，行与评审点/项目之间一律用索引（rp / dp / pj）
+           关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 契约锚点（勿改，与父页逐字） */
+  const RV_REF     = 297;                          /* 年度评审总数 */
+  const TR_REF     = 230;                          /* TR 年度场次 */
+  const DCP_REF    = 67;                           /* DCP 年度场次 */
+  const ONTIME_REF = 259;                          /* TR/DCP 按期通过场次 */
+  const OTD_REF    = 87.2;                         /* 按期交付率（%） */
+  const TR_CNT_REF  = [48, 44, 42, 38, 32, 26];
+  const DCP_CNT_REF = [22, 21, 15, 9];
+  const TR_NAME_REF  = "TR1,TR2,TR3,TR4,TR5,TR6";
+  const LINE_NAME_REF = "智家终端,云平台服务,AIoT模组,行业方案";
+  /* 父页 ip 的 TR_RATE 24 格原文（独立字面量，供逐格比对，防止本页改矩阵后与父页脱钩） */
+  const TR_RATE_REF = "92,88,84,78,86,90|95,93,90,88,91,96|89,85,80,71,82,87|90,86,83,76,84,93";
+
+  /* 4.2 四产品线（契约 §2.2 逐字，顺序同父页 LINES） */
+  const LINES = [
+    { name: "智家终端",   color: C.blue },
+    { name: "云平台服务", color: C.cyan },
+    { name: "AIoT模组",   color: C.violet },
+    { name: "行业方案",   color: C.amber }
+  ];
+
+  /* 4.3 TR 一次通过率矩阵 TR_RATE[产品线][TR]（父页逐字；TR4 软硬联调关口最低，AIoT模组 71%） */
+  const TR_RATE = [
+    [92, 88, 84, 78, 86, 90],   /* 智家终端 */
+    [95, 93, 90, 88, 91, 96],   /* 云平台服务 */
+    [89, 85, 80, 71, 82, 87],   /* AIoT模组 */
+    [90, 86, 83, 76, 84, 93]    /* 行业方案 */
+  ];
+  /* 场次拆分 TR_SPLIT[产品线][TR]（本页二级自编）：列和 == 父页 TR 年度场次，行和 == 该线年度 TR 场次 */
+  const TR_SPLIT = [
+    [15, 14, 13, 12, 10, 8],    /* 智家终端 Σ 72 */
+    [12, 11, 11, 10,  8, 7],    /* 云平台服务 Σ 59 */
+    [11, 10,  9,  8,  7, 6],    /* AIoT模组 Σ 51 */
+    [10,  9,  9,  8,  7, 5]     /* 行业方案 Σ 48 */
+  ];
+
+  /* 4.4 六道 TR：年度场次（父页逐字）+ 结论三态 + 按期场次 + 遗留项四元组
+         pass 不写死：由 cnt − cond − rej 现算，并与矩阵反解值比对（页尾自检） */
+  const TRS = [
+    { name: "TR1", label: "需求与概念评审", cnt: 48, cond: 3, rej: 1, ontime: 43, left: [62, 56, 4, 2] },
+    { name: "TR2", label: "总体方案评审",   cnt: 44, cond: 4, rej: 1, ontime: 38, left: [58, 51, 5, 2] },
+    { name: "TR3", label: "详细设计评审",   cnt: 42, cond: 5, rej: 2, ontime: 37, left: [66, 57, 6, 3] },
+    { name: "TR4", label: "软硬联调评审",   cnt: 38, cond: 6, rej: 2, ontime: 32, left: [74, 61, 9, 4] },
+    { name: "TR5", label: "系统验证评审",   cnt: 32, cond: 3, rej: 1, ontime: 28, left: [48, 41, 5, 2] },
+    { name: "TR6", label: "发布就绪评审",   cnt: 26, cond: 2, rej: 0, ontime: 23, left: [32, 29, 2, 1] }
+  ];
+
+  /* 4.5 四类 DCP：三态与父页 DCP 数组逐字（pass/cond/rej），cnt 由三态求和现算 */
+  const DCPS = [
+    { name: "CDCP", label: "概念决策",     pass: 14, cond: 5, rej: 3, ontime: 19, left: [26, 22, 3, 1] },
+    { name: "PDCP", label: "计划决策",     pass: 13, cond: 6, rej: 2, ontime: 18, left: [24, 21, 2, 1] },
+    { name: "ADCP", label: "可获得性决策", pass: 10, cond: 4, rej: 1, ontime: 13, left: [18, 16, 2, 0] },
+    { name: "LDCP", label: "生命周期决策", pass: 6,  cond: 2, rej: 1, ontime: 8,  left: [10, 9,  1, 0] }
+  ];
+
+  /* 4.6 结论三态 */
+  const RES_NAMES  = ["通过", "有条件通过", "否决"];
+  const RES_BADGE  = ["is-r0", "is-r1", "is-r2"];
+  const RES_COLORS = [C.green, C.amber, C.red];
+  /* 遗留项状态三态 */
+  const LST_NAMES  = ["已闭环", "进行中", "超期未闭"];
+  const LST_BADGE  = ["is-s0", "is-s1", "is-s2"];
+  const LST_COLORS = [C.green, C.blue, C.red];
+
+  /* 4.7 八个重点项目（契约 §2.3 逐字，产品线随项目派生，台账不另写一份产品线） */
+  const PROJECTS = [
+    { name: "星澜S3",   line: "智家终端" },
+    { name: "星澜Pro2", line: "智家终端" },
+    { name: "云枢3.0",  line: "云平台服务" },
+    { name: "云盾2.1",  line: "云平台服务" },
+    { name: "澜芯M60",  line: "AIoT模组" },
+    { name: "澜芯M80",  line: "AIoT模组" },
+    { name: "智楼5.0",  line: "行业方案" },
+    { name: "车联1.0",  line: "行业方案" }
+  ];
+
+  /* 4.8 评审要素清单（材料 / 参会角色 / 出口准则），按评审点名索引 */
+  const ELEMENTS = {
+    TR1: { mats: "《产品需求规格 PRD》·《市场与竞品分析》·《概念可行性与风险清单》",
+           roles: "IPMT 代表 · 产品经理 · 系统架构师 · 市场代表", exit: "需求基线冻结，进入总体方案设计" },
+    TR2: { mats: "《系统总体方案》·《架构选型对比》·《关键技术预研报告》",
+           roles: "系统架构师 · 软件/硬件主管 · 云平台架构 · 测试架构", exit: "总体方案与接口边界确认，进入详细设计" },
+    TR3: { mats: "《详细设计说明书》·《BOM 与选型清单》·《可测性设计方案》",
+           roles: "硬件结构 · 嵌入式主管 · 供应链代表 · 测试经理", exit: "设计与 BOM 冻结，进入样机试制与开发" },
+    TR4: { mats: "《软硬联调报告》·《接口一致性测试记录》·《集成缺陷清单》",
+           roles: "系统架构师 · 集成经理 · 硬件调试 · 云端联调", exit: "跨域接口打通，进入系统验证" },
+    TR5: { mats: "《系统验证报告》·《性能与可靠性数据》·《遗留缺陷评估》",
+           roles: "测试架构 · 质量代表 · SRE 站点可靠性 · 产品经理", exit: "验证通过，进入发布就绪准备" },
+    TR6: { mats: "《发布就绪清单》·《运维交接手册》·《回滚与应急预案》",
+           roles: "发布经理 · SRE 站点可靠性 · 服务与支持 · 产品经理", exit: "发布准入通过，进入试销与量产" },
+    CDCP: { mats: "《商业计划书 Charter》·《市场机会评估》·《投资回报测算》",
+            roles: "IPMT 主任 · 财经代表 · 市场代表 · 产品经理", exit: "立项批准，进入计划阶段" },
+    PDCP: { mats: "《项目任务书》·《开发预算与资源计划》·《风险应对预案》",
+            roles: "IPMT 主任 · 财经代表 · PDT 经理 · 资源线主管", exit: "计划批准，进入开发阶段" },
+    ADCP: { mats: "《可获得性评估报告》·《量产与交付准备》·《渠道与定价方案》",
+            roles: "IPMT 主任 · 供应链代表 · 制造代表 · 销售代表", exit: "可获得性批准，进入发布与量产" },
+    LDCP: { mats: "《生命周期评估》·《退役与迁移方案》·《备件与服务承诺》",
+            roles: "IPMT 主任 · 服务与支持 · 供应链代表 · 产品经理", exit: "生命周期决策生效，进入退役或延寿" }
+  };
+
+  /* 4.9 遗留项模板池（台账行按索引引用，避免逐行重复长文本） */
+  const LEFT_POOL = [
+    "接口时序用例补测并回归",          /* 0 */
+    "热设计余量复测报告归档",          /* 1 */
+    "BOM 长交期物料替代方案",          /* 2 */
+    "容量模型按峰值 1.5 倍重算",       /* 3 */
+    "安全基线扫描高危项清零",          /* 4 */
+    "可靠性试验样本量补足",            /* 5 */
+    "跨域依赖接口契约冻结",            /* 6 */
+    "灰度回滚预案演练留证",            /* 7 */
+    "成本目标缺口专项分解",            /* 8 */
+    "交付物清单与文档补齐",            /* 9 */
+    "第三方组件许可证合规复核",        /* 10 */
+    "射频指标一致性复测",              /* 11 */
+    "监控与告警埋点补全",              /* 12 */
+    "运维交接与值班表确认",            /* 13 */
+    "需求可测性验收准则细化",          /* 14 */
+    "算力预算与训练排期确认"           /* 15 */
+  ];
+  const OWNERS = ["李昀", "张牧", "陈遥", "周霁", "吴桁", "郑楠", "何澈", "孙珩"];
+  const DUE_OFF = [10, 20, 30, 45, 60];              /* 遗留项计划关闭日 = 实际评审日 + 该偏移（天） */
+
+  /* 4.10 台账抽样 22 行（按实际评审日倒序；297 场不可能逐条陈列）
+         no = 窗口内评审流水号 RV-2026-0001 ~ 0297（与时序同序，进自检）
+         rp = 一级口径索引（0–5 = TR1–TR6，6 = DCP）；dp = DCP 子决策点索引（非 DCP 行为 -1）
+         pj = 项目索引（产品线由项目派生）；res = 结论索引；lf = [[遗留项模板索引, 状态索引], …] 3~5 条
+         逾期天数 = 实际日 − 计划日（现算，不写死）。 */
+  const ROWS = [
+    { no: "RV-2026-0231", rp: 4, dp: -1, pj: 0, topic: "整机系统验证与可靠性摸底", plan: "2026-08-14", act: "2026-08-14", res: 0,
+      lf: [[5, 0], [9, 0], [12, 1]] },
+    { no: "RV-2026-0229", rp: 3, dp: -1, pj: 4, topic: "软硬联调与接口一致性",     plan: "2026-08-10", act: "2026-08-13", res: 1,
+      lf: [[0, 1], [6, 1], [11, 2], [1, 0], [9, 0]] },
+    { no: "RV-2026-0226", rp: 6, dp: 0,  pj: 5, topic: "概念决策：立项范围与投资",  plan: "2026-08-08", act: "2026-08-08", res: 0,
+      lf: [[8, 1], [14, 0], [9, 0]] },
+    { no: "RV-2026-0224", rp: 5, dp: -1, pj: 7, topic: "发布就绪与运维交接",       plan: "2026-07-31", act: "2026-08-06", res: 2,
+      lf: [[13, 2], [7, 1], [12, 1], [4, 2], [9, 0]] },
+    { no: "RV-2026-0221", rp: 3, dp: -1, pj: 2, topic: "服务化拆分与云端联调",     plan: "2026-08-03", act: "2026-08-03", res: 0,
+      lf: [[6, 0], [3, 0], [12, 1]] },
+    { no: "RV-2026-0218", rp: 2, dp: -1, pj: 1, topic: "详细设计与 BOM 冻结",      plan: "2026-07-28", act: "2026-07-28", res: 1,
+      lf: [[2, 1], [1, 0], [8, 1], [9, 0]] },
+    { no: "RV-2026-0215", rp: 6, dp: 1,  pj: 3, topic: "计划决策：开发预算与资源",  plan: "2026-07-24", act: "2026-07-24", res: 0,
+      lf: [[8, 0], [4, 0], [9, 0]] },
+    { no: "RV-2026-0212", rp: 1, dp: -1, pj: 6, topic: "总体方案与架构选型",       plan: "2026-07-17", act: "2026-07-17", res: 1,
+      lf: [[6, 1], [3, 0], [10, 1], [14, 0]] },
+    { no: "RV-2026-0209", rp: 4, dp: -1, pj: 2, topic: "系统验证与性能压测",       plan: "2026-07-15", act: "2026-07-15", res: 0,
+      lf: [[3, 0], [12, 0], [7, 1]] },
+    { no: "RV-2026-0205", rp: 0, dp: -1, pj: 5, topic: "需求与概念澄清",           plan: "2026-07-09", act: "2026-07-09", res: 0,
+      lf: [[14, 0], [15, 1], [9, 0]] },
+    { no: "RV-2026-0201", rp: 3, dp: -1, pj: 1, topic: "软硬联调与整机集成",       plan: "2026-07-02", act: "2026-07-08", res: 1,
+      lf: [[0, 1], [1, 2], [5, 1], [6, 0], [9, 0]] },
+    { no: "RV-2026-0197", rp: 5, dp: -1, pj: 6, topic: "发布就绪与交付物审查",     plan: "2026-06-26", act: "2026-06-26", res: 0,
+      lf: [[13, 0], [7, 0], [9, 0]] },
+    { no: "RV-2026-0193", rp: 6, dp: 2,  pj: 6, topic: "可获得性决策：量产与交付",  plan: "2026-06-19", act: "2026-06-19", res: 1,
+      lf: [[2, 1], [8, 1], [13, 0], [9, 0]] },
+    { no: "RV-2026-0188", rp: 2, dp: -1, pj: 4, topic: "详细设计与射频指标",       plan: "2026-06-12", act: "2026-06-16", res: 2,
+      lf: [[11, 2], [1, 1], [2, 1], [5, 0], [9, 0]] },
+    { no: "RV-2026-0184", rp: 1, dp: -1, pj: 3, topic: "总体方案与安全基线",       plan: "2026-06-05", act: "2026-06-05", res: 0,
+      lf: [[4, 0], [10, 0], [3, 1]] },
+    { no: "RV-2026-0179", rp: 0, dp: -1, pj: 7, topic: "需求与概念：车云协同口径",  plan: "2026-05-28", act: "2026-05-28", res: 1,
+      lf: [[14, 1], [6, 1], [8, 0], [9, 0]] },
+    { no: "RV-2026-0173", rp: 4, dp: -1, pj: 1, topic: "系统验证与可靠性复测",     plan: "2026-05-21", act: "2026-05-21", res: 0,
+      lf: [[5, 0], [1, 0], [12, 0]] },
+    { no: "RV-2026-0168", rp: 2, dp: -1, pj: 2, topic: "详细设计与容量模型",       plan: "2026-05-14", act: "2026-05-14", res: 0,
+      lf: [[3, 0], [12, 0], [9, 0]] },
+    { no: "RV-2026-0161", rp: 6, dp: 3,  pj: 0, topic: "生命周期决策：版本退役",    plan: "2026-05-07", act: "2026-05-07", res: 0,
+      lf: [[13, 0], [2, 0], [9, 0]] },
+    { no: "RV-2026-0154", rp: 3, dp: -1, pj: 6, topic: "软硬联调与边缘一体机",     plan: "2026-04-29", act: "2026-05-06", res: 1,
+      lf: [[0, 1], [6, 2], [12, 1], [4, 0], [9, 0]] },
+    { no: "RV-2026-0147", rp: 1, dp: -1, pj: 0, topic: "总体方案与整机架构",       plan: "2026-04-22", act: "2026-04-22", res: 0,
+      lf: [[1, 0], [2, 0], [8, 1], [9, 0]] },
+    { no: "RV-2026-0139", rp: 0, dp: -1, pj: 2, topic: "需求与概念：多租户口径",    plan: "2026-04-15", act: "2026-04-15", res: 1,
+      lf: [[14, 0], [3, 1], [10, 0]] }
+  ];
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 5.1 DCP：cnt 由三态求和现算 */
+  DCPS.forEach((d) => { d.cnt = d.pass + d.cond + d.rej; });
+  D.dcpTotal = sum(DCPS.map((d) => d.cnt));
+  D.dcpPass = sum(DCPS.map((d) => d.pass));
+  D.dcpCond = sum(DCPS.map((d) => d.cond));
+  D.dcpRej = sum(DCPS.map((d) => d.rej));
+  D.dcpOntime = sum(DCPS.map((d) => d.ontime));
+  D.dcpLeft = [0, 1, 2, 3].map((k) => sum(DCPS.map((d) => d.left[k])));
+
+  /* 5.2 TR：pass 现算 = cnt − cond − rej；矩阵反解值另算一份用于比对 */
+  TRS.forEach((t, ti) => {
+    t.pass = t.cnt - t.cond - t.rej;
+    t.passByMatrix = sum(LINES.map((l, li) => Math.round(TR_SPLIT[li][ti] * TR_RATE[li][ti] / 100)));
+    t.late = t.cnt - t.ontime;
+  });
+  D.trTotal = sum(TRS.map((t) => t.cnt));
+  D.trPass = sum(TRS.map((t) => t.pass));
+  D.trPassByMatrix = sum(TRS.map((t) => t.passByMatrix));
+  D.trOntime = sum(TRS.map((t) => t.ontime));
+  D.trLeft = [0, 1, 2, 3].map((k) => sum(TRS.map((t) => t.left[k])));
+  D.trSplitCol = TRS.map((t, ti) => sum(LINES.map((l, li) => TR_SPLIT[li][ti])));
+  D.trSplitRow = LINES.map((l, li) => sum(TR_SPLIT[li]));
+  D.trSplitAll = sum(D.trSplitRow);
+  D.trRate = 100 * D.trPass / D.trTotal;
+
+  /* 5.3 一级口径 7 项（TR1–TR6 + DCP 汇总），台账 / chip / 图表共用同一份 */
+  const RPS = TRS.map((t) => ({
+    name: t.name, label: t.label, kind: "TR",
+    cnt: t.cnt, pass: t.pass, cond: t.cond, rej: t.rej,
+    ontime: t.ontime, late: t.late, left: t.left.slice(), color: C.blue
+  })).concat([{
+    name: "DCP", label: "决策评审 CDCP / PDCP / ADCP / LDCP", kind: "DCP",
+    cnt: D.dcpTotal, pass: D.dcpPass, cond: D.dcpCond, rej: D.dcpRej,
+    ontime: D.dcpOntime, late: D.dcpTotal - D.dcpOntime, left: D.dcpLeft.slice(), color: C.violet
+  }]);
+  RPS.forEach((r) => {
+    r.otd = 100 * r.ontime / r.cnt;
+    r.passRate = 100 * r.pass / r.cnt;
+    r.closeRate = 100 * r.left[1] / r.left[0];
+  });
+
+  /* 5.4 全盘合计（合计 = 分项之和，比率现算） */
+  D.rvTotal = sum(RPS.map((r) => r.cnt));
+  D.pass = sum(RPS.map((r) => r.pass));
+  D.cond = sum(RPS.map((r) => r.cond));
+  D.rej = sum(RPS.map((r) => r.rej));
+  D.ontime = sum(RPS.map((r) => r.ontime));
+  D.late = D.rvTotal - D.ontime;
+  D.otd = 100 * D.ontime / D.rvTotal;                 /* 按期交付率 = 259 ÷ 297 = 87.2% */
+  D.passRate = 100 * D.pass / D.rvTotal;              /* 全盘一次通过率 */
+  D.left = [0, 1, 2, 3].map((k) => sum(RPS.map((r) => r.left[k])));
+  D.leftTotal = D.left[0];
+  D.leftClosed = D.left[1];
+  D.closeRate = 100 * D.leftClosed / D.leftTotal;     /* 遗留项闭环率 = 已闭环 ÷ 总数 */
+  D.resTotals = [D.pass, D.cond, D.rej];
+
+  /* 5.5 矩阵派生：最低格、按线加权一次通过率 */
+  D.matLow = { rate: 101, line: "", tr: "" };
+  TR_RATE.forEach((row, li) => row.forEach((r, ti) => {
+    if (r < D.matLow.rate) D.matLow = { rate: r, line: LINES[li].name, tr: TRS[ti].name };
+  }));
+  D.lineRate = LINES.map((l, li) => {
+    const n = sum(TR_SPLIT[li]);
+    const p = sum(TRS.map((t, ti) => Math.round(TR_SPLIT[li][ti] * TR_RATE[li][ti] / 100)));
+    return 100 * p / n;
+  });
+
+  /* 5.6 抽样行派生：逾期天数 / 遗留项状态分布 / 分段条数 */
+  const DAY = 86400000;
+  function parseDay(ds) {
+    return Date.UTC(Number(ds.slice(0, 4)), Number(ds.slice(5, 7)) - 1, Number(ds.slice(8, 10)));
+  }
+  function addDays(ds, n) {
+    const d = new Date(parseDay(ds) + n * DAY);
+    return pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate());
+  }
+  ROWS.forEach((r) => {
+    r.lateDays = Math.round((parseDay(r.act) - parseDay(r.plan)) / DAY);
+    r.seq = Number(r.no.slice(-4));
+    r.rpName = r.rp === 6 ? DCPS[r.dp].name : TRS[r.rp].name;
+    r.proj = PROJECTS[r.pj].name;
+    r.line = PROJECTS[r.pj].line;
+    r.leftN = r.lf.length;
+    r.leftClosed = r.lf.filter((x) => x[1] === 0).length;
+  });
+  D.n = ROWS.length;
+  D.rowsByRp = RPS.map((rp, i) => ROWS.filter((r) => r.rp === i).length);
+  D.rowsByRes = RES_NAMES.map((s, si) => ROWS.filter((r) => r.res === si).length);
+  D.sampleLate = ROWS.filter((r) => r.lateDays > 0).length;
+  D.sampleOntime = D.n - D.sampleLate;
+  D.sampleOtd = 100 * D.sampleOntime / D.n;
+  D.sampleLeft = sum(ROWS.map((r) => r.leftN));
+  D.sampleLeftClosed = sum(ROWS.map((r) => r.leftClosed));
+  D.sampleShare = 100 * D.n / D.rvTotal;
+  D.worst = ROWS.slice().sort((a, b) => b.lateDays - a.lateDays)[0];
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("yv-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("yv-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("yv-meta-rv").textContent = fmtInt(D.rvTotal);
+  $("yv-meta-n").textContent = fmtInt(D.n);
+
+  /* ===== 7. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "评审总场次", v: D.rvTotal, dec: 0, unit: "场", color: C.blue,
+      s: "TR " + fmtInt(D.trTotal) + " + DCP " + fmtInt(D.dcpTotal) + " · 与父页管道盘同源" },
+    { k: "按期率", v: D.otd, dec: 1, unit: "%", color: C.green,
+      s: fmtInt(D.ontime) + " ÷ " + fmtInt(D.rvTotal) + " 现算 · 契约按期交付率口径" },
+    { k: "一次通过率（全盘）", v: D.passRate, dec: 1, unit: "%", color: C.cyan,
+      s: "通过 " + D.pass + " 场 · 有条件 " + D.cond + " · 否决 " + D.rej },
+    { k: "TR 一次通过率", v: D.trRate, dec: 1, unit: "%", color: C.amber,
+      s: D.trPass + " ÷ " + D.trTotal + " · 由 6×4 矩阵加权反解一致" },
+    { k: "遗留项总数", v: D.leftTotal, dec: 0, unit: "项", color: C.violet,
+      s: "已闭环 " + D.left[1] + " · 进行中 " + D.left[2] + " · 超期 " + D.left[3] },
+    { k: "遗留项闭环率", v: D.closeRate, dec: 1, unit: "%", color: C.orange,
+      s: D.leftClosed + " ÷ " + D.leftTotal + " 现算 · 超期未闭 " + D.left[3] + " 项待清" }
+  ];
+  $("yv-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="yv-kpi" style="--yv-kc:' + p.color + '">' +
+      '<div class="yv-kpi-k">' + p.k + "</div>" +
+      '<div class="yv-kpi-v"><b id="yv-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="yv-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("yv-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 一级筛选 chip（全部 + TR1–TR6 + DCP；计数 = 该评审点全盘场次，非样例数） ===== */
+  const RFILTERS = [{ name: "全部", color: C.blue, n: D.rvTotal, rate: D.passRate, cnt: D.n }]
+    .concat(RPS.map((r, i) => ({ name: r.name, color: r.kind === "DCP" ? C.violet : C.blue, n: r.cnt, rate: r.passRate, cnt: D.rowsByRp[i] })));
+  const rbox = $("yv-rchips");
+  rbox.innerHTML = RFILTERS.map((f, i) => (
+    '<button class="yv-rchip" type="button" data-i="' + i + '" style="--yv-cc:' + f.color + '">' +
+      '<span class="yv-rchip-t"><u>' + f.name + "</u><b>" + fmtInt(f.n) + "</b></span>" +
+      "<i>通过 " + fmtDec(f.rate, 0) + "% · 样例 " + f.cnt + "</i>" +
+    "</button>"
+  )).join("");
+  const rchips = Array.from(rbox.children);
+
+  /* ===== 9. 二级筛选：结论 chip（全部 + 三态；计数随一级筛选联动重算） ===== */
+  const cbox = $("yv-cchips");
+  function resScopeCnt(ri, ci) {
+    return ROWS.filter((r) => (ri === 0 || r.rp === ri - 1) && (ci === 0 || r.res === ci - 1)).length;
+  }
+  function renderCChips(ri, ci) {
+    const items = [{ name: "全部", color: C.blue }]
+      .concat(RES_NAMES.map((n, k) => ({ name: n, color: RES_COLORS[k] })));
+    cbox.innerHTML = items.map((f, i) => (
+      '<button class="yv-cchip' + (i === ci ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === ci ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + resScopeCnt(ri, i) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(cbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(rIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 10. hash 契约：父页 P2「TR 一次通过率矩阵」下钻「子页#encodeURIComponent(评审点名)」
+         归一化后（decodeURIComponent + trim + 全角空白剔除）查表；
+         HASH_ALIAS 收「TR-1」「tr1」「TR１」「TR1评审」等别名，DCP 四子决策点也归到 DCP 口径；
+         产品线名（矩阵纵轴，可能被下钻脚本取到）不改一级筛选，只高亮矩阵对应行。 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("all", 0); alias("全量", 0);
+  TRS.forEach((t, ti) => {
+    const up = t.name, low = t.name.toLowerCase();
+    [up, low].forEach((base) => {
+      const digit = base.slice(2);
+      alias(base, ti + 1);
+      alias(base.slice(0, 2) + "-" + digit, ti + 1);        /* TR-1 / tr-1 */
+      alias(base.slice(0, 2) + "－" + digit, ti + 1);        /* 全角连字符 */
+      alias(base + "评审", ti + 1);
+      alias(base + "技术评审", ti + 1);
+      alias(base + "评审点", ti + 1);
+    });
+    alias("ＴＲ" + t.name.slice(2), ti + 1);                 /* 全角 TR1 */
+    alias(t.label, ti + 1);                                  /* 「需求与概念评审」等中文标签 */
+  });
+  const DCP_IDX = RPS.length;                                /* DCP 在 RFILTERS 中的位次（= 7） */
+  ["DCP", "dcp", "Dcp", "ＤＣＰ"].forEach((k) => alias(k, DCP_IDX));
+  ["DCP评审", "dcp评审", "DCP决策", "决策评审", "决策评审点"].forEach((k) => alias(k, DCP_IDX));
+  DCPS.forEach((d) => {
+    alias(d.name, DCP_IDX); alias(d.name.toLowerCase(), DCP_IDX);
+    alias(d.name + "评审", DCP_IDX); alias(d.label, DCP_IDX);
+  });
+  /* 产品线别名：不改一级筛选，仅高亮矩阵该行 */
+  const LINE_ALIAS = {};
+  LINES.forEach((l, li) => { LINE_ALIAS[l.name] = li; LINE_ALIAS[l.name.toLowerCase()] = li; });
+
+  function normHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    return raw.replace(/[\s　]+/g, "");                      /* trim + 全角空白剔除归一化 */
+  }
+  function resolveHash() {
+    const raw = normHash();
+    if (!raw) return -1;                                     /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  function resolveLineHash() {
+    const raw = normHash();
+    if (!raw) return -1;
+    const hit = LINE_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(ri) {
+    const want = "#" + encodeURIComponent(RFILTERS[ri].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 台账主表渲染（行高 28px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("yv-tbody");
+  let view = ROWS, rIdx = 0, cIdx = 0, selPos = 0, lineHi = -1;
+
+  function rowHtml(r, k) {
+    const rpColor = r.rp === 6 ? C.violet : C.blue;
+    const lateTxt = r.lateDays > 0 ? "+" + r.lateDays + "d" : "按期";
+    const lateColor = r.lateDays > 5 ? C.red : r.lateDays > 0 ? C.amber : C.green;
+    return "<li data-no=\"" + r.no + "\" style=\"animation-delay:" + (k * 12) + "ms\">" +
+      '<span class="yv-no">' + r.no + "</span>" +
+      '<span class="yv-rp" style="color:' + rpColor + '">' + r.rpName + "</span>" +
+      '<span class="yv-proj">' + r.proj + "</span>" +
+      '<span class="yv-line">' + r.line + "</span>" +
+      '<span class="yv-topic">' + r.topic + "</span>" +
+      '<span class="yv-day">' + r.plan.slice(5) + "</span>" +
+      '<span class="yv-day">' + r.act.slice(5) + "</span>" +
+      '<span class="yv-late" style="color:' + lateColor + '">' + lateTxt + "</span>" +
+      '<span class="yv-badge ' + RES_BADGE[r.res] + '">' + RES_NAMES[r.res] + "</span>" +
+      '<span class="yv-left"><u>' + r.leftN + "</u><s>闭 " + r.leftClosed + "</s></span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      /* 手动点行 → 选中并暂停轮巡 20 秒（与 hash 定位同一门闩） */
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    const rp = rIdx === 0 ? null : RPS[rIdx - 1];
+    const scopeN = rp ? rp.cnt : D.rvTotal;
+    const scopeOn = rp ? rp.ontime : D.ontime;
+    $("yv-table-tag").textContent =
+      "抽样展示：全年 " + fmtInt(D.rvTotal) + " 场不逐条陈列 · 样例 " + D.n +
+      " 场（占 " + fmtDec(D.sampleShare, 1) + "%）";
+    $("yv-filters-state").innerHTML =
+      "样例 <b>" + view.length + "</b>/" + D.n + "<i>|</i>全盘 <em>" + fmtInt(scopeN) +
+      "</em> 场 · 按期 <em>" + fmtInt(scopeOn) + "</em>（" + fmtDec(100 * scopeOn / scopeN, 1) + "%）";
+    $("yv-tfoot").innerHTML =
+      "抽样口径：样例 <b>" + D.n + "</b> 场 = 全年 " + fmtInt(D.rvTotal) + " 场的 <b>" + fmtDec(D.sampleShare, 1) +
+      "%</b>（重大逾期与否决场次优先在册，故样例按期率 " + fmtDec(D.sampleOtd, 1) +
+      "% 低于全盘 " + fmtDec(D.otd, 1) + "%）· 样例遗留项 " + D.sampleLeft +
+      " 项 / 全盘 " + fmtInt(D.leftTotal) + " 项 · 逾期天数 = 实际日 − 计划日（现算）";
+  }
+
+  /* ===== 12. 单场评审详情（纯 HTML/CSS；选中行联动）
+         评审要素清单（材料 / 参会角色 / 决议）+ 遗留项闭环追踪（3~5 条，责任人 / 计划关闭日 / 状态三态） ===== */
+  function renderSel() {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("yv-detail-tag").textContent = "当前筛选无样例场次";
+      $("yv-dt-headbox").innerHTML = '<div class="yv-dt-sub">调整评审点或结论筛选后，此处展示选中场次的评审要素与遗留项。</div>';
+      $("yv-dt-elements").innerHTML = "";
+      $("yv-lf-tag").innerHTML = "";
+      $("yv-lf-list").innerHTML = "";
+      return;
+    }
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    const el = ELEMENTS[r.rpName];
+    const rp = RPS[r.rp];
+    const rpColor = r.rp === 6 ? C.violet : C.blue;
+    $("yv-detail-tag").textContent = "评审材料 / 参会角色 / 决议 + 遗留项闭环追踪";
+    $("yv-dt-headbox").innerHTML =
+      '<div class="yv-dt-no"><b>' + r.no + "</b>" +
+        '<span class="yv-badge" style="background:' + rpColor + ";color:#071026\">" + r.rpName + "</span>" +
+        '<span class="yv-badge ' + RES_BADGE[r.res] + '">' + RES_NAMES[r.res] + "</span>" +
+        '<span class="yv-dt-sub">' + (r.rp === 6 ? DCPS[r.dp].label : rp.label) + "</span></div>" +
+      '<div class="yv-dt-title"><b>' + r.proj + "</b> · " + r.line + " · " + r.topic + "</div>" +
+      '<div class="yv-dt-sub">计划 <b>' + r.plan + "</b> → 实际 <b>" + r.act + "</b> · " +
+        (r.lateDays > 0 ? "逾期 <b>" + r.lateDays + "</b> 天" : "按期召开") +
+        " · 该评审点全盘按期率 <b>" + fmtDec(rp.otd, 1) + "</b>%</div>";
+    const elRows = [
+      { k: "评审材料", v: el.mats, c: C.blue },
+      { k: "参会角色", v: el.roles, c: C.cyan },
+      { k: "决议", v: (r.res === 0 ? "通过 · " + el.exit
+                     : r.res === 1 ? "有条件通过 · 遗留项限期关闭后自动生效，不再复评"
+                     : "否决 · 补齐材料与整改证据后重新申请评审"), c: RES_COLORS[r.res] }
+    ];
+    $("yv-dt-elements").innerHTML = elRows.map((x) => (
+      '<div class="yv-el-row" style="--yv-pc:' + x.c + '"><b>' + x.k + "</b><span>" + x.v + "</span></div>"
+    )).join("");
+    $("yv-lf-tag").innerHTML =
+      "<u>遗留项闭环追踪</u><span>本场 <b>" + r.leftN + "</b> 项 · 已闭环 <b>" + r.leftClosed +
+      "</b> 项（" + fmtDec(100 * r.leftClosed / r.leftN, 0) + "%）· 计划关闭日 = 评审日 + 约定周期</span>";
+    $("yv-lf-list").innerHTML = r.lf.map((it, k) => {
+      const owner = OWNERS[(r.seq + k * 3) % OWNERS.length];
+      const due = addDays(r.act, DUE_OFF[k % DUE_OFF.length]);
+      return '<div class="yv-lf-row"><span>' + LEFT_POOL[it[0]] + "</span>" +
+        "<em>" + owner + "</em><em>" + due + "</em>" +
+        '<span class="yv-badge ' + LST_BADGE[it[1]] + '">' + LST_NAMES[it[1]] + "</span></div>";
+    }).join("");
+  }
+
+  /* ===== 13. TR 一次通过率矩阵 6 × 4（与父页 TR_RATE 同源同值；本次筛选高亮该 TR 列 / 该产品线行）
+         ★ piecewise visualMap 设了两端 text 必须显式补 showLabel: true，否则每档 label 被整体吞掉。 ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function matrixOption(ri, li) {
+    /* ★ 只把标量与数组下发给 option（[x, y, value] 三元组 + 逐点 itemStyle），无任何对象回指 */
+    const hiTr = ri >= 1 && ri <= TRS.length ? ri - 1 : -1;
+    const data = [];
+    TR_RATE.forEach((row, y) => row.forEach((v, x) => {
+      const on = (hiTr < 0 && li < 0) || (hiTr >= 0 && x === hiTr) || (li >= 0 && y === li);
+      data.push({
+        value: [x, y, v],
+        itemStyle: on
+          ? { borderColor: C.amber, borderWidth: hiTr >= 0 || li >= 0 ? 1.6 : 0.6, opacity: 1 }
+          : { borderColor: "rgba(8,18,49,.9)", borderWidth: 0.6, opacity: 0.34 }
+      });
+    }));
+    const trNames = TRS.map((t) => t.name);
+    const lineNames = LINES.map((l) => l.name);
+    const splits = TR_SPLIT;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 6, top: 8, bottom: 24, containLabel: true },
+      tooltip: Object.assign({
+        position: "top",
+        formatter: (p) => {
+          const x = p.data.value[0], y = p.data.value[1], v = p.data.value[2];
+          const n = splits[y][x], ps = Math.round(n * v / 100);
+          return "<b>" + lineNames[y] + " × " + trNames[x] + "</b><br/>一次通过率 <b style=\"color:" +
+            (v < 80 ? C.red : C.green) + "\">" + v + "%</b><br/><span style=\"color:" + C.textDim +
+            "\">年度场次 " + n + " 场 · 一次通过 " + ps + " 场</span>";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: trNames.slice(), splitArea: { show: false },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 11, fontWeight: 700 }
+      },
+      yAxis: {
+        type: "category", data: lineNames.slice(), splitArea: { show: false },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10.5 }
+      },
+      visualMap: {
+        type: "piecewise", show: true, orient: "horizontal", left: "center", bottom: 0,
+        itemWidth: 12, itemHeight: 10, itemGap: 6,
+        text: ["高", "低"], showLabel: true,                 /* ★ 设了 text 必须显式 showLabel */
+        textStyle: { color: C.textDim, fontSize: 9.5 },
+        pieces: [
+          { min: 95, max: 100, label: "≥95", color: C.green },
+          { min: 90, max: 95,  label: "90–95", color: C.cyan },
+          { min: 85, max: 90,  label: "85–90", color: C.blue },
+          { min: 80, max: 85,  label: "80–85", color: C.amber },
+          { min: 0,  max: 80,  label: "<80 预警", color: C.red }
+        ]
+      },
+      series: [{
+        type: "heatmap", data: data,
+        label: { show: true, color: "#0a1730", fontSize: 10.5, fontWeight: 700, formatter: (p) => p.data.value[2] + "%" },
+        emphasis: { itemStyle: { borderColor: "#fff", borderWidth: 1.6 } }
+      }]
+    };
+  }
+
+  /* ===== 14. 按期 / 逾期分布（7 个一级口径横向堆叠；按期率现算，全盘回归 87.2%） ===== */
+  function ontimeOption(ri) {
+    const names = RPS.map((r) => r.name);
+    const on = RPS.map((r) => r.ontime);
+    const late = RPS.map((r) => r.late);
+    const rate = RPS.map((r) => Number(fmtDec(r.otd, 1)));
+    const hi = ri - 1;
+    const style = (base) => RPS.map((r, i) => ({
+      value: base[i],
+      itemStyle: { opacity: hi < 0 || i === hi ? 1 : 0.34 }
+    }));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 40, top: 6, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + names[i] + "</b><br/>按期 <b style=\"color:" + C.green + "\">" + on[i] +
+            "</b> 场 · 逾期 <b style=\"color:" + C.red + "\">" + late[i] + "</b> 场<br/>按期率 <b>" +
+            fmtDec(rate[i], 1) + "%</b> · 合计 " + (on[i] + late[i]) + " 场";
+        }
+      }, TIP),
+      xAxis: {
+        type: "value", axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      yAxis: {
+        type: "category", data: names.slice(), inverse: true,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10, fontWeight: 700 }
+      },
+      series: [
+        { name: "按期", type: "bar", stack: "rv", barWidth: "56%", data: style(on),
+          itemStyle: { color: C.green, borderRadius: [3, 0, 0, 3] } },
+        { name: "逾期", type: "bar", stack: "rv", data: style(late),
+          itemStyle: { color: C.red, borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: "right", color: C.amber, fontSize: 9.5, fontWeight: 700,
+            formatter: (p) => fmtDec(rate[p.dataIndex], 1) + "%" } }
+      ]
+    };
+  }
+
+  /* ===== 15. 遗留项闭环环形（三态；闭环率现算，随一级筛选切口径） ===== */
+  function leftOption(ri) {
+    const src = ri === 0 ? D.left : RPS[ri - 1].left;
+    const total = src[0], closed = src[1];
+    const rate = 100 * closed / total;
+    const vals = [src[1], src[2], src[3]];
+    return {
+      backgroundColor: "transparent",
+      title: {
+        text: fmtDec(rate, 1) + "%", subtext: "闭环率 · " + RFILTERS[ri].name,
+        left: "34%", top: "34%", textAlign: "center",
+        textStyle: { color: C.green, fontSize: 20, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" },
+        subtextStyle: { color: C.textDim, fontSize: 10 }
+      },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => "<b>" + p.name + "</b><br/>" + p.value + " 项 · 占 " +
+          fmtDec(100 * p.value / total, 1) + "%<br/><span style=\"color:" + C.textDim +
+          "\">口径 " + RFILTERS[ri].name + " · 遗留项合计 " + total + " 项</span>"
+      }, TIP),
+      legend: {
+        orient: "vertical", right: 2, top: "center", itemWidth: 10, itemHeight: 8, itemGap: 9,
+        textStyle: { color: C.textDim, fontSize: 10 },
+        formatter: (n) => n + " " + vals[LST_NAMES.indexOf(n)],
+        data: LST_NAMES.slice()
+      },
+      series: [{
+        type: "pie", radius: ["52%", "76%"], center: ["34%", "50%"], avoidLabelOverlap: true,
+        label: { show: false }, labelLine: { show: false },
+        itemStyle: { borderColor: "#0a1730", borderWidth: 2 },
+        data: LST_NAMES.map((n, k) => ({ name: n, value: vals[k], itemStyle: { color: LST_COLORS[k] } }))
+      }]
+    };
+  }
+
+  /* ===== 16. 筛选主流程：一次调用刷新 chip / 表 / 详情 / 三张图 / 页头 chip（单一入口） ===== */
+  function applyFilter(ri, ci, pushHash) {
+    rIdx = clamp(ri, 0, RFILTERS.length - 1);
+    cIdx = clamp(ci, 0, RES_NAMES.length);
+    view = ROWS.filter((r) =>
+      (rIdx === 0 || r.rp === rIdx - 1) && (cIdx === 0 || r.res === cIdx - 1));
+    selPos = 0;
+    rchips.forEach((el, i) => {
+      const on = i === rIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? RFILTERS[i].color : "";
+      el.style.borderColor = on ? RFILTERS[i].color : "";
+    });
+    renderCChips(rIdx, cIdx);
+    const rp = rIdx === 0 ? null : RPS[rIdx - 1];
+    $("yv-chip-key").textContent = "一次通过率 · " + RFILTERS[rIdx].name;
+    $("yv-chip-rate").textContent = fmtDec(rp ? rp.passRate : D.passRate, 1) + "%";
+    $("yv-matrix-tag").innerHTML = "24 格与父页同源 · 最低 <b>" + D.matLow.tr + " × " + D.matLow.line + " " +
+      D.matLow.rate + "%</b> · " + (rIdx >= 1 && rIdx <= TRS.length ? "高亮 " + RFILTERS[rIdx].name + " 列"
+        : lineHi >= 0 ? "高亮 " + LINES[lineHi].name + " 行" : "全矩阵");
+    $("yv-ontime-tag").innerHTML = "Σ 按期 <b>" + fmtInt(D.ontime) + "</b> / " + fmtInt(D.rvTotal) +
+      " = " + fmtDec(D.otd, 1) + "%";
+    const lsrc = rIdx === 0 ? D.left : RPS[rIdx - 1].left;
+    $("yv-left-tag").innerHTML = "Σ <b>" + lsrc[0] + "</b> 项 · 口径 " + RFILTERS[rIdx].name;
+    renderTable();
+    renderSel();
+    if (matrixChart) matrixChart.setOption(matrixOption(rIdx, lineHi), true);
+    if (ontimeChart) ontimeChart.setOption(ontimeOption(rIdx), true);
+    if (leftChart) leftChart.setOption(leftOption(rIdx), true);
+    if (pushHash) syncHash(rIdx);
+  }
+
+  rchips.forEach((el) => el.addEventListener("click", () => { lineHi = -1; applyFilter(Number(el.dataset.i), 0, true); }));
+
+  /* hash 定位：命中评审点则激活筛选 chip、闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) {
+      const li = resolveLineHash();
+      lineHi = li;
+      applyFilter(0, 0, false);
+      if (li >= 0) pauseRotate(20000);
+      return;
+    }
+    lineHi = -1;
+    applyFilter(hit, 0, false);
+    if (hit > 0) {
+      const chip = rchips[hit];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                 /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发IPD管道与评审1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 17. kiosk 轮巡：台账行 3 秒逐行高亮并联动详情；hash 定位或手动点行后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 18. 初始渲染：先填充全部 DOM（KPI + 表 + 详情），再 init 图表 ===== */
+  let matrixChart = null, ontimeChart = null, leftChart = null;
+  applyFilter(0, 0, false);                                  /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  matrixChart = echarts.init($("yv-chart-matrix"));
+  matrixChart.setOption(matrixOption(0, -1));
+  ontimeChart = echarts.init($("yv-chart-ontime"));
+  ontimeChart.setOption(ontimeOption(0));
+  leftChart = echarts.init($("yv-chart-left"));
+  leftChart.setOption(leftOption(0));
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* 矩阵轮播提示：逐格巡检 24 格 */
+  let tipIdx = 0;
+  setInterval(() => {
+    matrixChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % (TRS.length * LINES.length);
+  }, 4200);
+
+  /* ===== 19. 底部评审研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "TR4 软硬联调关口一次通过率最低：" + D.matLow.tr + " × " + D.matLow.line + " 仅 " +
+        D.matLow.rate + "%，该评审点遗留项 " + RPS[3].left[0] + " 项、超期未闭 " + RPS[3].left[3] +
+        " 项，为全盘最高" },
+    { lv: "高", c: C.red, t: "否决场次全年 " + D.rej + " 场（占 " + fmtDec(100 * D.rej / D.rvTotal, 1) +
+        "%），样例内最长逾期「" + D.worst.no + " · " + D.worst.rpName + " · " + D.worst.proj + "」逾期 " +
+        D.worst.lateDays + " 天" },
+    { lv: "中", c: C.orange, t: "按期交付率 " + fmtDec(D.otd, 1) + "% = 按期 " + fmtInt(D.ontime) + " ÷ 总数 " +
+        fmtInt(D.rvTotal) + "（TR " + fmtInt(D.trTotal) + " + DCP " + fmtInt(D.dcpTotal) +
+        "），逾期 " + D.late + " 场仍高于目标 90% 的缺口" },
+    { lv: "中", c: C.orange, t: "遗留项闭环 " + D.leftClosed + " / " + D.leftTotal + " = " + fmtDec(D.closeRate, 1) +
+        "%，进行中 " + D.left[2] + " 项、超期未闭 " + D.left[3] + " 项，超期项集中在 TR3 / TR4 详细设计与联调段" },
+    { lv: "低", c: C.amber, t: "四产品线加权一次通过率：" + LINES.map((l, li) => l.name + " " + fmtDec(D.lineRate[li], 1) + "%").join(" · ") },
+    { lv: "低", c: C.green, t: "TR 一次通过 " + D.trPass + " / " + D.trTotal + " = " + fmtDec(D.trRate, 1) +
+        "%，与 6×4 矩阵按场次加权反解 " + D.trPassByMatrix + " 场逐点一致（矩阵即台账的上游口径）" },
+    { lv: "低", c: C.green, t: "勾稽：评审总数 " + fmtInt(D.rvTotal) + " = TR " + fmtInt(D.trTotal) + " + DCP " +
+        fmtInt(D.dcpTotal) + "；三态 " + D.pass + " + " + D.cond + " + " + D.rej + " = " + fmtInt(D.rvTotal) +
+        "；按期 " + fmtInt(D.ontime) + " + 逾期 " + D.late + " = " + fmtInt(D.rvTotal) }
+  ];
+  const track = $("yv-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="yv-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                    /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 20. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(matrixOption(0, -1)); JSON.stringify(matrixOption(4, 2)); JSON.stringify(ontimeOption(0)); JSON.stringify(leftOption(7)); }
+  catch (e) { optAcyclic = false; console.error("[TR评审台账] option 存在循环引用：", e.message); }
+
+  const matStr = TR_RATE.map((row) => row.join(",")).join("|");
+  const checks = [
+    ["评审点名与父页逐字（TR1–TR6）", TRS.map((t) => t.name).join(",") === TR_NAME_REF],
+    ["产品线名与父页逐字（矩阵纵轴四线）", LINES.map((l) => l.name).join(",") === LINE_NAME_REF],
+    ["年度评审总数 297 = TR 230 + DCP 67（各自现算）",
+      D.trTotal === TR_REF && D.dcpTotal === DCP_REF && D.rvTotal === RV_REF],
+    ["TR1–TR6 年度场次与父页逐字（48/44/42/38/32/26）",
+      TRS.every((t, i) => t.cnt === TR_CNT_REF[i])],
+    ["DCP 四决策点场次与父页三态之和逐字（22/21/15/9）",
+      DCPS.every((d, i) => d.cnt === DCP_CNT_REF[i]) && D.dcpPass === 43 && D.dcpCond === 17 && D.dcpRej === 7],
+    ["矩阵值与父页同源逐格相等（24 格字符串比对）", matStr === TR_RATE_REF],
+    ["矩阵 24 格均在 70%–98% 区间（父页口径）",
+      TR_RATE.every((row) => row.every((v) => v >= 70 && v <= 98))],
+    ["TR 场次拆分列和 == 各 TR 年度场次（二级拆分收敛）",
+      D.trSplitCol.every((v, i) => v === TRS[i].cnt)],
+    ["TR 场次拆分全表 Σ = 230 且行和 = 四产品线年度 TR 场次",
+      D.trSplitAll === TR_REF && D.trSplitRow.every((v) => v > 0) && sum(D.trSplitRow) === TR_REF],
+    ["TR 通过场次 = 矩阵按场次加权反解（逐 TR 相等）",
+      TRS.every((t) => t.pass === t.passByMatrix) && D.trPass === D.trPassByMatrix],
+    ["结论三态 Σ = 297（通过 + 有条件 + 否决）",
+      D.pass + D.cond + D.rej === RV_REF && D.resTotals.every((v) => v > 0)],
+    ["逐评审点三态之和 = 该点年度场次", RPS.every((r) => r.pass + r.cond + r.rej === r.cnt)],
+    ["按期 259 ÷ 297 ≈ 87.2%（容差 0.05，契约按期交付率）",
+      D.ontime === ONTIME_REF && Math.abs(D.otd - OTD_REF) < 0.05],
+    ["逐评审点按期 + 逾期 = 该点年度场次，且 Σ 按期 = 259",
+      RPS.every((r) => r.ontime + r.late === r.cnt) && sum(RPS.map((r) => r.ontime)) === ONTIME_REF],
+    ["TR 按期 " + D.trOntime + " + DCP 按期 " + D.dcpOntime + " = 259",
+      D.trOntime + D.dcpOntime === ONTIME_REF],
+    ["遗留项四元组自洽：总数 = 已闭环 + 进行中 + 超期（逐评审点）",
+      RPS.every((r) => r.left[0] === r.left[1] + r.left[2] + r.left[3])],
+    ["遗留项闭环率 = 已闭环 ÷ 总数 = 363 ÷ 418",
+      D.leftTotal === 418 && D.leftClosed === 363 && Math.abs(D.closeRate - 100 * 363 / 418) < 1e-9],
+    ["遗留项 Σ = TR 段 + DCP 段（两段双向收敛）",
+      D.trLeft.every((v, k) => v + D.dcpLeft[k] === D.left[k])],
+    ["抽样各段条数 = 一级 chip 计数（含「全部」）",
+      RFILTERS.every((f, i) => f.cnt === (i === 0 ? ROWS.length : ROWS.filter((r) => r.rp === i - 1).length))],
+    ["一级 chip 计数 = 该评审点全盘场次（非样例数）",
+      RFILTERS.slice(1).every((f, i) => f.n === RPS[i].cnt) && RFILTERS[0].n === RV_REF],
+    ["二级结论 chip 计数在「全部」口径下之和 = 样例总数 22",
+      sum(RES_NAMES.map((n, k) => resScopeCnt(0, k + 1))) === D.n && D.n === 22],
+    ["抽样等级分布之和 = 样例总数，且 3 ≤ 每场遗留项 ≤ 5",
+      sum(D.rowsByRp) === D.n && ROWS.every((r) => r.leftN >= 3 && r.leftN <= 5)],
+    ["逐行逾期天数 = 实际日 − 计划日（现算且 ≥ 0）",
+      ROWS.every((r) => r.lateDays === Math.round((parseDay(r.act) - parseDay(r.plan)) / DAY) && r.lateDays >= 0)],
+    ["样例逾期场次 = 逾期天数 > 0 的行数，按期 + 逾期 = 22",
+      D.sampleOntime + D.sampleLate === D.n && D.sampleLate === ROWS.filter((r) => r.lateDays > 0).length],
+    ["样例遗留项 Σ 与已闭环 Σ 现算一致（逐行 lf 状态求和）",
+      D.sampleLeft === sum(ROWS.map((r) => r.lf.length)) &&
+      D.sampleLeftClosed === sum(ROWS.map((r) => r.lf.filter((x) => x[1] === 0).length))],
+    ["样例编号唯一、格式 RV-2026-XXXX、落在 1–297 且按时间倒序严格递减",
+      (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^RV-2026-\d{4}$/.test(r.no) && r.seq >= 1 && r.seq <= RV_REF) &&
+      ROWS.every((r, i) => i === 0 || r.seq < ROWS[i - 1].seq)],
+    ["样例实际评审日严格倒序且均落在统计窗口内（2025-09 ~ 2026-08）",
+      ROWS.every((r, i) => (i === 0 || r.act < ROWS[i - 1].act) &&
+        r.act >= "2025-09-01" && r.act <= "2026-08-31")],
+    ["样例项目 / 产品线取契约八重点项目逐字，产品线由项目派生",
+      ROWS.every((r) => PROJECTS[r.pj] && PROJECTS[r.pj].line === r.line) &&
+      (new Set(ROWS.map((r) => r.pj))).size === PROJECTS.length],
+    ["样例评审点索引合法：TR 行 dp = −1、DCP 行 dp 命中四决策点",
+      ROWS.every((r) => (r.rp >= 0 && r.rp < RPS.length) &&
+        (r.rp === 6 ? (r.dp >= 0 && r.dp < DCPS.length) : r.dp === -1))],
+    ["每场评审均有要素清单（材料 / 角色 / 出口准则）",
+      ROWS.every((r) => ELEMENTS[r.rpName] && ELEMENTS[r.rpName].mats && ELEMENTS[r.rpName].roles && ELEMENTS[r.rpName].exit)],
+    ["遗留项模板索引与状态三态合法",
+      ROWS.every((r) => r.lf.every((x) => x[0] >= 0 && x[0] < LEFT_POOL.length && x[1] >= 0 && x[1] < LST_NAMES.length))],
+    ["hash TR1–TR6 与 DCP 均可解析（含「TR-1」「tr1」「CDCP」等别名）",
+      HASH_ALIAS["TR1"] === 1 && HASH_ALIAS["TR6"] === 6 && HASH_ALIAS["DCP"] === DCP_IDX &&
+      HASH_ALIAS["tr1"] === 1 && HASH_ALIAS["TR-1"] === 1 && HASH_ALIAS["TR4评审"] === 4 &&
+      HASH_ALIAS["dcp"] === DCP_IDX && HASH_ALIAS["CDCP"] === DCP_IDX && HASH_ALIAS["LDCP"] === DCP_IDX &&
+      TRS.every((t, i) => HASH_ALIAS[t.name] === i + 1)],
+    ["产品线 hash 别名解析到矩阵行（不改一级筛选）",
+      LINES.every((l, li) => LINE_ALIAS[l.name] === li)],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[TR评审台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1210 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发跨域接口台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --ry-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：接口号 / 接口名 / 两端域 / 基线 / 负责人 / 计划联调日 / 状态 / 缺陷 */
+    --ry-tcols: 90px 1fr 92px 52px 116px 76px 58px 40px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .ry-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 8% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 92% 6%, rgba(169, 140, 245, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 430px 430px;
+    grid-template-rows: 84px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .ry-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .ry-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .ry-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .ry-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(169, 140, 245, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(169, 140, 245, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .ry-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .ry-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .ry-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .ry-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .ry-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到软硬云AI集成协同，琥珀描边与本页星蓝主色区分 */
+  .ry-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .ry-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .ry-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .ry-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .ry-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .ry-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .ry-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .ry-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .ry-chips { display: flex; align-items: center; gap: 9px; }
+  .ry-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 122px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .ry-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .ry-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .ry-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .ry-chip.is-key b { color: var(--rnd-blue); }
+  .ry-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .ry-clock-time { font: 700 26px/1 var(--ry-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .ry-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 筛选条：域对 chip（hash 契约目标：父页六对组合名逐字）+ 联调状态二级过滤 ===== */
+  .ry-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .ry-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .ry-pchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer; flex: none;
+    padding: 6px 9px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 12.5px; letter-spacing: 0.02em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .ry-pchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .ry-pchip b { font: 700 12px/1 var(--ry-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .ry-pchip i { font-style: normal; font-size: 10.5px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .ry-pchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .ry-pchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .ry-pchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .ry-pchip.is-hit { animation: ry-hit 0.9s ease-in-out 2; }
+  @keyframes ry-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--ry-cc, rgba(92, 157, 255, 0.8)); } }
+  .ry-fdiv { flex: none; width: 1px; height: 24px; margin: 0 3px; background: rgba(96, 140, 255, 0.28); }
+  .ry-schip {
+    display: flex; align-items: baseline; gap: 5px; cursor: pointer; flex: none;
+    padding: 4px 9px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.04em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .ry-schip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .ry-schip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .ry-schip.is-on { color: #071026; font-weight: 700; }
+  .ry-schip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  .ry-filters-state {
+    margin-left: auto; flex: 1; min-width: 0; text-align: right;
+    font-size: 11.5px; color: var(--rnd-text-dim); letter-spacing: 0.04em; font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ry-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .ry-filters-state em { font-style: normal; color: #d3e2ff; }
+  .ry-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 7px; }
+
+  /* ===== KPI 条（五格，翻牌缓动；init 前填充完毕） ===== */
+  .ry-kpis {
+    grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; min-width: 0;
+  }
+  .ry-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .ry-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--ry-kc, var(--rnd-blue));
+  }
+  .ry-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .ry-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .ry-kpi-v b { font: 700 24px/1 var(--ry-mono); color: var(--ry-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .ry-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .ry-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .ry-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .ry-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .ry-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .ry-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .ry-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .ry-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .ry-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ry-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .ry-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：行高 24px × 26 行 + 表头，tbody overflow hidden 防撑破 */
+  .ry-panel.is-ledger { flex: none; height: 742px; min-height: 0; overflow: hidden; }
+  /* ★ 时间轴块由 JS 填充（选中行联动重绘）：写死高度 + min-height:0 + overflow:hidden，
+     避免填充后把同列兄弟块压变形；本页所有 DOM 均在 echarts.init 之前填充完毕。 */
+  .ry-panel.is-tl { flex: none; height: 306px; min-height: 0; overflow: hidden; }
+  .ry-panel.is-blk { flex: 1; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .ry-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .ry-thead, .ry-tbody li {
+    display: grid; grid-template-columns: var(--ry-tcols); align-items: center; gap: 8px;
+  }
+  .ry-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .ry-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .ry-tbody li {
+    padding: 0 8px; height: 24px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: ry-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes ry-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .ry-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .ry-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .ry-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .ry-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ry-tbody li .ry-no { font: 700 11.5px/1 var(--ry-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.03em; }
+  .ry-tbody li .ry-nm { color: #dfe9ff; }
+  .ry-tbody li .ry-pr { font-size: 11.5px; font-weight: 700; }
+  .ry-tbody li .ry-bl { font-size: 11.5px; color: #bfd2f6; }
+  .ry-tbody li .ry-ow { font-size: 11.5px; color: #a9bce4; }
+  .ry-tbody li .ry-dt { font-size: 11.5px; color: #a9bce4; }
+  .ry-tbody li .ry-df { text-align: right; font: 700 12px/1 var(--ry-mono); }
+  .ry-badge {
+    padding: 2px 6px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  /* 联调状态四档 */
+  .ry-badge.is-s0 { color: #063a25; background: var(--rnd-green); }
+  .ry-badge.is-s1 { color: #3a2a05; background: var(--rnd-amber); }
+  .ry-badge.is-s2 { border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+  .ry-badge.is-s3 { color: #3d060c; background: var(--rnd-red); }
+
+  /* ===== 中栏上：单接口五节点联调时间轴（纯 HTML/CSS） ===== */
+  .ry-tl-head { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 7px 10px 8px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 8px; min-height: 66px; }
+  .ry-tl-no { display: flex; align-items: center; gap: 8px; }
+  .ry-tl-no b { font: 700 13px/1 var(--ry-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .ry-tl-title { font-size: 13px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ry-tl-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ry-tl-sub b { font-weight: 700; color: #c9d8f8; }
+  .ry-tl-bar { flex: none; display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; background: rgba(14, 26, 66, 0.5); }
+  .ry-tl-seg { position: relative; min-width: 14px; }
+  .ry-tl-seg + .ry-tl-seg { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .ry-tl-seg.is-cur {
+    background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px) !important;
+    animation: ry-breath 1.6s ease-in-out infinite;
+  }
+  @keyframes ry-breath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+  .ry-tl-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ry-tl-row { flex: 1; display: grid; grid-template-columns: 84px 1fr 62px; align-items: center; gap: 8px; padding: 0 4px; border-radius: 5px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .ry-tl-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .ry-tl-row b { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.02em; }
+  .ry-tl-row b::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--ry-pc, var(--rnd-blue)); }
+  .ry-tl-row.is-todo b { color: rgba(127, 146, 196, 0.6); }
+  .ry-tl-row.is-todo b::before { opacity: 0.3; }
+  .ry-tl-row span { color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ry-tl-row em { font-style: normal; text-align: right; font: 700 13px/1 var(--ry-mono); color: var(--rnd-cyan); }
+  .ry-tl-row.is-cur em { color: var(--rnd-amber); }
+  .ry-tl-row.is-todo em { color: rgba(127, 146, 196, 0.5); }
+
+  /* ===== 中栏下：阻塞接口清单（按阻塞天数降序） ===== */
+  .ry-blk-list { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; overflow: hidden; display: flex; flex-direction: column; gap: 7px; }
+  .ry-blk {
+    flex: none; padding: 6px 10px 7px; border-radius: 8px; cursor: pointer;
+    border: 1px solid rgba(255, 95, 107, 0.26); background: rgba(60, 18, 34, 0.34);
+    transition: border-color .2s, background .2s;
+  }
+  .ry-blk:hover { border-color: rgba(255, 95, 107, 0.7); background: rgba(72, 22, 40, 0.5); }
+  .ry-blk.is-sel { border-color: var(--rnd-red); box-shadow: inset 2px 0 0 var(--rnd-red); }
+  .ry-blk-r1 { display: flex; align-items: baseline; gap: 8px; }
+  .ry-blk-r1 b { font: 700 11.5px/1 var(--ry-mono); color: #ffb9be; letter-spacing: 0.03em; flex: none; }
+  .ry-blk-r1 em { font-style: normal; font-size: 12.5px; font-weight: 700; color: #ffe6e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+  .ry-blk-r1 u { text-decoration: none; flex: none; font: 700 16px/1 var(--ry-mono); color: var(--rnd-red); font-variant-numeric: tabular-nums; }
+  .ry-blk-r1 s { text-decoration: none; flex: none; font-size: 10.5px; color: rgba(255, 185, 190, 0.8); }
+  .ry-blk-r2 { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 11px; color: rgba(214, 226, 250, 0.78); font-variant-numeric: tabular-nums; }
+  .ry-blk-r2 i { font-style: normal; padding: 1px 6px 2px; border-radius: 4px; font-size: 10.5px; font-weight: 700; flex: none; }
+  .ry-blk-r2 span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ry-blk-t { margin-top: 5px; height: 5px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .ry-blk-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; background: linear-gradient(90deg, rgba(255, 95, 107, 0.45), var(--rnd-red)); }
+  .ry-blk-empty { font-size: 12px; color: var(--rnd-text-dim); padding: 10px 4px; }
+
+  /* ===== 底部口径与研判滚动条 ===== */
+  .ry-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .ry-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange);
+  }
+  .ry-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: ry-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes ry-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .ry-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .ry-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .ry-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .ry-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .ry-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .ry-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="ry-stage" id="ry-stage">
+    <!-- mockflag:begin --><div class="ry-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="ry-error" id="ry-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="ry-header">
+      <div class="ry-head-left">
+        <div class="ry-crumb">
+          <a class="ry-crumb-up" href="大屏样板间-研发软硬云AI集成协同1920.html" title="返回上级专题页（Esc）">‹ 返回 软硬云AI集成协同</a>
+          <b>云麓智联科技</b><i>›</i><span>软硬云AI集成协同</span><i>›</i><em>跨域接口联调台账</em>
+        </div>
+        <div class="ry-head-title-row">
+          <div class="ry-head-title">跨域接口联调台账</div>
+          <div class="ry-head-meta">
+            <span>接口总盘 <b id="ry-meta-all">--</b> 条 · 本表抽样 <b id="ry-meta-n">--</b> 条（<b id="ry-meta-p">--</b>）</span><i>|</i>
+            <span><b>6</b> 对域组合 · <b>4</b> 条集成基线 · <b>5</b> 节点联调</span><i>|</i>
+            <span>今日线 <b>2026-08-20</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="ry-head-right">
+        <div class="ry-chips">
+          <div class="ry-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="ry-chip is-key"><span id="ry-chip-key">达成率 · 全部</span><b id="ry-chip-rate">--</b></div>
+        </div>
+        <div class="ry-clock" aria-label="实时时钟">
+          <span class="ry-clock-time" id="ry-clock-time">--:--:--</span>
+          <span class="ry-clock-date" id="ry-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 筛选条：域对 chip（hash 契约目标：父页六对组合名逐字）+ 联调状态二级过滤 -->
+    <div class="ry-filters">
+      <span class="ry-filters-tag">域对筛选</span>
+      <div id="ry-pchips" style="display:flex;align-items:center;gap:8px;"></div>
+      <span class="ry-fdiv"></span>
+      <span class="ry-filters-tag">联调状态</span>
+      <div id="ry-schips" style="display:flex;align-items:center;gap:7px;"></div>
+      <div class="ry-filters-state" id="ry-filters-state">--</div>
+    </div>
+
+    <!-- KPI 五格 -->
+    <div class="ry-kpis" id="ry-kpis"></div>
+
+    <!-- 左：跨域接口明细台账（写死高度 742px = 26 行 × 24px + 表头） -->
+    <div class="ry-col">
+      <section class="ry-panel is-ledger">
+        <div class="ry-panel-head">
+          <h2>跨域接口明细台账（域对 × 集成基线）</h2>
+          <span class="ry-panel-tag" id="ry-table-tag">--</span>
+        </div>
+        <div class="ry-table">
+          <div class="ry-thead">
+            <span>接口号</span><span>接口名</span><span>两端域</span><span>基线</span>
+            <span>负责人（两端）</span><span>计划联调日</span><span>状态</span><span>缺陷</span>
+          </div>
+          <ul class="ry-tbody" id="ry-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中：单接口五节点联调时间轴 + 阻塞接口清单 -->
+    <div class="ry-col">
+      <section class="ry-panel is-tl">
+        <div class="ry-panel-head">
+          <h2>单接口联调时间轴</h2>
+          <span class="ry-panel-tag" id="ry-tl-tag">--</span>
+        </div>
+        <div class="ry-tl-head" id="ry-tl-headbox"></div>
+        <div class="ry-tl-bar" id="ry-tl-bar"></div>
+        <div class="ry-tl-list" id="ry-tl-list"></div>
+      </section>
+      <section class="ry-panel is-blk">
+        <div class="ry-panel-head">
+          <h2>阻塞接口清单 · 阻塞天数降序</h2>
+          <span class="ry-panel-tag" id="ry-blk-tag">--</span>
+        </div>
+        <ul class="ry-blk-list" id="ry-blk-list"></ul>
+      </section>
+    </div>
+
+    <!-- 右：六对达成条形 + 基线 × 域对矩阵 -->
+    <div class="ry-col">
+      <section class="ry-panel" style="flex:1;">
+        <div class="ry-panel-head">
+          <h2>六对域组合 · 计划 vs 已联调</h2>
+          <span class="ry-panel-tag" id="ry-if-tag">--</span>
+        </div>
+        <div class="ry-chart" id="ry-chart-if"></div>
+      </section>
+      <section class="ry-panel" style="flex:1;">
+        <div class="ry-panel-head">
+          <h2>基线 × 域对 接口数矩阵</h2>
+          <span class="ry-panel-tag" id="ry-mx-tag">--</span>
+        </div>
+        <div class="ry-chart" id="ry-chart-mx"></div>
+      </section>
+    </div>
+
+    <!-- 底部口径与研判滚动条 -->
+    <div class="ry-foot">
+      <div class="ry-foot-tag">口径与研判</div>
+      <div class="ry-foot-view"><div class="ry-foot-track" id="ry-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("ry-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("ry-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，初始 hash 解析在页面中部
+     就会调用它；见 docs/RndIpdThemed.md §8 批次四「holdUntil 的 TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const DAY = 86400000;
+  const ts = (s) => new Date(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10))).getTime();
+  const fmtDate = (t) => { const d = new Date(t); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  const fmtShort = (t) => { const d = new Date(t); return String(d.getFullYear()).slice(2) + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 集成 PMO 视角）
+         ★ 与父页 P9「软硬云AI集成协同」严格同源（docs/RndIpdThemed.md §2.3 / §6 P9）：
+           四条集成基线 R26.2 / R26.4 / R26.6 / R26.8 逐字；
+           六对域组合名 = 父页 IF_PAIRS 的 a + "↔" + b 逐字（软件↔硬件 / 软件↔云端 / 软件↔AI /
+           硬件↔云端 / 硬件↔AI / 云端↔AI），逐对计划数与已联调数与父页逐字相等，
+           整体达成率 = Σ已联调 ÷ Σ计划 = 640 ÷ 700 = 91.4%（回归父页 ct-chart-if 的整体线）；
+           阻塞接口总量 31 个 = 父页「跨域依赖阻塞热力」4×4 接口类矩阵 Σ（对角线除外）。
+         ★ 本页与兄弟页 S7「单集成基线详情」（前缀 jx）的分工：
+           jx 做**单条基线的四域构成与就绪度**（一条基线看四个域），
+           本页做**接口级联调明细**（一条接口看定义→桩→联调→修复→通过的全过程）。
+           两页共用四基线名与六对组合名，但不共用度量：jx 的接口数是「含域内接口」的基线全量口径
+           （560 / 632 / 700），本页 700 只统计跨域六对，两者不可直接相减。
+         ★ 二级拆分（4 基线 × 6 对接口数矩阵、26 条抽样明细、五节点日期）为本页自编，
+           行和 / 列和一律收敛到上级数，全部进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，行与域对 / 基线之间一律用索引
+           （pi / bi / st）关联，绝不用对象引用回指。 ===== */
+
+  const TODAY = ts("2026-08-20");                  /* 今日线（与父页逐字同源） */
+
+  /* 4.1 父页契约锚点（勿改，逐字回归用） */
+  const IF_NAMES_REF = ["软件↔硬件", "软件↔云端", "软件↔AI", "硬件↔云端", "硬件↔AI", "云端↔AI"];
+  const IF_PLAN_REF  = [150, 180, 120, 90, 60, 100];   /* 父页 IF_PAIRS.plan 逐字，Σ = 700 */
+  const IF_DONE_REF  = [137, 165, 109, 82, 55, 92];    /* 父页 IF_PAIRS.done 逐字，Σ = 640 */
+  const IF_RATE_REF  = 91.4;                           /* 父页整体达成（现算回归，容差 0.05） */
+
+  /* 4.2 四域与六对组合（名称由 a↔b 现拼，与父页同一套拼法，不另写死一份） */
+  const DOMAINS = ["软件", "硬件", "云端", "AI"];
+  const PAIRS = [
+    { a: "软件", b: "硬件", meta: "驱动 / HAL / 传感器协议",   color: C.series[0] },
+    { a: "软件", b: "云端", meta: "设备接入 / 影子设备 / OTA", color: C.series[1] },
+    { a: "软件", b: "AI",   meta: "推理 SDK / 端侧算子",       color: C.series[2] },
+    { a: "硬件", b: "云端", meta: "遥测上报 / 固件签名",       color: C.series[3] },
+    { a: "硬件", b: "AI",   meta: "NPU 调度 / 量化算子",       color: C.series[4] },
+    { a: "云端", b: "AI",   meta: "模型分发 / 特征回流",       color: C.series[5] }
+  ];
+
+  /* 4.3 四条集成基线（§2.3 逐字）+ 接口号段（700 条总盘按基线连续编号） */
+  const BASELINES = [
+    { name: "R26.2", state: "已发布", color: C.green,  win: "2026-01-05 → 03-20" },
+    { name: "R26.4", state: "已发布", color: C.cyan,   win: "2026-03-23 → 06-05" },
+    { name: "R26.6", state: "集成中", color: C.amber,  win: "2026-06-08 → 09-11" },
+    { name: "R26.8", state: "规划中", color: C.violet, win: "2026-09-14 → 11-27" }
+  ];
+
+  /* 4.4 基线 × 域对 接口数矩阵（行 = 四基线，列 = 六对；格值 = 计划接口数）
+         列和 == 父页六对计划数（150/180/120/90/60/100），全表 Σ == 700；
+         行和 = 各基线跨域接口数（190 / 210 / 200 / 100），两个方向都进自检。 */
+  const MX_PLAN = [
+    /* R26.2 */ [42, 50, 32, 24, 14, 28],
+    /* R26.4 */ [46, 54, 36, 26, 18, 30],
+    /* R26.6 */ [42, 52, 34, 24, 16, 32],
+    /* R26.8 */ [20, 24, 18, 16, 12, 10]
+  ];
+  /* 待联调（= 计划 − 已联调）矩阵：已发布的两条基线接口全部联调关闭，缺口只落在 R26.6 / R26.8；
+     列和 == 父页逐对待办数（13/15/11/8/5/8），Σ == 60。 */
+  const MX_GAP = [
+    /* R26.2 */ [0, 0, 0, 0, 0, 0],
+    /* R26.4 */ [0, 0, 0, 0, 0, 0],
+    /* R26.6 */ [4, 5, 3, 2, 1, 3],
+    /* R26.8 */ [9, 10, 8, 6, 4, 5]
+  ];
+
+  /* 4.5 父页「跨域依赖阻塞热力」4×4 接口类矩阵（逐字内联，只用于现算阻塞接口总量 31 个） */
+  const DEP_MATRIX = [
+    /* 依赖方 软件 */ [null, 4, 3, 2],
+    /* 依赖方 硬件 */ [3, null, 1, 1],
+    /* 依赖方 云端 */ [4, 1, null, 3],
+    /* 依赖方 AI  */ [2, 3, 4, null]
+  ];
+
+  /* 4.6 五节点联调流程与状态字典 */
+  const NODES = ["接口定义", "双方桩就绪", "首次联调", "缺陷修复", "联调通过"];
+  const NODE_HINT = ["接口契约评审通过 → 双方冻结签名", "定义 → 两端 mock/桩服务可用",
+                     "桩就绪 → 首次点对点联调", "首次联调 → 缺陷清零回归", "修复回归 → 联调通过签署"];
+  const NODE_COLORS = [C.violet, C.cyan, C.blue, C.orange, C.green];
+  const ST_NAMES  = ["已联调", "联调中", "未开始", "阻塞"];
+  const ST_COLORS = [C.green, C.amber, C.blueDeep, C.red];
+  const ST_BADGE  = ["is-s0", "is-s1", "is-s2", "is-s3"];
+  const BLOCK_REASONS = ["跨域依赖", "环境未就绪", "协议变更", "人力冲突"];
+  const BLOCK_COLORS  = [C.red, C.orange, C.amber, C.violet];
+
+  /* 4.7 两端负责人名册（按域分册；行只存索引，不存对象） */
+  const OWNERS = {
+    "软件": ["陆延", "韩若", "程越", "方桐"],
+    "硬件": ["邱明", "辛柏", "赵禾", "蒋屿"],
+    "云端": ["沈砚", "林澈", "乔叙", "白露"],
+    "AI":   ["谢知", "温澜", "施予", "阮清"]
+  };
+
+  /* 4.8 台账抽样 26 条（700 条总盘不可能逐条陈列；抽样占比页内现算标注）
+         no  = 接口号，按基线号段连续编（R26.2 0001–0190 / R26.4 0191–0400 /
+               R26.6 0401–0600 / R26.8 0601–0700），号段与基线自洽进自检；
+         pi  = 域对索引  bi = 基线索引  st = 状态索引  oa/ob = 两端负责人在各自域名册中的下标
+         def = 接口定义日；seg = 四段停留天数（定义→桩→首联→修复→通过）
+               五节点日期与联调周期全部由 def + seg 现算，页面上不出现硬编码日期差；
+         dfc = 该接口联调期累计缺陷数（属兄弟页 jx「集成拦截」口径的接口级明细，抽样合计不做全量勾稽）
+         br/bd = 阻塞原因索引 / 已阻塞天数（仅状态为阻塞的行有） */
+  const ROWS = [
+    { no: "IF-0014", nm: "传感器数据采集协议",   pi: 0, bi: 0, oa: 0, ob: 0, st: 0, dfc: 5, def: "2025-11-10", seg: [14, 10, 9, 6] },
+    { no: "IF-0031", nm: "设备影子状态同步",     pi: 1, bi: 0, oa: 1, ob: 0, st: 0, dfc: 6, def: "2025-11-17", seg: [16, 12, 10, 7] },
+    { no: "IF-0052", nm: "OTA 升级包下发通道",   pi: 1, bi: 0, oa: 0, ob: 1, st: 0, dfc: 7, def: "2025-11-24", seg: [15, 13, 11, 8] },
+    { no: "IF-0068", nm: "遥测指标上报格式",     pi: 3, bi: 0, oa: 1, ob: 0, st: 0, dfc: 3, def: "2025-12-05", seg: [14, 11, 8, 5] },
+    { no: "IF-0087", nm: "端侧推理 SDK 调用",    pi: 2, bi: 0, oa: 2, ob: 0, st: 0, dfc: 4, def: "2025-12-01", seg: [18, 12, 9, 6] },
+    { no: "IF-0126", nm: "模型分发签名校验",     pi: 5, bi: 0, oa: 2, ob: 1, st: 0, dfc: 5, def: "2025-12-15", seg: [17, 14, 10, 7] },
+    { no: "IF-0203", nm: "HAL 电源管理接口",     pi: 0, bi: 1, oa: 3, ob: 2, st: 0, dfc: 4, def: "2026-01-12", seg: [15, 11, 9, 6] },
+    { no: "IF-0221", nm: "驱动固件版本协商",     pi: 0, bi: 1, oa: 0, ob: 0, st: 0, dfc: 5, def: "2026-01-19", seg: [16, 12, 10, 6] },
+    { no: "IF-0248", nm: "设备接入鉴权握手",     pi: 1, bi: 1, oa: 1, ob: 3, st: 0, dfc: 8, def: "2026-01-26", seg: [18, 13, 11, 7] },
+    { no: "IF-0266", nm: "影子设备属性回写",     pi: 1, bi: 1, oa: 2, ob: 0, st: 0, dfc: 4, def: "2026-02-02", seg: [14, 12, 9, 6] },
+    { no: "IF-0295", nm: "端侧算子量化接口",     pi: 2, bi: 1, oa: 3, ob: 2, st: 0, dfc: 9, def: "2026-02-09", seg: [20, 14, 12, 8] },
+    { no: "IF-0318", nm: "NPU 任务调度协议",     pi: 4, bi: 1, oa: 3, ob: 0, st: 0, dfc: 6, def: "2026-02-16", seg: [17, 13, 10, 7] },
+    { no: "IF-0347", nm: "特征数据回流通道",     pi: 5, bi: 1, oa: 1, ob: 3, st: 0, dfc: 5, def: "2026-02-23", seg: [16, 12, 10, 6] },
+    { no: "IF-0412", nm: "传感器标定参数下发",   pi: 0, bi: 2, oa: 0, ob: 1, st: 0, dfc: 4, def: "2026-04-06", seg: [15, 11, 9, 6] },
+    { no: "IF-0428", nm: "边缘算子热更新",       pi: 2, bi: 2, oa: 2, ob: 1, st: 0, dfc: 6, def: "2026-04-13", seg: [18, 12, 10, 7] },
+    { no: "IF-0447", nm: "影子设备批量同步",     pi: 1, bi: 2, oa: 1, ob: 2, st: 0, dfc: 5, def: "2026-04-20", seg: [16, 13, 11, 7] },
+    { no: "IF-0489", nm: "高速采集总线时序对齐", pi: 0, bi: 2, oa: 2, ob: 2, st: 3, dfc: 8, def: "2026-06-15", seg: [24, 20, 18, 14], br: 0, bd: 12 },
+    { no: "IF-0503", nm: "固件签名与遥测双向确认", pi: 3, bi: 2, oa: 0, ob: 3, st: 1, dfc: 6, def: "2026-06-22", seg: [21, 17, 15, 11] },
+    { no: "IF-0521", nm: "OTA 差分包校验",       pi: 1, bi: 2, oa: 3, ob: 0, st: 1, dfc: 7, def: "2026-06-29", seg: [20, 16, 14, 10] },
+    { no: "IF-0540", nm: "NPU 量化算子精度对齐", pi: 4, bi: 2, oa: 3, ob: 2, st: 3, dfc: 5, def: "2026-06-29", seg: [23, 19, 17, 13], br: 1, bd: 9 },
+    { no: "IF-0566", nm: "模型灰度分发回执",     pi: 5, bi: 2, oa: 1, ob: 0, st: 3, dfc: 6, def: "2026-07-06", seg: [22, 18, 16, 12], br: 2, bd: 15 },
+    { no: "IF-0612", nm: "端云协同推理路由",     pi: 2, bi: 3, oa: 3, ob: 3, st: 1, dfc: 3, def: "2026-06-22", seg: [25, 20, 18, 14] },
+    { no: "IF-0627", nm: "遥测上报协议 v3",      pi: 3, bi: 3, oa: 2, ob: 3, st: 3, dfc: 2, def: "2026-07-06", seg: [25, 21, 19, 15], br: 3, bd: 7 },
+    { no: "IF-0641", nm: "跨域配置中心接口",     pi: 1, bi: 3, oa: 0, ob: 2, st: 2, dfc: 0, def: "2026-07-13", seg: [24, 20, 18, 14] },
+    { no: "IF-0658", nm: "新一代 HAL 抽象层",    pi: 0, bi: 3, oa: 1, ob: 1, st: 2, dfc: 0, def: "2026-07-20", seg: [26, 22, 20, 15] },
+    { no: "IF-0673", nm: "模型特征回流 v2",      pi: 5, bi: 3, oa: 0, ob: 1, st: 3, dfc: 1, def: "2026-07-27", seg: [26, 22, 20, 16], br: 0, bd: 5 }
+  ];
+  /* 接口号段（与 4.8 注释同源，进自检） */
+  const SEG_LO = [1, 191, 401, 601];
+  const SEG_HI = [190, 400, 600, 700];
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 5.1 六对组合：名称现拼、计划/已联调由矩阵列和现算 */
+  const colSum = (M, j) => M.reduce((a, row) => a + row[j], 0);
+  PAIRS.forEach((p, j) => {
+    p.name = p.a + "↔" + p.b;                       /* ★ 与父页同一拼法，逐字一致 */
+    p.plan = colSum(MX_PLAN, j);
+    p.gap = colSum(MX_GAP, j);
+    p.done = p.plan - p.gap;
+    p.rate = 100 * p.done / p.plan;
+  });
+  D.plan = sum(PAIRS.map((p) => p.plan));
+  D.done = sum(PAIRS.map((p) => p.done));
+  D.gap = D.plan - D.done;
+  D.rate = 100 * D.done / D.plan;
+  D.rateMean = sum(PAIRS.map((p) => p.rate)) / PAIRS.length;
+  D.worst = PAIRS.slice().sort((a, b) => a.rate - b.rate)[0];
+  D.best = PAIRS.slice().sort((a, b) => b.rate - a.rate)[0];
+
+  /* 5.2 基线维度：行和 = 各基线跨域接口数 */
+  BASELINES.forEach((b, i) => {
+    b.plan = sum(MX_PLAN[i]);
+    b.gap = sum(MX_GAP[i]);
+    b.done = b.plan - b.gap;
+    b.rate = 100 * b.done / b.plan;
+  });
+  D.rowSum = sum(BASELINES.map((b) => b.plan));
+  D.colSum = sum(PAIRS.map((p) => p.plan));
+  D.mxCells = MX_PLAN.length * MX_PLAN[0].length;
+
+  /* 5.3 阻塞接口全量（父页 4×4 接口类热力 Σ，对角线不计） */
+  D.depSum = 0;
+  DEP_MATRIX.forEach((row, i) => row.forEach((v, j) => { if (i !== j && v) D.depSum += v; }));
+
+  /* 5.4 抽样行派生：五节点日期与联调周期全部由 def + seg 现算 */
+  ROWS.forEach((r) => {
+    r.t = [ts(r.def)];
+    r.seg.forEach((s) => r.t.push(r.t[r.t.length - 1] + s * DAY));
+    r.segSum = sum(r.seg);
+    r.cycle = Math.round((r.t[4] - r.t[0]) / DAY);   /* 联调周期 = 通过日 − 定义日 */
+    r.planDay = r.t[2];                              /* 计划联调日 = 节点③首次联调 */
+    r.reached = r.t.filter((x) => x <= TODAY).length; /* 已到达节点数（未到 = is-todo） */
+    r.seq = Number(r.no.slice(-4));
+    r.pair = PAIRS[r.pi].name;
+    r.owA = OWNERS[PAIRS[r.pi].a][r.oa];
+    r.owB = OWNERS[PAIRS[r.pi].b][r.ob];
+    r.blockFrom = r.st === 3 ? TODAY - r.bd * DAY : 0;
+  });
+  D.n = ROWS.length;
+  D.share = 100 * D.n / D.plan;
+  D.rowsByPair = PAIRS.map((p, j) => ROWS.filter((r) => r.pi === j).length);
+  D.rowsByBase = BASELINES.map((b, i) => ROWS.filter((r) => r.bi === i).length);
+  D.rowsBySt = ST_NAMES.map((s, k) => ROWS.filter((r) => r.st === k).length);
+  D.dfcSum = sum(ROWS.map((r) => r.dfc));
+  D.blocked = ROWS.filter((r) => r.st === 3).slice().sort((a, b) => b.bd - a.bd);
+  D.blockDaysMax = D.blocked.length ? D.blocked[0].bd : 1;
+  D.blockDaysSum = sum(D.blocked.map((r) => r.bd));
+  D.cycleAvg = sum(ROWS.filter((r) => r.st === 0).map((r) => r.cycle)) /
+               Math.max(1, ROWS.filter((r) => r.st === 0).length);
+  D.longest = ROWS.slice().sort((a, b) => b.cycle - a.cycle)[0];
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("ry-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("ry-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("ry-meta-all").textContent = fmtInt(D.plan);
+  $("ry-meta-n").textContent = fmtInt(D.n);
+  $("ry-meta-p").textContent = fmtDec(D.share, 1) + "%";
+
+  /* ===== 7. KPI 五格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "跨域接口总数", v: D.plan, dec: 0, unit: "条", color: C.blue,
+      s: "四基线 × 六对矩阵全表 Σ · 与父页六对计划数之和逐字" },
+    { k: "已联调接口", v: D.done, dec: 0, unit: "条", color: C.green,
+      s: "待联调 " + D.gap + " 条 · 逐对与父页「联调接口达成」逐字" },
+    { k: "整体联调达成率", v: D.rate, dec: 1, unit: "%", color: C.amber,
+      s: fmtInt(D.done) + " ÷ " + fmtInt(D.plan) + " 现算 · 回归父页整体线 " + fmtDec(IF_RATE_REF, 1) + "%" },
+    { k: "阻塞接口", v: D.depSum, dec: 0, unit: "条", color: C.red,
+      s: "父页跨域依赖阻塞热力接口类 Σ · 本表抽样 " + D.blocked.length + " 条明细" },
+    { k: "Σ 联调缺陷", v: D.dfcSum, dec: 0, unit: "条", color: C.violet,
+      s: "抽样 " + D.n + " 条接口累计 · 集成拦截口径的接口级明细" }
+  ];
+  $("ry-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="ry-kpi" style="--ry-kc:' + p.color + '">' +
+      '<div class="ry-kpi-k">' + p.k + "</div>" +
+      '<div class="ry-kpi-v"><b id="ry-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="ry-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("ry-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 域对筛选 chip（全部 + 六对；每 chip 带「抽样条数 / 接口数 · 达成率」） ===== */
+  const PFILTERS = [{ name: "全部", color: C.blue, plan: D.plan, done: D.done, rate: D.rate, cnt: D.n }]
+    .concat(PAIRS.map((p, j) => ({ name: p.name, color: p.color, plan: p.plan, done: p.done, rate: p.rate, cnt: D.rowsByPair[j] })));
+  const pbox = $("ry-pchips");
+  pbox.innerHTML = PFILTERS.map((f, i) => (
+    '<button class="ry-pchip" type="button" data-i="' + i + '" style="--ry-cc:' + f.color + '"' +
+      ' title="' + f.name + "：接口 " + f.plan + " 条 · 已联调 " + f.done + " 条 · 达成 " + fmtDec(f.rate, 1) + '%">' +
+      "<u>" + f.name + "</u><b>" + f.cnt + "/" + f.plan + "</b>" +
+      "<i>" + fmtDec(f.rate, 1) + "%</i>" +
+    "</button>"
+  )).join("");
+  const pchips = Array.from(pbox.children);
+
+  /* ===== 9. 联调状态二级过滤 chip（全部 + 四档；计数随域对筛选联动重算） ===== */
+  const sbox = $("ry-schips");
+  function stScopeCnt(pj, sk) {
+    return ROWS.filter((r) => (pj === 0 || r.pi === pj - 1) && (sk === 0 || r.st === sk - 1)).length;
+  }
+  function renderSChips(pj, sk) {
+    const items = [{ name: "全部", color: C.blue }]
+      .concat(ST_NAMES.map((n, k) => ({ name: n, color: ST_COLORS[k] })));
+    sbox.innerHTML = items.map((f, i) => (
+      '<button class="ry-schip' + (i === sk ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === sk ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + stScopeCnt(pj, i) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(sbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(pIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 10. hash 契约：父页 P9 的联调接口达成图（ct-chart-if）逐条下钻
+         「子页#encodeURIComponent(六对组合名)」，组合名含「↔」符号。
+         normKey 归一化：全角→半角 + 空白（含全角）剔除 + 连接符号（↔ ⇄ × x * · / - 等）剔除 + 大写，
+         于是「软件↔硬件」「软件 × 硬件」「软件-硬件」「硬件↔软件」「软硬」「ｓｏｆｔ」类写法同归一条键。
+         HASH_ALIAS 另收「软硬 / 软云 / 软AI / 硬云 / 硬AI / 云AI」等简写与「…接口 / …联调」后缀。 ===== */
+  const SHORT = { "软件": ["软件", "软"], "硬件": ["硬件", "硬"], "云端": ["云端", "云"], "AI": ["AI"] };
+  function normKey(s) {
+    return String(s)
+      .replace(/[！-～]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))  /* 全角→半角 */
+      .replace(/[\s　 ]+/g, "")                                                    /* trim + 全角空白剔除 */
+      .replace(/[↔⇄⇋⇌⟷<>×✕✖*·・、,;:\/\\|_+\-–—~和与对至到]/g, "")
+      .toUpperCase();
+  }
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { const kk = normKey(k); if (kk) HASH_ALIAS[kk] = v; };
+  ["全部", "ALL", "all", "全量", "全部组合"].forEach((k) => alias(k, 0));
+  PAIRS.forEach((p, j) => {
+    const A = SHORT[p.a], B = SHORT[p.b];
+    A.forEach((x) => B.forEach((y) => {
+      [x + y, y + x].forEach((base) => {
+        alias(base, j + 1);
+        alias(base + "接口", j + 1);
+        alias(base + "联调", j + 1);
+        alias(base + "组合", j + 1);
+        alias(base + "域对", j + 1);
+      });
+    }));
+    alias(p.name, j + 1);                       /* 契约原文（含 ↔） */
+    alias(p.b + "↔" + p.a, j + 1);              /* 反向写法 */
+  });
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    const key = normKey(raw);
+    if (!key) return -1;                                    /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[key];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(pj) {
+    const want = "#" + encodeURIComponent(PFILTERS[pj].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 台账主表渲染（行高 24px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("ry-tbody");
+  let view = ROWS, pIdx = 0, sIdx = 0, selPos = 0;
+
+  function rowHtml(r, k) {
+    const cDfc = r.dfc === 0 ? "rgba(127,146,196,.55)" : r.dfc > 6 ? C.red : r.dfc > 3 ? C.amber : C.cyan;
+    return "<li data-no=\"" + r.no + "\" style=\"animation-delay:" + (k * 12) + "ms\">" +
+      '<span class="ry-no">' + r.no + "</span>" +
+      '<span class="ry-nm">' + r.nm + "</span>" +
+      '<span class="ry-pr" style="color:' + PAIRS[r.pi].color + '">' + r.pair + "</span>" +
+      '<span class="ry-bl" style="color:' + BASELINES[r.bi].color + '">' + BASELINES[r.bi].name + "</span>" +
+      '<span class="ry-ow">' + r.owA + " / " + r.owB + "</span>" +
+      '<span class="ry-dt">' + fmtShort(r.planDay) + "</span>" +
+      '<span class="ry-badge ' + ST_BADGE[r.st] + '">' + ST_NAMES[r.st] + "</span>" +
+      '<span class="ry-df" style="color:' + cDfc + '">' + r.dfc + "</span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      /* 手动点行 → 选中并暂停轮巡 20 秒（与 hash 定位同一门闩） */
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    const f = PFILTERS[pIdx];
+    $("ry-table-tag").textContent =
+      "抽样展示：总盘 " + fmtInt(D.plan) + " 条不逐条陈列 · 本表 " + D.n +
+      " 条（" + fmtDec(D.share, 1) + "%）· 已联调 " + fmtInt(f.done) + " / " + fmtInt(f.plan) +
+      " · 行点击或轮巡联动时间轴";
+    $("ry-filters-state").innerHTML =
+      "筛选 <b>" + view.length + "</b> 条 / 抽样 " + D.n + "<i>|</i>全盘 <em>" + fmtInt(f.plan) +
+      "</em> 条 · 达成 <em>" + fmtDec(f.rate, 1) + "%</em>";
+  }
+
+  /* ===== 12. 单接口五节点联调时间轴（纯 HTML/CSS；选中行联动）
+         节点日期 = 接口定义日 + 累计停留天数现算；未到今日线的节点置 is-todo。 ===== */
+  function renderSel() {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("ry-tl-tag").textContent = "当前筛选无抽样行";
+      $("ry-tl-headbox").innerHTML = '<div class="ry-tl-sub">调整域对或联调状态筛选后，此处展示选中接口的五节点联调过程。</div>';
+      $("ry-tl-bar").innerHTML = "";
+      $("ry-tl-list").innerHTML = "";
+      return;
+    }
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    Array.from($("ry-blk-list").children).forEach((el) => {
+      el.classList && el.classList.toggle("is-sel", el.dataset && el.dataset.no === r.no);
+    });
+    $("ry-tl-tag").textContent = "定义→桩→首联→修复→通过 · Σ 各段天数 = 联调周期";
+    $("ry-tl-headbox").innerHTML =
+      '<div class="ry-tl-no"><b>' + r.no + "</b>" +
+        '<span class="ry-badge ' + ST_BADGE[r.st] + '">' + ST_NAMES[r.st] + "</span>" +
+        '<span class="ry-tl-sub" style="color:' + PAIRS[r.pi].color + '">' + r.pair + "</span>" +
+        '<span class="ry-tl-sub" style="color:' + BASELINES[r.bi].color + '">' + BASELINES[r.bi].name + "</span></div>" +
+      '<div class="ry-tl-title">' + r.nm + "</div>" +
+      '<div class="ry-tl-sub">两端负责人 <b>' + r.owA + " / " + r.owB + "</b> · 联调周期 <b>" + r.cycle +
+        "</b> 天（Σ " + r.seg.length + " 段 = " + r.segSum + "）· 联调缺陷 <b>" + r.dfc + "</b> 条" +
+        (r.st === 3 ? " · 已阻塞 <b>" + r.bd + "</b> 天（" + BLOCK_REASONS[r.br] + "）" : "") + "</div>";
+    $("ry-tl-bar").innerHTML = r.seg.map((v, k) => (
+      '<span class="ry-tl-seg' + (r.reached === k + 1 ? " is-cur" : "") + '" style="flex:' + v +
+        ";background:" + NODE_COLORS[k + 1] + ";opacity:" + (r.reached >= k + 2 ? 1 : 0.42) +
+        '" title="' + NODES[k + 1] + " · " + v + ' 天"></span>'
+    )).join("");
+    $("ry-tl-list").innerHTML = NODES.map((name, k) => {
+      const done = k < r.reached;
+      const cur = k === r.reached - 1 && r.st !== 0;
+      const day = fmtDate(r.t[k]);
+      const stay = k === 0 ? "起点" : r.seg[k - 1] + " 天";
+      const body = k === 0
+        ? day + " · " + NODE_HINT[0]
+        : day + " · " + NODE_HINT[k] + (done ? "" : "（计划）");
+      return '<div class="ry-tl-row ' + (done ? (cur ? "is-cur" : "") : "is-todo") +
+        '" style="--ry-pc:' + NODE_COLORS[k] + '">' +
+        "<b>" + name + "</b><span>" + body + "</span><em>" + stay + "</em></div>";
+    }).join("");
+  }
+
+  /* ===== 13. 阻塞接口清单（状态为阻塞的行按阻塞天数降序；随域对筛选缩放口径） ===== */
+  function renderBlocked() {
+    const list = D.blocked.filter((r) => pIdx === 0 || r.pi === pIdx - 1);
+    const box = $("ry-blk-list");
+    $("ry-blk-tag").innerHTML = "全盘阻塞 <b>" + D.depSum + "</b> 条（父页接口类热力 Σ）· 本表 <b>" +
+      list.length + "</b> 条 · Σ 阻塞 <b>" + sum(list.map((r) => r.bd)) + "</b> 天";
+    if (!list.length) {
+      box.innerHTML = '<li class="ry-blk-empty">当前域对口径下无阻塞接口抽样行。</li>';
+      return;
+    }
+    box.innerHTML = list.map((r) => {
+      const w = clamp(100 * r.bd / D.blockDaysMax, 12, 100);
+      return '<li class="ry-blk" data-no="' + r.no + '">' +
+        '<div class="ry-blk-r1"><b>' + r.no + "</b><em>" + r.nm + "</em>" +
+          "<u>" + r.bd + "</u><s>天</s></div>" +
+        '<div class="ry-blk-r2">' +
+          '<i style="background:' + BLOCK_COLORS[r.br] + ";color:#26120a\">" + BLOCK_REASONS[r.br] + "</i>" +
+          '<span style="color:' + PAIRS[r.pi].color + '">' + r.pair + "</span>" +
+          '<span style="color:' + BASELINES[r.bi].color + '">' + BASELINES[r.bi].name + "</span>" +
+          "<span>阻塞起 " + fmtShort(r.blockFrom) + "</span>" +
+          "<span>" + r.owA + " / " + r.owB + "</span>" +
+        "</div>" +
+        '<div class="ry-blk-t"><u style="width:' + fmtDec(w, 1) + '%"></u></div>' +
+      "</li>";
+    }).join("");
+    Array.from(box.children).forEach((el) => {
+      el.addEventListener("click", () => {
+        const k = view.findIndex((r) => r.no === el.dataset.no);
+        if (k >= 0) { selPos = k; renderSel(); pauseRotate(20000); }
+      });
+    });
+  }
+
+  /* ===== 14. 六对达成条形：计划 vs 已联调（堆叠 = 已联调 + 待联调，整体线现算回归父页） ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function ifOption(pj) {
+    /* ★ 只把标量与数组下发给 option，PAIRS 对象本身不进 series.data（避免任何回指） */
+    const names = PAIRS.map((p) => p.name);
+    const dones = PAIRS.map((p) => p.done);
+    const gaps = PAIRS.map((p) => p.gap);
+    const plans = PAIRS.map((p) => p.plan);
+    const rates = PAIRS.map((p) => Number(fmtDec(p.rate, 1)));
+    const metas = PAIRS.map((p) => p.meta);
+    const cols = PAIRS.map((p, j) => (pj === 0 || pj - 1 === j ? p.color : "rgba(92,157,255,.34)"));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 92, top: 24, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + names[i] + "</b>　达成 <b style=\"color:" + C.blue + "\">" + fmtDec(rates[i], 1) + "%</b><br/>" +
+            "已联调 <b>" + dones[i] + "</b> ÷ 计划 <b>" + plans[i] + "</b> · 待联调 <b style=\"color:" +
+            C.orange + "\">" + gaps[i] + "</b><br/><span style=\"color:" + C.textDim + "\">" + metas[i] + "</span>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["已联调", "待联调"]
+      },
+      xAxis: {
+        type: "value", max: Math.max.apply(null, plans),
+        axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false }
+      },
+      yAxis: {
+        type: "category", inverse: true, data: names.slice(),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#bcd2f8", fontSize: 11.5, fontWeight: 700 }
+      },
+      series: [
+        { name: "已联调", type: "bar", stack: "if", barWidth: 15,
+          data: dones.map((v, i) => ({ value: v, itemStyle: { color: cols[i], borderRadius: [4, 0, 0, 4] } })) },
+        { name: "待联调", type: "bar", stack: "if", barWidth: 15,
+          itemStyle: { color: "rgba(255,157,92,.42)", borderRadius: [0, 4, 4, 0] },
+          data: gaps.slice(),
+          label: {
+            show: true, position: "right", color: "#dfe9ff", fontSize: 10.5, fontWeight: 700,
+            formatter: (p) => dones[p.dataIndex] + "/" + plans[p.dataIndex] + " · " + fmtDec(rates[p.dataIndex], 1) + "%"
+          } }
+      ]
+    };
+  }
+
+  /* ===== 15. 基线 × 域对 接口数矩阵（热力；行和 = 基线接口数、列和 = 各对接口数） ===== */
+  function mxOption() {
+    const data = [];
+    MX_PLAN.forEach((row, i) => row.forEach((v, j) => data.push([j, i, v])));
+    const names = PAIRS.map((p) => p.name);
+    const bases = BASELINES.map((b) => b.name);
+    const rowSums = BASELINES.map((b) => b.plan);
+    const colSums = PAIRS.map((p) => p.plan);
+    const gapFlat = MX_GAP.map((r) => r.slice());
+    const maxV = Math.max.apply(null, data.map((d) => d[2]));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 14, top: 26, bottom: 30, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.data[0], i = p.data[1], v = p.data[2], g = gapFlat[i][j];
+          return "<b>" + bases[i] + " × " + names[j] + "</b><br/>计划接口 <b>" + v + "</b> 条 · 已联调 <b style=\"color:" +
+            C.green + "\">" + (v - g) + "</b> · 待联调 <b style=\"color:" + C.orange + "\">" + g + "</b><br/>" +
+            "<span style=\"color:" + C.textDim + "\">行和（" + bases[i] + "）" + rowSums[i] +
+            " 条 · 列和（" + names[j] + "）" + colSums[j] + " 条</span>";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: names.slice(), splitArea: { show: true },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10, interval: 0, rotate: 20 }
+      },
+      yAxis: {
+        type: "category", data: bases.slice(), inverse: true, splitArea: { show: true },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: "#bcd2f8", fontSize: 11, fontWeight: 700 }
+      },
+      visualMap: {
+        min: 0, max: maxV, calculable: false, orient: "horizontal", left: "center", bottom: 0,
+        itemWidth: 11, itemHeight: 62, textStyle: { color: C.textDim, fontSize: 10 },
+        inRange: { color: ["rgba(47,111,214,.22)", "rgba(92,157,255,.62)", "#ffc24d"] }
+      },
+      series: [{
+        type: "heatmap", data: data,
+        label: { show: true, color: "#0b1531", fontSize: 12, fontWeight: 700 },
+        itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 3, borderRadius: 5 },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: "rgba(255,194,77,.6)" } }
+      }]
+    };
+  }
+
+  /* ===== 16. 筛选主流程：一次调用刷新 chip / 表 / 时间轴 / 阻塞清单 / 条形（单一入口） ===== */
+  function applyFilter(pj, sk, pushHash) {
+    pIdx = clamp(pj, 0, PFILTERS.length - 1);
+    sIdx = clamp(sk, 0, ST_NAMES.length);
+    view = ROWS.filter((r) =>
+      (pIdx === 0 || r.pi === pIdx - 1) && (sIdx === 0 || r.st === sIdx - 1));
+    selPos = 0;
+    pchips.forEach((el, i) => {
+      const on = i === pIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? PFILTERS[i].color : "";
+      el.style.borderColor = on ? PFILTERS[i].color : "";
+    });
+    renderSChips(pIdx, sIdx);
+    const f = PFILTERS[pIdx];
+    $("ry-chip-key").textContent = "达成率 · " + f.name;
+    $("ry-chip-rate").textContent = fmtDec(f.rate, 1) + "%";
+    $("ry-if-tag").innerHTML = "整体 <b>" + fmtDec(D.rate, 1) + "%</b> = " + fmtInt(D.done) + " ÷ " +
+      fmtInt(D.plan) + " · 六对均值 <b>" + fmtDec(D.rateMean, 1) + "%</b> · 最弱「" + D.worst.name + "」";
+    $("ry-mx-tag").innerHTML = "全表 Σ <b>" + fmtInt(D.rowSum) + "</b> 条 = 行和 Σ = 列和 Σ · " +
+      MX_PLAN.length + " × " + MX_PLAN[0].length + " 格";
+    renderTable();
+    renderBlocked();
+    renderSel();
+    if (ifChart) ifChart.setOption(ifOption(pIdx), true);
+    if (pushHash) syncHash(pIdx);
+  }
+
+  pchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), 0, true)));
+
+  /* hash 定位：命中域对则激活筛选 chip、闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyFilter(0, 0, false); return; }
+    applyFilter(hit, 0, false);
+    if (hit > 0) {
+      const chip = pchips[hit];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                 /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发软硬云AI集成协同1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 17. kiosk 轮巡：台账行 3 秒逐行高亮并联动时间轴；hash 定位或手动点行后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 18. 初始渲染：先填充全部 DOM（KPI + 表 + 时间轴 + 阻塞清单），再 init 图表 ===== */
+  let ifChart = null, mxChart = null;
+  applyFilter(0, 0, false);                                  /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  ifChart = echarts.init($("ry-chart-if"));
+  ifChart.setOption(ifOption(0));
+  mxChart = echarts.init($("ry-chart-mx"));
+  mxChart.setOption(mxOption());
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* 矩阵格逐格扫描提示 */
+  let mxIdx = 0;
+  const mxCells = D.mxCells;
+  setInterval(() => {
+    mxChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: mxIdx });
+    mxIdx = (mxIdx + 1) % mxCells;
+  }, 4200);
+
+  /* ===== 19. 底部口径与研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "口径", c: C.amber, t: "本页 = 接口级联调明细（一条接口看 定义→桩就绪→首次联调→缺陷修复→联调通过 全过程）；" +
+        "兄弟页「单集成基线详情」= 单条基线的四域构成与就绪度，两页共用四基线与六对组合名，不重复度量" },
+    { lv: "口径", c: C.amber, t: "接口总盘 " + fmtInt(D.plan) + " 条 = 父页「联调接口达成」六对计划数之和 = 四基线 × 六对矩阵全表 Σ；" +
+        "本表 " + D.n + " 条为抽样（" + fmtDec(D.share, 1) + "%），逐对抽样条数 " + D.rowsByPair.join(" / ") + " 与 chip 计数一致" },
+    { lv: "口径", c: C.amber, t: "整体联调达成 " + fmtDec(D.rate, 1) + "% = Σ已联调 " + fmtInt(D.done) + " ÷ Σ计划 " +
+        fmtInt(D.plan) + "（现算回归父页整体线 " + fmtDec(IF_RATE_REF, 1) + "%）；六对完成率等权均值 " + fmtDec(D.rateMean, 1) + "%" },
+    { lv: "口径", c: C.amber, t: "基线接口数为跨域口径：" + BASELINES.map((b) => b.name + " " + b.plan).join(" / ") +
+        "；父页基线卡的 560 / 632 / 700 是含域内接口的基线全量口径，两者不可直接相减" },
+    { lv: "高", c: C.red, t: "阻塞接口全盘 " + D.depSum + " 条（父页跨域依赖阻塞热力接口类 Σ），本表抽样 " +
+        D.blocked.length + " 条、Σ 阻塞 " + D.blockDaysSum + " 天，最久「" + D.blocked[0].nm + "」" +
+        D.blocked[0].bd + " 天（" + BLOCK_REASONS[D.blocked[0].br] + "）" },
+    { lv: "高", c: C.red, t: "最弱组合「" + D.worst.name + "」达成 " + fmtDec(D.worst.rate, 1) + "%（" +
+        D.worst.done + " / " + D.worst.plan + "），尚余 " + D.worst.gap + " 条待联调；最好「" + D.best.name +
+        "」" + fmtDec(D.best.rate, 1) + "%" },
+    { lv: "中", c: C.orange, t: "R26.6 集成中：" + BASELINES[2].done + " / " + BASELINES[2].plan + " 条已联调（" +
+        fmtDec(BASELINES[2].rate, 1) + "%），R26.8 规划中 " + BASELINES[3].done + " / " + BASELINES[3].plan +
+        " 条（" + fmtDec(BASELINES[3].rate, 1) + "%），冲刺缺口合计 " + (BASELINES[2].gap + BASELINES[3].gap) + " 条" },
+    { lv: "中", c: C.orange, t: "抽样口径下联调周期：已联调接口平均 " + fmtDec(D.cycleAvg, 1) + " 天，最长「" +
+        D.longest.nm + "」" + D.longest.cycle + " 天（Σ 四段 = " + D.longest.segSum + "）；Σ 联调缺陷 " +
+        D.dfcSum + " 条，属集成拦截口径的接口级明细" },
+    { lv: "低", c: C.green, t: "勾稽：矩阵行和 Σ = " + fmtInt(D.rowSum) + " 条 = 列和 Σ = " + fmtInt(D.colSum) +
+        " 条 = 接口总盘；待联调矩阵列和 " + PAIRS.map((p) => p.gap).join(" / ") + " · Σ = " + D.gap + " 条" }
+  ];
+  const track = $("ry-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="ry-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                    /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 20. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(ifOption(0)); JSON.stringify(ifOption(3)); JSON.stringify(mxOption()); }
+  catch (e) { optAcyclic = false; console.error("[跨域接口台账] option 存在循环引用：", e.message); }
+
+  const hashProbe = ["软件↔硬件", "软件 ↔ 硬件", "软件×硬件", "软件-硬件", "硬件↔软件", "软硬",
+                     "软件↔云端", "软云", "软件↔AI", "软ai", "硬件↔云端", "硬云",
+                     "硬件↔AI", "硬AI", "云端↔AI", "云ai", "云端↔ＡＩ"];
+  const hashWant  = [1, 1, 1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 6];
+
+  const checks = [
+    ["六对组合名与父页逐字（a↔b 现拼）",
+      PAIRS.every((p, j) => p.name === IF_NAMES_REF[j]) && PAIRS.length === 6],
+    ["六对计划数与父页逐对相等（150/180/120/90/60/100）",
+      PAIRS.every((p, j) => p.plan === IF_PLAN_REF[j])],
+    ["六对已联调数与父页逐对相等（137/165/109/82/55/92）",
+      PAIRS.every((p, j) => p.done === IF_DONE_REF[j])],
+    ["接口总盘 = 六对计划之和 = 700 条", D.plan === sum(IF_PLAN_REF) && D.plan === 700],
+    ["整体达成率 ≈ 91.4% = Σ已联调 ÷ Σ计划（回归父页整体线）",
+      Math.abs(D.rate - IF_RATE_REF) < 0.05 && D.done === sum(IF_DONE_REF)],
+    ["矩阵行和 = 各基线接口数，Σ 行和 = 总盘",
+      BASELINES.every((b, i) => b.plan === sum(MX_PLAN[i])) && D.rowSum === D.plan],
+    ["矩阵列和 = 各对接口数，Σ 列和 = 总盘",
+      PAIRS.every((p, j) => p.plan === colSum(MX_PLAN, j)) && D.colSum === D.plan],
+    ["待联调矩阵列和 = 逐对待办数，Σ = 60 条",
+      PAIRS.every((p, j) => p.gap === colSum(MX_GAP, j) && p.gap === p.plan - p.done) && D.gap === 60],
+    ["矩阵逐格 0 ≤ 待联调 ≤ 计划，已发布两基线零缺口",
+      MX_PLAN.every((row, i) => row.every((v, j) => MX_GAP[i][j] >= 0 && MX_GAP[i][j] <= v)) &&
+      BASELINES[0].gap === 0 && BASELINES[1].gap === 0],
+    ["四基线名与契约 §2.3 逐字（R26.2 / R26.4 / R26.6 / R26.8）",
+      BASELINES.map((b) => b.name).join(",") === "R26.2,R26.4,R26.6,R26.8"],
+    ["抽样各对条数 = chip 计数（逐对）",
+      PFILTERS.every((f, i) => f.cnt === (i === 0 ? ROWS.length : ROWS.filter((r) => r.pi === i - 1).length)) &&
+      sum(D.rowsByPair) === D.n],
+    ["抽样基线分布之和 = 抽样总数 26，占总盘 " + fmtDec(D.share, 1) + "%",
+      sum(D.rowsByBase) === D.n && D.n === 26],
+    ["单接口 Σ 各段天数 = 联调周期（逐行，四段皆为正）",
+      ROWS.every((r) => r.segSum === r.cycle && r.seg.length === 4 && r.seg.every((v) => v > 0))],
+    ["五节点日期由定义日 + 累计天数现算且严格递增（逐行）",
+      ROWS.every((r) => r.t.length === 5 && r.t.every((v, k) => k === 0 || v > r.t[k - 1]))],
+    ["计划联调日 = 节点③首次联调日（逐行）",
+      ROWS.every((r) => r.planDay === r.t[2])],
+    ["状态与今日线自洽：已联调已过通过日、未开始未到首联日、联调中/阻塞在途",
+      ROWS.every((r) => (
+        r.st === 0 ? r.t[4] <= TODAY :
+        r.st === 1 ? (r.t[2] <= TODAY && r.t[4] > TODAY) :
+        r.st === 2 ? (r.t[0] <= TODAY && r.t[2] > TODAY) :
+                     (r.t[0] <= TODAY && r.t[4] > TODAY)))],
+    ["已发布两基线的抽样行全部为已联调，未开始行零缺陷",
+      ROWS.filter((r) => r.bi < 2).every((r) => r.st === 0) &&
+      ROWS.filter((r) => r.st === 2).every((r) => r.dfc === 0)],
+    ["接口号唯一、格式 IF-XXXX，且落在所属基线号段内",
+      (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^IF-\d{4}$/.test(r.no)) &&
+      ROWS.every((r) => r.seq >= SEG_LO[r.bi] && r.seq <= SEG_HI[r.bi])],
+    ["台账按基线号段升序、段内计划联调日不倒挂",
+      ROWS.every((r, i) => i === 0 || (r.seq > ROWS[i - 1].seq &&
+        (r.bi !== ROWS[i - 1].bi || r.planDay >= ROWS[i - 1].planDay)))],
+    ["阻塞行齐备（原因/天数合法）且清单按阻塞天数降序",
+      ROWS.filter((r) => r.st === 3).every((r) => r.br >= 0 && r.br < BLOCK_REASONS.length && r.bd > 0) &&
+      D.blocked.every((r, i) => i === 0 || r.bd <= D.blocked[i - 1].bd) &&
+      D.blocked.length === D.rowsBySt[3]],
+    ["阻塞抽样条数 ≤ 全盘阻塞 31 条（父页 4×4 接口类热力 Σ）",
+      D.depSum === 31 && D.blocked.length <= D.depSum],
+    ["四类阻塞原因全部出现在抽样清单中",
+      (new Set(D.blocked.map((r) => r.br))).size === BLOCK_REASONS.length],
+    ["Σ 联调缺陷 = 逐行相加（抽样口径）",
+      D.dfcSum === sum(ROWS.map((r) => r.dfc)) && D.dfcSum > 0],
+    ["两端负责人取自两端域名册（逐行下标合法且不同名）",
+      ROWS.every((r) => OWNERS[PAIRS[r.pi].a][r.oa] === r.owA && OWNERS[PAIRS[r.pi].b][r.ob] === r.owB &&
+        r.owA !== r.owB)],
+    ["hash 六对名可解析（含 ↔ / × / - / 空白 / 反向 / 简写 / 全角）",
+      hashProbe.every((s, i) => HASH_ALIAS[normKey(s)] === hashWant[i]) &&
+      HASH_ALIAS[normKey("全部")] === 0 &&
+      PAIRS.every((p, j) => HASH_ALIAS[normKey(decodeURIComponent(encodeURIComponent(p.name)))] === j + 1)],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[跨域接口台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
