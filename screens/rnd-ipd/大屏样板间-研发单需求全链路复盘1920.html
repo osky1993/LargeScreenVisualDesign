@@ -1,0 +1,1375 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单需求全链路复盘</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --zx-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 变更记录列宽：序号 / 变更点+影响范围 / 发起方 / 延期天数 */
+    --zx-ccols: 26px 1fr 98px 64px;
+    /* 关联对象宫格列宽 */
+    --zx-ocols: repeat(4, 1fr);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .zx-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 8% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 92% 6%, rgba(255, 157, 92, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 560px;
+    grid-template-rows: 84px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .zx-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .zx-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .zx-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .zx-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 92, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 157, 92, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .zx-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .zx-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .zx-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .zx-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .zx-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到需求全生命周期，琥珀描边与本页星蓝主色区分 */
+  .zx-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .zx-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .zx-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .zx-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .zx-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .zx-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .zx-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .zx-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .zx-chips { display: flex; align-items: center; gap: 9px; }
+  .zx-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 128px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .zx-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .zx-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .zx-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .zx-chip.is-key b { color: var(--rnd-blue); }
+  .zx-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .zx-clock-time { font: 700 26px/1 var(--zx-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .zx-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 标杆需求切换器（hash 契约目标：四来源名 + 需求编号） ===== */
+  .zx-switch {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .zx-switch-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .zx-rchip {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 1px; cursor: pointer;
+    flex: 1 1 0; min-width: 0; padding: 5px 10px 6px; border-radius: 8px; font-family: inherit; text-align: left;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .zx-rchip u { text-decoration: none; font: 700 11px/1.15 var(--zx-mono); letter-spacing: 0.03em; color: inherit; }
+  .zx-rchip i { font-style: normal; font-size: 11px; line-height: 1.2; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .zx-rchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .zx-rchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .zx-rchip.is-on i { color: rgba(7, 16, 38, 0.72); }
+  .zx-rchip.is-hit { animation: zx-hit 0.9s ease-in-out 2; }
+  @keyframes zx-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--zx-cc, rgba(92, 157, 255, 0.8)); } }
+
+  /* ===== KPI 条（七格，翻牌缓动；init 前填充完毕） ===== */
+  .zx-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; min-width: 0; }
+  .zx-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .zx-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--zx-kc, var(--rnd-blue)); }
+  .zx-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .zx-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .zx-kpi-v b { font: 700 24px/1 var(--zx-mono); color: var(--zx-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .zx-kpi-v b.is-txt { font-size: 17px; letter-spacing: 0.04em; font-family: inherit; }
+  .zx-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .zx-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .zx-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .zx-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .zx-panel::before { content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .zx-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .zx-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .zx-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .zx-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .zx-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .zx-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 左栏两块高度全部写死：事件流 420 + 底排 308 + gap 14 = 742（= 1fr 行高），
+     图表容器父链恒为 flex，任何 JS 填充都压不矮它们。 */
+  .zx-panel.is-flow { flex: none; height: 420px; min-height: 0; overflow: hidden; }
+  .zx-row2 { flex: none; height: 308px; min-height: 0; display: flex; gap: 14px; }
+  .zx-row2 > .zx-panel { flex: 1 1 0; min-width: 0; }
+  /* ★ 右栏三块由 JS 在每次切换需求时重填（内容行数随需求变化 3~5 条），
+     一律写死高度 + min-height:0 + overflow:hidden（168 + 258 + 288 + gap 28 = 742），避免重填后互相挤压。 */
+  .zx-panel.is-obj { flex: none; height: 168px; min-height: 0; overflow: hidden; }
+  .zx-panel.is-chg { flex: none; height: 258px; min-height: 0; overflow: hidden; }
+  .zx-panel.is-cc  { flex: none; height: 288px; min-height: 0; overflow: hidden; }
+
+  /* ===== 关联对象宫格（CSS grid，非 <table>） ===== */
+  .zx-obj { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--zx-ocols); grid-auto-rows: 1fr; gap: 8px; }
+  .zx-obj-c {
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 4px 10px;
+    border-radius: 8px; border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.5);
+    min-width: 0;
+  }
+  .zx-obj-c span { font-size: 10px; letter-spacing: 0.12em; color: #6079b0; }
+  .zx-obj-c b { font-size: 14px; font-weight: 700; color: var(--zx-oc, #cfdcff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .zx-obj-c i { font-style: normal; font-size: 10px; color: rgba(127, 146, 196, 0.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 需求变更记录（CSS grid 模拟表） ===== */
+  .zx-ctable { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .zx-cthead, .zx-cbody li { display: grid; grid-template-columns: var(--zx-ccols); align-items: center; gap: 8px; }
+  .zx-cthead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .zx-cbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .zx-cbody li { padding: 0 8px; height: 36px; border-radius: 5px; font-size: 12px; color: #c9d8f8; animation: zx-rowin .34s ease both; }
+  @keyframes zx-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .zx-cbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .zx-cno { font: 700 11px/1 var(--zx-mono); color: #071026; background: var(--rnd-orange); border-radius: 4px; text-align: center; padding: 3px 0; }
+  .zx-ctxt { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .zx-ctxt b { font-weight: 700; font-size: 12px; color: #dfe9ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zx-ctxt i { font-style: normal; font-size: 10.5px; color: rgba(127, 146, 196, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zx-cwho { font-size: 11px; color: #a9bce4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zx-cday { text-align: right; font: 700 13px/1 var(--zx-mono); color: var(--rnd-orange); font-variant-numeric: tabular-nums; }
+
+  /* ===== 复盘结论 ===== */
+  .zx-cc { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 7px; }
+  .zx-cc-i {
+    flex: 1; min-height: 0; display: grid; grid-template-columns: 58px 1fr; align-items: center; gap: 10px;
+    padding: 6px 10px; border-radius: 8px; border-left: 3px solid var(--zx-cs, var(--rnd-blue));
+    background: rgba(14, 26, 66, 0.5);
+  }
+  .zx-cc-k { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-align: center; padding: 3px 0; border-radius: 4px; color: #071026; background: var(--zx-cs, var(--rnd-blue)); }
+  .zx-cc-t { font-size: 11.5px; line-height: 1.5; color: #cfdcff; overflow: hidden; }
+  .zx-cc-t b { font-weight: 700; color: var(--zx-cs, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+
+  /* ===== 底部滚动条 ===== */
+  .zx-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .zx-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange); }
+  .zx-foot-tag::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange); box-shadow: 0 0 10px var(--rnd-orange); animation: zx-blink 1.6s ease-in-out infinite; }
+  @keyframes zx-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .zx-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .zx-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .zx-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .zx-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .zx-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .zx-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="zx-stage" id="zx-stage">
+    <!-- mockflag:begin --><div class="zx-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="zx-error" id="zx-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="zx-header">
+      <div class="zx-head-left">
+        <div class="zx-crumb">
+          <a class="zx-crumb-up" href="大屏样板间-研发需求全生命周期1920.html" title="返回上级专题页（Esc）">‹ 返回 需求全生命周期</a>
+          <b>云麓智联科技</b><i>›</i><span>需求全生命周期</span><i>›</i><em>单需求全链路复盘</em>
+        </div>
+        <div class="zx-head-title-row">
+          <div class="zx-head-title">单需求全链路复盘</div>
+          <div class="zx-head-meta">
+            <span><b id="zx-meta-n">--</b> 条标杆需求 · Σ 历时 <b id="zx-meta-days">--</b> 天 · 平均等待占比 <b id="zx-meta-wait">--</b></span><i>|</i>
+            <span>口径分工：<b>需求条目台账</b>看全量 12,400 条的来源筛选与五节点概览，<b>本页</b>只深挖单条的逐事件全链路</span><i>|</i>
+            <span>数据截止 <b>2026-08-19</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="zx-head-right">
+        <div class="zx-chips">
+          <div class="zx-chip"><span>REPLAY WINDOW</span><b id="zx-chip-win">--</b></div>
+          <div class="zx-chip is-key"><span id="zx-chip-key">总历时</span><b id="zx-chip-val">--</b></div>
+        </div>
+        <div class="zx-clock" aria-label="实时时钟">
+          <span class="zx-clock-time" id="zx-clock-time">--:--:--</span>
+          <span class="zx-clock-date" id="zx-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 标杆需求切换器（← → 切换，hash 可直达） -->
+    <div class="zx-switch">
+      <span class="zx-switch-tag">标杆需求</span>
+      <div id="zx-rchips" style="display:flex;align-items:center;gap:9px;flex:1;min-width:0;"></div>
+    </div>
+
+    <!-- KPI 七格 -->
+    <div class="zx-kpis" id="zx-kpis"></div>
+
+    <!-- 左：全链路事件流时间轴（主视觉）+ 阶段耗时瀑布 + 计划 vs 实际哑铃 -->
+    <div class="zx-col">
+      <section class="zx-panel is-flow">
+        <div class="zx-panel-head">
+          <h2>全链路事件流时间轴（OR 提出 → 验收）</h2>
+          <span class="zx-panel-tag" id="zx-flow-tag">--</span>
+        </div>
+        <div class="zx-chart" id="zx-chart-flow"></div>
+      </section>
+      <div class="zx-row2">
+        <section class="zx-panel">
+          <div class="zx-panel-head">
+            <h2>阶段耗时瀑布 · 时间去哪了</h2>
+            <span class="zx-panel-tag" id="zx-wf-tag">--</span>
+          </div>
+          <div class="zx-chart" id="zx-chart-waterfall"></div>
+        </section>
+        <section class="zx-panel">
+          <div class="zx-panel-head">
+            <h2>计划 vs 实际 · 逐阶段哑铃</h2>
+            <span class="zx-panel-tag" id="zx-db-tag">--</span>
+          </div>
+          <div class="zx-chart" id="zx-chart-dumbbell"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- 右：关联对象 + 需求变更记录 + 复盘结论 -->
+    <div class="zx-col">
+      <section class="zx-panel is-obj">
+        <div class="zx-panel-head">
+          <h2>关联对象</h2>
+          <span class="zx-panel-tag" id="zx-obj-tag">--</span>
+        </div>
+        <div class="zx-obj" id="zx-obj"></div>
+      </section>
+      <section class="zx-panel is-chg">
+        <div class="zx-panel-head">
+          <h2>需求变更记录</h2>
+          <span class="zx-panel-tag" id="zx-chg-tag">--</span>
+        </div>
+        <div class="zx-ctable">
+          <div class="zx-cthead"><span>#</span><span>变更点 / 影响范围</span><span>发起方</span><span>延期</span></div>
+          <ul class="zx-cbody" id="zx-cbody"></ul>
+        </div>
+      </section>
+      <section class="zx-panel is-cc">
+        <div class="zx-panel-head">
+          <h2>复盘结论</h2>
+          <span class="zx-panel-tag" id="zx-cc-tag">--</span>
+        </div>
+        <div class="zx-cc" id="zx-cc"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="zx-foot">
+      <div class="zx-foot-tag">复盘研判</div>
+      <div class="zx-foot-view"><div class="zx-foot-track" id="zx-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("zx-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("zx-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)",
+    sky: "#8ec5ff",
+    wait: "rgba(127,146,196,.42)",
+    lane: "rgba(96,140,255,.06)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 需求复盘视角）
+         ★ 与契约 docs/RndIpdThemed.md 严格同源：
+           §2.2 需求盘 OR 12,400 → IR 9,800 → SR 7,600 → AR 21,500 点当量（SR→AR 拆分放大）；
+           四来源 客户直采 4,460 / 市场洞察 3,290 / 技术规划 2,830 / 内部运营 1,820（Σ = 12,400）；
+           §2.3 12 团队与四产品线名称逐字；父页 P3「需求全生命周期」四来源即本页 hash 键。
+         ★ 与兄弟页 S3「需求条目台账」的分工（页头口径条同文）：
+           台账 = 全量 12,400 条按来源筛选 + 单条五节点（OR 受理 / IR 分析 / SR 定义 / AR 开发 / 交付上线）概览；
+           本页 = 8 条已闭环标杆需求的**逐事件**全链路复盘，颗粒度细一个量级（16~20 个事件节点、
+           等待/处理分离、回退回环、变更逐条、计划 vs 实际逐阶段），两页需求编号刻意不重叠。
+         ★ 本页唯一数据源 = 每条需求的**事件表 ev**：
+           ev = [名称, 泳道, 责任人, 阶段, 等待天, 处理天, 回退目标事件索引]。
+           节点日期 = 起始日 + Σ前序(等待+处理)；阶段耗时瀑布 = 按阶段归集 ev；
+           等待/处理拆分 = Σ 各自列；总时长 = Σ(等待+处理)。全部现算，页面无硬编码合计。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，事件与阶段/泳道之间一律用索引关联，
+           绝不用对象引用回指。 ===== */
+
+  /* 4.1 契约锚点（勿改，与父页逐字） */
+  const SRC_NAMES = ["客户直采", "市场洞察", "技术规划", "内部运营"];   /* §6 P3→S3 hash 对象集 */
+  const SRC_OR    = [4460, 3290, 2830, 1820];                            /* Σ = 12,400 */
+  const OR_REF = 12400;
+  const SRC_COLORS = [C.blue, C.cyan, C.violet, C.amber];   /* 四来源配色，与父页桑基同族 */
+  const LINE_NAMES = ["智家终端", "云平台服务", "AIoT模组", "行业方案"];
+  const TEAM12 = ["天枢", "天璇", "天玑", "天权", "玉衡", "开阳", "摇光", "青龙", "白虎", "朱雀", "玄武", "紫微"];
+  /* 编号号段：与兄弟页台账同惯例，号段随来源递增（进自检） */
+  const NO_SEG = [[200, 999], [1000, 1499], [1500, 1999], [2000, 2499]];
+  const DATA_AS_OF = "2026-08-19";
+
+  /* 4.2 九阶段（瀑布归集口径；「变更返工」为穿插段，计划恒为 0） */
+  const SG = ["OR 受理", "IR 分析", "SR 定义", "AR 拆分", "开发", "变更返工", "测试", "发布", "验收"];
+  const SG_COLORS = [C.blue, C.sky, C.violet, C.blueDeep, C.cyan, C.orange, C.amber, C.red, C.green];
+  const CHG_SG = 5;                                                      /* 变更返工段索引 */
+
+  /* 4.3 五条角色泳道（事件流纵轴） */
+  const LANES = ["需求与产品", "系统工程", "研发团队", "测试与质量", "发布与运营"];
+
+  /* 4.4 复盘状态四档 */
+  const STT_NAMES = ["已闭环", "改进跟踪", "复盘归档中", "已闭环·免整改"];
+  const STT_COLORS = [C.green, C.amber, C.blue, C.cyan];
+
+  /* 4.5 八条标杆需求（四来源各 2 条、四产品线全覆盖、承接团队取 §2.3 12 团队逐字）
+         plan = 九阶段计划耗时（天，Σ = 计划总时长；变更返工计划恒为 0）
+         chg  = [变更点, 发起方, 影响范围, 延期天]，Σ 延期 == 瀑布「变更返工」段（硬校验）
+         ev   = 事件表（本页唯一数据源，见 §4 抬头说明） */
+
+
+  const REQS = [
+    {
+      no: "OR-2026-0226", t: "智能门锁指静脉双模验证与离线开锁", si: 0, li: 0, team: "天权", site: "深圳中心", dom: "硬件",
+      d0: "2025-11-06", arN: 14, bugN: 23, base: "R26.4", rel: "R26.4.3", stt: 0,
+      plan: [10, 22, 28, 18, 36, 0, 26, 18, 14],
+      chg: [
+        ["指静脉活体检测阈值由单模改双模判定", "客户侧产品部", "SR 定义 + 算法接口 + 3 条 AR", 11],
+        ["离线开锁有效期由 24h 放宽至 72h", "客户侧产品部", "固件存储结构 + 2 条 AR", 9],
+        ["增加开锁失败埋点回传字段", "内部运营·数据组", "云端上报协议 + 1 条 AR", 6]
+      ],
+      ev: [
+        ["提出", 0, "王敏·产品经理", 0, 0, 0, -1],
+        ["入池", 0, "李遥·需求管理", 0, 6, 3, -1],
+        ["受理", 0, "郑毅·IPMT 值班", 1, 8, 4, -1],
+        ["IR分析", 1, "陈昊·系统工程", 1, 5, 9, -1],
+        ["SR评审", 1, "SE 评审组", 2, 9, 5, -1],
+        ["驳回", 1, "跨域评审委员会", 2, 4, 8, 3],
+        ["SR签发", 1, "陈昊·系统工程", 2, 4, 6, -1],
+        ["AR拆分", 1, "陈昊·系统工程", 3, 3, 5, -1],
+        ["排期", 2, "刘颖·天权 SM", 3, 12, 2, -1],
+        ["开发", 2, "赵岩·天权开发", 4, 3, 18, -1],
+        ["阻塞", 2, "外协·模组供应", 4, 15, 4, 8],
+        ["变更CR1", 0, "客户侧产品部", 5, 6, 9, 6],
+        ["返工", 2, "赵岩·天权开发", 5, 3, 8, -1],
+        ["提测", 3, "孙倩·测试", 6, 4, 5, -1],
+        ["打回", 3, "孙倩·QA 回归", 6, 3, 9, 9],
+        ["测试通过", 3, "孙倩·测试经理", 6, 3, 7, -1],
+        ["发布评审", 4, "周琦·发布经理", 7, 5, 3, -1],
+        ["上线", 4, "SRE·发布列车", 7, 4, 4, -1],
+        ["验收", 0, "王敏·客户代表", 8, 8, 5, -1]
+      ]
+    },
+    {
+      no: "OR-2026-0694", t: "网关设备影子批量下发与断网续传", si: 0, li: 1, team: "天璇", site: "北京总部", dom: "云平台",
+      d0: "2026-01-12", arN: 9, bugN: 11, base: "R26.6", rel: "R26.6.1", stt: 1,
+      plan: [8, 16, 18, 14, 20, 0, 18, 12, 10],
+      chg: [
+        ["批量下发单批上限由 200 提至 1,000 台", "客户侧交付部", "分片协议 + 2 条 AR", 7],
+        ["断网续传补偿窗口由 6h 延长至 24h", "天璇·架构组", "存储配额 + 1 条 AR", 5],
+        ["新增下发结果回执聚合接口", "内部运营·工单组", "开放 API + 1 条 AR", 4]
+      ],
+      ev: [
+        ["提出", 0, "林可·产品经理", 0, 0, 0, -1],
+        ["入池", 0, "李遥·需求管理", 0, 4, 3, -1],
+        ["受理", 0, "郑毅·IPMT 值班", 1, 5, 3, -1],
+        ["IR分析", 1, "贺松·系统工程", 1, 3, 8, -1],
+        ["SR评审", 1, "SE 评审组", 2, 6, 4, -1],
+        ["SR签发", 1, "贺松·系统工程", 2, 3, 5, -1],
+        ["AR拆分", 1, "贺松·系统工程", 3, 3, 4, -1],
+        ["排期", 2, "许畅·天璇 SM", 3, 7, 2, -1],
+        ["开发", 2, "文昕·天璇开发", 4, 2, 16, -1],
+        ["变更CR1", 0, "客户侧交付部", 5, 4, 7, 5],
+        ["返工", 2, "文昕·天璇开发", 5, 2, 3, -1],
+        ["提测", 3, "邵岚·测试", 6, 3, 4, -1],
+        ["打回", 3, "邵岚·QA 回归", 6, 2, 6, 8],
+        ["测试通过", 3, "邵岚·测试经理", 6, 2, 5, -1],
+        ["发布评审", 4, "周琦·发布经理", 7, 3, 2, -1],
+        ["灰度", 4, "SRE·发布列车", 7, 2, 4, -1],
+        ["上线", 4, "SRE·发布列车", 7, 2, 3, -1],
+        ["验收", 0, "林可·产品经理", 8, 5, 4, -1]
+      ]
+    },
+    {
+      no: "OR-2026-1108", t: "适老化大字模式全屋场景联动", si: 1, li: 0, team: "天枢", site: "北京总部", dom: "软件",
+      d0: "2025-11-15", arN: 17, bugN: 19, base: "R26.4", rel: "R26.4.6", stt: 2,
+      plan: [12, 26, 32, 20, 40, 0, 30, 20, 16],
+      chg: [
+        ["大字模式覆盖范围由中控屏扩到 App 与语音播报", "市场洞察·体验组", "三端 UI + 5 条 AR", 18],
+        ["场景联动增加“一键呼叫子女”入口", "市场洞察·体验组", "通讯录权限 + 2 条 AR", 13],
+        ["字号档位由 3 档细化为 5 档", "客户侧产品部", "布局适配 + 2 条 AR", 10],
+        ["语音播报语速与音量联动调节", "市场洞察·体验组", "语音 SDK + 1 条 AR", 7]
+      ],
+      ev: [
+        ["提出", 0, "苏婉·产品经理", 0, 0, 0, -1],
+        ["入池", 0, "李遥·需求管理", 0, 9, 3, -1],
+        ["受理", 0, "郑毅·IPMT 值班", 1, 13, 4, -1],
+        ["IR分析", 1, "陈昊·系统工程", 1, 8, 7, -1],
+        ["SR评审", 1, "SE 评审组", 2, 12, 5, -1],
+        ["驳回", 1, "跨域评审委员会", 2, 6, 7, 3],
+        ["SR签发", 1, "陈昊·系统工程", 2, 7, 5, -1],
+        ["AR拆分", 1, "陈昊·系统工程", 3, 4, 5, -1],
+        ["排期", 2, "董蕊·天枢 SM", 3, 16, 2, -1],
+        ["开发", 2, "程飞·天枢开发", 4, 4, 17, -1],
+        ["阻塞", 2, "跨域·语音中台", 4, 18, 3, 8],
+        ["变更CR1", 0, "市场洞察·体验组", 5, 9, 10, 6],
+        ["变更CR2", 0, "客户侧产品部", 5, 8, 7, 6],
+        ["返工", 2, "程飞·天枢开发", 5, 5, 9, -1],
+        ["提测", 3, "何蓉·测试", 6, 6, 4, -1],
+        ["打回", 3, "何蓉·QA 回归", 6, 5, 8, 9],
+        ["测试通过", 3, "何蓉·测试经理", 6, 4, 6, -1],
+        ["发布评审", 4, "周琦·发布经理", 7, 7, 3, -1],
+        ["上线", 4, "SRE·发布列车", 7, 5, 3, -1],
+        ["验收", 0, "苏婉·产品经理", 8, 11, 4, -1]
+      ]
+    },
+    {
+      no: "OR-2026-1433", t: "模组出货区域画像与竞品对标月报", si: 1, li: 2, team: "摇光", site: "成都中心", dom: "软件",
+      d0: "2026-02-09", arN: 7, bugN: 6, base: "R26.6", rel: "R26.6.4", stt: 3,
+      plan: [8, 16, 18, 14, 20, 0, 18, 12, 10],
+      chg: [
+        ["画像维度增加渠道商与行业标签", "市场洞察·战略组", "数仓模型 + 2 条 AR", 9],
+        ["对标口径由季度改为滚动 12 月", "市场洞察·战略组", "指标口径 + 1 条 AR", 6],
+        ["月报增加自动邮件推送", "内部运营·运营组", "调度任务 + 1 条 AR", 5]
+      ],
+      ev: [
+        ["提出", 0, "郝萌·产品经理", 0, 0, 0, -1],
+        ["入池", 0, "李遥·需求管理", 0, 5, 2, -1],
+        ["受理", 0, "郑毅·IPMT 值班", 1, 6, 3, -1],
+        ["IR分析", 1, "贺松·系统工程", 1, 4, 7, -1],
+        ["SR评审", 1, "SE 评审组", 2, 7, 4, -1],
+        ["SR签发", 1, "贺松·系统工程", 2, 4, 4, -1],
+        ["AR拆分", 1, "贺松·系统工程", 3, 3, 4, -1],
+        ["排期", 2, "聂川·摇光 SM", 3, 9, 2, -1],
+        ["开发", 2, "高越·摇光开发", 4, 3, 14, -1],
+        ["变更CR1", 0, "市场洞察·战略组", 5, 5, 8, 5],
+        ["返工", 2, "高越·摇光开发", 5, 3, 4, -1],
+        ["提测", 3, "邵岚·测试", 6, 4, 4, -1],
+        ["测试通过", 3, "邵岚·测试经理", 6, 3, 6, -1],
+        ["发布评审", 4, "周琦·发布经理", 7, 4, 2, -1],
+        ["上线", 4, "SRE·发布列车", 7, 3, 3, -1],
+        ["验收", 0, "郝萌·产品经理", 8, 6, 4, -1]
+      ]
+    },
+    {
+      no: "OR-2026-1666", t: "M80 双频 Wi-Fi 6 共存射频方案", si: 2, li: 2, team: "白虎", site: "西安中心", dom: "硬件",
+      d0: "2025-10-20", arN: 21, bugN: 31, base: "R26.4", rel: "R26.4.8", stt: 0,
+      plan: [12, 28, 34, 22, 46, 0, 34, 20, 16],
+      chg: [
+        ["共存策略由静态分时改为动态功率协商", "技术规划·预研组", "射频架构 + 6 条 AR", 19],
+        ["天线布局由两天线改为三天线分集", "技术规划·预研组", "结构改板 + 4 条 AR", 15],
+        ["增加 2.4G/5G 同时收发的认证用例", "测试架构组", "认证测试 + 2 条 AR", 11]
+      ],
+      ev: [
+        ["提出", 0, "岳枫·产品经理", 0, 0, 0, -1],
+        ["入池", 0, "李遥·需求管理", 0, 7, 3, -1],
+        ["受理", 0, "郑毅·IPMT 值班", 1, 9, 5, -1],
+        ["IR分析", 1, "崔骏·系统工程", 1, 6, 11, -1],
+        ["SR评审", 1, "SE 评审组", 2, 11, 6, -1],
+        ["驳回", 1, "跨域评审委员会", 2, 5, 9, 3],
+        ["SR签发", 1, "崔骏·系统工程", 2, 5, 7, -1],
+        ["AR拆分", 1, "崔骏·系统工程", 3, 4, 6, -1],
+        ["排期", 2, "祁苒·白虎 SM", 3, 14, 3, -1],
+        ["开发", 2, "卢平·白虎开发", 4, 4, 22, -1],
+        ["阻塞", 2, "外协·射频器件", 4, 21, 5, 8],
+        ["变更CR1", 0, "技术规划·预研组", 5, 7, 9, 6],
+        ["变更CR2", 0, "技术规划·预研组", 5, 6, 7, 6],
+        ["返工", 2, "卢平·白虎开发", 5, 4, 12, -1],
+        ["提测", 3, "殷桐·测试", 6, 5, 6, -1],
+        ["打回", 3, "殷桐·QA 回归", 6, 4, 11, 9],
+        ["测试通过", 3, "殷桐·测试经理", 6, 4, 8, -1],
+        ["发布评审", 4, "周琦·发布经理", 7, 6, 4, -1],
+        ["上线", 4, "SRE·发布列车", 7, 5, 4, -1],
+        ["验收", 0, "岳枫·产品经理", 8, 9, 6, -1]
+      ]
+    },
+    {
+      no: "OR-2026-1874", t: "端侧推理统一算子接入层", si: 2, li: 0, team: "天玑", site: "上海中心", dom: "AI算法",
+      d0: "2025-12-22", arN: 13, bugN: 15, base: "R26.6", rel: "R26.6.2", stt: 1,
+      plan: [10, 24, 30, 18, 36, 0, 28, 16, 13],
+      chg: [
+        ["算子集由 32 个扩到 51 个以覆盖御风边缘模型", "技术规划·算法组", "算子库 + 4 条 AR", 12],
+        ["量化精度由 INT8 增加 FP16 兜底通路", "技术规划·算法组", "推理运行时 + 2 条 AR", 8],
+        ["接入层增加模型热加载内存上限保护", "云端 SRE 组", "运行时守护 + 1 条 AR", 6]
+      ],
+      ev: [
+        ["提出", 0, "骆青·产品经理", 0, 0, 0, -1],
+        ["入池", 0, "李遥·需求管理", 0, 6, 3, -1],
+        ["受理", 0, "郑毅·IPMT 值班", 1, 8, 4, -1],
+        ["IR分析", 1, "崔骏·系统工程", 1, 5, 9, -1],
+        ["SR评审", 1, "SE 评审组", 2, 9, 5, -1],
+        ["驳回", 1, "跨域评审委员会", 2, 4, 7, 3],
+        ["SR签发", 1, "崔骏·系统工程", 2, 4, 6, -1],
+        ["AR拆分", 1, "崔骏·系统工程", 3, 3, 5, -1],
+        ["排期", 2, "邓沐·天玑 SM", 3, 11, 2, -1],
+        ["开发", 2, "宗迪·天玑开发", 4, 3, 19, -1],
+        ["阻塞", 2, "跨域·算力配额", 4, 13, 3, 8],
+        ["变更CR1", 0, "技术规划·算法组", 5, 6, 8, 6],
+        ["返工", 2, "宗迪·天玑开发", 5, 4, 8, -1],
+        ["提测", 3, "殷桐·测试", 6, 4, 5, -1],
+        ["打回", 3, "殷桐·QA 回归", 6, 3, 8, 9],
+        ["测试通过", 3, "殷桐·测试经理", 6, 3, 6, -1],
+        ["发布评审", 4, "周琦·发布经理", 7, 5, 3, -1],
+        ["上线", 4, "SRE·发布列车", 7, 4, 3, -1],
+        ["验收", 0, "骆青·产品经理", 8, 7, 5, -1]
+      ]
+    },
+    {
+      no: "OR-2026-2078", t: "工单与告警平台打通自动建单", si: 3, li: 1, team: "朱雀", site: "南京中心", dom: "云平台",
+      d0: "2026-02-24", arN: 8, bugN: 7, base: "R26.6", rel: "R26.6.5", stt: 3,
+      plan: [7, 14, 16, 12, 20, 0, 16, 10, 8],
+      chg: [
+        ["建单规则由固定模板改为可配置规则集", "内部运营·工单组", "规则引擎 + 2 条 AR", 6],
+        ["增加重复告警合并建单去重", "云端 SRE 组", "去重窗口 + 1 条 AR", 4],
+        ["工单回写告警平台处理状态", "内部运营·工单组", "双向接口 + 1 条 AR", 3]
+      ],
+      ev: [
+        ["提出", 0, "夏栎·产品经理", 0, 0, 0, -1],
+        ["入池", 0, "李遥·需求管理", 0, 4, 2, -1],
+        ["受理", 0, "郑毅·IPMT 值班", 1, 4, 3, -1],
+        ["IR分析", 1, "贺松·系统工程", 1, 3, 6, -1],
+        ["SR评审", 1, "SE 评审组", 2, 5, 4, -1],
+        ["SR签发", 1, "贺松·系统工程", 2, 3, 4, -1],
+        ["AR拆分", 1, "贺松·系统工程", 3, 2, 4, -1],
+        ["排期", 2, "薛屿·朱雀 SM", 3, 6, 2, -1],
+        ["开发", 2, "仇越·朱雀开发", 4, 2, 15, -1],
+        ["变更CR1", 0, "内部运营·工单组", 5, 3, 6, 5],
+        ["返工", 2, "仇越·朱雀开发", 5, 2, 2, -1],
+        ["提测", 3, "邵岚·测试", 6, 3, 4, -1],
+        ["测试通过", 3, "邵岚·测试经理", 6, 2, 5, -1],
+        ["发布评审", 4, "周琦·发布经理", 7, 3, 2, -1],
+        ["上线", 4, "SRE·发布列车", 7, 2, 3, -1],
+        ["验收", 0, "夏栎·产品经理", 8, 4, 3, -1]
+      ]
+    },
+    {
+      no: "OR-2026-2264", t: "行业方案交付验收资料自动归档", si: 3, li: 3, team: "紫微", site: "北京总部", dom: "软件",
+      d0: "2026-01-05", arN: 11, bugN: 9, base: "R26.6", rel: "R26.6.3", stt: 2,
+      plan: [9, 18, 24, 16, 30, 0, 24, 14, 12],
+      chg: [
+        ["归档范围由验收报告扩到全过程交付物", "内部运营·交付部", "目录模型 + 3 条 AR", 9],
+        ["增加客户签章件的水印与防篡改校验", "内部运营·合规组", "加签服务 + 2 条 AR", 7],
+        ["归档结果同步到项目管理系统", "内部运营·PMO", "集成接口 + 1 条 AR", 5],
+        ["保留期由 3 年调整为 5 年", "内部运营·合规组", "存储策略 + 1 条 AR", 4]
+      ],
+      ev: [
+        ["提出", 0, "樊悦·产品经理", 0, 0, 0, -1],
+        ["入池", 0, "李遥·需求管理", 0, 5, 3, -1],
+        ["受理", 0, "郑毅·IPMT 值班", 1, 7, 3, -1],
+        ["IR分析", 1, "贺松·系统工程", 1, 4, 7, -1],
+        ["SR评审", 1, "SE 评审组", 2, 8, 4, -1],
+        ["驳回", 1, "跨域评审委员会", 2, 4, 6, 3],
+        ["SR签发", 1, "贺松·系统工程", 2, 4, 5, -1],
+        ["AR拆分", 1, "贺松·系统工程", 3, 3, 4, -1],
+        ["排期", 2, "戚航·紫微 SM", 3, 10, 2, -1],
+        ["开发", 2, "莫寒·紫微开发", 4, 3, 15, -1],
+        ["阻塞", 2, "跨域·合规加签", 4, 12, 3, 8],
+        ["变更CR1", 0, "内部运营·交付部", 5, 5, 7, 6],
+        ["返工", 2, "莫寒·紫微开发", 5, 3, 10, -1],
+        ["提测", 3, "何蓉·测试", 6, 4, 4, -1],
+        ["打回", 3, "何蓉·QA 回归", 6, 3, 7, 9],
+        ["测试通过", 3, "何蓉·测试经理", 6, 3, 5, -1],
+        ["发布评审", 4, "周琦·发布经理", 7, 4, 3, -1],
+        ["上线", 4, "SRE·发布列车", 7, 3, 3, -1],
+        ["验收", 0, "樊悦·产品经理", 8, 7, 4, -1]
+      ]
+    }
+  ];
+
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const DAY = 86400000;
+  function parseDay(s) {
+    return new Date(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10)));
+  }
+  const mmdd = (dt) => pad(dt.getMonth() + 1) + "-" + pad(dt.getDate());
+  const ymd  = (dt) => dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate());
+
+  /* 5.1 事件表 → 逐事件时间戳、阶段归集、等待/处理拆分（单一数据源派生一切） */
+  REQS.forEach((r) => {
+    r.src = SRC_NAMES[r.si];
+    r.line = LINE_NAMES[r.li];
+    r.start = parseDay(r.d0);
+    let acc = 0;
+    /* E 为页面内部对象数组，仅供 DOM 与 tooltip 文案使用，绝不整体塞进 option */
+    r.E = r.ev.map((e, i) => {
+      const w = e[4], p = e[5];
+      const t0 = acc, tw = acc + w, t1 = acc + w + p;
+      acc = t1;
+      return {
+        i: i, n: e[0], lane: e[1], own: e[2], sg: e[3], w: w, p: p, back: e[6],
+        t0: t0, tw: tw, t1: t1, dur: w + p,
+        date: new Date(r.start.getTime() + t1 * DAY),
+        shortOwn: e[2].split("·")[0].slice(0, 4)
+      };
+    });
+    r.days = acc;
+    r.wait = sum(r.E.map((e) => e.w));
+    r.proc = sum(r.E.map((e) => e.p));
+    r.end = new Date(r.start.getTime() + r.days * DAY);
+    /* 阶段归集：actual[i] / actWait[i] / actProc[i] */
+    r.act = SG.map(() => 0); r.actW = SG.map(() => 0); r.actP = SG.map(() => 0);
+    r.E.forEach((e) => { r.act[e.sg] += e.dur; r.actW[e.sg] += e.w; r.actP[e.sg] += e.p; });
+    r.planDays = sum(r.plan);
+    r.dev = r.act.map((v, i) => v - r.plan[i]);
+    r.devTotal = r.days - r.planDays;
+    r.chgDelay = sum(r.chg.map((c) => c[3]));
+    r.backs = r.E.filter((e) => e.back >= 0);
+    r.backDays = sum(r.backs.map((e) => e.dur));
+    r.waitShare = 100 * r.wait / r.days;
+    r.procShare = 100 * r.proc / r.days;
+    r.stName = STT_NAMES[r.stt];
+    r.stColor = STT_COLORS[r.stt];
+    r.roleN = (new Set(r.E.map((e) => e.own))).size;
+    r.gapMin = Math.min.apply(null, r.E.slice(1).map((e) => e.dur));
+    /* 最长等待事件 / 变更外最大超期阶段 / 最优阶段（现算，供复盘结论引用） */
+    r.longWait = r.E.slice(1).reduce((a, b) => (b.w > a.w ? b : a));
+    const others = SG.map((n, i) => ({ i: i, n: n, d: r.dev[i] })).filter((x) => x.i !== CHG_SG);
+    r.worst = others.slice().sort((a, b) => b.d - a.d)[0];
+    r.under = others.filter((x) => x.d <= 0).sort((a, b) => a.d - b.d);
+    r.best = r.under[0];
+  });
+
+  /* 5.2 全页汇总 */
+  const D = {};
+  D.n = REQS.length;
+  D.days = sum(REQS.map((r) => r.days));
+  D.wait = sum(REQS.map((r) => r.wait));
+  D.waitShare = 100 * D.wait / D.days;
+  D.chgN = sum(REQS.map((r) => r.chg.length));
+  D.chgDelay = sum(REQS.map((r) => r.chgDelay));
+  D.arN = sum(REQS.map((r) => r.arN));
+  D.bugN = sum(REQS.map((r) => r.bugN));
+  D.backN = sum(REQS.map((r) => r.backs.length));
+  D.devTotal = sum(REQS.map((r) => r.devTotal));
+  D.srcCnt = SRC_NAMES.map((s, si) => REQS.filter((r) => r.si === si).length);
+  D.lineCnt = LINE_NAMES.map((s, li) => REQS.filter((r) => r.li === li).length);
+  D.orRef = sum(SRC_OR);
+  D.longest = REQS.slice().sort((a, b) => b.days - a.days)[0];
+  D.fastest = REQS.slice().sort((a, b) => a.days - b.days)[0];
+  D.winFrom = REQS.slice().sort((a, b) => a.start - b.start)[0].start;
+  D.winTo = REQS.slice().sort((a, b) => b.end - a.end)[0].end;
+
+  /* 5.3 回退分类（按事件名归类，供结论与 tooltip 用文案） */
+  function kindOf(n) {
+    if (n.indexOf("驳回") >= 0) return "评审驳回";
+    if (n.indexOf("变更") >= 0) return "需求变更";
+    if (n.indexOf("打回") >= 0) return "测试打回";
+    if (n.indexOf("阻塞") >= 0) return "依赖阻塞";
+    return "回退";
+  }
+  REQS.forEach((r) => {
+    const m = {};
+    r.backs.forEach((e) => { const k = kindOf(e.n); m[k] = (m[k] || 0) + 1; });
+    r.backKinds = Object.keys(m).map((k) => k + " " + m[k] + " 次").join(" / ");
+  });
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("zx-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("zx-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("zx-meta-n").textContent = fmtInt(D.n);
+  $("zx-meta-days").textContent = fmtInt(D.days);
+  $("zx-meta-wait").textContent = fmtDec(D.waitShare, 1) + "%";
+
+  /* ===== 7. 标杆需求切换器（八枚 chip；hash 契约目标） ===== */
+  const rbox = $("zx-rchips");
+  rbox.innerHTML = REQS.map((r, i) => (
+    '<button class="zx-rchip" type="button" data-i="' + i + '" style="--zx-cc:' + SRC_COLORS[r.si] + '"' +
+      ' title="' + r.no + " · " + r.t + " · " + r.src + " / " + r.line + " / " + r.team + '队">' +
+      "<u>" + r.no + "</u><i>" + r.src + " · " + r.t + "</i>" +
+    "</button>"
+  )).join("");
+  const rchips = Array.from(rbox.children);
+
+  /* ===== 8. KPI 七格（每次切换需求重填；翻牌缓动，init 之前先填一轮） ===== */
+  let kpiToken = 0;
+  function renderKpis(r) {
+    const items = [
+      { k: "全链路总历时", v: r.days, dec: 0, unit: "天", color: C.blue,
+        s: ymd(r.start) + " → " + ymd(r.end) + " · Σ 九阶段现算" },
+      { k: "处理时间占比", v: r.procShare, dec: 1, unit: "%", color: C.cyan,
+        s: "处理 " + r.proc + " 天 / 等待 " + r.wait + " 天（" + fmtDec(r.waitShare, 1) + "%）" },
+      { k: "计划偏差", v: r.devTotal, dec: 0, unit: "天", color: r.devTotal > 0 ? C.red : C.green,
+        s: "实际 " + r.days + " 天 vs 计划 " + r.planDays + " 天 · Σ 各段偏差" },
+      { k: "需求变更次数", v: r.chg.length, dec: 0, unit: "次", color: C.orange,
+        s: "回退 " + r.backs.length + " 次（" + r.backKinds + "）" },
+      { k: "变更延期天数", v: r.chgDelay, dec: 0, unit: "天", color: C.amber,
+        s: "= 瀑布「变更返工」段 " + r.act[CHG_SG] + " 天 · 占全程 " + fmtDec(100 * r.chgDelay / r.days, 1) + "%" },
+      { k: "关联 AR 条数", v: r.arN, dec: 0, unit: "条", color: C.violet,
+        s: "关联缺陷 " + r.bugN + " 个 · 承接 " + r.team + "队 · " + r.line },
+      { k: "当前状态", text: r.stName, color: r.stColor,
+        s: r.base + " 基线 · " + r.rel + " 版本 · " + r.roleN + " 个责任方参与" }
+    ];
+    $("zx-kpis").innerHTML = items.map((p, i) => (
+      '<div class="zx-kpi" style="--zx-kc:' + p.color + '">' +
+        '<div class="zx-kpi-k">' + p.k + "</div>" +
+        '<div class="zx-kpi-v">' +
+          (p.text
+            ? '<b class="is-txt">' + p.text + "</b>"
+            : '<b id="zx-kpi-' + i + '">0</b><s>' + p.unit + "</s>") +
+        "</div>" +
+        '<div class="zx-kpi-s">' + p.s + "</div>" +
+      "</div>"
+    )).join("");
+    /* 翻牌缓动：easeOutCubic，0.9 秒收敛；token 防止快速切换时旧动画覆盖新值 */
+    const my = ++kpiToken;
+    items.forEach((p, i) => {
+      if (p.text) return;
+      const el = $("zx-kpi-" + i), dur = 900, t0 = performance.now();
+      (function step(now) {
+        if (my !== kpiToken) return;
+        const q = Math.min(1, (now - t0) / dur);
+        const e = 1 - Math.pow(1 - q, 3);
+        el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+        if (q < 1) requestAnimationFrame(step);
+        else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+      })(t0);
+    });
+  }
+
+  /* ===== 9. 右栏三块（关联对象 / 变更记录 / 复盘结论）——全部纯 DOM，init 之前填充完毕 ===== */
+  function renderObj(r) {
+    const cells = [
+      { k: "需求来源", v: r.src, i: "全盘 " + fmtInt(SRC_OR[r.si]) + " 条 OR · 占 " + fmtDec(100 * SRC_OR[r.si] / OR_REF, 1) + "%", c: SRC_COLORS[r.si] },
+      { k: "所属产品线", v: r.line, i: "集成基线 " + r.base + " · 发布 " + r.rel, c: C.amber },
+      { k: "承接团队", v: r.team + " 队", i: r.site + " · " + r.dom + "域", c: C.blue },
+      { k: "责任方数", v: r.roleN + " 个", i: LANES.length + " 条角色泳道贯穿全程", c: C.sky },
+      { k: "关联 AR 条数", v: fmtInt(r.arN) + " 条", i: "AR 为 SR 拆分放大口径（契约 21,500 点当量）", c: C.violet },
+      { k: "关联缺陷数", v: fmtInt(r.bugN) + " 个", i: "AR 均摊 " + fmtDec(r.bugN / r.arN, 2) + " 个 / 条", c: C.red },
+      { k: "回退次数", v: r.backs.length + " 次", i: r.backKinds, c: C.orange },
+      { k: "复盘状态", v: r.stName, i: "事件节点 " + r.E.length + " 个 · 九阶段全覆盖", c: r.stColor }
+    ];
+    $("zx-obj").innerHTML = cells.map((c) => (
+      '<div class="zx-obj-c" style="--zx-oc:' + c.c + '">' +
+        "<span>" + c.k + "</span><b>" + c.v + "</b><i>" + c.i + "</i>" +
+      "</div>"
+    )).join("");
+    $("zx-obj-tag").innerHTML = r.no + " · 承接团队取 <b>12 团队</b>逐字 · 来源取父页四来源逐字";
+  }
+
+  function renderChg(r) {
+    $("zx-cbody").innerHTML = r.chg.map((c, k) => (
+      "<li style=\"animation-delay:" + (k * 40) + "ms\">" +
+        '<span class="zx-cno">' + (k + 1) + "</span>" +
+        '<span class="zx-ctxt"><b>' + c[0] + "</b><i>影响 " + c[2] + "</i></span>" +
+        '<span class="zx-cwho">' + c[1] + "</span>" +
+        '<span class="zx-cday">+' + c[3] + " 天</span>" +
+      "</li>"
+    )).join("");
+    $("zx-chg-tag").innerHTML = r.chg.length + " 条变更 · Σ 延期 <b>" + r.chgDelay +
+      "</b> 天 ≡ 瀑布「变更返工」段 " + r.act[CHG_SG] + " 天";
+  }
+
+  function renderCC(r) {
+    const chgShare = 100 * r.chgDelay / r.days;
+    const backShare = 100 * r.backDays / r.days;
+    const items = [
+      { k: "做对了", c: C.green,
+        t: "九阶段中 <b>" + r.under.length + "</b> 段实际未超计划，最省的是「" + r.best.n + "」段 <b>" +
+           r.act[r.best.i] + "</b> 天 vs 计划 " + r.plan[r.best.i] + " 天；发布段 <b>" + r.act[7] +
+           "</b> 天沿用 " + r.base + " 发布列车窗口，未额外占用整机资源。" },
+      { k: "教训 · 等待", c: C.amber,
+        t: "等待 <b>" + r.wait + "</b> 天占全程 <b>" + fmtDec(r.waitShare, 1) +
+           "%</b>，处理仅 " + r.proc + " 天；单点最长等待发生在「" + r.longWait.n + "」（<b>" +
+           r.longWait.w + "</b> 天，责任方 " + r.longWait.own + "），跨域评审与排期是主要停摆点。" },
+      { k: "教训 · 回退", c: C.orange,
+        t: "全程 <b>" + r.backs.length + "</b> 次回退（" + r.backKinds + "），累计吃掉 <b>" +
+           r.backDays + "</b> 天、占全程 <b>" + fmtDec(backShare, 1) +
+           "%</b>；其中需求变更 " + r.chg.length + " 条独占 " + r.chgDelay + " 天（" + fmtDec(chgShare, 1) + "%）。" },
+      { k: "改进项", c: C.red,
+        t: "剔除变更返工后，「" + r.worst.n + "」段超期 <b>+" + r.worst.d +
+           "</b> 天为最大偏差项，总偏差 <b>+" + r.devTotal + "</b> 天；建议在 SR 签发前冻结需求边界，" +
+           "并把「" + r.longWait.n + "」的等待纳入 " + r.team + "队 Sprint 前置检查项。" }
+    ];
+    $("zx-cc").innerHTML = items.map((it) => (
+      '<div class="zx-cc-i" style="--zx-cs:' + it.c + '">' +
+        '<span class="zx-cc-k">' + it.k + "</span>" +
+        '<span class="zx-cc-t">' + it.t + "</span>" +
+      "</div>"
+    )).join("");
+    $("zx-cc-tag").innerHTML = "结论由本页数据现算 · 等待占比 <b>" + fmtDec(r.waitShare, 1) +
+      "%</b> · 回退占比 <b>" + fmtDec(backShare, 1) + "%</b>";
+  }
+
+
+  /* ===== 10. 主视觉：全链路事件流时间轴（custom 横向泳道）
+         · 横轴 = 真实日历天（0 = OR 提出日），纵轴 = 五条角色泳道；
+         · 每个节点前的连接段按「等待（淡色细条）/ 处理（实色粗条）」分色，一眼看出停摆在哪；
+         · 回退用橙色回环箭头从发起事件指回被打回的既有节点（评审驳回 / 需求变更 / 测试打回 / 依赖阻塞）；
+         · 节点标签上行为事件名、下行为「日期 责任人 耗时」，按索引奇偶分两层错开防重叠。
+         ★ option 只吃标量数组（EVD / ARCD），事件对象 r.E 只在闭包里查文案，绝不进 series.data。 ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+
+  function flowOption(r) {
+    const NAME = r.E.map((e) => e.n);
+    const OWN  = r.E.map((e) => e.own);
+    const SHORT = r.E.map((e) => e.shortOwn);
+    const DATE = r.E.map((e) => mmdd(e.date));
+    const FULL = r.E.map((e) => ymd(e.date));
+    const DUR  = r.E.map((e) => e.dur);
+    const WW   = r.E.map((e) => e.w);
+    const PP   = r.E.map((e) => e.p);
+    const SGI  = r.E.map((e) => e.sg);
+    const last = r.E.length - 1;
+    /* 事件节点：[t1, lane, idx, t0, tw, sg, isBack] —— 全标量 */
+    const EVD = r.E.map((e) => [e.t1, e.lane, e.i, e.t0, e.tw, e.sg, e.back >= 0 ? 1 : 0]);
+    /* 回环：[srcT, srcLane, dstT, dstLane, order, srcIdx, dstIdx] —— 全标量 */
+    const ARCD = r.backs.map((e, k) => [e.t1, e.lane, r.E[e.back].t1, r.E[e.back].lane, k, e.i, e.back]);
+
+    function renderEv(params, api) {
+      const t1 = api.value(0), lane = api.value(1), idx = api.value(2);
+      const t0 = api.value(3), tw = api.value(4), sg = api.value(5), isBack = api.value(6);
+      const col = SG_COLORS[sg];
+      const pe = api.coord([t1, lane]);
+      const ps = api.coord([t0, lane]);
+      const pw = api.coord([tw, lane]);
+      const kids = [];
+      if (idx > 0) {
+        if (pw[0] > ps[0]) {
+          kids.push({ type: "rect", shape: { x: ps[0], y: pe[1] - 4, width: pw[0] - ps[0], height: 8, r: 2 },
+            style: { fill: C.wait } });
+        }
+        kids.push({ type: "rect", shape: { x: pw[0], y: pe[1] - 7, width: Math.max(1.5, pe[0] - pw[0]), height: 14, r: 3 },
+          style: { fill: col, opacity: 0.92 } });
+      }
+      if (isBack) {
+        kids.push({ type: "polygon",
+          shape: { points: [[pe[0], pe[1] - 8], [pe[0] + 7, pe[1]], [pe[0], pe[1] + 8], [pe[0] - 7, pe[1]]] },
+          style: { fill: C.orange, stroke: PAL.stage, lineWidth: 1.6 } });
+      } else {
+        kids.push({ type: "circle", shape: { cx: pe[0], cy: pe[1], r: 5 },
+          style: { fill: col, stroke: PAL.stage, lineWidth: 1.6 } });
+      }
+      const align = idx === 0 ? "left" : (idx === last ? "right" : "center");
+      const up = (idx % 2 === 0) ? -14 : -25;
+      const dn = (idx % 2 === 0) ? 13 : 23;
+      kids.push({ type: "text", style: { x: pe[0], y: pe[1] + up, text: NAME[idx],
+        fill: isBack ? C.orange : "#e4edff", font: "700 10.5px sans-serif", align: align, verticalAlign: "middle" } });
+      kids.push({ type: "text", style: { x: pe[0], y: pe[1] + dn,
+        text: DATE[idx] + " " + SHORT[idx] + " " + DUR[idx] + "d",
+        fill: "rgba(127,146,196,.92)", font: "9px sans-serif", align: align, verticalAlign: "middle" } });
+      return { type: "group", children: kids };
+    }
+
+    function renderArc(params, api) {
+      const a = api.coord([api.value(0), api.value(1)]);
+      const b = api.coord([api.value(2), api.value(3)]);
+      const ord = api.value(4);
+      const top = Math.min(a[1], b[1]) - 24 - (ord % 3) * 13;
+      return { type: "group", children: [
+        { type: "bezierCurve",
+          shape: { x1: a[0], y1: a[1] - 9, x2: b[0], y2: b[1] - 9, cpx1: (a[0] + b[0]) / 2, cpy1: top },
+          style: { stroke: C.orange, lineWidth: 1.6, lineDash: [5, 4], fill: "transparent" } },
+        { type: "polygon",
+          shape: { points: [[b[0], b[1] - 9], [b[0] + 9, b[1] - 16], [b[0] + 9, b[1] - 2]] },
+          style: { fill: C.orange } }
+      ] };
+    }
+
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 10, right: 34, top: 44, bottom: 26, containLabel: true },
+      xAxis: {
+        type: "value", min: 0, max: r.days, splitNumber: 9,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10,
+          formatter: (v) => mmdd(new Date(r.start.getTime() + v * DAY)) },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      yAxis: {
+        type: "category", data: LANES.slice(), inverse: true, boundaryGap: true,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: "#9cb2e2", fontSize: 11, fontWeight: 700 },
+        splitArea: { show: true, areaStyle: { color: ["rgba(96,140,255,.055)", "transparent"] } },
+        splitLine: { show: false }
+      },
+      series: [
+        { name: "回退回环", type: "custom", renderItem: renderArc, data: ARCD, z: 3, silent: false,
+          encode: { x: [0, 2], y: [1, 3] },
+          tooltip: Object.assign({ trigger: "item", formatter: (p) => {
+            const si = p.value[5], di = p.value[6];
+            return "<b style=\"color:" + C.orange + "\">回退 · " + kindOf(NAME[si]) + "</b><br/>" +
+              "由「" + NAME[si] + "」（" + FULL[si] + "）打回至「" + NAME[di] + "」（" + FULL[di] + "）<br/>" +
+              "<span style=\"color:" + C.textDim + "\">本次回退耗时 " + DUR[si] + " 天：等待 " + WW[si] +
+              " + 处理 " + PP[si] + "；发起方 " + OWN[si] + "</span>";
+          } }, TIP) },
+        { name: "事件节点", type: "custom", renderItem: renderEv, data: EVD, z: 6,
+          encode: { x: [0, 3, 4], y: 1 },
+          tooltip: Object.assign({ trigger: "item", formatter: (p) => {
+            const i = p.value[2];
+            return "<b>" + (i + 1) + " / " + (last + 1) + " · " + NAME[i] + "</b>" +
+              "<span style=\"color:" + SG_COLORS[SGI[i]] + "\">（" + SG[SGI[i]] + "）</span><br/>" +
+              "节点日期 <b>" + FULL[i] + "</b> · 责任人 <b>" + OWN[i] + "</b><br/>" +
+              "泳道 " + LANES[p.value[1]] + " · 本段耗时 <b>" + DUR[i] + "</b> 天" +
+              (i === 0 ? "（起点）" : "：等待 <b style=\"color:" + C.textDim + "\">" + WW[i] +
+                "</b> + 处理 <b style=\"color:" + SG_COLORS[SGI[i]] + "\">" + PP[i] + "</b>") + "<br/>" +
+              "<span style=\"color:" + C.textDim + "\">距 OR 提出第 " + p.value[0] + " 天 / 全程 " + r.days + " 天</span>";
+          } }, TIP) }
+      ]
+    };
+  }
+
+  /* ===== 11. 阶段耗时瀑布（占位 + 等待 + 处理 三层堆叠；末柱「合计」= Σ 等待 + Σ 处理 = 总时长）
+         「变更返工」为穿插段（不按时序落位），瀑布按阶段归集，Σ 各段恒等于总时长。 ===== */
+  function waterfallOption(r) {
+    const cats = SG.concat(["合计"]);
+    const base = [];
+    let acc = 0;
+    r.act.forEach((v) => { base.push(acc); acc += v; });
+    base.push(0);
+    const ws = r.actW.concat([r.wait]);
+    const ps = r.actP.concat([r.proc]);
+    const tot = r.act.concat([r.days]);
+    const plans = r.plan.concat([r.planDays]);
+    const devs = r.dev.concat([r.devTotal]);
+    const cols = SG_COLORS.concat([C.blue]);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 8, top: 30, bottom: 2, containLabel: true },
+      legend: { top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["等待", "处理"] },
+      tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (pp) => {
+          const i = pp[0].dataIndex;
+          return "<b>" + cats[i] + "</b> · 合计 <b>" + tot[i] + "</b> 天<br/>" +
+            "等待 <b style=\"color:" + C.textDim + "\">" + ws[i] + "</b> 天（" +
+            fmtDec(tot[i] ? 100 * ws[i] / tot[i] : 0, 1) + "%） · 处理 <b style=\"color:" + cols[i] + "\">" +
+            ps[i] + "</b> 天<br/><span style=\"color:" + C.textDim + "\">计划 " + plans[i] + " 天 · 偏差 " +
+            (devs[i] >= 0 ? "+" : "") + devs[i] + " 天</span>";
+        } }, TIP),
+      xAxis: { type: "category", data: cats,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10, interval: 0, rotate: 26 } },
+      yAxis: { type: "value", name: "天", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+      series: [
+        { name: "占位", type: "bar", stack: "wf", silent: true, barWidth: "58%",
+          itemStyle: { color: "transparent" }, emphasis: { disabled: true }, data: base.slice() },
+        { name: "等待", type: "bar", stack: "wf", barWidth: "58%",
+          itemStyle: { color: C.wait }, data: ws.slice() },
+        { name: "处理", type: "bar", stack: "wf", barWidth: "58%",
+          label: { show: true, position: "top", color: "#cfdcff", fontSize: 10, fontWeight: 700,
+            formatter: (p) => tot[p.dataIndex] + "d" },
+          data: ps.map((v, i) => ({ value: v, itemStyle: { color: cols[i], borderRadius: [3, 3, 0, 0] } })) }
+      ]
+    };
+  }
+
+  /* ===== 12. 计划 vs 实际逐阶段哑铃（超期段红点、按期段绿点；「变更返工」计划恒为 0） ===== */
+  function dumbbellOption(r) {
+    const PLAN = r.plan.map((v, i) => [v, i]);
+    const ACT = r.act.map((v, i) => ({ value: [v, i],
+      itemStyle: { color: r.dev[i] > 0 ? C.red : C.green } }));
+    const LINK = r.plan.map((v, i) => [v, r.act[i], i]);
+    function renderLink(params, api) {
+      const a = api.coord([api.value(0), api.value(2)]);
+      const b = api.coord([api.value(1), api.value(2)]);
+      const over = api.value(1) > api.value(0);
+      return { type: "line",
+        shape: { x1: a[0], y1: a[1], x2: b[0], y2: b[1] },
+        style: { stroke: over ? "rgba(255,95,107,.55)" : "rgba(111,224,154,.55)", lineWidth: 5 } };
+    }
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 60, top: 30, bottom: 2, containLabel: true },
+      legend: { top: 0, right: 2, itemWidth: 10, itemHeight: 10, itemGap: 12,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["计划", "实际"] },
+      tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (pp) => {
+          const i = pp[0].dataIndex;
+          return "<b>" + SG[i] + "</b><br/>计划 <b style=\"color:" + C.blue + "\">" + r.plan[i] +
+            "</b> 天 → 实际 <b style=\"color:" + (r.dev[i] > 0 ? C.red : C.green) + "\">" + r.act[i] +
+            "</b> 天<br/>偏差 <b>" + (r.dev[i] >= 0 ? "+" : "") + r.dev[i] + "</b> 天" +
+            (i === CHG_SG ? "（计划口径不含需求变更，故计划为 0）" : "") +
+            "<br/><span style=\"color:" + C.textDim + "\">其中等待 " + r.actW[i] + " 天 / 处理 " + r.actP[i] + " 天</span>";
+        } }, TIP),
+      xAxis: { type: "value", name: "天", min: 0, nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLine: { show: false }, axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } } },
+      yAxis: { type: "category", data: SG.slice(), inverse: true,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10.5 },
+        splitLine: { show: false } },
+      series: [
+        { name: "偏差连线", type: "custom", renderItem: renderLink, data: LINK, silent: true, z: 2,
+          encode: { x: [0, 1], y: 2 } },
+        { name: "计划", type: "scatter", symbolSize: 9, z: 4, data: PLAN,
+          itemStyle: { color: C.blue, borderColor: PAL.stage, borderWidth: 1.2 } },
+        { name: "实际", type: "scatter", symbolSize: 11, z: 5, data: ACT,
+          itemStyle: { borderColor: PAL.stage, borderWidth: 1.2 },
+          label: { show: true, position: "right", distance: 8, fontSize: 10, fontWeight: 700,
+            color: "#cfdcff", formatter: (p) => {
+              const i = p.dataIndex;
+              return (r.dev[i] >= 0 ? "+" : "") + r.dev[i] + "d";
+            } } }
+      ]
+    };
+  }
+
+
+  /* ===== 13. hash 契约：父页 P3「需求全生命周期」的「需求状态累积流图」面板级入口
+         → 子页#encodeURIComponent(来源名)，四来源逐字命中该来源的代表需求（各来源首条）；
+         另收需求编号（大小写 / 去前缀 / 带「需求」后缀）与需求标题作别名。 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k).replace(/[\s　]+/g, "")] = v; };
+  SRC_NAMES.forEach((s, si) => {
+    const first = REQS.findIndex((r) => r.si === si);
+    alias(s, first);
+    alias(s + "需求", first);
+    alias(s + "来源", first);
+    alias(s + "标杆需求", first);
+  });
+  REQS.forEach((r, i) => {
+    alias(r.no, i);
+    alias(r.no.toLowerCase(), i);
+    alias(r.no.slice(-4), i);
+    alias(r.no + "需求", i);
+    alias(r.t, i);
+  });
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                       /* trim + 全角空白剔除归一化 */
+    if (!raw) return -1;                                      /* 无 hash：默认首条，不触发高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(i) {
+    const want = "#" + encodeURIComponent(REQS[i].no);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 14. 切换主流程：一次调用刷新 chip / KPI / 右栏三块 / 三张图 / 页头（单一入口） ===== */
+  let flowChart = null, wfChart = null, dbChart = null;
+  let cur = 0;
+  function select(i, pushHash) {
+    cur = clamp(i, 0, REQS.length - 1);
+    const r = REQS[cur];
+    rchips.forEach((el, k) => {
+      const on = k === cur;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? SRC_COLORS[REQS[k].si] : "";
+      el.style.borderColor = on ? SRC_COLORS[REQS[k].si] : "";
+    });
+    $("zx-chip-win").textContent = ymd(r.start).slice(2) + " → " + ymd(r.end).slice(2);
+    $("zx-chip-key").textContent = "总历时 · " + r.no.slice(-4);
+    $("zx-chip-val").textContent = r.days + " 天";
+    renderKpis(r);
+    renderObj(r);
+    renderChg(r);
+    renderCC(r);
+    $("zx-flow-tag").innerHTML = r.E.length + " 个事件 · " + LANES.length +
+      " 条泳道 · 淡条=等待 实条=处理 · 橙色回环=回退 <b>" + r.backs.length + "</b> 次";
+    $("zx-wf-tag").innerHTML = "Σ 九阶段 = <b>" + r.days + "</b> 天（等待 " + r.wait +
+      " + 处理 " + r.proc + "）· 变更返工为穿插段";
+    $("zx-db-tag").innerHTML = "计划 " + r.planDays + " 天 → 实际 " + r.days +
+      " 天 · 总偏差 <b>" + (r.devTotal >= 0 ? "+" : "") + r.devTotal + "</b> 天 = Σ 各段偏差";
+    if (flowChart) flowChart.setOption(flowOption(r), true);
+    if (wfChart) wfChart.setOption(waterfallOption(r), true);
+    if (dbChart) dbChart.setOption(dumbbellOption(r), true);
+    if (pushHash) syncHash(cur);
+  }
+
+  rchips.forEach((el) => el.addEventListener("click", () => {
+    select(Number(el.dataset.i), true);
+    pauseRotate(20000);                                       /* 手动点选后暂停轮巡 20 秒 */
+  }));
+
+  /* hash 定位：命中则切到对应需求、闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { select(0, false); return; }
+    select(hit, false);
+    const chip = rchips[hit];
+    chip.classList.remove("is-hit");
+    void chip.offsetWidth;                                    /* 重排以重启动画 */
+    chip.classList.add("is-hit");
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* ===== 15. 键盘：Esc 返回上级专题页（与 crumb 同效）；← → 切换标杆需求 ===== */
+  const UP_HREF = "大屏样板间-研发需求全生命周期1920.html";
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { location.href = UP_HREF; return; }
+    if (e.key === "ArrowLeft") { select((cur - 1 + REQS.length) % REQS.length, true); pauseRotate(20000); }
+    if (e.key === "ArrowRight") { select((cur + 1) % REQS.length, true); pauseRotate(20000); }
+  });
+
+  /* ===== 16. 初始渲染：先把全部 DOM（KPI + 右栏三块 + chip）填充完，再 init 三张图 ===== */
+  select(0, false);                                           /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  flowChart = echarts.init($("zx-chart-flow"));
+  wfChart = echarts.init($("zx-chart-waterfall"));
+  dbChart = echarts.init($("zx-chart-dumbbell"));
+  locateByHash();                                             /* 初始解析 hash（无 hash 落首条） */
+
+  /* ===== 17. kiosk 轮巡：13 秒逐条切换标杆需求；hash 定位、手动点选或键盘操作后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil) return;
+    select((cur + 1) % REQS.length, true);
+  }, 13000);
+
+  /* 事件流节点巡检提示：每 3.4 秒高亮下一个事件节点 */
+  let tipIdx = 0;
+  setInterval(() => {
+    const r = REQS[cur];
+    tipIdx = (tipIdx + 1) % r.E.length;
+    flowChart.dispatchAction({ type: "showTip", seriesIndex: 1, dataIndex: tipIdx });
+  }, 3400);
+
+  /* ===== 18. 底部复盘研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "最长一条「" + D.longest.no + "」" + D.longest.t + "：全程 " + D.longest.days +
+        " 天（计划 " + D.longest.planDays + " 天，偏差 +" + D.longest.devTotal + " 天），等待占 " +
+        fmtDec(D.longest.waitShare, 1) + "%" },
+    { lv: "高", c: C.red, t: "八条标杆合计 " + fmtInt(D.days) + " 天，其中等待 " + fmtInt(D.wait) +
+        " 天占 " + fmtDec(D.waitShare, 1) + "%——「时间去哪了」的答案首先是排队，不是干活" },
+    { lv: "中", c: C.orange, t: "需求变更累计 " + D.chgN + " 条、延期 " + D.chgDelay + " 天（占八条总历时 " +
+        fmtDec(100 * D.chgDelay / D.days, 1) + "%），逐条与瀑布「变更返工」段一一勾稽" },
+    { lv: "中", c: C.orange, t: "全链路回退累计 " + D.backN + " 次（评审驳回 / 需求变更 / 测试打回 / 依赖阻塞四类），" +
+        "回退恒指向既有的更早节点，事件节点日期本身严格递增" },
+    { lv: "低", c: C.amber, t: "最快一条「" + D.fastest.no + "」" + D.fastest.t + "：" + D.fastest.days +
+        " 天、偏差仅 +" + D.fastest.devTotal + " 天，等待占 " + fmtDec(D.fastest.waitShare, 1) +
+        "%，可作为流程基线样本" },
+    { lv: "低", c: C.green, t: "样本口径：四来源各 " + D.srcCnt.join(" / ") + " 条、四产品线各 " +
+        D.lineCnt.join(" / ") + " 条，来源与父页 OR " + fmtInt(D.orRef) + " 条四分同名同序" },
+    { lv: "低", c: C.green, t: "关联对象：Σ 关联 AR " + fmtInt(D.arN) + " 条、关联缺陷 " + fmtInt(D.bugN) +
+        " 个，承接团队全部取自 12 团队；复盘窗口 " + ymd(D.winFrom) + " ~ " + ymd(D.winTo) },
+    { lv: "低", c: C.blue, t: "与「需求条目台账」分工：台账做全量筛选与五节点概览，本页做单条逐事件复盘，" +
+        "两页需求编号不重叠、来源口径同源" }
+  ];
+  const track = $("zx-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="zx-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                     /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 19. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try {
+    REQS.forEach((r) => {
+      JSON.stringify(flowOption(r)); JSON.stringify(waterfallOption(r)); JSON.stringify(dumbbellOption(r));
+    });
+  } catch (e) { optAcyclic = false; console.error("[单需求全链路复盘] option 存在循环引用：", e.message); }
+
+  const asOf = parseDay(DATA_AS_OF);
+  const checks = [
+    ["八条标杆需求编号唯一且格式 OR-2026-XXXX",
+      (new Set(REQS.map((r) => r.no))).size === REQS.length &&
+      REQS.every((r) => /^OR-2026-\d{4}$/.test(r.no))],
+    ["来源 ⊆ 四来源且与父页逐字（客户直采 / 市场洞察 / 技术规划 / 内部运营）",
+      SRC_NAMES.join(",") === "客户直采,市场洞察,技术规划,内部运营" &&
+      REQS.every((r) => SRC_NAMES.indexOf(r.src) === r.si)],
+    ["四来源 OR 条数 Σ = 12,400（契约基准盘逐字）", D.orRef === OR_REF],
+    ["四来源各 2 条、四产品线全覆盖（样本不偏科）",
+      D.srcCnt.every((v) => v === 2) && D.lineCnt.every((v) => v >= 1) && sum(D.lineCnt) === REQS.length],
+    ["承接团队 ⊆ 12 团队（§2.3 逐字）", REQS.every((r) => TEAM12.indexOf(r.team) >= 0) && TEAM12.length === 12],
+    ["产品线 ⊆ 四产品线（§2.1 逐字）", REQS.every((r) => LINE_NAMES.indexOf(r.line) === r.li)],
+    ["逐条：瀑布 Σ 各段 = 总时长",
+      REQS.every((r) => sum(r.act) === r.days)],
+    ["逐条：等待 + 处理 = 总时长（两个方向双向收敛）",
+      REQS.every((r) => r.wait + r.proc === r.days &&
+        sum(r.actW) === r.wait && sum(r.actP) === r.proc &&
+        r.act.every((v, i) => v === r.actW[i] + r.actP[i]))],
+    ["逐条：事件表 Σ(等待+处理) = 总时长（事件表是唯一数据源）",
+      REQS.every((r) => sum(r.E.map((e) => e.w + e.p)) === r.days && r.E[r.E.length - 1].t1 === r.days)],
+    ["逐条：Σ 计划各段 = 计划总时长，且总偏差 = Σ 各段偏差",
+      REQS.every((r) => sum(r.plan) === r.planDays && sum(r.dev) === r.devTotal &&
+        r.devTotal === r.days - r.planDays)],
+    ["逐条：变更 Σ 延期 = 瀑布「变更返工」段耗时",
+      REQS.every((r) => r.chgDelay === r.act[CHG_SG] && r.act[CHG_SG] > 0)],
+    ["逐条：变更记录 3~5 条且每条延期 > 0",
+      REQS.every((r) => r.chg.length >= 3 && r.chg.length <= 5 && r.chg.every((c) => c[3] > 0))],
+    ["逐条：计划口径不含需求变更（「变更返工」计划恒为 0）",
+      REQS.every((r) => r.plan[CHG_SG] === 0)],
+    ["逐条：事件流节点日期严格递增（口径：回退以回环箭头表达，不产生倒序节点）",
+      REQS.every((r) => r.E.every((e, i) => i === 0 ? e.t1 === 0 : e.t1 > r.E[i - 1].t1))],
+    ["逐条：回环恒指向既有的更早节点（回退目标索引 < 发起索引）且至少 1 次回退",
+      REQS.every((r) => r.backs.length >= 1 &&
+        r.backs.every((e) => e.back >= 0 && e.back < e.i))],
+    ["逐条：九阶段全部出现且每段耗时 > 0",
+      REQS.every((r) => r.act.length === 9 && r.act.every((v) => v > 0) &&
+        (new Set(r.E.map((e) => e.sg))).size === 9)],
+    ["逐条：相邻节点间隔 ≥ 总时长 2.8%（事件流标签不重叠的排版下限）",
+      REQS.every((r) => r.gapMin / r.days >= 0.028)],
+    ["逐条：泳道索引合法且五条泳道全部有事件",
+      REQS.every((r) => r.E.every((e) => e.lane >= 0 && e.lane < LANES.length) &&
+        (new Set(r.E.map((e) => e.lane))).size === LANES.length)],
+    ["逐条：编号号段与来源自洽（号段随来源递增，与兄弟页台账同惯例）",
+      REQS.every((r) => {
+        const v = Number(r.no.slice(-4));
+        return v >= NO_SEG[r.si][0] && v <= NO_SEG[r.si][1];
+      })],
+    ["逐条：起止日期由 起始日 + 累计天数现算，且结束日期 ≤ 数据截止 2026-08-19",
+      REQS.every((r) => Math.round((r.end - r.start) / DAY) === r.days && r.end <= asOf)],
+    ["逐条：至少 1 个阶段实际 ≤ 计划（「做对了」结论有据）",
+      REQS.every((r) => r.under.length >= 1)],
+    ["逐条：变更外最大超期段取自九阶段且剔除「变更返工」",
+      REQS.every((r) => r.worst.i !== CHG_SG && r.worst.d === Math.max.apply(null,
+        r.dev.filter((v, i) => i !== CHG_SG)))],
+    ["逐条：关联 AR / 缺陷为正整数，关联缺陷密度可现算",
+      REQS.every((r) => r.arN > 0 && r.bugN > 0 && Number.isFinite(r.bugN / r.arN))],
+    ["页级：Σ 八条总历时 = Σ 各条等待 + Σ 各条处理",
+      D.days === D.wait + sum(REQS.map((r) => r.proc))],
+    ["hash：四来源名均可解析（父页面板级入口逐字）",
+      SRC_NAMES.every((s) => resolveHashOf(s) >= 0 && REQS[resolveHashOf(s)].src === s)],
+    ["hash：八个需求编号均可解析（含小写与去前缀别名）",
+      REQS.every((r, i) => resolveHashOf(r.no) === i && resolveHashOf(r.no.toLowerCase()) === i &&
+        resolveHashOf(r.no.slice(-4)) === i)],
+    ["图表 option 无循环引用（八条 × 三图 JSON.stringify 环检测）", optAcyclic]
+  ];
+  function resolveHashOf(s) {
+    const hit = HASH_ALIAS[String(s).replace(/[\s　]+/g, "")];
+    return hit === undefined ? -1 : hit;
+  }
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单需求全链路复盘] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

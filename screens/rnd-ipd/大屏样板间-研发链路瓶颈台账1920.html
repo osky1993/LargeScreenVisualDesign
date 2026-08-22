@@ -1,0 +1,1271 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发链路瓶颈台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --fb-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：瓶颈编号 / 所在节点 / 类型 / 瓶颈描述 / 首次发现 / 持续天数 / 影响吞吐 / 责任域 / 等级 */
+    --fb-tcols: 92px 106px 74px 1fr 84px 148px 96px 66px 52px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .fb-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 8% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 92% 4%, rgba(255, 157, 92, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 640px;
+    grid-template-rows: 84px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .fb-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .fb-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .fb-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .fb-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 92, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 157, 92, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .fb-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .fb-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .fb-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .fb-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .fb-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到交付流水线数字孪生，琥珀描边与本页星蓝主色区分 */
+  .fb-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .fb-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .fb-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .fb-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .fb-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .fb-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .fb-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+  .fb-head-meta .fb-scope { color: rgba(255, 194, 77, 0.85); }
+
+  .fb-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .fb-chips { display: flex; align-items: center; gap: 9px; }
+  .fb-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 124px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .fb-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .fb-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .fb-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .fb-chip.is-key b { color: var(--rnd-blue); }
+  .fb-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .fb-clock-time { font: 700 26px/1 var(--fb-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .fb-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 筛选条：一级 = 责任域（hash 契约目标，与父页热力 y 轴类目逐字）+ 二级 = 瓶颈等级 ===== */
+  .fb-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .fb-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .fb-dchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 6px 14px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13.5px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .fb-dchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .fb-dchip b { font: 700 14px/1 var(--fb-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .fb-dchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .fb-dchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .fb-dchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .fb-dchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .fb-dchip.is-hit { animation: fb-hit 0.9s ease-in-out 2; }
+  @keyframes fb-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--fb-cc, rgba(92, 157, 255, 0.8)); } }
+  .fb-fdiv { flex: none; width: 1px; height: 24px; margin: 0 4px; background: rgba(96, 140, 255, 0.28); }
+  .fb-gchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 4px 11px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .fb-gchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .fb-gchip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .fb-gchip.is-on { color: #071026; font-weight: 700; }
+  .fb-gchip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  .fb-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .fb-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .fb-filters-state em { font-style: normal; color: #d3e2ff; }
+  .fb-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .fb-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .fb-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .fb-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--fb-kc, var(--rnd-blue)); }
+  .fb-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .fb-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .fb-kpi-v b { font: 700 24px/1 var(--fb-mono); color: var(--fb-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .fb-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .fb-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .fb-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .fb-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .fb-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .fb-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .fb-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .fb-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .fb-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .fb-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .fb-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：行高 27px × 24 行 + 表头，tbody overflow hidden 防撑破 */
+  .fb-panel.is-ledger { flex: none; height: 742px; min-height: 0; overflow: hidden; }
+  /* ★ 剖析块由 JS 填充（选中行联动重绘），且与两块图表同属 .fb-col 一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .fb-panel.is-diag { flex: none; height: 304px; min-height: 0; overflow: hidden; }
+  .fb-panel.is-heat { flex: none; height: 212px; min-height: 0; overflow: hidden; }
+  .fb-row2 { display: flex; gap: 14px; flex: 1; min-height: 0; min-width: 0; }
+  .fb-row2 > .fb-panel { flex: 1; min-width: 0; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .fb-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .fb-thead, .fb-tbody li { display: grid; grid-template-columns: var(--fb-tcols); align-items: center; gap: 8px; }
+  .fb-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .fb-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .fb-tbody li {
+    padding: 0 8px; height: 27px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: fb-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes fb-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .fb-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .fb-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .fb-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .fb-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fb-tbody li .fb-no { font: 700 11.5px/1 var(--fb-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.03em; }
+  .fb-tbody li .fb-node { font-size: 11.5px; color: #bfd2f6; }
+  .fb-tbody li .fb-ty { font-size: 11.5px; }
+  .fb-tbody li .fb-desc { color: #dfe9ff; }
+  .fb-tbody li .fb-when { font-size: 11.5px; color: #a9bce4; }
+  .fb-tbody li .fb-imp { text-align: right; font-weight: 700; }
+  .fb-tbody li .fb-dom { font-size: 11.5px; }
+  .fb-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  /* 等级三档 */
+  .fb-badge.is-g0 { color: #3d060c; background: var(--rnd-red); }
+  .fb-badge.is-g1 { color: #3a2a05; background: var(--rnd-amber); }
+  .fb-badge.is-g2 { color: #041b3a; background: var(--rnd-blue); }
+  /* 持续天数：等待/处理双段微条 + 数值 */
+  .fb-dur { display: flex; align-items: center; gap: 8px; }
+  .fb-dur-t { flex: 1; min-width: 0; height: 7px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; display: flex; }
+  .fb-dur-t u { display: block; height: 100%; text-decoration: none; }
+  .fb-dur em { flex: none; width: 46px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+
+  /* ===== 右上：单条瓶颈剖析（纯 HTML/CSS，选中行联动） ===== */
+  .fb-diag-head { flex: none; display: flex; flex-direction: column; gap: 4px; padding: 6px 10px 7px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); min-height: 58px; margin-bottom: 7px; }
+  .fb-diag-no { display: flex; align-items: center; gap: 9px; }
+  .fb-diag-no b { font: 700 13px/1 var(--fb-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .fb-diag-title { font-size: 12.5px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fb-diag-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fb-diag-sub b { font-weight: 700; color: #c9d8f8; }
+
+  /* 排队等待 vs 处理时长拆分 */
+  .fb-split { flex: none; margin-bottom: 7px; }
+  .fb-split-bar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: rgba(14, 26, 66, 0.5); }
+  .fb-split-seg { position: relative; display: flex; align-items: center; justify-content: center; min-width: 30px; font-size: 11px; font-weight: 700; color: #071026; letter-spacing: 0.03em; }
+  .fb-split-seg.is-wait { background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.18) 0 6px, transparent 6px 12px); }
+  .fb-split-seg + .fb-split-seg { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .fb-split-note { display: flex; justify-content: space-between; margin-top: 3px; font-size: 10.5px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; }
+  .fb-split-note b { font-weight: 700; color: var(--rnd-amber); }
+
+  /* 影响链路：上游 → 本节点 → 下游 */
+  .fb-chain { flex: none; display: flex; align-items: stretch; gap: 4px; margin-bottom: 7px; }
+  .fb-chain-box {
+    flex: 1; min-width: 0; padding: 5px 8px 6px; border-radius: 7px;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.5);
+  }
+  .fb-chain-box.is-cur { border-color: rgba(255, 157, 92, 0.6); background: rgba(72, 40, 18, 0.42); box-shadow: inset 0 0 14px rgba(255, 157, 92, 0.14); }
+  .fb-chain-k { font-size: 10px; letter-spacing: 0.12em; color: #6079b0; }
+  .fb-chain-n { font-size: 12px; font-weight: 700; color: #dfe9ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fb-chain-v { font-size: 10.5px; color: var(--rnd-cyan); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fb-chain-box.is-cur .fb-chain-v { color: var(--rnd-orange); }
+  .fb-chain-ar { flex: none; align-self: center; font-size: 13px; color: rgba(127, 146, 196, 0.7); }
+
+  /* 处置进展横向步进条 */
+  .fb-steps { flex: none; display: flex; align-items: stretch; gap: 0; }
+  .fb-step { position: relative; flex: 1; min-width: 0; padding-top: 12px; }
+  .fb-step::before { content: ""; position: absolute; left: 0; right: 0; top: 5px; height: 2px; background: rgba(96, 140, 255, 0.18); }
+  .fb-step.is-done::before, .fb-step.is-cur::before { background: rgba(111, 224, 154, 0.45); }
+  .fb-step::after {
+    content: ""; position: absolute; left: 50%; top: 0; width: 11px; height: 11px; margin-left: -5.5px;
+    border-radius: 50%; background: #16264f; border: 2px solid rgba(96, 140, 255, 0.35);
+  }
+  .fb-step.is-done::after { background: var(--rnd-green); border-color: var(--rnd-green); }
+  .fb-step.is-cur::after { background: var(--rnd-amber); border-color: var(--rnd-amber); animation: fb-breath 1.6s ease-in-out infinite; }
+  @keyframes fb-breath { 0%, 100% { box-shadow: 0 0 0 rgba(255, 194, 77, 0); } 50% { box-shadow: 0 0 12px rgba(255, 194, 77, 0.9); } }
+  .fb-step b { display: block; text-align: center; font-size: 11.5px; font-weight: 700; color: rgba(127, 146, 196, 0.62); }
+  .fb-step span { display: block; text-align: center; font-size: 10px; color: rgba(127, 146, 196, 0.5); font-variant-numeric: tabular-nums; }
+  .fb-step.is-done b { color: #cfe9d8; }
+  .fb-step.is-done span { color: rgba(111, 224, 154, 0.8); }
+  .fb-step.is-cur b { color: #ffe3b0; }
+  .fb-step.is-cur span { color: var(--rnd-amber); }
+
+  /* ===== 底部滚动条 ===== */
+  .fb-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .fb-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange); }
+  .fb-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: fb-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes fb-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .fb-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .fb-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .fb-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .fb-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .fb-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .fb-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="fb-stage" id="fb-stage">
+    <!-- mockflag:begin --><div class="fb-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="fb-error" id="fb-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="fb-header">
+      <div class="fb-head-left">
+        <div class="fb-crumb">
+          <a class="fb-crumb-up" href="大屏样板间-研发交付流水线数字孪生1920.html" title="返回上级专题页（Esc）">‹ 返回 交付流水线数字孪生</a>
+          <b>云麓智联科技</b><i>›</i><span>交付流水线数字孪生</span><i>›</i><em>链路瓶颈台账</em>
+        </div>
+        <div class="fb-head-title-row">
+          <div class="fb-head-title">链路瓶颈台账</div>
+          <div class="fb-head-meta">
+            <span>全链路 <b>12</b> 节点 × <b>5</b> 类瓶颈 · 在册 <b id="fb-meta-n">--</b> 项 / 全盘 <b id="fb-meta-all">--</b> 项</span><i>|</i>
+            <span>统计窗口 <b>FY2026</b> · 数据日 <b>2026-08-20</b></span><i>|</i>
+            <span class="fb-scope">本页＝全链路横向：哪些环节在堵 / 堵多久 / 影响多少（单节点 360° 见姊妹页「单链路节点详情」）</span>
+          </div>
+        </div>
+      </div>
+      <div class="fb-head-right">
+        <div class="fb-chips">
+          <div class="fb-chip"><span>DATA AS OF</span><b>2026-08-20</b></div>
+          <div class="fb-chip is-key"><span id="fb-chip-key">在册均堵 · 全部</span><b id="fb-chip-val">--</b></div>
+        </div>
+        <div class="fb-clock" aria-label="实时时钟">
+          <span class="fb-clock-time" id="fb-clock-time">--:--:--</span>
+          <span class="fb-clock-date" id="fb-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 筛选条：一级 = 责任域（父页热力 y 轴类目逐字）+ 二级 = 瓶颈等级 -->
+    <div class="fb-filters">
+      <span class="fb-filters-tag">责任域筛选</span>
+      <div id="fb-dchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="fb-fdiv"></span>
+      <span class="fb-filters-tag">瓶颈等级</span>
+      <div id="fb-gchips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="fb-filters-state" id="fb-filters-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="fb-kpis" id="fb-kpis"></div>
+
+    <!-- 左：链路瓶颈明细台账（写死高度 742px = 24 行 × 27px + 表头） -->
+    <div class="fb-col">
+      <section class="fb-panel is-ledger">
+        <div class="fb-panel-head">
+          <h2>链路瓶颈明细台账（责任域 × 瓶颈等级）</h2>
+          <span class="fb-panel-tag" id="fb-table-tag">--</span>
+        </div>
+        <div class="fb-table">
+          <div class="fb-thead">
+            <span>瓶颈编号</span><span>所在节点</span><span>类型</span><span>瓶颈描述</span>
+            <span>首次发现</span><span>持续天数（等待/处理）</span><span>影响吞吐</span><span>责任域</span><span>等级</span>
+          </div>
+          <ul class="fb-tbody" id="fb-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右：单条瓶颈剖析 + 节点瓶颈热力 + 类型帕累托 + 影响吞吐 Top 8 -->
+    <div class="fb-col">
+      <section class="fb-panel is-diag">
+        <div class="fb-panel-head">
+          <h2>单条瓶颈剖析</h2>
+          <span class="fb-panel-tag" id="fb-diag-tag">--</span>
+        </div>
+        <div class="fb-diag-head" id="fb-diag-headbox"></div>
+        <div class="fb-split" id="fb-diag-split"></div>
+        <div class="fb-chain" id="fb-diag-chain"></div>
+        <div class="fb-steps" id="fb-diag-steps"></div>
+      </section>
+      <section class="fb-panel is-heat">
+        <div class="fb-panel-head">
+          <h2>节点瓶颈热力 · 12 节点 × 5 类型</h2>
+          <span class="fb-panel-tag">全盘口径 Σ <b id="fb-heat-n">--</b> 项 · 行和=节点数、列和=类型数</span>
+        </div>
+        <div class="fb-chart" id="fb-chart-heat"></div>
+      </section>
+      <div class="fb-row2">
+        <section class="fb-panel">
+          <div class="fb-panel-head">
+            <h2>瓶颈类型帕累托</h2>
+            <span class="fb-panel-tag" id="fb-pareto-tag">--</span>
+          </div>
+          <div class="fb-chart" id="fb-chart-pareto"></div>
+        </section>
+        <section class="fb-panel">
+          <div class="fb-panel-head">
+            <h2>影响吞吐排行 Top 8</h2>
+            <span class="fb-panel-tag" id="fb-top-tag">--</span>
+          </div>
+          <div class="fb-chart" id="fb-chart-top"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="fb-foot">
+      <div class="fb-foot-tag">瓶颈研判</div>
+      <div class="fb-foot-view"><div class="fb-foot-track" id="fb-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("fb-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("fb-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，初始 hash 解析在页面中部
+     就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 交付链路治理视角）
+         ★ 与父页 P13「交付流水线数字孪生」同源（docs/RndIpdThemed.md §6 P13→本页）：
+           12 个链路节点名与契约 §6 逐字（需求池…运营监控塔）；责任域四档取父页
+           「域 × 基线交付热力」的 y 轴类目逐字（软件 / 硬件 / 云平台 / AI算法）；
+           父页链路预警「变更前置 26 h 高于目标，瓶颈在集成测试台排队等待」在本页落到
+           最堵节点 = 集成测试台、首位类型 = 排队等待，两页口径互证。
+         ★ 与姊妹子页 S15「单链路节点详情」（前缀 lj）的分工：lj 做**单个节点的 360 度**
+           （吞吐 / 积压 / 上下游桑基 / 内部工序）；本页做**全链路瓶颈的横向台账**
+           （哪些环节在堵、堵多久、影响多少），两页不重复口径、可互相跳转阅读。
+         ★ 本页口径声明：
+           · 瓶颈 = 链路某节点上一次可归因的持续性堵塞，全盘 FY2026 累计 96 项（含已消解），
+             台账陈列的是**数据日仍未闭环的 24 项**（在册），故在册均持续天数远高于全盘均值。
+           · 持续天数 = 排队等待 + 处理时长（逐条 Σ 校验），且 == 数据日 − 首次发现（逐条现算）。
+           · 影响吞吐统一以「点当量」汇总：构建/发布类节点（CI 构建中心、发布列车站）的影响
+             以「次」计量，按 1 次 ≡ 1 点当量并入 Σ，表内仍按各自单位显示。
+           · 影响链路三段：上游滞留 + 下游待料 == 本节点在堵量（按等待/处理占比现算，逐条校验）。
+         ★ 二级拆分（节点×类型矩阵、域×类型矩阵、等级三档、24 条在册明细）为本页自编，
+           Σ 一律收敛到全盘 96 项，全部进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，行与节点/类型/域/等级之间一律用
+           索引（nd / ty / dm / lv）关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 契约锚点（勿改，与父页 / 契约 §6 逐字） */
+  const NODE_CONTRACT = ["需求池", "规划台", "软件集群", "硬件实验室", "云平台集群", "AI算法集群",
+                         "CI 构建中心", "单测门", "集成测试台", "系统实验室", "发布列车站", "运营监控塔"];
+  const DOM_CONTRACT = ["软件", "硬件", "云平台", "AI算法"];      /* 父页 dv-chart-heat y 轴类目 */
+  const BASELINES = ["R26.2", "R26.4", "R26.6", "R26.8"];         /* 父页 dv-chart-heat x 轴类目 */
+  const AS_OF = "2026-08-20";
+  const BN_REF = 96;                                              /* 全盘瓶颈项数（本页自编基数） */
+
+  /* 4.2 12 个链路节点（名称逐字契约；unit = 该节点影响吞吐的显示单位；up/down = 影响链路上下游） */
+  const NODES = [
+    { name: "需求池",      unit: "点", up: "外部需求输入",   down: "规划台" },
+    { name: "规划台",      unit: "点", up: "需求池",         down: "四域开发集群" },
+    { name: "软件集群",    unit: "点", up: "规划台",         down: "CI 构建中心" },
+    { name: "硬件实验室",  unit: "点", up: "规划台",         down: "CI 构建中心" },
+    { name: "云平台集群",  unit: "点", up: "规划台",         down: "CI 构建中心" },
+    { name: "AI算法集群",  unit: "点", up: "规划台",         down: "CI 构建中心" },
+    { name: "CI 构建中心", unit: "次", up: "四域开发集群",   down: "单测门" },
+    { name: "单测门",      unit: "点", up: "CI 构建中心",    down: "集成测试台" },
+    { name: "集成测试台",  unit: "点", up: "单测门",         down: "系统实验室" },
+    { name: "系统实验室",  unit: "点", up: "集成测试台",     down: "发布列车站" },
+    { name: "发布列车站",  unit: "次", up: "系统实验室",     down: "生产/市场/OTA 三出口" },
+    { name: "运营监控塔",  unit: "点", up: "三类出口",       down: "缺陷回流站" }
+  ];
+
+  /* 4.3 五类瓶颈类型 */
+  const TYPES = [
+    { name: "排队等待", color: C.amber,  note: "上游到量、本节点产能排不开" },
+    { name: "资源不足", color: C.orange, note: "机时 / 算力 / 样机台位不足" },
+    { name: "依赖阻塞", color: C.violet, note: "跨域接口或外部件未就位" },
+    { name: "返工",     color: C.red,    note: "质量回退，同一工序二次投入" },
+    { name: "审批等待", color: C.cyan,   note: "评审 / 决策点排队" }
+  ];
+
+  /* 4.4 四责任域（名称 = 父页热力 y 轴类目逐字；n = 全盘归口瓶颈数，Σ = 96） */
+  const DOMS = [
+    { name: "软件",   n: 34, color: C.blue },
+    { name: "硬件",   n: 24, color: C.orange },
+    { name: "云平台", n: 20, color: C.cyan },
+    { name: "AI算法", n: 18, color: C.violet }
+  ];
+
+  /* 4.5 瓶颈三档等级（n Σ = 96；avgDur / avgImp = 全盘级内均值，用于现算全盘平均与 Σ 影响） */
+  const LEVELS = [
+    { name: "严重", n: 14, avgDur: 24.5, avgImp: 128, color: C.red,   badge: "is-g0",
+      note: "阻断主链路 / 影响基线交付窗口" },
+    { name: "中等", n: 34, avgDur: 11.2, avgImp: 46,  color: C.amber, badge: "is-g1",
+      note: "拖慢单域节奏，可绕行" },
+    { name: "轻微", n: 48, avgDur: 4.6,  avgImp: 15,  color: C.blue,  badge: "is-g2",
+      note: "局部抖动，短周期自消解" }
+  ];
+
+  /* 4.6 节点 × 类型矩阵（行 = 12 节点，列 = 5 类型；行和 = 各节点瓶颈数、列和 = 各类型总数，
+         全表 Σ = 96。两个方向都进页尾自检；热力图展示时行列转置（x=节点、y=类型）。 */
+  const MAT = [
+    [3, 0, 1, 0, 4],   /* 需求池 */
+    [2, 0, 2, 1, 4],   /* 规划台 */
+    [2, 1, 3, 4, 0],   /* 软件集群 */
+    [1, 4, 2, 2, 0],   /* 硬件实验室 */
+    [1, 3, 2, 1, 0],   /* 云平台集群 */
+    [1, 4, 1, 1, 0],   /* AI算法集群 */
+    [4, 3, 0, 1, 0],   /* CI 构建中心 */
+    [1, 0, 0, 3, 0],   /* 单测门 */
+    [6, 2, 3, 2, 0],   /* 集成测试台 —— 与父页预警「瓶颈在集成测试台排队等待」互证 */
+    [3, 4, 1, 2, 0],   /* 系统实验室 */
+    [1, 0, 1, 0, 4],   /* 发布列车站 */
+    [0, 1, 2, 2, 0]    /* 运营监控塔 */
+  ];
+
+  /* 4.7 域 × 类型矩阵（行 = 4 责任域，列 = 5 类型）：行和 == DOMS.n、列和 == 各类型总数，
+         切一级筛选时帕累托按本表取行，两个方向都收敛到 96。 */
+  const DOM_TYPE = [
+    [9, 6, 7, 8, 4],   /* 软件   Σ 34 */
+    [6, 7, 4, 4, 3],   /* 硬件   Σ 24 */
+    [6, 4, 4, 4, 2],   /* 云平台 Σ 20 */
+    [4, 5, 3, 3, 3]    /* AI算法 Σ 18 */
+  ];
+
+  /* 4.8 处置四阶段 */
+  const STAGES = ["识别", "定位", "措施", "验证"];
+  const STAGE_HINT = ["发现并登记", "根因定位", "处置措施执行", "效果验证与关闭"];
+
+  /* 4.9 在册未闭环瓶颈 24 条（按持续天数降序；nd = 节点索引、ty = 类型索引、dm = 责任域索引、
+         lv = 等级索引、pg = 当前处置阶段索引）
+         found = 首次发现日；wait / hand = 排队等待 / 处理时长（天），持续天数 = 两者之和，
+         且恒等于 数据日 2026-08-20 − 首次发现（逐条进自检）；imp = 影响吞吐（单位随节点）。 */
+  const ROWS = [
+    { no: "BN-0007", nd: 8,  ty: 0, dm: 1, lv: 0, pg: 2, found: "2026-06-29", wait: 38, hand: 14, imp: 386,
+      desc: "R26.6 集成回归排队 3 个批次，硬件联调机位串行" },
+    { no: "BN-0012", nd: 9,  ty: 1, dm: 0, lv: 0, pg: 2, found: "2026-07-05", wait: 30, hand: 16, imp: 312,
+      desc: "系统级实验室机时被可靠性长试占满，软件系统测排不进" },
+    { no: "BN-0019", nd: 3,  ty: 1, dm: 1, lv: 0, pg: 2, found: "2026-07-10", wait: 26, hand: 15, imp: 268,
+      desc: "DVT 样机台位不足，星澜Pro2 与澜芯M60 抢台" },
+    { no: "BN-0023", nd: 5,  ty: 1, dm: 3, lv: 0, pg: 2, found: "2026-07-14", wait: 25, hand: 12, imp: 244,
+      desc: "训练算力池被慧眼大版本占满，御风迭代排队" },
+    { no: "BN-0028", nd: 1,  ty: 4, dm: 0, lv: 0, pg: 2, found: "2026-07-17", wait: 27, hand: 7,  imp: 226,
+      desc: "SR 拆分方案跨域会签未闭环，AR 分配悬挂" },
+    { no: "BN-0031", nd: 2,  ty: 3, dm: 0, lv: 0, pg: 3, found: "2026-07-20", wait: 11, hand: 20, imp: 208,
+      desc: "接口契约变更致三个模块返工，重新提测" },
+    { no: "BN-0035", nd: 6,  ty: 0, dm: 2, lv: 0, pg: 2, found: "2026-07-23", wait: 19, hand: 9,  imp: 168,
+      desc: "构建集群高峰期排队，云平台镜像构建等待超 40 min" },
+    { no: "BN-0040", nd: 8,  ty: 2, dm: 2, lv: 0, pg: 2, found: "2026-07-25", wait: 18, hand: 8,  imp: 176,
+      desc: "联调依赖的鉴权服务新版未就绪，集成用例挂起" },
+    { no: "BN-0044", nd: 10, ty: 4, dm: 0, lv: 0, pg: 3, found: "2026-07-27", wait: 17, hand: 7,  imp: 92,
+      desc: "R26.6 冻结例外申请审批链过长，发布窗口顺延" },
+    { no: "BN-0049", nd: 0,  ty: 4, dm: 1, lv: 0, pg: 2, found: "2026-07-29", wait: 16, hand: 6,  imp: 148,
+      desc: "硬件类 OR 需求缺 IPMT 决策，需求池积压" },
+    { no: "BN-0053", nd: 4,  ty: 2, dm: 2, lv: 1, pg: 2, found: "2026-07-31", wait: 12, hand: 8,  imp: 132,
+      desc: "多可用区网络策略未下发，灰度环境依赖阻塞" },
+    { no: "BN-0057", nd: 9,  ty: 0, dm: 1, lv: 1, pg: 2, found: "2026-08-02", wait: 12, hand: 6,  imp: 124,
+      desc: "可靠性试验排期与整机系统测冲突，顺位等待" },
+    { no: "BN-0061", nd: 2,  ty: 2, dm: 0, lv: 1, pg: 3, found: "2026-08-03", wait: 10, hand: 7,  imp: 116,
+      desc: "依赖 CBB 组件新版本延期，特性分支挂起" },
+    { no: "BN-0064", nd: 8,  ty: 0, dm: 0, lv: 1, pg: 2, found: "2026-08-04", wait: 11, hand: 5,  imp: 108,
+      desc: "集成用例并发上限受限，回归批次串行执行" },
+    { no: "BN-0068", nd: 5,  ty: 2, dm: 3, lv: 1, pg: 1, found: "2026-08-06", wait: 9,  hand: 5,  imp: 96,
+      desc: "标注数据集交付延期，智荐版本训练无法启动" },
+    { no: "BN-0072", nd: 7,  ty: 3, dm: 0, lv: 1, pg: 3, found: "2026-08-07", wait: 5,  hand: 8,  imp: 84,
+      desc: "覆盖率门禁未过反复提交，单测门二次拦截" },
+    { no: "BN-0075", nd: 3,  ty: 3, dm: 1, lv: 1, pg: 2, found: "2026-08-08", wait: 5,  hand: 7,  imp: 78,
+      desc: "结构件公差超差，样机返修后重新试制" },
+    { no: "BN-0079", nd: 6,  ty: 1, dm: 2, lv: 1, pg: 3, found: "2026-08-10", wait: 7,  hand: 3,  imp: 64,
+      desc: "构建缓存盘容量告警，制品拉取限速" },
+    { no: "BN-0083", nd: 11, ty: 3, dm: 3, lv: 1, pg: 3, found: "2026-08-11", wait: 4,  hand: 5,  imp: 56,
+      desc: "推理监控指标口径修订，看板与告警规则返工" },
+    { no: "BN-0086", nd: 1,  ty: 2, dm: 1, lv: 2, pg: 3, found: "2026-08-12", wait: 5,  hand: 3,  imp: 48,
+      desc: "硬件路标输入晚到，规划台条目待补齐" },
+    { no: "BN-0089", nd: 4,  ty: 1, dm: 2, lv: 2, pg: 3, found: "2026-08-13", wait: 4,  hand: 3,  imp: 40,
+      desc: "灰度集群节点配额临时收紧，压测排期后移" },
+    { no: "BN-0091", nd: 0,  ty: 0, dm: 0, lv: 2, pg: 3, found: "2026-08-15", wait: 3,  hand: 2,  imp: 32,
+      desc: "OR 集中入池，需求分诊排队一个工作日" },
+    { no: "BN-0094", nd: 7,  ty: 3, dm: 3, lv: 2, pg: 3, found: "2026-08-16", wait: 2,  hand: 2,  imp: 24,
+      desc: "算法用例桩数据失效，单测门重跑" },
+    { no: "BN-0096", nd: 11, ty: 2, dm: 0, lv: 2, pg: 1, found: "2026-08-17", wait: 2,  hand: 1,  imp: 18,
+      desc: "回流缺陷派发规则依赖新版路由表，暂缓生效" }
+  ];
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 5.1 节点 × 类型矩阵双向和 */
+  D.nodeN = MAT.map((row) => sum(row));                                  /* 各节点瓶颈数（行和） */
+  D.typeN = TYPES.map((t, j) => sum(MAT.map((row) => row[j])));          /* 各类型总数（列和） */
+  D.matAll = sum(D.nodeN);
+  D.hotIdx = D.nodeN.indexOf(Math.max.apply(null, D.nodeN));             /* 最堵节点 */
+  D.hotTypeIdx = MAT[D.hotIdx].indexOf(Math.max.apply(null, MAT[D.hotIdx]));
+
+  /* 5.2 域维度与等级维度（与矩阵双向收敛到同一总数） */
+  D.domN = DOMS.map((d) => d.n);
+  D.domAll = sum(D.domN);
+  D.domTypeRow = DOM_TYPE.map((row) => sum(row));
+  D.domTypeCol = TYPES.map((t, j) => sum(DOM_TYPE.map((row) => row[j])));
+  D.levN = LEVELS.map((l) => l.n);
+  D.levAll = sum(D.levN);
+  D.sevN = LEVELS[0].n;
+  D.sevShare = 100 * D.sevN / D.levAll;
+  D.avgDur = sum(LEVELS.map((l) => l.n * l.avgDur)) / D.levAll;          /* 全盘平均持续天数 */
+  D.impAll = sum(LEVELS.map((l) => l.n * l.avgImp));                     /* 全盘 Σ 影响吞吐（点当量） */
+
+  /* 5.3 在册明细派生：持续天数 = 等待 + 处理；影响链路三段由等待/处理占比现算 */
+  function dayOf(ds) {
+    return new Date(Number(ds.slice(0, 4)), Number(ds.slice(5, 7)) - 1, Number(ds.slice(8, 10)));
+  }
+  const AS_OF_T = dayOf(AS_OF).getTime();
+  const dayDiff = (ds) => Math.round((AS_OF_T - dayOf(ds).getTime()) / 86400000);
+  ROWS.forEach((r) => {
+    r.dur = r.wait + r.hand;
+    r.age = dayDiff(r.found);
+    r.waitPct = 100 * r.wait / r.dur;
+    r.up = Math.round(r.imp * r.wait / r.dur);      /* 上游滞留 */
+    r.down = r.imp - r.up;                          /* 下游待料：与上游滞留相加恒等于本节点在堵量 */
+    r.unit = NODES[r.nd].unit;
+    r.seq = Number(r.no.slice(-4));
+  });
+  D.n = ROWS.length;
+  D.openDur = sum(ROWS.map((r) => r.dur));
+  D.openWait = sum(ROWS.map((r) => r.wait));
+  D.openHand = sum(ROWS.map((r) => r.hand));
+  D.openWaitPct = 100 * D.openWait / D.openDur;
+  D.openImp = sum(ROWS.map((r) => r.imp));
+  D.openAvgDur = D.openDur / D.n;
+  D.rowsByDom = DOMS.map((d, i) => ROWS.filter((r) => r.dm === i).length);
+  D.rowsByLev = LEVELS.map((l, i) => ROWS.filter((r) => r.lv === i).length);
+  D.rowsByType = TYPES.map((t, j) => ROWS.filter((r) => r.ty === j).length);
+  D.rowsByNode = NODES.map((nd, i) => ROWS.filter((r) => r.nd === i).length);
+  D.longest = ROWS.slice().sort((a, b) => b.dur - a.dur)[0];
+  D.durMax = D.longest.dur;
+  D.impMax = Math.max.apply(null, ROWS.map((r) => r.imp));
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("fb-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("fb-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("fb-meta-n").textContent = fmtInt(D.n);
+  $("fb-meta-all").textContent = fmtInt(D.matAll);
+  $("fb-heat-n").textContent = fmtInt(D.matAll);
+
+  /* ===== 7. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "瓶颈总数", v: D.matAll, dec: 0, unit: "项", color: C.blue,
+      s: "FY2026 全链路 12 节点 × 5 类型 · 在册未闭环 " + D.n + " 项" },
+    { k: "严重瓶颈", v: D.sevN, dec: 0, unit: "项", color: C.red,
+      s: "占 " + fmtDec(D.sevShare, 1) + "% · 中等 " + LEVELS[1].n + " / 轻微 " + LEVELS[2].n },
+    { k: "平均持续天数", v: D.avgDur, dec: 1, unit: "天", color: C.amber,
+      s: "全盘加权 = Σ(级内均值 × 项数) ÷ " + D.matAll + " · 在册均 " + fmtDec(D.openAvgDur, 1) + " 天" },
+    { k: "Σ 影响吞吐", v: D.impAll, dec: 0, unit: "点当量", color: C.violet,
+      s: "在册 " + fmtInt(D.openImp) + "（占 " + fmtDec(100 * D.openImp / D.impAll, 1) + "%）· 1 次 ≡ 1 点当量" },
+    { k: "最堵节点", v: D.nodeN[D.hotIdx], dec: 0, unit: "项", color: C.orange,
+      s: NODES[D.hotIdx].name + " · " + TYPES[D.hotTypeIdx].name + " " + MAT[D.hotIdx][D.hotTypeIdx] +
+         " 项占 " + fmtDec(100 * MAT[D.hotIdx][D.hotTypeIdx] / D.nodeN[D.hotIdx], 1) + "%" },
+    { k: "等待占比", v: D.openWaitPct, dec: 1, unit: "%", color: C.cyan,
+      s: "在册 Σ等待 " + D.openWait + " ÷ Σ持续 " + D.openDur + " 天现算（处理 " + D.openHand + " 天）" }
+  ];
+  $("fb-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="fb-kpi" style="--fb-kc:' + p.color + '">' +
+      '<div class="fb-kpi-k">' + p.k + "</div>" +
+      '<div class="fb-kpi-v"><b id="fb-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="fb-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("fb-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 一级筛选：责任域 chip（全部 + 四域，名称与父页热力类目逐字）
+         每 chip 带全盘归口项数与在册条数，计数随一级口径重算。 ===== */
+  const DFILTERS = [{ name: "全部", color: C.blue, n: D.matAll, cnt: D.n }]
+    .concat(DOMS.map((d, i) => ({ name: d.name, color: d.color, n: d.n, cnt: D.rowsByDom[i] })));
+  const dbox = $("fb-dchips");
+  dbox.innerHTML = DFILTERS.map((f, i) => (
+    '<button class="fb-dchip" type="button" data-i="' + i + '" style="--fb-cc:' + f.color + '">' +
+      "<u>" + f.name + "</u><b>" + fmtInt(f.n) + "</b>" +
+      "<i>项 · 在册 " + f.cnt + "</i>" +
+    "</button>"
+  )).join("");
+  const dchips = Array.from(dbox.children);
+
+  /* ===== 9. 二级筛选：瓶颈等级 chip（全部 + 三档；计数随一级筛选联动重算） ===== */
+  const gbox = $("fb-gchips");
+  function levScopeCnt(di, gi) {
+    return ROWS.filter((r) => (di === 0 || r.dm === di - 1) && (gi === 0 || r.lv === gi - 1)).length;
+  }
+  function renderGChips(di, gi) {
+    const items = [{ name: "全部", color: C.blue }]
+      .concat(LEVELS.map((l) => ({ name: l.name, color: l.color })));
+    gbox.innerHTML = items.map((f, i) => (
+      '<button class="fb-gchip' + (i === gi ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === gi ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + levScopeCnt(di, i) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(gbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(dIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 10. hash 契约：父页 P13 图表 dv-chart-heat 下钻「子页#encodeURIComponent(类目名)」。
+         该热力 y 轴类目 = 四域名、x 轴类目 = 四基线名，两组类目本页都能解析：
+         域名激活对应一级 chip；基线名不是本页一级口径（瓶颈按域归口），落回「全部」并在
+         状态行标注来源基线。HASH_ALIAS 收简写（云端 / AI / 集群全名 / 大小写）。 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("all", 0); alias("全量", 0);
+  DOMS.forEach((d, i) => {
+    alias(d.name, i + 1);
+    alias(d.name + "域", i + 1);
+    alias(d.name + "集群", i + 1);
+  });
+  alias("云端", 3); alias("云端域", 3); alias("云平台集群", 3);
+  alias("AI", 4); alias("ai", 4); alias("Ai", 4); alias("AI域", 4); alias("AI算法集群", 4);
+  alias("硬件实验室", 2);
+  const BASE_FROM = {};
+  BASELINES.forEach((b) => {
+    BASE_FROM[b] = b; BASE_FROM[b.toLowerCase()] = b;
+    alias(b, 0); alias(b.toLowerCase(), 0);
+    alias(b + "基线", 0); BASE_FROM[b + "基线"] = b;
+  });
+  function normHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    return raw.replace(/[\s　]+/g, "");                       /* trim + 全角空白剔除归一化 */
+  }
+  function resolveHash() {
+    const raw = normHash();
+    if (!raw) return -1;                                       /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  let baseNote = "";
+  function syncHash(di) {
+    const want = "#" + encodeURIComponent(DFILTERS[di].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 台账主表渲染（行高 27px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("fb-tbody");
+  let view = ROWS, dIdx = 0, gIdx = 0, selPos = 0;
+
+  function rowHtml(r, k) {
+    const w = clamp(r.dur / D.durMax * 100, 8, 100);
+    const cDur = r.dur > 30 ? C.red : r.dur > 12 ? C.amber : C.cyan;
+    const wPart = fmtDec(w * r.wait / r.dur, 2), hPart = fmtDec(w * r.hand / r.dur, 2);
+    return "<li data-no=\"" + r.no + "\" style=\"animation-delay:" + (k * 12) + "ms\">" +
+      '<span class="fb-no">' + r.no + "</span>" +
+      '<span class="fb-node">' + NODES[r.nd].name + "</span>" +
+      '<span class="fb-ty" style="color:' + TYPES[r.ty].color + '">' + TYPES[r.ty].name + "</span>" +
+      '<span class="fb-desc">' + r.desc + "</span>" +
+      '<span class="fb-when">' + r.found.slice(2) + "</span>" +
+      '<span class="fb-dur"><span class="fb-dur-t">' +
+        '<u style="width:' + wPart + "%;background:" + C.amber + '"></u>' +
+        '<u style="width:' + hPart + "%;background:" + C.cyan + '"></u>' +
+      '</span><em style="color:' + cDur + '">' + r.dur + " 天</em></span>" +
+      '<span class="fb-imp" style="color:' + C.violet + '">' + fmtInt(r.imp) + " " + r.unit + "</span>" +
+      '<span class="fb-dom" style="color:' + DOMS[r.dm].color + '">' + DOMS[r.dm].name + "</span>" +
+      '<span class="fb-badge ' + LEVELS[r.lv].badge + '">' + LEVELS[r.lv].name + "</span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      /* 手动点行 → 选中并暂停轮巡 20 秒（与 hash 定位同一门闩） */
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    const scopeN = dIdx === 0 ? D.matAll : DOMS[dIdx - 1].n;
+    $("fb-table-tag").textContent =
+      "在册未闭环 " + D.n + " 项逐条陈列 · 全盘 " + fmtInt(D.matAll) +
+      " 项（含已消解）· 持续天数 = 数据日 − 首次发现 = 等待 + 处理";
+    $("fb-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 项在册 / 共 " + D.n + " 项<i>|</i>该口径全盘 <em>" + fmtInt(scopeN) +
+      "</em> 项<i>|</i>" + (baseNote ? "下钻来源基线 <em>" + baseNote + "</em>（基线非本页一级口径，落全部）"
+        : "行点击或轮巡联动右侧瓶颈剖析");
+  }
+
+  /* ===== 12. 单条瓶颈剖析（纯 HTML/CSS；选中行联动）
+         ① 排队等待 vs 处理时长拆分（等待占比现算）
+         ② 影响链路：上游滞留 → 本节点在堵 → 下游待料（上游 + 下游 == 本节点量，现算）
+         ③ 处置四阶段步进条（各阶段日期由首次发现 + 累计偏移现算） ===== */
+  function stageOffsets(r) {
+    const o1 = Math.max(1, Math.round(r.wait * 0.4));
+    const o3 = r.wait + Math.max(1, Math.round(r.hand * 0.5));
+    return [0, o1, r.wait, Math.min(o3, r.dur)];
+  }
+  function plusDays(ds, k) {
+    const t = new Date(dayOf(ds).getTime() + k * 86400000);
+    return pad(t.getMonth() + 1) + "-" + pad(t.getDate());
+  }
+  function renderSel() {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("fb-diag-tag").textContent = "当前筛选无在册瓶颈";
+      $("fb-diag-headbox").innerHTML = '<div class="fb-diag-sub">调整责任域或瓶颈等级筛选后，此处展示单条瓶颈的等待/处理拆分与影响链路。</div>';
+      $("fb-diag-split").innerHTML = "";
+      $("fb-diag-chain").innerHTML = "";
+      $("fb-diag-steps").innerHTML = "";
+      return;
+    }
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    const nd = NODES[r.nd];
+    $("fb-diag-tag").textContent = "等待 + 处理 = 持续天数 · 上游滞留 + 下游待料 = 本节点在堵量";
+    $("fb-diag-headbox").innerHTML =
+      '<div class="fb-diag-no"><b>' + r.no + "</b>" +
+        '<span class="fb-badge ' + LEVELS[r.lv].badge + '">' + LEVELS[r.lv].name + "</span>" +
+        '<span class="fb-diag-sub" style="color:' + TYPES[r.ty].color + '">' + TYPES[r.ty].name + "</span>" +
+        '<span class="fb-diag-sub">' + nd.name + " · 责任域 " + DOMS[r.dm].name + "</span></div>" +
+      '<div class="fb-diag-title">' + r.desc + "</div>" +
+      '<div class="fb-diag-sub">首次发现 <b>' + r.found + "</b> · 持续 <b>" + r.dur +
+        "</b> 天（数据日 " + AS_OF + " 现算）· 影响吞吐 <b>" + fmtInt(r.imp) + " " + r.unit +
+        "</b> · 类型口径：" + TYPES[r.ty].note + "</div>";
+    $("fb-diag-split").innerHTML =
+      '<div class="fb-split-bar">' +
+        '<span class="fb-split-seg is-wait" style="flex:' + r.wait + ";background:" + C.amber + '">排队等待 ' + r.wait + " 天</span>" +
+        '<span class="fb-split-seg" style="flex:' + r.hand + ";background:" + C.cyan + '">处理 ' + r.hand + " 天</span>" +
+      "</div>" +
+      '<div class="fb-split-note"><span>等待占比 <b>' + fmtDec(r.waitPct, 1) + "%</b>（" + r.wait + " ÷ " + r.dur +
+        "）· 在册整体 " + fmtDec(D.openWaitPct, 1) + "%</span>" +
+        "<span>处理占比 " + fmtDec(100 - r.waitPct, 1) + "% · 级内均持续 " + fmtDec(LEVELS[r.lv].avgDur, 1) + " 天</span></div>";
+    $("fb-diag-chain").innerHTML =
+      '<div class="fb-chain-box"><div class="fb-chain-k">上游</div><div class="fb-chain-n">' + nd.up +
+        '</div><div class="fb-chain-v">滞留 ' + fmtInt(r.up) + " " + r.unit + "</div></div>" +
+      '<span class="fb-chain-ar">▶</span>' +
+      '<div class="fb-chain-box is-cur"><div class="fb-chain-k">本节点</div><div class="fb-chain-n">' + nd.name +
+        '</div><div class="fb-chain-v">在堵 ' + fmtInt(r.imp) + " " + r.unit + "</div></div>" +
+      '<span class="fb-chain-ar">▶</span>' +
+      '<div class="fb-chain-box"><div class="fb-chain-k">下游</div><div class="fb-chain-n">' + nd.down +
+        '</div><div class="fb-chain-v">待料 ' + fmtInt(r.down) + " " + r.unit + "</div></div>";
+    const offs = stageOffsets(r);
+    $("fb-diag-steps").innerHTML = STAGES.map((name, k) => {
+      const cls = k < r.pg ? "is-done" : (k === r.pg ? "is-cur" : "");
+      const txt = k <= r.pg ? plusDays(r.found, offs[k]) : "待启动";
+      return '<div class="fb-step ' + cls + '" title="' + STAGE_HINT[k] + '"><b>' + name + "</b><span>" + txt + "</span></div>";
+    }).join("");
+  }
+
+  /* ===== 13. 节点瓶颈热力（12 节点 × 5 类型；展示时转置：x = 节点、y = 类型）
+         y 轴标签带该类型总数（列和），tooltip 给出该节点行和，双向和都看得见。 ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function heatOption() {
+    /* ★ 只把标量与数组下发给 option（[节点索引, 类型索引, 值]），不放任何业务对象 */
+    const data = [];
+    MAT.forEach((row, i) => row.forEach((v, j) => data.push([i, j, v])));
+    const nodeNames = NODES.map((n) => n.name);
+    const typeLabels = TYPES.map((t, j) => t.name + " " + D.typeN[j]);
+    const nodeSums = D.nodeN.slice();
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 8, top: 6, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        formatter: (p) => {
+          const i = p.value[0], j = p.value[1];
+          return "<b>" + nodeNames[i] + " · " + TYPES[j].name + "</b><br/>瓶颈 <b>" + p.value[2] +
+            "</b> 项<br/><span style=\"color:" + C.textDim + "\">该节点合计 " + nodeSums[i] +
+            " 项 · 该类型合计 " + D.typeN[j] + " 项</span>";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: nodeNames,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        splitArea: { show: true, areaStyle: { color: ["rgba(20,36,86,.16)", "transparent"] } },
+        axisLabel: { color: C.textDim, fontSize: 9.5, interval: 0, rotate: 30 }
+      },
+      yAxis: {
+        type: "category", data: typeLabels, inverse: true,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: C.text, fontSize: 10.5 }
+      },
+      visualMap: {
+        show: false, min: 0, max: 6,
+        inRange: { color: ["rgba(20,36,86,.55)", "#254a9e", C.blueDeep, C.blue, C.amber, C.orange] }
+      },
+      series: [{
+        type: "heatmap", data: data,
+        label: { show: true, color: "#061027", fontSize: 9.5, fontWeight: 700,
+          formatter: (p) => (p.value[2] ? p.value[2] : "") },
+        itemStyle: { borderColor: PAL.stage, borderWidth: 1.6, borderRadius: 3 },
+        emphasis: { itemStyle: { shadowBlur: 8, shadowColor: "rgba(92,157,255,.5)" } }
+      }]
+    };
+  }
+
+  /* ===== 14. 瓶颈类型帕累托（柱 = 项数降序，线 = 累计占比，末值恒为 100%）
+         全部口径用列和，选中域时取 DOM_TYPE 该行，两种口径 Σ 都收敛。 ===== */
+  function paretoData(di) {
+    const items = TYPES.map((t, j) => ({
+      name: t.name, color: t.color, j: j,
+      n: di === 0 ? D.typeN[j] : DOM_TYPE[di - 1][j]
+    }));
+    items.sort((a, b) => (b.n - a.n) || (a.j - b.j));
+    const total = sum(items.map((it) => it.n));
+    let acc = 0;
+    items.forEach((it) => { acc += it.n; it.cum = total ? 100 * acc / total : 0; });
+    return { items: items, total: total };
+  }
+  function paretoOption(di) {
+    const pd = paretoData(di);
+    /* ★ 只把标量与数组下发给 option，items 对象本身不进 series.data（避免任何回指） */
+    const names = pd.items.map((it) => it.name);
+    const vals = pd.items.map((it) => it.n);
+    const cols = pd.items.map((it) => it.color);
+    const cums = pd.items.map((it) => Number(fmtDec(it.cum, 1)));
+    const total = pd.total;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 28, top: 24, bottom: 0, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const share = total ? 100 * vals[i] / total : 0;
+          return "<b>" + names[i] + "</b><br/>瓶颈 <b>" + vals[i] + "</b> 项 · 占 <b>" + fmtDec(share, 1) +
+            "%</b><br/>累计占比 <b style=\"color:" + C.amber + "\">" + fmtDec(cums[i], 1) + "%</b>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 0, itemWidth: 11, itemHeight: 7, itemGap: 8,
+        textStyle: { color: C.textDim, fontSize: 10 }, data: ["项数", "累计占比"]
+      },
+      xAxis: {
+        type: "category", data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5, interval: 0, rotate: 20 }
+      },
+      yAxis: [
+        { type: "value", name: "项", nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: { color: C.textDim, fontSize: 9.5 },
+          splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+        { type: "value", name: "%", min: 0, max: 100, nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: { color: C.textDim, fontSize: 9.5 }, splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "项数", type: "bar", barWidth: "50%",
+          label: { show: true, position: "top", color: "#cfdcff", fontSize: 9.5, fontWeight: 700 },
+          data: vals.map((v, i) => ({ value: v, itemStyle: { color: cols[i], borderRadius: [3, 3, 0, 0] } })) },
+        { name: "累计占比", type: "line", yAxisIndex: 1, smooth: false,
+          symbol: "circle", symbolSize: 5, z: 5, data: cums.slice(),
+          lineStyle: { width: 2, color: C.amber }, itemStyle: { color: C.amber },
+          markLine: {
+            symbol: "none", silent: true,
+            lineStyle: { color: "rgba(255,157,92,.65)", type: "dashed", width: 1.3 },
+            label: { color: C.orange, fontSize: 9.5, position: "insideEndTop", formatter: "80% 线" },
+            data: [{ yAxis: 80 }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 15. 影响吞吐排行 Top 8（当前筛选口径下按影响吞吐降序；Σ 与总影响量比对） ===== */
+  function topData() {
+    const arr = view.slice().sort((a, b) => (b.imp - a.imp) || (a.seq - b.seq)).slice(0, 8);
+    return arr;
+  }
+  function topOption() {
+    const arr = topData();
+    /* ★ 逐字段展开为标量数组，业务对象不进 option */
+    const labels = arr.map((r) => r.no + "·" + NODES[r.nd].name);
+    const vals = arr.map((r) => r.imp);
+    const cols = arr.map((r) => LEVELS[r.lv].color);
+    const units = arr.map((r) => r.unit);
+    const types = arr.map((r) => TYPES[r.ty].name);
+    const durs = arr.map((r) => r.dur);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 46, top: 6, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + labels[i] + "</b><br/>影响吞吐 <b>" + fmtInt(vals[i]) + " " + units[i] +
+            "</b><br/><span style=\"color:" + C.textDim + "\">" + types[i] + " · 已持续 " + durs[i] + " 天</span>";
+        }
+      }, TIP),
+      xAxis: {
+        type: "value", axisLabel: { color: C.textDim, fontSize: 9.5 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false }
+      },
+      yAxis: {
+        type: "category", data: labels.slice(), inverse: true,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5, interval: 0 }
+      },
+      series: [{
+        type: "bar", barWidth: "62%",
+        label: { show: true, position: "right", color: "#cfdcff", fontSize: 9.5, fontWeight: 700,
+          formatter: (p) => fmtInt(p.value) + " " + units[p.dataIndex] },
+        data: vals.map((v, i) => ({ value: v, itemStyle: { color: cols[i], borderRadius: [0, 3, 3, 0] } }))
+      }]
+    };
+  }
+
+  /* ===== 16. 筛选主流程：一次调用刷新 chip / 表 / 剖析 / 帕累托 / Top8 / 页头 chip（单一入口） ===== */
+  function applyFilter(di, gi, pushHash) {
+    dIdx = clamp(di, 0, DFILTERS.length - 1);
+    gIdx = clamp(gi, 0, LEVELS.length);
+    view = ROWS.filter((r) => (dIdx === 0 || r.dm === dIdx - 1) && (gIdx === 0 || r.lv === gIdx - 1));
+    selPos = 0;
+    dchips.forEach((el, i) => {
+      const on = i === dIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? DFILTERS[i].color : "";
+      el.style.borderColor = on ? DFILTERS[i].color : "";
+    });
+    renderGChips(dIdx, gIdx);
+    const vDur = view.length ? sum(view.map((r) => r.dur)) / view.length : 0;
+    $("fb-chip-key").textContent = "在册均堵 · " + DFILTERS[dIdx].name;
+    $("fb-chip-val").textContent = fmtDec(vDur, 1) + " 天";
+    const pd = paretoData(dIdx);
+    $("fb-pareto-tag").innerHTML = "五类 Σ <b>" + fmtInt(pd.total) + "</b> 项 · 累计末值 <b>" +
+      fmtDec(pd.items[pd.items.length - 1].cum, 0) + "%</b> · " + DFILTERS[dIdx].name;
+    renderTable();
+    renderSel();
+    const tp = topData();
+    const tpSum = sum(tp.map((r) => r.imp));
+    $("fb-top-tag").innerHTML = "Σ Top" + tp.length + " <b>" + fmtInt(tpSum) + "</b> 点当量 · 占在册 " +
+      fmtDec(D.openImp ? 100 * tpSum / D.openImp : 0, 1) + "% / 全盘 " + fmtDec(100 * tpSum / D.impAll, 1) + "%";
+    if (paretoChart) paretoChart.setOption(paretoOption(dIdx), true);
+    if (topChart) topChart.setOption(topOption(), true);
+    if (pushHash) syncHash(dIdx);
+  }
+
+  dchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), 0, true)));
+
+  /* hash 定位：命中责任域则激活筛选 chip 并闪烁；命中基线名则落全部并标注来源；均暂停轮巡 20 秒 */
+  function locateByHash() {
+    const raw = normHash();
+    const hit = resolveHash();
+    baseNote = BASE_FROM[raw] || "";
+    if (hit < 0) { baseNote = ""; applyFilter(0, 0, false); return; }
+    applyFilter(hit, 0, false);
+    const chip = dchips[hit];
+    chip.classList.remove("is-hit");
+    void chip.offsetWidth;                                   /* 重排以重启动画 */
+    chip.classList.add("is-hit");
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发交付流水线数字孪生1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 17. kiosk 轮巡：台账行 3 秒逐行高亮并联动瓶颈剖析；hash 定位或手动点行后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 18. 初始渲染：先填充全部 DOM（KPI + 表 + 剖析），再 init 图表 ===== */
+  let heatChart = null, paretoChart = null, topChart = null;
+  applyFilter(0, 0, false);                                  /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  heatChart = echarts.init($("fb-chart-heat"));
+  heatChart.setOption(heatOption());
+  paretoChart = echarts.init($("fb-chart-pareto"));
+  paretoChart.setOption(paretoOption(0));
+  topChart = echarts.init($("fb-chart-top"));
+  topChart.setOption(topOption());
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* 热力图轮播提示：每 3.8s 点一格最堵节点所在列 */
+  let tipIdx = 0;
+  setInterval(() => {
+    heatChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % (NODES.length * TYPES.length);
+  }, 3800);
+
+  /* ===== 19. 底部瓶颈研判滚动条（文案数字全部由派生量现算） ===== */
+  const pd0 = paretoData(0);
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "最堵节点「" + NODES[D.hotIdx].name + "」" + D.nodeN[D.hotIdx] + " 项（占全盘 " +
+        fmtDec(100 * D.nodeN[D.hotIdx] / D.matAll, 1) + "%），其中" + TYPES[D.hotTypeIdx].name + " " +
+        MAT[D.hotIdx][D.hotTypeIdx] + " 项 —— 与父页链路预警「变更前置 26 h，瓶颈在集成测试台排队等待」同源" },
+    { lv: "高", c: C.red, t: "严重瓶颈 " + D.sevN + " 项仅占 " + fmtDec(D.sevShare, 1) + "% 项数，级内均持续 " +
+        fmtDec(LEVELS[0].avgDur, 1) + " 天、均影响 " + LEVELS[0].avgImp + " 点当量，是交付窗口的主要风险源" },
+    { lv: "中", c: C.orange, t: "类型首位「" + pd0.items[0].name + "」" + pd0.items[0].n + " 项（占 " +
+        fmtDec(100 * pd0.items[0].n / D.matAll, 1) + "%），前两类累计已达 " + fmtDec(pd0.items[1].cum, 1) +
+        "%，治理优先级从队列与资源入手" },
+    { lv: "中", c: C.orange, t: "在册 " + D.n + " 项 Σ等待 " + D.openWait + " 天 / Σ处理 " + D.openHand +
+        " 天，等待占比 " + fmtDec(D.openWaitPct, 1) + "% —— 堵在「排不上」而非「做不完」" },
+    { lv: "低", c: C.amber, t: "最久一项「" + D.longest.no + "」" + NODES[D.longest.nd].name + " 已持续 " +
+        D.longest.dur + " 天（首次发现 " + D.longest.found + "），影响 " + fmtInt(D.longest.imp) + " " + D.longest.unit },
+    { lv: "低", c: C.green, t: "在册 Σ影响 " + fmtInt(D.openImp) + " 点当量，占全盘 " +
+        fmtDec(100 * D.openImp / D.impAll, 1) + "%；全盘平均持续 " + fmtDec(D.avgDur, 1) + " 天、在册均 " +
+        fmtDec(D.openAvgDur, 1) + " 天（在册为未闭环长尾）" },
+    { lv: "低", c: C.green, t: "分工：本页＝全链路瓶颈横向台账（哪些环节在堵 / 堵多久 / 影响多少）；" +
+        "单个节点的吞吐、积压、上下游桑基与内部工序见姊妹页「单链路节点详情」" },
+    { lv: "低", c: C.green, t: "勾稽：节点行和 Σ = " + fmtInt(D.matAll) + " 项 · 类型列和 Σ = " +
+        fmtInt(sum(D.typeN)) + " 项 · 四域 Σ = " + fmtInt(D.domAll) + " 项 · 三档等级 Σ = " + fmtInt(D.levAll) + " 项" }
+  ];
+  const track = $("fb-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="fb-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                    /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 20. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(heatOption()); JSON.stringify(paretoOption(0)); JSON.stringify(paretoOption(2)); JSON.stringify(topOption()); }
+  catch (e) { optAcyclic = false; console.error("[链路瓶颈台账] option 存在循环引用：", e.message); }
+
+  const CONTRACT_NODES = ["需求池", "规划台", "软件集群", "硬件实验室", "云平台集群", "AI算法集群",
+                          "CI 构建中心", "单测门", "集成测试台", "系统实验室", "发布列车站", "运营监控塔"];
+  const checks = [
+    ["12 个节点名与契约 §6 逐字一致且无遗漏",
+      NODES.length === 12 && NODE_CONTRACT.length === 12 &&
+      NODES.every((n, i) => n.name === CONTRACT_NODES[i] && n.name === NODE_CONTRACT[i])],
+    ["台账所在节点 ⊆ 12 节点，且 12 节点全部出现",
+      ROWS.every((r) => r.nd >= 0 && r.nd < NODES.length) &&
+      (new Set(ROWS.map((r) => r.nd))).size === NODES.length],
+    ["责任域四档 = 父页热力 y 轴类目逐字（软件/硬件/云平台/AI算法）",
+      DOMS.every((d, i) => d.name === DOM_CONTRACT[i]) && DOMS.length === 4],
+    ["热力行和 = 各节点瓶颈数，Σ 行和 = 瓶颈总数 96",
+      D.nodeN.every((v, i) => v === sum(MAT[i])) && D.matAll === BN_REF],
+    ["热力列和 = 各类型总数，Σ 列和 = 瓶颈总数 96（双向硬校验）",
+      sum(D.typeN) === BN_REF && D.typeN.every((v, j) => v === sum(MAT.map((row) => row[j])))],
+    ["最堵节点 = 集成测试台（行和最大 13，与父页链路预警互证）",
+      NODES[D.hotIdx].name === "集成测试台" && D.nodeN[D.hotIdx] === 13],
+    ["四责任域 Σ = 96；域×类型行和 == 各域项数、列和 == 各类型总数",
+      D.domAll === BN_REF && D.domTypeRow.every((v, i) => v === DOMS[i].n) &&
+      D.domTypeCol.every((v, j) => v === D.typeN[j])],
+    ["等级三档 Σ = 瓶颈总数 96", D.levAll === BN_REF && LEVELS.length === 3],
+    ["帕累托 Σ = 瓶颈总数 96 且累计末值 = 100%",
+      pd0.total === BN_REF && Math.abs(pd0.items[pd0.items.length - 1].cum - 100) < 1e-9],
+    ["帕累托柱按项数降序（累计线单调不减）",
+      pd0.items.every((it, i) => i === 0 || it.n <= pd0.items[i - 1].n)],
+    ["各责任域口径下帕累托 Σ == 该域项数且末值 100%",
+      DOMS.every((d, i) => {
+        const p = paretoData(i + 1);
+        return p.total === d.n && Math.abs(p.items[p.items.length - 1].cum - 100) < 1e-9;
+      })],
+    ["单条 等待 + 处理 = 持续天数（逐条，且两段均为正）",
+      ROWS.every((r) => r.dur === r.wait + r.hand && r.wait > 0 && r.hand > 0)],
+    ["单条 持续天数 == 数据日 2026-08-20 − 首次发现（逐条现算）",
+      ROWS.every((r) => r.age === r.dur)],
+    ["单条 上游滞留 + 下游待料 == 本节点在堵量（逐条现算）",
+      ROWS.every((r) => r.up + r.down === r.imp && r.up > 0 && r.down > 0)],
+    ["Top8 Σ 影响吞吐 ≤ 全盘 Σ 影响吞吐，且降序排列",
+      (() => {
+        const a = ROWS.slice().sort((x, y) => y.imp - x.imp).slice(0, 8);
+        return sum(a.map((r) => r.imp)) <= D.impAll && a.every((r, i) => i === 0 || r.imp <= a[i - 1].imp);
+      })()],
+    ["在册 Σ 影响吞吐 ≤ 全盘 Σ 影响吞吐（在册是全盘子集）", D.openImp <= D.impAll],
+    ["抽样各责任域条数 = 一级 chip 计数", DFILTERS.every((f, i) =>
+      f.cnt === (i === 0 ? ROWS.length : ROWS.filter((r) => r.dm === i - 1).length))],
+    ["抽样各等级条数 = 二级 chip 计数（全部口径）", LEVELS.every((l, i) =>
+      levScopeCnt(0, i + 1) === D.rowsByLev[i]) && levScopeCnt(0, 0) === D.n],
+    ["在册各等级 / 各类型 / 各节点条数均不超过全盘对应项数",
+      D.rowsByLev.every((v, i) => v <= LEVELS[i].n) &&
+      D.rowsByType.every((v, j) => v <= D.typeN[j]) &&
+      D.rowsByNode.every((v, i) => v <= D.nodeN[i])],
+    ["在册条数 24 且等级分布之和 = 24", D.n === 24 && sum(D.rowsByLev) === D.n && sum(D.rowsByDom) === D.n],
+    ["五类瓶颈类型在册全部出现", (new Set(ROWS.map((r) => r.ty))).size === TYPES.length],
+    ["全盘平均持续天数 = Σ(级内均值 × 项数) ÷ 96 现算",
+      Math.abs(D.avgDur - sum(LEVELS.map((l) => l.n * l.avgDur)) / BN_REF) < 1e-9],
+    ["在册等待占比 = Σ等待 ÷ Σ持续 现算，且 Σ等待 + Σ处理 = Σ持续",
+      D.openWait + D.openHand === D.openDur && Math.abs(D.openWaitPct - 100 * D.openWait / D.openDur) < 1e-9],
+    ["编号唯一、格式 BN-XXXX、序号 ≤ 96 且按持续天数严格降序",
+      (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^BN-\d{4}$/.test(r.no) && r.seq >= 1 && r.seq <= BN_REF) &&
+      ROWS.every((r, i) => i === 0 || r.dur < ROWS[i - 1].dur)],
+    ["持续天数降序 ⇔ 首次发现升序（编号随发现时序递增）",
+      ROWS.every((r, i) => i === 0 || (r.found > ROWS[i - 1].found && r.seq > ROWS[i - 1].seq))],
+    ["处置阶段索引合法（0–3），严重项均已进入「措施」及以上",
+      ROWS.every((r) => r.pg >= 0 && r.pg < STAGES.length) &&
+      ROWS.filter((r) => r.lv === 0).every((r) => r.pg >= 2)],
+    ["处置阶段偏移单调不减且不超过持续天数",
+      ROWS.every((r) => {
+        const o = stageOffsets(r);
+        return o.every((v, i) => (i === 0 || v >= o[i - 1]) && v <= r.dur);
+      })],
+    ["父页热力 8 个类目名（四域 + 四基线）hash 均可解析",
+      DOM_CONTRACT.every((n) => resolveName(n) > 0) && BASELINES.every((b) => resolveName(b) === 0)],
+    ["hash 别名可解析（云端 / AI / 集群全名 / 小写基线）",
+      HASH_ALIAS["云端"] === 3 && HASH_ALIAS["AI"] === 4 && HASH_ALIAS["软件集群"] === 1 &&
+      HASH_ALIAS["r26.6"] === 0 && BASE_FROM["R26.6"] === "R26.6"],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  function resolveName(nm) {
+    const v = HASH_ALIAS[String(nm).replace(/[\s　]+/g, "")];
+    return v === undefined ? -1 : v;
+  }
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[链路瓶颈台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

@@ -118,6 +118,17 @@ SUB_NV = "大屏样板间-研发跨站协作图谱1920.html"
 SUB_PV = "大屏样板间-研发技能图谱1920.html"
 
 
+# ---- 二期扩充 W10（收官）：D 型时序复盘 ×3 + B 型台账 ×3 ----
+# D 型按「时间窗」而非对象组织（事件流时间轴 + 前后对比），是第五种子页形态。
+CLUSTERS4 = ["软件", "硬件", "云平台", "AI算法"]   # dv 热力 y 轴类目（实测于父页源码，非「云端/AI」）
+SUB_ZX = "大屏样板间-研发单需求全链路复盘1920.html"
+SUB_XQ = "大屏样板间-研发单发布批次复盘1920.html"
+SUB_FJ = "大屏样板间-研发季度指数复盘1920.html"
+SUB_FB = "大屏样板间-研发链路瓶颈台账1920.html"
+SUB_LN = "大屏样板间-研发改进行动台账1920.html"
+SUB_QW = "大屏样板间-研发专利资产台账1920.html"
+
+
 PAGES = [
     {
         "file": "大屏样板间-研发产品组合与路标1920.html",
@@ -141,6 +152,9 @@ PAGES = [
     },
     {
         "file": "大屏样板间-研发需求全生命周期1920.html",
+        "panels": [
+            {"panelTitle": "需求状态累积流图", "label": "需求复盘", "sub": SUB_ZX},
+        ],
         "targets": [
             {"rows": "#rq-tbody li", "names": SOURCES4, "sub": SUB_TZ},
         ],
@@ -245,6 +259,9 @@ PAGES = [
     {
         # 事件行文本含 P1/P2/P3/P4 等级标记，按等级下钻到台账并定位该等级
         "file": "大屏样板间-研发云端服务与发布1920.html",
+        "panels": [
+            {"panelTitle": "发布列车节奏日历热力", "label": "发布复盘", "sub": SUB_XQ},
+        ],
         "targets": [
             {"rows": "#cy-list li", "names": INCLV4, "sub": SUB_RZ},
         ],
@@ -255,6 +272,9 @@ PAGES = [
     {
         # 等距 SVG 的 16 个节点组带 data-node，textContent 含节点名原文（已浏览器实测）
         "file": "大屏样板间-研发交付流水线数字孪生1920.html",
+        "charts": [
+            {"chartId": "dv-chart-heat", "names": CLUSTERS4, "sub": SUB_FB},
+        ],
         "targets": [
             {"rows": "[data-node]", "names": NODES12, "match": NODES12_MATCH, "sub": SUB_LJ},
         ],
@@ -277,6 +297,7 @@ PAGES = [
     {
         "file": "大屏样板间-研发技术资产与复用1920.html",
         "charts": [
+            {"chartId": "ta-chart-patent", "names": LINES4, "sub": SUB_QW},
             {"chartId": "ta-chart-shelf", "names": CBBDOMS5, "sub": SUB_TP},
         ],
         "targets": [
@@ -285,6 +306,10 @@ PAGES = [
     },
     {
         "file": "大屏样板间-研发效能指数1920.html",
+        "panels": [
+            {"panelTitle": "改进行动追踪", "label": "行动台账", "sub": SUB_LN},
+            {"panelTitle": "指数 24 月走势", "label": "季度复盘", "sub": SUB_FJ},
+        ],
         "targets": [
             {"rows": "#pi-tbody li", "names": DIMS6, "sub": SUB_ZB},
         ],

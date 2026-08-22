@@ -1,0 +1,1501 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单发布批次复盘</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --xq-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 =====
+     行：页头 84 / 批次切换器 48 / KPI 66 / 发布时间线 286 / 主区 1fr(446) / 口径条 52
+     列：640（灰度放量）/ 620（前后对比 + 内容构成）/ 596（事件 + 结论） */
+  .xq-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 8% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 92% 4%, rgba(255, 157, 92, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 640px 620px 596px;
+    grid-template-rows: 84px 48px 66px 286px 1fr 52px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .xq-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .xq-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .xq-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .xq-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 92, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 157, 92, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .xq-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .xq-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .xq-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .xq-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .xq-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到云端服务与发布，琥珀描边与本页星蓝主色区分 */
+  .xq-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .xq-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .xq-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .xq-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .xq-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .xq-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .xq-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .xq-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .xq-chips { display: flex; align-items: center; gap: 9px; }
+  .xq-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 122px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .xq-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .xq-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .xq-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .xq-chip.is-key b { color: var(--rnd-blue); }
+  .xq-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .xq-clock-time { font: 700 26px/1 var(--xq-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .xq-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 批次切换器（hash 契约目标：发布批次号） ===== */
+  .xq-switch {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .xq-switch-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .xq-bchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 5px 13px 6px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .xq-bchip u { text-decoration: none; font: 700 13.5px/1 var(--xq-mono); color: inherit; }
+  .xq-bchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .xq-bchip s { text-decoration: none; font-size: 10px; letter-spacing: 0.12em; padding: 1px 5px 2px; border-radius: 4px; }
+  .xq-bchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .xq-bchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .xq-bchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .xq-bchip.is-on s { background: rgba(7, 16, 38, 0.22); color: #071026; }
+  .xq-bchip.is-hit { animation: xq-hit 0.9s ease-in-out 2; }
+  @keyframes xq-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--xq-cc, rgba(92, 157, 255, 0.8)); } }
+  .xq-switch-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .xq-switch-state b { font-weight: 700; color: var(--rnd-blue); }
+  .xq-switch-state em { font-style: normal; color: #d3e2ff; }
+  .xq-switch-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 条（八格；前七格翻牌缓动，末格为文本徽章） ===== */
+  .xq-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(8, 1fr); gap: 12px; min-width: 0; }
+  .xq-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 13px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .xq-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--xq-kc, var(--rnd-blue)); }
+  .xq-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .xq-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .xq-kpi-v b { font: 700 23px/1 var(--xq-mono); color: var(--xq-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .xq-kpi-v em { font-style: normal; font-size: 16px; font-weight: 700; color: var(--xq-kc, var(--rnd-blue)); letter-spacing: 0.04em; }
+  .xq-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .xq-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .xq-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .xq-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .xq-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .xq-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .xq-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .xq-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .xq-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .xq-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .xq-panel-tag u { text-decoration: none; font-weight: 700; color: var(--rnd-orange); }
+  .xq-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* 时间线面板占满整行（主视觉） */
+  .xq-panel.is-tl { grid-column: 1 / -1; }
+  /* ★ 事件清单区由 JS 填充且与结论块同列：写死高度 + min-height:0 + overflow:hidden */
+  .xq-panel.is-ev { flex: none; height: 190px; min-height: 0; overflow: hidden; }
+  .xq-panel.is-sum { flex: 1; min-height: 0; overflow: hidden; }
+  /* ★ 四域版本条与图表同属一个 flex 容器：flex:none + 写死高度，避免填充后把图表压矮 */
+  .xq-vers { flex: none; height: 42px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 6px; min-height: 0; overflow: hidden; }
+  .xq-ver {
+    display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 3px 9px;
+    border-radius: 7px; border: 1px solid rgba(96, 140, 255, 0.22); background: rgba(14, 26, 66, 0.5);
+    min-width: 0; overflow: hidden;
+  }
+  .xq-ver span { font-size: 10px; letter-spacing: 0.12em; color: #6079b0; }
+  .xq-ver b { font: 700 12.5px/1.1 var(--xq-mono); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 发布期事件清单（CSS grid 模拟表，非 <table>） ===== */
+  .xq-evlist { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; overflow: hidden; }
+  .xq-evlist li {
+    display: grid; grid-template-columns: 96px 40px 116px 1fr 62px; align-items: center; gap: 8px;
+    padding: 0 8px; height: 40px; border-radius: 6px;
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: xq-rowin .34s ease both;
+  }
+  @keyframes xq-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .xq-evlist li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .xq-evlist li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .xq-evlist li .xq-ev-t { font: 700 11.5px/1 var(--xq-mono); color: rgba(127, 146, 196, 0.95); }
+  .xq-evlist li .xq-ev-sys { font-size: 11.5px; color: #bfd2f6; }
+  .xq-evlist li .xq-ev-why { color: #dfe9ff; font-size: 11.5px; }
+  .xq-evlist li .xq-ev-min { text-align: right; font: 700 13px/1 var(--xq-mono); }
+  .xq-badge { padding: 2px 6px; border-radius: 4px; text-align: center; justify-self: start; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+  .xq-badge.is-p0 { color: #3d060c; background: var(--rnd-red); }
+  .xq-badge.is-p1 { color: #3a1c05; background: var(--rnd-orange); }
+  .xq-badge.is-p2 { color: #3a2a05; background: var(--rnd-amber); }
+  .xq-badge.is-p3 { color: #041b3a; background: var(--rnd-blue); }
+  .xq-evempty {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+    border: 1px dashed rgba(111, 224, 154, 0.34); border-radius: 9px; background: rgba(20, 60, 44, 0.18);
+  }
+  .xq-evempty b { font-size: 15px; font-weight: 700; color: var(--rnd-green); letter-spacing: 0.08em; }
+  .xq-evempty span { font-size: 11.5px; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+
+  /* ===== 复盘结论 ===== */
+  .xq-sumlist { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 7px; overflow: hidden; }
+  .xq-sum {
+    position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 5px 11px 6px 13px; border-radius: 8px;
+    background: rgba(14, 26, 66, 0.5); border: 1px solid rgba(96, 140, 255, 0.18);
+    animation: xq-rowin .34s ease both;
+  }
+  .xq-sum::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--xq-sc, var(--rnd-blue)); }
+  .xq-sum-k { display: flex; align-items: center; gap: 7px; font-size: 11px; letter-spacing: 0.12em; color: var(--xq-sc, var(--rnd-blue)); font-weight: 700; }
+  .xq-sum-k u { text-decoration: none; font: 700 10.5px/1 var(--xq-mono); color: rgba(127, 146, 196, 0.8); }
+  .xq-sum-t { font-size: 12px; line-height: 1.42; color: #dfe9ff; font-variant-numeric: tabular-nums; }
+  .xq-sum-t b { font-weight: 700; color: #ffffff; }
+
+  /* ===== 底部口径条（marquee） ===== */
+  .xq-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .xq-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange); }
+  .xq-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: xq-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes xq-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .xq-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .xq-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 46px; white-space: nowrap; will-change: transform; }
+  .xq-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .xq-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .xq-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .xq-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="xq-stage" id="xq-stage">
+    <!-- mockflag:begin --><div class="xq-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="xq-error" id="xq-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="xq-header">
+      <div class="xq-head-left">
+        <div class="xq-crumb">
+          <a class="xq-crumb-up" href="大屏样板间-研发云端服务与发布1920.html" title="返回上级专题页（Esc）">‹ 返回 云端服务与发布</a>
+          <b>云麓智联科技</b><i>›</i><span>云端服务与发布</span><i>›</i><em>单发布批次复盘</em>
+        </div>
+        <div class="xq-head-title-row">
+          <div class="xq-head-title">单发布批次复盘</div>
+          <div class="xq-head-meta">
+            <span>批次 <b id="xq-meta-id">--</b> · <b id="xq-meta-date">--</b></span><i>|</i>
+            <span><b>7</b> 个批次（3 大版本 + 4 常规）· <b id="xq-meta-nodes">--</b> 个时间线节点</span><i>|</i>
+            <span>发布列车 <b>双月一班 · 固定周四 · 班距 9 周 · 前 3 天冻结</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="xq-head-right">
+        <div class="xq-chips">
+          <div class="xq-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="xq-chip is-key"><span id="xq-chip-key">发布后可用性</span><b id="xq-chip-av">--</b></div>
+        </div>
+        <div class="xq-clock" aria-label="实时时钟">
+          <span class="xq-clock-time" id="xq-clock-time">--:--:--</span>
+          <span class="xq-clock-date" id="xq-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 批次切换器：hash 契约目标（发布批次号 R26.2 / R26.4 / R26.6 与契约集成基线逐字） -->
+    <div class="xq-switch">
+      <span class="xq-switch-tag">发布批次</span>
+      <div id="xq-bchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <div class="xq-switch-state" id="xq-switch-state">--</div>
+    </div>
+
+    <!-- KPI 八格 -->
+    <div class="xq-kpis" id="xq-kpis"></div>
+
+    <!-- 主视觉：发布时间线（横向事件流 + 真实时间比例带 + 回滚回环） -->
+    <section class="xq-panel is-tl">
+      <div class="xq-panel-head">
+        <h2>发布时间线 · 代码冻结 → 构建打包 → 预发验证 → 灰度 10% → 灰度 50% → 全量 → 观察期结束</h2>
+        <span class="xq-panel-tag" id="xq-tl-tag">--</span>
+      </div>
+      <div class="xq-chart" id="xq-chart-timeline"></div>
+    </section>
+
+    <!-- 左列：灰度放量曲线（流量阶梯 × 错误率双轴） -->
+    <div class="xq-col">
+      <section class="xq-panel" style="flex:1;">
+        <div class="xq-panel-head">
+          <h2>灰度放量曲线 · 流量占比阶梯 × 期间错误率</h2>
+          <span class="xq-panel-tag" id="xq-gray-tag">--</span>
+        </div>
+        <div class="xq-chart" id="xq-chart-gray"></div>
+      </section>
+    </div>
+
+    <!-- 中列：发布前后 7 天对比 + 发布内容构成 -->
+    <div class="xq-col">
+      <section class="xq-panel" style="flex:none;height:226px;">
+        <div class="xq-panel-head">
+          <h2>发布前后对比 · 前 7 天 vs 后 7 天</h2>
+          <span class="xq-panel-tag" id="xq-ba-tag">--</span>
+        </div>
+        <div class="xq-chart" id="xq-chart-ba"></div>
+      </section>
+      <section class="xq-panel" style="flex:1;">
+        <div class="xq-panel-head">
+          <h2>发布内容构成 · 四域版本号</h2>
+          <span class="xq-panel-tag" id="xq-mix-tag">--</span>
+        </div>
+        <div class="xq-vers" id="xq-vers"></div>
+        <div class="xq-chart" id="xq-chart-mix"></div>
+      </section>
+    </div>
+
+    <!-- 右列：发布期事件（写死 190px）+ 复盘结论 -->
+    <div class="xq-col">
+      <section class="xq-panel is-ev">
+        <div class="xq-panel-head">
+          <h2>发布期线上事件</h2>
+          <span class="xq-panel-tag" id="xq-ev-tag">--</span>
+        </div>
+        <ul class="xq-evlist" id="xq-evlist"></ul>
+      </section>
+      <section class="xq-panel is-sum">
+        <div class="xq-panel-head">
+          <h2>复盘结论（由本批次数据现算）</h2>
+          <span class="xq-panel-tag" id="xq-sum-tag">--</span>
+        </div>
+        <div class="xq-sumlist" id="xq-sumlist"></div>
+      </section>
+    </div>
+
+    <!-- 底部口径条 -->
+    <div class="xq-foot">
+      <div class="xq-foot-tag">口径说明</div>
+      <div class="xq-foot-view"><div class="xq-foot-track" id="xq-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("xq-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("xq-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，初始 hash 解析在页面中部
+     就会调用它；见 docs/RndIpdThemed.md §8 批次四「holdUntil 的 TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad2 = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const r1 = (v) => Math.round(v * 10) / 10;
+
+  const TIP = {
+    backgroundColor: "rgba(8,18,49,.94)",
+    borderColor: "rgba(96,140,255,.45)",
+    borderWidth: 1,
+    padding: [8, 12],
+    textStyle: { color: "#dce8ff", fontSize: 12 },
+    extraCssText: "box-shadow:0 6px 22px rgba(0,0,0,.5);border-radius:8px;"
+  };
+
+  /* =====================================================================
+     4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 发布与 SRE 视角）
+
+     ★ 形态：D 型「时序复盘」子页 —— 按**时间窗**（一次发布批次从代码冻结到观察期结束）
+       而非对象组织。与 A 型（对象切换器，看单个对象的 360 度截面）、B 型（台账筛选，
+       全量明细 + 单条穿透）、C 型（横向对比，N 个对象并排 PK）的根本区别：
+       本页横轴是**时刻**不是对象，纵深是**过程**不是属性。
+
+     ★ 与姊妹子页 S14「线上事件台账」（前缀 rz，同父页 P12）的分工：
+       rz = 全年 116 起线上事件按 P1~P4 等级筛选 + 单事件五段处置（事件视角 / 全年跨度）；
+       本页 = 单次发布批次的完整复盘（发布视角 / 一次窗口）。
+       两页在 2026-08-18 21:07 的 P2 事件上逐字对齐（云枢 API 网关 · 58 min ·
+       灰度批次配置错误 → 回滚 R26.6-rc3），即父页 RECENT 首条 / rz INC-2026-0116。
+
+     ★ 契约逐字项（docs/RndIpdThemed.md §2.2 / §2.3）：
+       云服务 SLO 目标 99.95% / 达成 99.968%；DORA 变更失败率 8.4% / MTTR 42 min /
+       部署频率 14.2 次/日；四条集成基线 R26.2 / R26.4 / R26.6 / R26.8。
+       父页 P12 发布列车节奏日历热力：大版本双月一班、固定周四、班距 9 周、前 3 天冻结窗口，
+       窗口末周周一 2026-08-17 → R26.2 落在 2026-02-26、R26.4 落在 2026-04-30、
+       R26.6 落在 2026-07-02（均为周四，逐字复算自父页 MAJORS 的 w/d 坐标）。
+       父页逐月事件数 INC_CNT（2025-09 ~ 2026-08）逐字引入作事件上限。
+
+     ★ 循环引用红线：进 option 的数据只放标量与数组，段与批次之间一律用索引关联，
+       绝不用对象引用回指（setOption 深拷贝遇环会整页全空）。
+     ===================================================================== */
+
+  /* 4.1 契约锚点（勿改，与父页 / 契约逐字） */
+  const SLO_TARGET   = 99.95;      /* 云服务 SLO 目标 % */
+  const SLO_ACT      = 99.968;     /* 本期达成 %（MTD 口径，= 最新批次发布后可用性） */
+  const DORA_FAIL    = 8.4;        /* 变更失败率 %（全环境部署口径） */
+  const DORA_MTTR    = 42;         /* MTTR min */
+  const DORA_DEPLOY  = 14.2;       /* 部署频率 次/日（全环境部署口径） */
+  const BASELINES    = ["R26.2", "R26.4", "R26.6", "R26.8"];   /* §2.3 四条集成基线 */
+  const TRAIN_GAP_W  = 9;          /* 发布列车班距（周），父页逐字 */
+  const FREEZE_DAYS  = 3;          /* 大版本前冻结天数，父页逐字 */
+  /* 父页逐月事件数（2025-09 ~ 2026-08），键为「MM」月份串，作本页批次事件数上限 */
+  const PARENT_INC = { "09": 14, "10": 13, "11": 12, "12": 11, "01": 10, "02": 10,
+                       "03": 9, "04": 9, "05": 8, "06": 7, "07": 7, "08": 6 };
+
+  /* 4.2 段类型 → 颜色 / 是否计入灰度时长 / 是否计入标准七节点 */
+  const KIND = {
+    freeze:   { c: C.violet,   label: "冻结" },
+    build:    { c: C.blue,     label: "构建" },
+    verify:   { c: C.cyan,     label: "验证" },
+    gray:     { c: C.green,    label: "灰度" },
+    full:     { c: C.blueDeep, label: "全量" },
+    watch:    { c: "#5f74a8",  label: "观察" },
+    rollback: { c: C.orange,   label: "回滚" },
+    fix:      { c: C.amber,    label: "修复" }
+  };
+  /* 标准七节点（D 型时间窗骨架，逐批次必须全部出现） */
+  const STD_NODES = ["代码冻结", "构建打包", "预发验证", "灰度 10%", "灰度 50%", "全量", "观察期结束"];
+
+  /* 4.3 七个发布批次（3 个大版本列车 + 4 个重点常规批次，按时序）
+         segs：st 节点名 / who 负责人 / dur 耗时(min) / k 段类型 / res 结果 / det 结果明细
+               pct 该段线上流量占比(%) —— 仅承流量的段有；err 该段实测错误率(%)
+               rb  回滚标记（该段流量回落，单调性自检对其豁免）；rbTo 回环指向的节点下标
+         ba ：发布前 7 天 vs 发布后 7 天 —— [前, 后]，窗口自「全量完成」切分
+         mix：[需求数, 缺陷修复数, 技术优化数]，Σ = 变更条目总数（现算）
+         ver：四域版本号 [软件, 硬件, 云端, AI]，主号与集成基线逐字
+         ev ：该批次发布窗口内引发的线上事件（0~3 条），等级/影响时长与父页口径同源 */
+  const BATCHES = [
+    {
+      id: "R26.2", kind: "major", t0: "2026-02-26 09:00", users: 2860, result: "成功",
+      scope: "智家终端固件 + 云平台联动", note: "大版本列车 · 已发布",
+      segs: [
+        { st: "代码冻结",   who: "张启明 · 发布经理", dur: 180, k: "freeze", res: "通过", det: "四域主干冻结 · 0 例带病合入" },
+        { st: "构建打包",   who: "陆珉 · CI 平台组",  dur: 96,  k: "build",  res: "通过", det: "制品 R26.2-b417 · 签名归档" },
+        { st: "预发验证",   who: "苏黎 · 测试中心",   dur: 214, k: "verify", res: "通过", det: "回归 1,286 例 · 0 阻断" },
+        { st: "灰度 10%",   who: "韩越 · SRE 值班",   dur: 120, k: "gray",   res: "通过", det: "错误率 0.30% · 无告警", pct: 10,  err: 0.30 },
+        { st: "灰度 50%",   who: "韩越 · SRE 值班",   dur: 150, k: "gray",   res: "通过", det: "错误率 0.28% · P99 回落", pct: 50,  err: 0.28 },
+        { st: "全量",       who: "韩越 · SRE 值班",   dur: 92,  k: "full",   res: "通过", det: "100% 放量 · 无回滚",     pct: 100, err: 0.27 },
+        { st: "观察期结束", who: "周迭 · 值班组",     dur: 480, k: "watch",  res: "通过", det: "8 h 观察 · 1 起 P3 尾随", pct: 100, err: 0.26 }
+      ],
+      ba: { err: [0.34, 0.26], p99: [428, 392], qps: [18.6, 19.4], av: [99.951, 99.962] },
+      mix: [42, 68, 21], ver: ["SW 26.2.0", "HW 26.2.0", "CLOUD 26.2.0", "AI 26.2.0"],
+      ev: [
+        { t: "02-26 20:41", lv: "P3", sys: "OTA 分发服务", min: 26, why: "灰度 50% 期 CDN 回源超时，切备用源站" }
+      ]
+    },
+    {
+      id: "R26.2.3", kind: "patch", t0: "2026-03-19 10:00", users: 2880, result: "成功",
+      scope: "智家终端固件补丁 + 网关限流", note: "常规批次 · R26.2 列车补丁",
+      segs: [
+        { st: "代码冻结",   who: "张启明 · 发布经理", dur: 60,  k: "freeze", res: "通过", det: "补丁分支冻结 · 40 条变更" },
+        { st: "构建打包",   who: "陆珉 · CI 平台组",  dur: 38,  k: "build",  res: "通过", det: "制品 R26.2.3-b092" },
+        { st: "预发验证",   who: "苏黎 · 测试中心",   dur: 96,  k: "verify", res: "通过", det: "回归 412 例 · 0 阻断" },
+        { st: "灰度 10%",   who: "韩越 · SRE 值班",   dur: 60,  k: "gray",   res: "通过", det: "错误率 0.26% · 平稳",   pct: 10,  err: 0.26 },
+        { st: "灰度 50%",   who: "韩越 · SRE 值班",   dur: 72,  k: "gray",   res: "通过", det: "错误率 0.25% · 平稳",   pct: 50,  err: 0.25 },
+        { st: "全量",       who: "韩越 · SRE 值班",   dur: 40,  k: "full",   res: "通过", det: "100% 放量 · 无回滚",   pct: 100, err: 0.24 },
+        { st: "观察期结束", who: "周迭 · 值班组",     dur: 240, k: "watch",  res: "通过", det: "4 h 观察 · 零告警",     pct: 100, err: 0.24 }
+      ],
+      ba: { err: [0.26, 0.24], p99: [392, 386], qps: [19.4, 19.6], av: [99.962, 99.964] },
+      mix: [8, 27, 5], ver: ["SW 26.2.3", "HW 26.2.0", "CLOUD 26.2.1", "AI 26.2.0"],
+      ev: []
+    },
+    {
+      id: "R26.4", kind: "major", t0: "2026-04-30 08:30", users: 3120, result: "成功 · 带尾随缺陷",
+      scope: "云枢 3.0 主干合入", note: "大版本列车 · 已发布",
+      segs: [
+        { st: "代码冻结",   who: "张启明 · 发布经理", dur: 210, k: "freeze", res: "通过", det: "云枢 3.0 主干合入冻结" },
+        { st: "构建打包",   who: "陆珉 · CI 平台组",  dur: 118, k: "build",  res: "通过", det: "制品 R26.4-b503 · 多架构" },
+        { st: "预发验证",   who: "苏黎 · 测试中心",   dur: 268, k: "verify", res: "通过", det: "回归 1,584 例 · 2 例降级放行" },
+        { st: "灰度 10%",   who: "韩越 · SRE 值班",   dur: 150, k: "gray",   res: "通过", det: "错误率 0.29% · 阈内",     pct: 10,  err: 0.29 },
+        { st: "灰度 50%",   who: "韩越 · SRE 值班",   dur: 186, k: "gray",   res: "观察", det: "错误率抬升至 0.33% · 未越线", pct: 50, err: 0.33, bad: true },
+        { st: "全量",       who: "韩越 · SRE 值班",   dur: 104, k: "full",   res: "通过", det: "100% 放量 · 连接池扩容",  pct: 100, err: 0.32 },
+        { st: "观察期结束", who: "周迭 · 值班组",     dur: 720, k: "watch",  res: "通过", det: "12 h 观察 · 2 起尾随事件", pct: 100, err: 0.31 }
+      ],
+      ba: { err: [0.24, 0.31], p99: [386, 455], qps: [19.6, 21.2], av: [99.964, 99.955] },
+      mix: [56, 74, 29], ver: ["SW 26.4.0", "HW 26.4.0", "CLOUD 26.4.0", "AI 26.4.0"],
+      ev: [
+        { t: "04-30 22:18", lv: "P3", sys: "云枢 API 网关", min: 34, why: "灰度 50% 期连接池耗尽，扩容 60 节点恢复" },
+        { t: "05-01 06:52", lv: "P4", sys: "运营监控看板", min: 17, why: "观察期指标写入积压，自愈重放" }
+      ]
+    },
+    {
+      id: "R26.4.2", kind: "patch", t0: "2026-05-21 10:00", users: 3150, result: "成功",
+      scope: "云枢 3.0 性能回收 + 连接池治理", note: "常规批次 · R26.4 列车补丁",
+      segs: [
+        { st: "代码冻结",   who: "张启明 · 发布经理", dur: 66,  k: "freeze", res: "通过", det: "性能回收分支冻结" },
+        { st: "构建打包",   who: "陆珉 · CI 平台组",  dur: 42,  k: "build",  res: "通过", det: "制品 R26.4.2-b118" },
+        { st: "预发验证",   who: "苏黎 · 测试中心",   dur: 108, k: "verify", res: "通过", det: "回归 486 例 + 压测 2 轮" },
+        { st: "灰度 10%",   who: "韩越 · SRE 值班",   dur: 66,  k: "gray",   res: "通过", det: "错误率 0.27% · 已回落",  pct: 10,  err: 0.27 },
+        { st: "灰度 50%",   who: "韩越 · SRE 值班",   dur: 84,  k: "gray",   res: "通过", det: "错误率 0.24% · P99 −81ms", pct: 50, err: 0.24 },
+        { st: "全量",       who: "韩越 · SRE 值班",   dur: 46,  k: "full",   res: "通过", det: "100% 放量 · 无回滚",     pct: 100, err: 0.23 },
+        { st: "观察期结束", who: "周迭 · 值班组",     dur: 300, k: "watch",  res: "通过", det: "5 h 观察 · 1 起 P4",      pct: 100, err: 0.22 }
+      ],
+      ba: { err: [0.31, 0.22], p99: [455, 374], qps: [21.2, 21.5], av: [99.955, 99.966] },
+      mix: [6, 31, 4], ver: ["SW 26.4.2", "HW 26.4.0", "CLOUD 26.4.1", "AI 26.4.2"],
+      ev: [
+        { t: "05-21 15:36", lv: "P4", sys: "设备接入集群", min: 13, why: "灰度 50% 期长连接重连抖动，限流后自愈" }
+      ]
+    },
+    {
+      id: "R26.6", kind: "major", t0: "2026-07-02 08:30", users: 3420, result: "成功 · 带尾随缺陷",
+      scope: "AIoT 模组 + 边缘模型同步", note: "大版本列车 · 集成中",
+      segs: [
+        { st: "代码冻结",   who: "张启明 · 发布经理", dur: 198, k: "freeze", res: "通过", det: "AIoT 模组 + 边缘模型冻结" },
+        { st: "构建打包",   who: "陆珉 · CI 平台组",  dur: 132, k: "build",  res: "通过", det: "制品 R26.6-b611 · 含边缘镜像" },
+        { st: "预发验证",   who: "苏黎 · 测试中心",   dur: 246, k: "verify", res: "通过", det: "回归 1,462 例 · 硬件在环 38 台" },
+        { st: "灰度 10%",   who: "韩越 · SRE 值班",   dur: 138, k: "gray",   res: "通过", det: "错误率 0.26% · 阈内",     pct: 10,  err: 0.26 },
+        { st: "灰度 50%",   who: "韩越 · SRE 值班",   dur: 174, k: "gray",   res: "观察", det: "边缘节点 OOM 告警 3 次",  pct: 50,  err: 0.28, bad: true },
+        { st: "全量",       who: "韩越 · SRE 值班",   dur: 96,  k: "full",   res: "通过", det: "100% 放量 · 权重回退兜底", pct: 100, err: 0.26 },
+        { st: "观察期结束", who: "周迭 · 值班组",     dur: 600, k: "watch",  res: "通过", det: "10 h 观察 · 1 起 P2 尾随", pct: 100, err: 0.25 }
+      ],
+      ba: { err: [0.22, 0.25], p99: [374, 368], qps: [21.5, 23.8], av: [99.966, 99.959] },
+      mix: [48, 61, 26], ver: ["SW 26.6.0", "HW 26.6.0", "CLOUD 26.6.0", "AI 26.6.0"],
+      ev: [
+        { t: "07-02 21:07", lv: "P2", sys: "模型推理网关", min: 63, why: "御风边缘模型热加载 OOM，回退上一权重恢复" }
+      ]
+    },
+    {
+      id: "R26.6.1", kind: "patch", t0: "2026-08-06 10:00", users: 3460, result: "成功",
+      scope: "边缘模型显存治理 + OTA 分发提速", note: "常规批次 · R26.6 列车补丁",
+      segs: [
+        { st: "代码冻结",   who: "张启明 · 发布经理", dur: 54,  k: "freeze", res: "通过", det: "显存治理分支冻结" },
+        { st: "构建打包",   who: "陆珉 · CI 平台组",  dur: 36,  k: "build",  res: "通过", det: "制品 R26.6.1-b076" },
+        { st: "预发验证",   who: "苏黎 · 测试中心",   dur: 88,  k: "verify", res: "通过", det: "回归 366 例 · 边缘在环 12 台" },
+        { st: "灰度 10%",   who: "韩越 · SRE 值班",   dur: 54,  k: "gray",   res: "通过", det: "错误率 0.23% · 平稳",   pct: 10,  err: 0.23 },
+        { st: "灰度 50%",   who: "韩越 · SRE 值班",   dur: 66,  k: "gray",   res: "通过", det: "错误率 0.22% · 显存 −31%", pct: 50, err: 0.22 },
+        { st: "全量",       who: "韩越 · SRE 值班",   dur: 38,  k: "full",   res: "通过", det: "100% 放量 · 无回滚",   pct: 100, err: 0.21 },
+        { st: "观察期结束", who: "周迭 · 值班组",     dur: 240, k: "watch",  res: "通过", det: "4 h 观察 · 零告警",     pct: 100, err: 0.21 }
+      ],
+      ba: { err: [0.25, 0.21], p99: [368, 351], qps: [23.8, 24.2], av: [99.959, 99.964] },
+      mix: [5, 19, 6], ver: ["SW 26.6.1", "HW 26.6.0", "CLOUD 26.6.1", "AI 26.6.0"],
+      ev: []
+    },
+    {
+      id: "R26.6.3", kind: "patch", t0: "2026-08-18 17:00", users: 3480, result: "回滚后重发成功",
+      scope: "网关灰度批次配置热修", note: "常规批次 · 含 1 次回滚回环",
+      segs: [
+        { st: "代码冻结",     who: "张启明 · 发布经理", dur: 60,  k: "freeze",   res: "通过",   det: "热修分支冻结 · 19 条变更" },
+        { st: "构建打包",     who: "陆珉 · CI 平台组",  dur: 42,  k: "build",    res: "通过",   det: "制品 R26.6.3-b031" },
+        { st: "预发验证",     who: "苏黎 · 测试中心",   dur: 96,  k: "verify",   res: "通过",   det: "回归 288 例 · 0 阻断" },
+        { st: "灰度 10%",     who: "韩越 · SRE 值班",   dur: 74,  k: "gray",     res: "异常",   det: "网关 5xx 抬升至 1.42%",  pct: 10,  err: 1.42, bad: true },
+        { st: "回滚",         who: "韩越 · SRE 值班",   dur: 18,  k: "rollback", res: "已回滚", det: "流量切回 R26.6-rc3",     pct: 0,   err: 0.31, rb: true, rbTo: 3 },
+        { st: "缺陷修复复验", who: "顾行 · 网关后端",   dur: 126, k: "fix",      res: "通过",   det: "灰度批次配置项修正 + 复验", pct: 0, err: 0.21 },
+        { st: "灰度 10%（重）", who: "韩越 · SRE 值班", dur: 60,  k: "gray",     res: "通过",   det: "错误率 0.22% · 已恢复",  pct: 10,  err: 0.22 },
+        { st: "灰度 50%",     who: "韩越 · SRE 值班",   dur: 90,  k: "gray",     res: "通过",   det: "错误率 0.20% · 平稳",    pct: 50,  err: 0.20 },
+        { st: "全量",         who: "韩越 · SRE 值班",   dur: 48,  k: "full",     res: "通过",   det: "100% 放量 · 二次成功",   pct: 100, err: 0.19 },
+        { st: "观察期结束",   who: "周迭 · 值班组",     dur: 360, k: "watch",    res: "通过",   det: "6 h 观察 · 无新增告警",  pct: 100, err: 0.18 }
+      ],
+      ba: { err: [0.21, 0.18], p99: [351, 342], qps: [24.2, 24.6], av: [99.964, 99.968] },
+      mix: [2, 14, 3], ver: ["SW 26.6.3", "HW 26.6.0", "CLOUD 26.6.2", "AI 26.6.1"],
+      ev: [
+        { t: "08-18 21:07", lv: "P2", sys: "云枢 API 网关", min: 58, why: "灰度批次配置错误 → 回滚 R26.6-rc3" },
+        { t: "08-19 01:34", lv: "P4", sys: "构建制品库",   min: 11, why: "复验期制品拉取限流，重试后恢复" }
+      ]
+    }
+  ];
+
+  /* 4.4 前后对比四指标口径（betterLow = 越低越好；pp = 用百分点表达差值） */
+  const METRICS = [
+    { key: "err", name: "错误率",   unit: "%",   dec: 2, betterLow: true,  pp: false },
+    { key: "p99", name: "P99 时延", unit: "ms",  dec: 0, betterLow: true,  pp: false },
+    { key: "qps", name: "QPS",      unit: "万/s", dec: 1, betterLow: false, pp: false },
+    { key: "av",  name: "可用性",   unit: "%",   dec: 3, betterLow: false, pp: true  }
+  ];
+  const MIX_NAMES  = ["需求", "缺陷修复", "技术优化"];
+  const MIX_COLORS = [C.blue, C.orange, C.cyan];
+  const DOMAINS    = ["软件域", "硬件域", "云端域", "AI 域"];
+  const DOM_COLORS = [C.blue, C.cyan, C.violet, C.green];
+  const LV_BADGE   = { P1: "is-p0", P2: "is-p1", P3: "is-p2", P4: "is-p3" };
+  const LV_COLOR   = { P1: C.red, P2: C.orange, P3: C.amber, P4: C.blue };
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+
+  /* 5.1 时刻推演：t0 + 累计耗时 → "MM-DD HH:MM"（逐段首尾时刻由耗时现算，不另写一份） */
+  function stampOf(t0, addMin) {
+    const d = new Date(
+      Number(t0.slice(0, 4)), Number(t0.slice(5, 7)) - 1, Number(t0.slice(8, 10)),
+      Number(t0.slice(11, 13)), Number(t0.slice(14, 16))
+    );
+    d.setMinutes(d.getMinutes() + addMin);
+    return pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  }
+  const minsOfStamp = (s) => (Number(s.slice(0, 2)) * 31 + Number(s.slice(3, 5))) * 1440 +
+                             Number(s.slice(6, 8)) * 60 + Number(s.slice(9, 11));
+
+  BATCHES.forEach((b, bi) => {
+    b.i = bi;
+    b.month = b.t0.slice(5, 7);
+    b.dateTxt = b.t0.slice(0, 10);
+    /* 逐段累计：cum0 起始偏移 / cum1 结束偏移 / at 起始时刻 / to 结束时刻 */
+    let acc = 0;
+    b.segs.forEach((s, si) => {
+      s.i = si; s.cum0 = acc; acc += s.dur; s.cum1 = acc;
+      s.at = stampOf(b.t0, s.cum0); s.to = stampOf(b.t0, s.cum1);
+      s.color = KIND[s.k].c;
+    });
+    b.total = acc;                                             /* 发布总时长 = Σ 各段耗时 */
+    b.gray  = sum(b.segs.filter((s) => s.k === "gray").map((s) => s.dur));
+    b.rollbacks = b.segs.filter((s) => s.rb).length;
+    b.endAt = stampOf(b.t0, b.total);
+    b.longest = b.segs.slice().sort((x, y) => y.dur - x.dur)[0];
+
+    /* 灰度放量阶梯：只取承流量的段，每段吐出首尾两点 → 天然阶梯，跨度恒等于这些段的 Σ 耗时 */
+    b.ramp = [];                                               /* [相对分钟, 流量占比%, 错误率%] */
+    b.rampSeg = [];                                            /* 与 ramp 段一一对应的段下标 */
+    let base = null;
+    b.segs.forEach((s) => {
+      if (s.pct == null) return;
+      if (base === null) base = s.cum0;
+      b.ramp.push([s.cum0 - base, s.pct, s.err]);
+      b.ramp.push([s.cum1 - base, s.pct, s.err]);
+      b.rampSeg.push(s.i);
+    });
+    b.rampBase = base;
+    b.rampSpan = b.ramp.length ? b.ramp[b.ramp.length - 1][0] : 0;
+    b.errMax = Math.max.apply(null, b.ramp.map((p) => p[2]));
+    b.pctSeq = b.rampSeg.map((si) => b.segs[si].pct);
+    b.rbFlags = b.rampSeg.map((si) => !!b.segs[si].rb);
+
+    /* 内容构成：三类 Σ = 变更条目总数 */
+    b.mixTotal = sum(b.mix);
+
+    /* 前后对比：逐指标现算改善/恶化与变化幅度 */
+    b.deltas = METRICS.map((m) => {
+      const v0 = b.ba[m.key][0], v1 = b.ba[m.key][1];
+      const better = m.betterLow ? v1 < v0 : v1 > v0;
+      const worse  = m.betterLow ? v1 > v0 : v1 < v0;
+      const rel = v0 === 0 ? 0 : 100 * (v1 - v0) / v0;
+      return { key: m.key, name: m.name, unit: m.unit, dec: m.dec, pp: m.pp,
+               v0: v0, v1: v1, better: better, worse: worse, rel: rel, abs: v1 - v0 };
+    });
+    b.nBetter = b.deltas.filter((d) => d.better).length;
+    b.nWorse  = b.deltas.filter((d) => d.worse).length;
+    b.topGain = b.deltas.filter((d) => d.better).sort((x, y) => Math.abs(y.rel) - Math.abs(x.rel))[0] || null;
+    b.topLoss = b.deltas.filter((d) => d.worse).sort((x, y) => Math.abs(y.rel) - Math.abs(x.rel))[0] || null;
+
+    /* 事件维度 */
+    b.evN = b.ev.length;
+    b.evMin = sum(b.ev.map((e) => e.min));
+    b.evTop = b.ev.slice().sort((x, y) => (x.lv < y.lv ? -1 : x.lv > y.lv ? 1 : 0))[0] || null;
+
+    b.avAfter = b.ba.av[1];
+    b.avGap = b.avAfter - SLO_TARGET;                          /* 高于 SLO 目标多少个百分点 */
+  });
+
+  const LATEST = BATCHES.length - 1;                           /* 默认展示最新批次 R26.6.3 */
+  const D = {};
+  D.nBatch   = BATCHES.length;
+  D.nMajor   = BATCHES.filter((b) => b.kind === "major").length;
+  D.majorIds = BATCHES.filter((b) => b.kind === "major").map((b) => b.id);
+  D.rbTotal  = sum(BATCHES.map((b) => b.rollbacks));
+  D.mixAvg   = MIX_NAMES.map((n, k) => sum(BATCHES.map((b) => b.mix[k])) / BATCHES.length);
+  D.evAll    = sum(BATCHES.map((b) => b.evN));
+  D.durAll   = sum(BATCHES.map((b) => b.total));
+  /* 事件按其自身发生月份归集（观察期跨月的事件计入其真实月份），与父页逐月事件数比对 */
+  D.evByMonth = {};
+  BATCHES.forEach((b) => b.ev.forEach((e) => {
+    const m = e.t.slice(0, 2);
+    D.evByMonth[m] = (D.evByMonth[m] || 0) + 1;
+  }));
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("xq-clock-time").textContent = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+    $("xq-clock-date").textContent = d.getFullYear() + "年" + pad2(d.getMonth() + 1) + "月" + pad2(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 7. 批次切换器 chip（hash 契约目标） ===== */
+  const bbox = $("xq-bchips");
+  bbox.innerHTML = BATCHES.map((b, i) => (
+    '<button class="xq-bchip" type="button" data-i="' + i + '" style="--xq-cc:' +
+      (b.kind === "major" ? C.amber : C.blue) + '" title="' + b.scope + '">' +
+      "<u>" + b.id + "</u>" +
+      '<s style="border:1px solid ' + (b.kind === "major" ? "rgba(255,194,77,.5)" : "rgba(92,157,255,.4)") +
+        ";color:" + (b.kind === "major" ? C.amber : C.blue) + '">' + (b.kind === "major" ? "大版本" : "常规") + "</s>" +
+      "<i>" + b.dateTxt.slice(5) + " · " + fmtInt(b.total) + " min</i>" +
+    "</button>"
+  )).join("");
+  const bchips = Array.from(bbox.children);
+
+  /* ===== 8. 单批次 HTML 渲染（★ 全部在 echarts.init 之前先跑一遍，兄弟块填充完毕） ===== */
+  let curIdx = LATEST;
+  const cur = () => BATCHES[curIdx];
+
+  function renderHead(b) {
+    $("xq-meta-id").textContent = b.id;
+    $("xq-meta-date").textContent = b.dateTxt + "（" + b.note + "）";
+    $("xq-meta-nodes").textContent = b.segs.length;
+    $("xq-chip-av").textContent = fmtDec(b.avAfter, 3) + "%";
+    $("xq-switch-state").innerHTML = "当前 <em>" + b.id + "</em> · " + b.scope +
+      "<i>|</i>发布窗口 <b>" + b.segs[0].at + " → " + b.endAt + "</b>" +
+      "<i>|</i>回滚 <b>" + b.rollbacks + "</b> 次<i>|</i>全 " + D.nBatch + " 批次 Σ <b>" +
+      fmtInt(D.durAll) + "</b> min";
+    bchips.forEach((el, i) => {
+      const on = i === b.i;
+      const col = BATCHES[i].kind === "major" ? C.amber : C.blue;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? col : "";
+      el.style.borderColor = on ? col : "";
+    });
+  }
+
+  /* KPI 八格：前七格翻牌缓动，末格为「变更结果」文本徽章 */
+  function kpisOf(b) {
+    const okResult = b.rollbacks === 0;
+    return [
+      { k: "发布时长", v: b.total, dec: 0, unit: "min", color: C.blue,
+        s: fmtDec(b.total / 60, 1) + " h · " + b.segs.length + " 段 Σ 现算" },
+      { k: "灰度时长", v: b.gray, dec: 0, unit: "min", color: C.green,
+        s: "占全程 " + fmtDec(100 * b.gray / b.total, 1) + "% · 含重新灰度" },
+      { k: "回滚次数", v: b.rollbacks, dec: 0, unit: "次", color: b.rollbacks ? C.orange : C.green,
+        s: b.rollbacks ? "灰度期触发回环 · 修复后重发" : "全程无回环 · 一次放量到位" },
+      { k: "变更条目", v: b.mixTotal, dec: 0, unit: "条", color: C.violet,
+        s: "需求 " + b.mix[0] + " + 缺陷 " + b.mix[1] + " + 技优 " + b.mix[2] },
+      { k: "影响用户数", v: b.users, dec: 0, unit: "万", color: C.cyan,
+        s: "全量后覆盖设备 / 用户口径" },
+      { k: "发布后可用性", v: b.avAfter, dec: 3, unit: "%", color: b.avGap > 0 ? C.green : C.red,
+        s: "SLO 目标 " + fmtDec(SLO_TARGET, 2) + "% · 高出 " + fmtDec(b.avGap * 1000, 1) + "‱" },
+      { k: "发布期事件", v: b.evN, dec: 0, unit: "起", color: b.evN ? C.amber : C.green,
+        s: b.evN ? "Σ 影响 " + fmtInt(b.evMin) + " min · 最高 " + b.evTop.lv : "窗口内零线上事件" },
+      { k: "变更结果", txt: b.result, color: okResult ? C.green : C.orange,
+        s: okResult ? "一次通过 · 无回滚" : "回滚 " + b.rollbacks + " 次后重发成功" }
+    ];
+  }
+  function renderKpis(b) {
+    const KP = kpisOf(b);
+    $("xq-kpis").innerHTML = KP.map((p, i) => (
+      '<div class="xq-kpi" style="--xq-kc:' + p.color + '">' +
+        '<div class="xq-kpi-k">' + p.k + "</div>" +
+        '<div class="xq-kpi-v">' +
+          (p.txt ? "<em>" + p.txt + "</em>"
+                 : '<b id="xq-kpi-' + i + '">0</b><s>' + p.unit + "</s>") +
+        "</div>" +
+        '<div class="xq-kpi-s">' + p.s + "</div>" +
+      "</div>"
+    )).join("");
+    /* 翻牌缓动：easeOutCubic，1.0 秒收敛（截图验收请等收敛后再判勾稽） */
+    KP.forEach((p, i) => {
+      if (p.txt) return;
+      const el = $("xq-kpi-" + i), dur = 1000, t0 = performance.now();
+      (function step(now) {
+        const q = Math.min(1, (now - t0) / dur);
+        const e = 1 - Math.pow(1 - q, 3);
+        el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+        if (q < 1) requestAnimationFrame(step);
+        else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+      })(t0);
+    });
+  }
+
+  /* 四域版本条（写死高度 42px，与内容构成图同属一个 flex 容器） */
+  function renderVers(b) {
+    $("xq-vers").innerHTML = DOMAINS.map((d, k) => (
+      '<div class="xq-ver"><span>' + d + '</span><b style="color:' + DOM_COLORS[k] + '">' + b.ver[k] + "</b></div>"
+    )).join("");
+  }
+
+  /* 发布期事件清单（0 条走空态） */
+  function renderEvents(b) {
+    const list = $("xq-evlist");
+    $("xq-ev-tag").innerHTML = b.evN
+      ? "<b>" + b.evN + "</b> 起 · Σ 影响 <b>" + fmtInt(b.evMin) + "</b> min · 上限 " +
+        PARENT_INC[b.month] + " 起（父页 " + b.month + " 月）"
+      : "窗口内 <b>0</b> 起 · 父页 " + b.month + " 月共 " + PARENT_INC[b.month] + " 起";
+    if (!b.evN) {
+      list.innerHTML = '<div class="xq-evempty"><b>发布窗口内零线上事件</b>' +
+        "<span>观察期 " + fmtDec(b.segs[b.segs.length - 1].dur / 60, 1) + " h 无新增告警 · 变更结果「" +
+        b.result + "」</span></div>";
+      return;
+    }
+    list.innerHTML = b.ev.map((e) => (
+      '<li><span class="xq-ev-t">' + e.t + "</span>" +
+      '<span class="xq-badge ' + LV_BADGE[e.lv] + '">' + e.lv + "</span>" +
+      '<span class="xq-ev-sys">' + e.sys + "</span>" +
+      '<span class="xq-ev-why">' + e.why + "</span>" +
+      '<span class="xq-ev-min" style="color:' + LV_COLOR[e.lv] + '">' + e.min + " min</span></li>"
+    )).join("");
+  }
+
+  /* 复盘结论：4 条，全部由本批次派生量现算 */
+  function conclusionsOf(b) {
+    const L = b.longest;
+    const gainTxt = b.topGain
+      ? "最大改善「" + b.topGain.name + "」" + fmtDec(Math.abs(b.topGain.rel), 1) + "%"
+      : "无改善项";
+    const lossTxt = b.topLoss
+      ? "，最大恶化「" + b.topLoss.name + "」" + fmtDec(Math.abs(b.topLoss.rel), 1) + "%"
+      : "，无恶化项";
+    const out = [
+      { k: "节奏", c: C.blue, t: "发布总时长 <b>" + fmtInt(b.total) + "</b> min（" + fmtDec(b.total / 60, 1) +
+          " h），灰度 <b>" + fmtInt(b.gray) + "</b> min 占 <b>" + fmtDec(100 * b.gray / b.total, 1) +
+          "%</b>；最长节点「" + L.st + "」" + fmtInt(L.dur) + " min，独占全程 <b>" +
+          fmtDec(100 * L.dur / b.total, 1) + "%</b>，是压缩发布窗口的首选靶点。" },
+      { k: "效果", c: b.nWorse ? C.orange : C.green, t: "前后 7 天四项指标 <b>" + b.nBetter +
+          "</b> 项改善 / <b>" + b.nWorse + "</b> 项恶化：" + gainTxt + lossTxt +
+          "；发布后可用性 <b>" + fmtDec(b.avAfter, 3) + "%</b>，较 SLO 目标 " + fmtDec(SLO_TARGET, 2) +
+          "% 高出 <b>" + fmtDec(b.avGap * 1000, 1) + "‱</b>。" },
+      { k: "内容", c: C.violet, t: "变更条目 <b>" + fmtInt(b.mixTotal) + "</b> 条 = 需求 " + b.mix[0] +
+          " + 缺陷修复 " + b.mix[1] + " + 技术优化 " + b.mix[2] + "，缺陷修复占 <b>" +
+          fmtDec(100 * b.mix[1] / b.mixTotal, 1) + "%</b>（7 批次均值 " +
+          fmtDec(100 * D.mixAvg[1] / sum(D.mixAvg), 1) + "%）；四域版本 " + b.ver.join(" / ") + "。" },
+      { k: "稳定性", c: b.rollbacks ? C.orange : C.green, t: b.rollbacks
+          ? "灰度期错误率触顶 <b>" + fmtDec(b.errMax, 2) + "%</b> 触发 <b>" + b.rollbacks +
+            "</b> 次回滚回环，修复复验 " + fmtInt(sum(b.segs.filter((s) => s.k === "fix").map((s) => s.dur))) +
+            " min 后重新灰度并二次全量；窗口内线上事件 <b>" + b.evN + "</b> 起、Σ 影响 <b>" +
+            fmtInt(b.evMin) + "</b> min，未超父页 " + b.month + " 月 " + PARENT_INC[b.month] + " 起的口径上限。"
+          : "全程零回滚，灰度期错误率峰值 <b>" + fmtDec(b.errMax, 2) + "%</b>；窗口内线上事件 <b>" +
+            b.evN + "</b> 起" + (b.evN ? "、Σ 影响 <b>" + fmtInt(b.evMin) + "</b> min" : "") +
+            "，未超父页 " + b.month + " 月 " + PARENT_INC[b.month] + " 起的口径上限。" }
+    ];
+    return out;
+  }
+  function renderSummary(b) {
+    const items = conclusionsOf(b);
+    $("xq-sum-tag").innerHTML = "<b>" + items.length + "</b> 条 · 全部由本批次派生量现算";
+    $("xq-sumlist").innerHTML = items.map((s, i) => (
+      '<div class="xq-sum" style="--xq-sc:' + s.c + ";animation-delay:" + (i * 55) + 'ms">' +
+        '<div class="xq-sum-k">' + s.k + "<u>#" + (i + 1) + "</u></div>" +
+        '<div class="xq-sum-t">' + s.t + "</div>" +
+      "</div>"
+    )).join("");
+  }
+
+  function renderTags(b) {
+    $("xq-tl-tag").innerHTML = "Σ 各段耗时 <b>" + fmtInt(b.total) + "</b> min = 发布总时长 · " +
+      b.segs.length + " 节点 · 回滚 <u>" + b.rollbacks + "</u> 次 · 下带真实时间比例带";
+    $("xq-gray-tag").innerHTML = "跨度 <b>" + fmtInt(b.rampSpan) + "</b> min · 末值 <b>" +
+      b.ramp[b.ramp.length - 1][1] + "%</b> · 错误率峰值 <u>" + fmtDec(b.errMax, 2) + "%</u>";
+    $("xq-ba-tag").innerHTML = "<b>" + b.nBetter + "</b> 改善 / <u>" + b.nWorse +
+      "</u> 恶化 · 窗口自「全量完成」切分";
+    $("xq-mix-tag").innerHTML = "Σ <b>" + fmtInt(b.mixTotal) + "</b> 条 · 灰底为 7 批次均值";
+  }
+
+  function renderHtml(b) {
+    renderHead(b); renderKpis(b); renderVers(b);
+    renderEvents(b); renderSummary(b); renderTags(b);
+  }
+
+  /* =====================================================================
+     9. 主视觉：发布时间线（custom）
+     坐标系用 0~100 的归一化 x/y（隐藏轴），一切几何在 renderItem 内换算成像素：
+       y  0~12 回滚回环弧 / 13~70 节点卡片 / 70~80 连接线 / 80~91 真实时间比例带 / 91~100 刻度
+     上排「等宽节点卡片」保证 7~10 个节点的文字永远排得下；
+     下排「真实时间比例带」保留耗时的真实比例，两排由连接线一一对应。
+     ★ 进 option 的 data 只有下标标量数组，几何全部从闭包里的 TL_VIEW（纯标量）取。
+     ===================================================================== */
+  let TL_VIEW = [];
+  const Y_CARD_T = 13, Y_CARD_B = 70, Y_LINK_B = 80, Y_BAND_T = 80, Y_BAND_B = 91, Y_ARC = 2.5;
+
+  function buildTlView(b) {
+    const n = b.segs.length;
+    const slotW = 100 / n;
+    const maxDur = Math.max.apply(null, b.segs.map((s) => s.dur));
+    TL_VIEW = b.segs.map((s, i) => ({
+      i: i, name: s.st, at: s.at, dur: s.dur, who: s.who, res: s.res, det: s.det,
+      color: s.color, bad: !!s.bad, rb: !!s.rb, rbTo: s.rbTo == null ? -1 : s.rbTo,
+      cx: (i + 0.5) * slotW, w: slotW - 0.7,
+      durPct: s.dur / maxDur,
+      x0: 100 * s.cum0 / b.total, x1: 100 * s.cum1 / b.total,
+      share: 100 * s.dur / b.total,
+      kindLabel: KIND[s.k].label
+    }));
+    return TL_VIEW;
+  }
+
+  function tlText(x, y, s, fill, size, weight, align, w, mono) {
+    const st = {
+      text: s, x: x, y: y, fill: fill, fontSize: size, fontWeight: weight || 400,
+      fontFamily: mono ? '"Bahnschrift","DIN Alternate","PingFang SC",sans-serif'
+                       : '"PingFang SC","Microsoft YaHei",sans-serif',
+      align: align || "left", verticalAlign: "top"
+    };
+    if (w) { st.width = w; st.overflow = "truncate"; }
+    return { type: "text", silent: true, style: st };
+  }
+
+  function renderTlItem(params, api) {
+    const i = api.value(0);
+    const V = TL_VIEW[i];
+    if (!V) return null;
+    const P = (x, y) => api.coord([x, y]);
+    const cl = P(V.cx - V.w / 2, 0)[0], cr = P(V.cx + V.w / 2, 0)[0];
+    const ct = P(0, Y_CARD_T)[1], cb = P(0, Y_CARD_B)[1];
+    const cw = cr - cl, chh = cb - ct;
+    const inner = cw - 20;
+    const kids = [];
+
+    /* 卡片底 + 左侧色条 */
+    kids.push({ type: "rect", shape: { x: cl, y: ct, width: cw, height: chh, r: 8 },
+      style: { fill: "rgba(14,26,66,.62)", stroke: V.bad ? "rgba(255,157,92,.6)" : "rgba(96,140,255,.24)", lineWidth: 1 } });
+    kids.push({ type: "rect", shape: { x: cl, y: ct, width: 3.5, height: chh, r: 2 },
+      style: { fill: V.color } });
+
+    /* 序号胶囊 + 阶段类型 */
+    kids.push({ type: "rect", shape: { x: cl + 10, y: ct + 8, width: 34, height: 15, r: 4 },
+      style: { fill: V.color, opacity: 0.9 } });
+    kids.push(tlText(cl + 27, ct + 10, (i + 1) + " " + V.kindLabel, "#071026", 10, 700, "center"));
+
+    /* 阶段名 / 时刻 / 耗时条 / 负责人 / 结果 / 明细 */
+    kids.push(tlText(cl + 50, ct + 8, V.name, "#eaf1ff", 13, 700, "left", cw - 60));
+    kids.push(tlText(cl + 10, ct + 30, V.at, "#a9bce4", 11.5, 700, "left", inner, true));
+    const barY = ct + 49;
+    kids.push({ type: "rect", shape: { x: cl + 10, y: barY, width: inner * 0.58, height: 6, r: 3 },
+      style: { fill: "rgba(96,140,255,.16)" } });
+    kids.push({ type: "rect", shape: { x: cl + 10, y: barY, width: Math.max(3, inner * 0.58 * V.durPct), height: 6, r: 3 },
+      style: { fill: V.color } });
+    kids.push(tlText(cr - 10, barY - 4, fmtInt(V.dur) + " min", V.color, 11.5, 700, "right", null, true));
+    kids.push(tlText(cl + 10, ct + 66, V.who, "rgba(127,146,196,.92)", 10.5, 400, "left", inner));
+    const resColor = V.res === "通过" ? C.green : V.res === "观察" ? C.amber : C.orange;
+    kids.push(tlText(cl + 10, ct + 84, V.res, resColor, 11.5, 700, "left", inner));
+    kids.push(tlText(cl + 10, ct + 101, V.det, "rgba(191,210,246,.86)", 10.5, 400, "left", inner));
+
+    /* 连接线：卡片底中 → 比例带对应段中 */
+    const bandCx = (V.x0 + V.x1) / 2;
+    const p1 = P(V.cx, Y_CARD_B), p2 = P(V.cx, Y_CARD_B + 4);
+    const p3 = P(bandCx, Y_LINK_B - 3), p4 = P(bandCx, Y_BAND_T);
+    kids.push({ type: "polyline", silent: true,
+      shape: { points: [p1, p2, p3, p4] },
+      style: { stroke: "rgba(96,140,255,.42)", lineWidth: 1, fill: "none" } });
+
+    /* 真实时间比例带 */
+    const bl = P(V.x0, 0)[0], br = P(V.x1, 0)[0];
+    const bt = P(0, Y_BAND_T)[1], bb = P(0, Y_BAND_B)[1];
+    kids.push({ type: "rect", shape: { x: bl + 0.6, y: bt, width: Math.max(1.4, br - bl - 1.2), height: bb - bt, r: 2 },
+      style: { fill: V.color, opacity: V.rb ? 1 : 0.72 } });
+    if (br - bl > 34) {
+      kids.push(tlText((bl + br) / 2, bt + 3, fmtDec(V.share, 1) + "%", "#071026", 10, 700, "center"));
+    }
+
+    /* ★ 回滚回环：橙色虚线从回滚卡片顶部绕回被回滚的灰度节点，箭头落回该卡片 */
+    if (V.rb && V.rbTo >= 0 && TL_VIEW[V.rbTo]) {
+      const T = TL_VIEW[V.rbTo];
+      const a1 = P(V.cx, Y_CARD_T), a2 = P(V.cx, Y_ARC), a3 = P(T.cx, Y_ARC), a4 = P(T.cx, Y_CARD_T - 1.2);
+      kids.push({ type: "polyline", silent: true, shape: { points: [a1, a2, a3, a4] },
+        style: { stroke: C.orange, lineWidth: 2, fill: "none", lineDash: [6, 4] } });
+      kids.push({ type: "polygon", silent: true,
+        shape: { points: [[a4[0], a4[1] + 8], [a4[0] - 5, a4[1] - 2], [a4[0] + 5, a4[1] - 2]] },
+        style: { fill: C.orange } });
+      kids.push(tlText((a2[0] + a3[0]) / 2, a2[1] - 12,
+        "回滚回环 · 流量切回 → 修复复验 → 重新灰度", C.orange, 11.5, 700, "center"));
+    }
+    return { type: "group", children: kids };
+  }
+
+  function tlOption(b) {
+    buildTlView(b);
+    return {
+      backgroundColor: "transparent",
+      animation: true, animationDuration: 420, animationEasing: "cubicOut",
+      grid: { left: 8, right: 8, top: 4, bottom: 2 },
+      xAxis: { type: "value", min: 0, max: 100, show: false },
+      yAxis: { type: "value", min: 0, max: 100, show: false, inverse: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const V = TL_VIEW[p.data[0]];
+          if (!V) return "";
+          return '<b style="color:' + V.color + '">' + (V.i + 1) + " · " + V.name + "</b><br/>" +
+            "起 <b>" + V.at + "</b> · 耗时 <b>" + fmtInt(V.dur) + "</b> min（占全程 " + fmtDec(V.share, 1) + "%）<br/>" +
+            "负责人 " + V.who + "<br/>结果 <b>" + V.res + "</b> · " + V.det;
+        }
+      }, TIP),
+      series: [{
+        type: "custom", name: "发布时间线", clip: false,
+        data: b.segs.map((s, i) => [i]),
+        renderItem: renderTlItem
+      }]
+    };
+  }
+
+  /* =====================================================================
+     10. 灰度放量曲线：流量占比阶梯（左轴）× 期间错误率（右轴）
+     阶梯点由时间线的承流量段现算（每段吐首尾两点），跨度恒等于这些段的 Σ 耗时；
+     回滚段用橙色 markArea 标注，并在图例注明「单调性口径对回落段豁免」。
+     ===================================================================== */
+  function grayOption(b) {
+    const xs = b.ramp.map((p) => p[0]);
+    const pctData = b.ramp.map((p) => [p[0], p[1]]);
+    const errData = b.ramp.map((p) => [p[0], p[2]]);
+    const rbSeg = b.segs.filter((s) => s.rb)[0] || null;
+    const fixSegs = b.segs.filter((s) => s.k === "fix");
+    const areas = [];
+    if (rbSeg) {
+      const a0 = rbSeg.cum0 - b.rampBase;
+      const a1 = (fixSegs.length ? fixSegs[fixSegs.length - 1].cum1 : rbSeg.cum1) - b.rampBase;
+      areas.push([{ xAxis: a0, itemStyle: { color: "rgba(255,157,92,.16)" },
+                    label: { show: true, color: C.orange, fontSize: 10.5, fontWeight: 700,
+                             position: "insideTop", formatter: "回滚 + 修复复验" } },
+                  { xAxis: a1 }]);
+    }
+    const errMaxAxis = Math.max(0.5, Math.ceil(b.errMax * 10) / 10 + 0.1);
+    return {
+      backgroundColor: "transparent",
+      animationDuration: 460,
+      grid: { left: 6, right: 10, top: 30, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "line", lineStyle: { color: "rgba(92,157,255,.5)" } },
+        formatter: (ps) => {
+          if (!ps.length) return "";
+          const m = ps[0].data[0];
+          const seg = b.segs.filter((s) => s.pct != null &&
+            (m + b.rampBase) >= s.cum0 && (m + b.rampBase) <= s.cum1)[0];
+          let h = "<b>灰度第 " + fmtInt(m) + " min</b>";
+          if (seg) h += "（" + seg.st + " · " + seg.at + "）";
+          h += "<br/>流量占比 <b style=\"color:" + C.green + "\">" + ps[0].data[1] + "%</b>";
+          if (ps[1]) h += "<br/>期间错误率 <b style=\"color:" + C.orange + "\">" + fmtDec(ps[1].data[1], 2) + "%</b>";
+          if (seg && seg.rb) h += '<br/><span style="color:' + C.orange + '">回落段（单调性自检已豁免）</span>';
+          return h;
+        }
+      }, TIP),
+      legend: { top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 12,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["流量占比", "期间错误率"] },
+      xAxis: {
+        type: "value", min: 0, max: Math.max.apply(null, xs), name: "min",
+        nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      yAxis: [
+        { type: "value", min: 0, max: 100, name: "流量 %", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10 },
+          splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+        { type: "value", min: 0, max: errMaxAxis, name: "错误率 %", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          axisLabel: { color: C.textDim, fontSize: 10, formatter: (v) => fmtDec(v, 2) },
+          splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "流量占比", type: "line", data: pctData, symbol: "circle", symbolSize: 5,
+          lineStyle: { width: 2.6, color: C.green }, itemStyle: { color: C.green },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "rgba(111,224,154,.34)" }, { offset: 1, color: "rgba(111,224,154,.03)" }]) },
+          markArea: areas.length ? { silent: true, data: areas } : undefined,
+          markLine: { symbol: "none", silent: true,
+            lineStyle: { color: "rgba(92,157,255,.55)", type: "dashed", width: 1.4 },
+            label: { color: C.blue, fontSize: 10.5, fontWeight: 700, position: "insideEndTop", formatter: "全量 100%" },
+            data: [{ yAxis: 100 }] } },
+        { name: "期间错误率", type: "line", yAxisIndex: 1, data: errData, smooth: false,
+          symbol: "circle", symbolSize: 5, z: 6,
+          lineStyle: { width: 2.2, color: C.orange }, itemStyle: { color: C.orange },
+          /* ★ 数据是 [x, y] 二维点，markPoint 的极值必须显式指定 valueDim，否则会按 x 取极值 */
+          markPoint: { symbolSize: 42, symbol: "pin", data: [{ type: "max", name: "峰值", valueDim: "y" }],
+            itemStyle: { color: b.errMax > 1 ? C.red : C.amber },
+            label: { color: "#071026", fontSize: 10, fontWeight: 700,
+              formatter: (p) => fmtDec(p.value, 2) } } }
+      ]
+    };
+  }
+
+  /* =====================================================================
+     11. 发布前后对比：哑铃图（custom）
+     四指标各自量纲不同，按「该指标前后两值 ± 35% 余量」映射到统一 x 段 [20, 62]，
+     实际数值与变化幅度以文字标在右侧；恶化项整行标红。
+     ===================================================================== */
+  let BA_VIEW = [];
+  function buildBaView(b) {
+    BA_VIEW = b.deltas.map((d) => {
+      const lo = Math.min(d.v0, d.v1), hi = Math.max(d.v0, d.v1);
+      const span = (hi - lo) || Math.abs(hi) * 0.02 || 1;
+      const a = lo - span * 0.35, z = hi + span * 0.35;
+      const map = (v) => 20 + 42 * (v - a) / (z - a);
+      return { name: d.name, unit: d.unit, dec: d.dec, pp: d.pp,
+               v0: d.v0, v1: d.v1, x0: map(d.v0), x1: map(d.v1),
+               better: d.better, worse: d.worse, rel: d.rel, abs: d.abs };
+    });
+    return BA_VIEW;
+  }
+  function renderBaItem(params, api) {
+    const i = api.value(0);
+    const V = BA_VIEW[i];
+    if (!V) return null;
+    const y = api.coord([0, i])[1];
+    const px = (x) => api.coord([x, i])[0];
+    const col = V.worse ? C.red : V.better ? C.green : C.textDim;
+    const kids = [];
+    kids.push({ type: "rect", silent: true,
+      shape: { x: px(2), y: y - 19, width: px(99) - px(2), height: 38, r: 7 },
+      style: { fill: V.worse ? "rgba(96,26,38,.28)" : "rgba(14,26,66,.42)" } });
+    /* 连杆 + 前后两点 */
+    kids.push({ type: "line", silent: true,
+      shape: { x1: px(V.x0), y1: y, x2: px(V.x1), y2: y },
+      style: { stroke: col, lineWidth: 5, opacity: 0.5, lineCap: "round" } });
+    kids.push({ type: "circle", silent: true, shape: { cx: px(V.x0), cy: y, r: 6 },
+      style: { fill: "rgba(8,18,49,.95)", stroke: "rgba(127,146,196,.9)", lineWidth: 2 } });
+    kids.push({ type: "circle", silent: true, shape: { cx: px(V.x1), cy: y, r: 7 },
+      style: { fill: col, stroke: "rgba(8,18,49,.9)", lineWidth: 1.5 } });
+    /* 数值 */
+    kids.push(tlText(px(V.x0), y - 22, fmtDec(V.v0, V.dec), "rgba(169,188,228,.95)", 10.5, 700, "center", null, true));
+    kids.push(tlText(px(V.x1), y + 10, fmtDec(V.v1, V.dec), col, 11.5, 700, "center", null, true));
+    /* 右侧：前 → 后 与变化幅度 */
+    kids.push(tlText(px(66), y - 13, "前 " + fmtDec(V.v0, V.dec) + " → 后 " + fmtDec(V.v1, V.dec) + " " + V.unit,
+      "rgba(191,210,246,.9)", 11, 400, "left", px(99) - px(66), true));
+    const arrow = V.abs > 0 ? "▲" : V.abs < 0 ? "▼" : "＝";
+    const deltaTxt = V.pp
+      ? arrow + " " + fmtDec(Math.abs(V.abs) * 1000, 1) + "‱"
+      : arrow + " " + fmtDec(Math.abs(V.rel), 1) + "%";
+    kids.push(tlText(px(66), y + 3, deltaTxt + "　" + (V.worse ? "恶化" : V.better ? "改善" : "持平"),
+      col, 12.5, 700, "left", px(99) - px(66), true));
+    return { type: "group", children: kids };
+  }
+  function baOption(b) {
+    buildBaView(b);
+    return {
+      backgroundColor: "transparent",
+      animationDuration: 420,
+      grid: { left: 62, right: 6, top: 6, bottom: 2 },
+      xAxis: { type: "value", min: 0, max: 100, show: false },
+      yAxis: {
+        type: "category", data: b.deltas.map((d) => d.name),
+        axisLine: { show: false }, axisTick: { show: false },
+        splitLine: { show: false },
+        axisLabel: { color: "#cfdcff", fontSize: 12, fontWeight: 700 }
+      },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const V = BA_VIEW[p.data[0]];
+          if (!V) return "";
+          return "<b>" + V.name + "</b>（" + V.unit + "）<br/>发布前 7 天 <b>" + fmtDec(V.v0, V.dec) +
+            "</b><br/>发布后 7 天 <b>" + fmtDec(V.v1, V.dec) + "</b><br/>" +
+            (V.pp ? "差值 " + fmtDec(V.abs * 1000, 1) + "‱" : "变化 " + fmtDec(V.rel, 1) + "%") +
+            " · <b style=\"color:" + (V.worse ? C.red : C.green) + "\">" +
+            (V.worse ? "恶化" : V.better ? "改善" : "持平") + "</b>";
+        }
+      }, TIP),
+      series: [{ type: "custom", name: "前后对比",
+        data: b.deltas.map((d, i) => [i]), renderItem: renderBaItem }]
+    };
+  }
+
+  /* =====================================================================
+     12. 发布内容构成：三类横向条（需求 / 缺陷修复 / 技术优化）
+     灰底 ghost 条 = 7 批次均值，给单批次一个横向参照；三类 Σ = 变更条目总数。
+     ===================================================================== */
+  function mixOption(b) {
+    const maxV = Math.max(Math.max.apply(null, b.mix), Math.max.apply(null, D.mixAvg)) * 1.22;
+    return {
+      backgroundColor: "transparent",
+      animationDuration: 420,
+      grid: { left: 4, right: 46, top: 4, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + MIX_NAMES[i] + "</b><br/>本批次 <b style=\"color:" + MIX_COLORS[i] + "\">" +
+            b.mix[i] + "</b> 条（占 " + fmtDec(100 * b.mix[i] / b.mixTotal, 1) + "%）<br/>" +
+            "7 批次均值 " + fmtDec(D.mixAvg[i], 1) + " 条";
+        }
+      }, TIP),
+      xAxis: { type: "value", min: 0, max: maxV, show: false },
+      yAxis: {
+        type: "category", data: MIX_NAMES, inverse: true,
+        axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+        axisLabel: { color: "#cfdcff", fontSize: 11.5, fontWeight: 700 }
+      },
+      series: [
+        { name: "7 批次均值", type: "bar", barGap: "-100%", barWidth: 17, z: 1, silent: true,
+          data: D.mixAvg.map((v) => r1(v)),
+          itemStyle: { color: "rgba(96,140,255,.14)", borderRadius: [0, 4, 4, 0] },
+          label: { show: true, position: "right", distance: 4, color: "rgba(127,146,196,.75)",
+            fontSize: 10, formatter: (p) => "均 " + fmtDec(p.value, 1) } },
+        { name: "本批次", type: "bar", barWidth: 11, z: 3,
+          data: b.mix.map((v, i) => ({ value: v, itemStyle: { color: MIX_COLORS[i], borderRadius: [0, 3, 3, 0] } })),
+          label: { show: true, position: "insideRight", distance: 6, color: "#071026",
+            fontSize: 11, fontWeight: 700, formatter: (p) => p.value } }
+      ]
+    };
+  }
+
+  /* ===== 13. hash 契约：父页 P12「发布列车节奏日历热力」面板级入口 → 子页#批次号
+         归一化（decodeURIComponent + trim + 全角空白剔除）后查 HASH_ALIAS；
+         收「R26.2」「26.2」「R262」「r26.2」「R26.2 批次 / 发布 / 版本」等写法。 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  BATCHES.forEach((b, i) => {
+    const id = b.id;                       /* "R26.2" */
+    const num = id.slice(1);               /* "26.2"  */
+    const idNo = id.replace(/\./g, "");    /* "R262"  */
+    const numNo = num.replace(/\./g, "");  /* "262"   */
+    [id, num, idNo, numNo].forEach((base) => {
+      [base, base.toLowerCase(), base.toUpperCase()].forEach((k) => {
+        alias(k, i);
+        ["批次", "发布", "版本", "发布批次", "批次复盘", "发布复盘", "列车"].forEach((sfx) => alias(k + sfx, i));
+      });
+    });
+  });
+  /* 面板级入口可能直接把面板名或「最新 / 全部」传进来 → 落最新批次 */
+  ["发布列车节奏日历热力", "发布列车", "最新", "最新批次", "全部", "ALL", "all"].forEach((k) => alias(k, LATEST));
+
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                        /* trim + 全角空白剔除归一化 */
+    if (!raw) return -1;
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(i) {
+    const want = "#" + encodeURIComponent(BATCHES[i].id);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 14. 切换主流程：单一入口刷新 chip / KPI / 四图 / 清单 / 结论 ===== */
+  let chTl = null, chGray = null, chBa = null, chMix = null;
+  function renderCharts(b) {
+    if (!chTl) return;
+    chTl.setOption(tlOption(b), true);
+    chGray.setOption(grayOption(b), true);
+    chBa.setOption(baOption(b), true);
+    chMix.setOption(mixOption(b), true);
+  }
+  function applyBatch(i, pushHash) {
+    curIdx = clamp(i, 0, BATCHES.length - 1);
+    const b = cur();
+    renderHtml(b);
+    renderCharts(b);
+    if (pushHash) syncHash(curIdx);
+  }
+  bchips.forEach((el) => el.addEventListener("click", () => {
+    applyBatch(Number(el.dataset.i), true);
+    pauseRotate(20000);
+  }));
+
+  /* hash 定位：命中批次则切换并闪烁对应 chip，暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    const idx = hit < 0 ? LATEST : hit;
+    applyBatch(idx, false);
+    if (hit >= 0) {
+      const chip = bchips[idx];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                   /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+      pauseRotate(20000);
+    }
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发云端服务与发布1920.html";
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { location.href = UP_HREF; return; }
+    if (e.key === "ArrowLeft") {
+      applyBatch((curIdx - 1 + BATCHES.length) % BATCHES.length, true); pauseRotate(20000);
+    } else if (e.key === "ArrowRight") {
+      applyBatch((curIdx + 1) % BATCHES.length, true); pauseRotate(20000);
+    }
+  });
+
+  /* ===== 15. kiosk 轮巡：13 秒切一个批次；hash 定位 / 手动点击 / ←→ 后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil) return;
+    applyBatch((curIdx + 1) % BATCHES.length, true);
+  }, 13000);
+
+  /* ===== 16. 初始渲染：★ 先把全部兄弟 DOM 填充完，再 init 图表 ===== */
+  renderHtml(cur());
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  chTl   = echarts.init($("xq-chart-timeline"));
+  chGray = echarts.init($("xq-chart-gray"));
+  chBa   = echarts.init($("xq-chart-ba"));
+  chMix  = echarts.init($("xq-chart-mix"));
+  applyBatch(curIdx, false);
+  locateByHash();                                              /* 初始解析 hash（无 hash 落最新批次） */
+
+  /* ===== 17. 底部口径条（D 型定义 / 与 A·B·C 型的区别 / 与兄弟页 rz 的分工 / 契约引用） ===== */
+  const NOTES = [
+    { lv: "D 型", c: C.amber, t: "本页是「时序复盘」型子页：按**时间窗**（一次发布批次自代码冻结到观察期结束）组织，" +
+        "主视觉是事件流时间轴 + 发布前后 7 天对比，回答「这一次发布从准备到收尾发生了什么」。" },
+    { lv: "型别差异", c: C.blue, t: "A 型「对象切换器」看单个对象的 360 度截面；B 型「台账筛选」看全量明细 + 单条穿透；" +
+        "C 型「横向对比」把 N 个对象摆一起 PK；D 型横轴是**时刻**不是对象，纵深是**过程**不是属性——" +
+        "同一批数据在 A/B/C 里是「谁怎么样」，在 D 里是「先后发生了什么、哪一步最贵、前后变了多少」。" },
+    { lv: "兄弟页分工", c: C.cyan, t: "姊妹子页「线上事件台账」（rz，同父页）做的是**全年 116 起事件按 P1~P4 等级筛选 + 单事件五段处置**" +
+        "（事件视角 · 全年跨度）；本页做的是**单次发布批次的完整复盘**（发布视角 · 一次窗口）。" +
+        "两页在 2026-08-18 21:07 的 P2 事件上逐字对齐：云枢 API 网关 · 58 min · 灰度批次配置错误 → 回滚 R26.6-rc3。" },
+    { lv: "契约口径", c: C.violet, t: "SLO 目标 " + fmtDec(SLO_TARGET, 2) + "% / 达成 " + fmtDec(SLO_ACT, 3) +
+        "%、变更失败率 " + fmtDec(DORA_FAIL, 1) + "%、MTTR " + DORA_MTTR + " min、部署频率 " + DORA_DEPLOY +
+        " 次/日 均引自契约 §2.2；四域版本主号与 §2.3 四条集成基线 " + BASELINES.join(" / ") +
+        " 逐字对应，R26.8 规划中尚无发布批次，故不在本页。" },
+    { lv: "抽样口径", c: C.green, t: "本页 " + D.nBatch + " 个批次 = " + D.nMajor + " 个大版本列车（" +
+        "双月一班 · 固定周四 · 班距 " + TRAIN_GAP_W + " 周 · 前 " + FREEZE_DAYS +
+        " 天冻结窗口，与父页发布列车节奏日历热力逐字）+ " + (D.nBatch - D.nMajor) +
+        " 个重点常规批次，**非全年全量**；故本页回滚 " + D.rbTotal + " 次的占比与契约变更失败率 " +
+        fmtDec(DORA_FAIL, 1) + "%（全环境部署口径、部署频率 " + DORA_DEPLOY + " 次/日）**不直接勾稽**。" },
+    { lv: "单调性口径", c: C.orange, t: "灰度阶梯流量占比在「同一次放量过程内」单调不减；R26.6.3 因灰度 10% 期错误率抬升至 1.42% 触发回滚，" +
+        "流量回落至 0% 后修复复验、重新灰度——该回落段已单独标记（橙色回环 + markArea），并在页尾单调性自检中显式豁免。" },
+    { lv: "窗口口径", c: C.textDim, t: "「发布后 7 天」自**全量完成**起算，灰度期事件计入变更失败与本页发布期事件，不计入发布后可用性；" +
+        "批次事件按其**自身发生月份**归集后与父页逐月事件数比对（观察期跨月的事件计入其真实月份）。" }
+  ];
+  const track = $("xq-foot-track");
+  const noteHtml = NOTES.map((a) => (
+    '<div class="xq-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' +
+    a.t.replace(/\*\*(.+?)\*\*/g, '<b style="color:#fff">$1</b>') + "</em></div>"
+  )).join("");
+  track.innerHTML = noteHtml + noteHtml;                        /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.62;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 18. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try {
+    BATCHES.forEach((b) => {
+      JSON.stringify(tlOption(b)); JSON.stringify(grayOption(b));
+      JSON.stringify(baOption(b)); JSON.stringify(mixOption(b));
+    });
+  } catch (e) {
+    optAcyclic = false;
+    console.error("[单发布批次复盘] option 存在循环引用：", e.message);
+  }
+  buildTlView(cur()); buildBaView(cur());                       /* 环检测跑完把视图还原到当前批次 */
+
+  const checks = [
+    ["时间线各段耗时 Σ = 发布总时长（逐批次）",
+      BATCHES.every((b) => sum(b.segs.map((s) => s.dur)) === b.total && b.total > 0)],
+    ["每批次含七个标准节点（回滚批次额外插入回滚 / 修复 / 重新灰度）",
+      BATCHES.every((b) => {
+        const names = b.segs.map((s) => s.st);
+        return STD_NODES.every((n) => names.some((x) => x.indexOf(n) === 0)) &&
+               b.segs.length >= STD_NODES.length;
+      })],
+    ["时间线节点时刻严格递增，且首节点时刻 = 批次起始时刻",
+      BATCHES.every((b) => b.segs[0].at === stampOf(b.t0, 0) &&
+        b.segs.every((s, i) => i === 0 || minsOfStamp(s.at) > minsOfStamp(b.segs[i - 1].at)))],
+    ["灰度时长 = Σ 灰度段耗时，且 0 < 灰度时长 < 发布总时长（逐批次）",
+      BATCHES.every((b) => b.gray === sum(b.segs.filter((s) => s.k === "gray").map((s) => s.dur)) &&
+        b.gray > 0 && b.gray < b.total)],
+    ["灰度阶梯流量占比单调不减（回滚回落段按口径豁免）",
+      BATCHES.every((b) => b.pctSeq.every((v, i) => i === 0 || v >= b.pctSeq[i - 1] || b.rbFlags[i]))],
+    ["灰度阶梯末值 = 100%，且阶梯跨度 = 承流量各段 Σ 耗时",
+      BATCHES.every((b) => {
+        const span = sum(b.segs.filter((s) => s.pct != null).map((s) => s.dur));
+        return b.ramp[b.ramp.length - 1][1] === 100 && b.rampSpan === span;
+      })],
+    ["灰度阶梯末点错误率 = 发布后 7 天错误率（现算衔接）",
+      BATCHES.every((b) => Math.abs(b.ramp[b.ramp.length - 1][2] - b.ba.err[1]) < 1e-9)],
+    ["发布内容三类 Σ = 变更条目总数（逐批次）",
+      BATCHES.every((b) => b.mix.length === 3 && sum(b.mix) === b.mixTotal && b.mixTotal > 0)],
+    ["7 批次三类均值之和 = 7 批次变更条目总数 ÷ 7",
+      Math.abs(sum(D.mixAvg) - sum(BATCHES.map((b) => b.mixTotal)) / BATCHES.length) < 1e-9],
+    ["发布后可用性均不低于契约 SLO 目标 99.95%",
+      BATCHES.every((b) => b.avAfter >= SLO_TARGET)],
+    ["最新批次发布后可用性 = 契约 SLO 达成 99.968%",
+      Math.abs(BATCHES[LATEST].avAfter - SLO_ACT) < 1e-9],
+    ["三个大版本批次号与契约集成基线逐字（R26.2 / R26.4 / R26.6）",
+      D.majorIds.length === 3 && D.majorIds.every((id, i) => id === BASELINES[i]) &&
+      D.majorIds.every((id) => BASELINES.indexOf(id) >= 0)],
+    ["大版本四域版本号主号 = 该基线号 + .0（四域逐字对齐集成基线）",
+      BATCHES.filter((b) => b.kind === "major").every((b) => {
+        const want = b.id.slice(1) + ".0";
+        return b.ver.length === 4 && b.ver.every((v) => v.split(" ")[1] === want);
+      })],
+    ["常规批次四域版本主号落在其所属大版本列车内（前两位一致）",
+      BATCHES.filter((b) => b.kind === "patch").every((b) => {
+        const train = b.id.slice(1).split(".").slice(0, 2).join(".");
+        return b.ver.every((v) => v.split(" ")[1].indexOf(train + ".") === 0);
+      })],
+    ["批次事件数 ≤ 父页该月事件数（按事件自身月份归集）",
+      Object.keys(D.evByMonth).every((m) => PARENT_INC[m] !== undefined && D.evByMonth[m] <= PARENT_INC[m])],
+    ["事件等级 ∈ 父页 P1~P4，影响时长为正，且时刻落在批次窗口内",
+      BATCHES.every((b) => b.ev.every((e) =>
+        LV_BADGE[e.lv] !== undefined && e.min > 0 &&
+        minsOfStamp(e.t) >= minsOfStamp(b.segs[0].at) && minsOfStamp(e.t) <= minsOfStamp(b.endAt)))],
+    ["2026-08-18 21:07 P2 事件与父页最近事件清单逐字（云枢 API 网关 · 58 min）",
+      (function () {
+        const e = BATCHES[LATEST].ev.filter((x) => x.t === "08-18 21:07")[0];
+        return !!e && e.lv === "P2" && e.sys === "云枢 API 网关" && e.min === 58 &&
+               e.why.indexOf("回滚 R26.6-rc3") >= 0;
+      })()],
+    ["回滚只发生在 R26.6.3，且该批次回滚 1 次、其余批次 0 次",
+      D.rbTotal === 1 && BATCHES[LATEST].rollbacks === 1 &&
+      BATCHES.slice(0, LATEST).every((b) => b.rollbacks === 0)],
+    ["回滚段流量占比 = 0% 且回环指向的正是被回滚的灰度节点",
+      BATCHES.every((b) => b.segs.filter((s) => s.rb).every((s) =>
+        s.pct === 0 && b.segs[s.rbTo] && b.segs[s.rbTo].k === "gray"))],
+    ["相邻批次前后窗口链式衔接：后窗口 == 下一批次前窗口（4 指标 × 6 对）",
+      BATCHES.every((b, i) => i === 0 || METRICS.every((m) =>
+        Math.abs(BATCHES[i - 1].ba[m.key][1] - b.ba[m.key][0]) < 1e-9))],
+    ["前后对比改善 / 恶化计数之和 ≤ 4，且与逐指标判定一致（逐批次）",
+      BATCHES.every((b) => b.nBetter + b.nWorse <= METRICS.length &&
+        b.nBetter === b.deltas.filter((d) => d.better).length)],
+    ["影响用户数随批次时序单调不减（覆盖面随版本推进扩大）",
+      BATCHES.every((b, i) => i === 0 || b.users >= BATCHES[i - 1].users)],
+    ["发布列车参数与父页逐字（班距 9 周 / 冻结 3 天）且三大版本均落在周四",
+      TRAIN_GAP_W === 9 && FREEZE_DAYS === 3 &&
+      BATCHES.filter((b) => b.kind === "major").every((b) => {
+        const d = new Date(Number(b.t0.slice(0, 4)), Number(b.t0.slice(5, 7)) - 1, Number(b.t0.slice(8, 10)));
+        return d.getDay() === 4;
+      })],
+    ["大版本班距 = 9 周（R26.2 → R26.4 → R26.6 各隔 63 天）",
+      (function () {
+        const ms = BATCHES.filter((b) => b.kind === "major").map((b) =>
+          new Date(Number(b.t0.slice(0, 4)), Number(b.t0.slice(5, 7)) - 1, Number(b.t0.slice(8, 10))).getTime());
+        return ms.every((t, i) => i === 0 || Math.round((t - ms[i - 1]) / 86400000) === TRAIN_GAP_W * 7);
+      })()],
+    ["契约 DORA 三值逐字引用（失败率 8.4% / MTTR 42 min / 部署频率 14.2 次-日）",
+      DORA_FAIL === 8.4 && DORA_MTTR === 42 && DORA_DEPLOY === 14.2],
+    ["hash 批次号各写法均可解析（R26.2 / 26.2 / R262 / r26.2 / R26.2批次）",
+      HASH_ALIAS["R26.2"] === 0 && HASH_ALIAS["26.2"] === 0 && HASH_ALIAS["R262"] === 0 &&
+      HASH_ALIAS["r26.2"] === 0 && HASH_ALIAS["R26.2批次"] === 0 &&
+      HASH_ALIAS["R26.4"] === 2 && HASH_ALIAS["R26.6"] === 4 &&
+      HASH_ALIAS["R26.6.3"] === LATEST && HASH_ALIAS["发布列车节奏日历热力"] === LATEST],
+    ["批次号唯一且大版本号与常规批次号不互相覆盖",
+      (new Set(BATCHES.map((b) => b.id))).size === BATCHES.length &&
+      (new Set(BATCHES.map((b) => b.id.replace(/\./g, "")))).size === BATCHES.length],
+    ["复盘结论固定 3~4 条且全部有正文（逐批次现算）",
+      BATCHES.every((b) => {
+        const cs = conclusionsOf(b);
+        return cs.length >= 3 && cs.length <= 4 && cs.every((c) => c.t && c.t.length > 10);
+      })],
+    ["图表 option 无循环引用（JSON.stringify 环检测，四图 × 七批次）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单发布批次复盘] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
