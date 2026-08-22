@@ -1,0 +1,1269 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发物料认证台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --zl-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：物料编号 / 物料名 / 类别 / 供应商 / 当前阶段 / 四阶段进度 / 预计完成日 / 风险 */
+    --zl-tcols: 100px 150px 52px 116px 92px 1fr 100px 56px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .zl-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 157, 92, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 640px;
+    grid-template-rows: 84px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .zl-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .zl-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .zl-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .zl-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 157, 92, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 157, 92, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .zl-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .zl-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .zl-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .zl-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .zl-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到硬件与样机，琥珀描边与本页星蓝主色区分 */
+  .zl-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .zl-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .zl-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .zl-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .zl-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .zl-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .zl-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .zl-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .zl-chips { display: flex; align-items: center; gap: 9px; }
+  .zl-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 122px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .zl-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .zl-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .zl-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .zl-chip.is-key b { color: var(--rnd-blue); }
+  .zl-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .zl-clock-time { font: 700 26px/1 var(--zl-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .zl-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 筛选条：一级 = 认证阶段（送样/测试/认证/量产准入）+ 二级 = 风险等级 ===== */
+  .zl-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .zl-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .zl-schip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 6px 14px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13.5px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .zl-schip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .zl-schip b { font: 700 14px/1 var(--zl-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .zl-schip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .zl-schip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .zl-schip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .zl-schip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .zl-schip.is-hit { animation: zl-hit 0.9s ease-in-out 2; }
+  @keyframes zl-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--zl-cc, rgba(92, 157, 255, 0.8)); } }
+  .zl-fdiv { flex: none; width: 1px; height: 24px; margin: 0 4px; background: rgba(96, 140, 255, 0.28); }
+  .zl-rchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 4px 11px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .zl-rchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .zl-rchip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .zl-rchip.is-on { color: #071026; font-weight: 700; }
+  .zl-rchip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  .zl-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .zl-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .zl-filters-state em { font-style: normal; color: #d3e2ff; }
+  .zl-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .zl-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .zl-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .zl-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--zl-kc, var(--rnd-blue)); }
+  .zl-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .zl-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .zl-kpi-v b { font: 700 24px/1 var(--zl-mono); color: var(--zl-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .zl-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .zl-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .zl-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .zl-row { flex: 1; display: flex; gap: 14px; min-height: 0; min-width: 0; }
+  .zl-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .zl-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .zl-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .zl-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .zl-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .zl-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .zl-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .zl-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：460px = 面板内衬 + 表头 + 13 行 × 28px，tbody overflow hidden 防撑破 */
+  .zl-panel.is-ledger { flex: none; height: 460px; min-height: 0; overflow: hidden; }
+  /* ★ 流转区由 JS 填充（选中行联动重绘），与热力图同属 .zl-col 一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .zl-panel.is-flow { flex: none; height: 396px; min-height: 0; overflow: hidden; }
+  .zl-panel.is-funnel { flex: none; width: 330px; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .zl-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .zl-thead, .zl-tbody li {
+    display: grid; grid-template-columns: var(--zl-tcols); align-items: center; gap: 8px;
+  }
+  .zl-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .zl-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .zl-tbody li {
+    padding: 0 8px; height: 28px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: zl-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes zl-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .zl-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .zl-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .zl-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .zl-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .zl-tbody li .zl-code { font: 700 11.5px/1 var(--zl-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.03em; }
+  .zl-tbody li .zl-name { color: #dfe9ff; }
+  .zl-tbody li .zl-name u { text-decoration: none; margin-left: 5px; font-size: 10px; color: rgba(255, 194, 77, 0.85); }
+  .zl-tbody li .zl-cat { font-size: 11.5px; }
+  .zl-tbody li .zl-sup { font-size: 11.5px; color: #bfd2f6; }
+  .zl-tbody li .zl-eta { font-size: 11.5px; color: #a9bce4; }
+  .zl-badge {
+    padding: 2px 7px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  /* 当前阶段四档 */
+  .zl-badge.is-s0 { color: #041b3a; background: var(--rnd-blue); }
+  .zl-badge.is-s1 { color: #04302c; background: var(--rnd-cyan); }
+  .zl-badge.is-s2 { color: #3a2a05; background: var(--rnd-amber); }
+  .zl-badge.is-s3 { color: #063a25; background: var(--rnd-green); }
+  /* 风险三档 */
+  .zl-badge.is-r0 { color: #3d060c; background: var(--rnd-red); }
+  .zl-badge.is-r1 { color: #3a1c05; background: var(--rnd-orange); }
+  .zl-badge.is-r2 { border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+  /* 四阶段进度微条 */
+  .zl-prog { display: flex; align-items: center; gap: 6px; }
+  .zl-ps { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; }
+  .zl-ps-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .zl-ps-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .zl-ps em { flex: none; width: 22px; text-align: right; font-style: normal; font-size: 10.5px; }
+  .zl-prog > b { flex: none; width: 52px; text-align: right; font: 700 12px/1 var(--zl-mono); }
+
+  /* ===== 右上：单物料认证流转（纯 HTML/CSS） ===== */
+  .zl-fl-head { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 7px 10px 8px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 8px; min-height: 62px; }
+  .zl-fl-no { display: flex; align-items: center; gap: 9px; }
+  .zl-fl-no b { font: 700 13px/1 var(--zl-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .zl-fl-title { font-size: 13px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zl-fl-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zl-fl-sub b { font-weight: 700; color: #c9d8f8; }
+  .zl-fl-bar { flex: none; display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; background: rgba(14, 26, 66, 0.5); }
+  .zl-fl-seg { position: relative; min-width: 16px; }
+  .zl-fl-seg + .zl-fl-seg { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .zl-fl-seg.is-cur {
+    background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px) !important;
+    animation: zl-breath 1.6s ease-in-out infinite;
+  }
+  @keyframes zl-breath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+  .zl-fl-list { flex: none; height: 112px; display: flex; flex-direction: column; }
+  .zl-fl-row { flex: 1; display: grid; grid-template-columns: 74px 1fr 78px; align-items: center; gap: 10px; padding: 0 4px; border-radius: 5px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .zl-fl-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .zl-fl-row b { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.04em; }
+  .zl-fl-row b::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--zl-pc, var(--rnd-blue)); }
+  .zl-fl-row.is-todo b { color: rgba(127, 146, 196, 0.6); }
+  .zl-fl-row.is-todo b::before { opacity: 0.3; }
+  .zl-fl-row span { color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zl-fl-row em { font-style: normal; text-align: right; font: 700 13px/1 var(--zl-mono); color: var(--rnd-cyan); }
+  .zl-fl-row.is-cur em { color: var(--rnd-amber); }
+  .zl-fl-row.is-todo em { color: rgba(127, 146, 196, 0.5); }
+
+  /* 认证项清单 */
+  .zl-ci { flex: none; height: 122px; margin-top: 8px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .zl-ci-head { flex: none; display: flex; align-items: baseline; justify-content: space-between; font-size: 11.5px; color: #8aa8e8; letter-spacing: 0.06em; margin-bottom: 5px; }
+  .zl-ci-head b { font-weight: 700; color: var(--rnd-amber); font-variant-numeric: tabular-nums; }
+  .zl-ci-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 26px; gap: 5px 10px; }
+  .zl-ci-item {
+    display: flex; align-items: center; gap: 7px; padding: 0 8px; border-radius: 5px;
+    font-size: 11.5px; color: #c9d8f8; background: rgba(28, 48, 112, 0.26);
+    border-left: 3px solid rgba(96, 140, 255, 0.3); overflow: hidden;
+  }
+  .zl-ci-item span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zl-ci-item i { font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; }
+  .zl-ci-item.is-pass { border-left-color: var(--rnd-green); }
+  .zl-ci-item.is-pass i { color: var(--rnd-green); }
+  .zl-ci-item.is-run { border-left-color: var(--rnd-amber); }
+  .zl-ci-item.is-run i { color: var(--rnd-amber); }
+  .zl-ci-item.is-todo { color: rgba(127, 146, 196, 0.62); }
+  .zl-ci-item.is-todo i { color: rgba(127, 146, 196, 0.5); }
+
+  /* ===== 底部滚动条 ===== */
+  .zl-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .zl-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange);
+  }
+  .zl-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: zl-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes zl-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .zl-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .zl-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .zl-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .zl-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .zl-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .zl-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="zl-stage" id="zl-stage">
+    <!-- mockflag:begin --><div class="zl-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="zl-error" id="zl-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="zl-header">
+      <div class="zl-head-left">
+        <div class="zl-crumb">
+          <a class="zl-crumb-up" href="大屏样板间-研发硬件与样机1920.html" title="返回上级专题页（Esc）">‹ 返回 硬件与样机</a>
+          <b>云麓智联科技</b><i>›</i><span>硬件与样机</span><i>›</i><em>物料认证台账</em>
+        </div>
+        <div class="zl-head-title-row">
+          <div class="zl-head-title">物料认证台账</div>
+          <div class="zl-head-meta">
+            <span>在册 <b id="zl-meta-n">--</b> 项（父页关键物料 <b id="zl-meta-key">--</b> 项 + 次要物料 <b id="zl-meta-ext">--</b> 项）</span><i>|</i>
+            <span><b>4</b> 阶段认证 · <b id="zl-meta-sup">--</b> 家供应商 · <b id="zl-meta-ci">--</b> 项认证项</span><i>|</i>
+            <span>分工：本页看<b>物料认证与供应风险</b>，良率与失效见「单样机批次详情」</span>
+          </div>
+        </div>
+      </div>
+      <div class="zl-head-right">
+        <div class="zl-chips">
+          <div class="zl-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="zl-chip is-key"><span id="zl-chip-key">综合进度 · 全部</span><b id="zl-chip-val">--</b></div>
+        </div>
+        <div class="zl-clock" aria-label="实时时钟">
+          <span class="zl-clock-time" id="zl-clock-time">--:--:--</span>
+          <span class="zl-clock-date" id="zl-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 筛选条：一级 = 认证阶段（hash 契约目标为物料名）+ 二级 = 风险等级 -->
+    <div class="zl-filters">
+      <span class="zl-filters-tag">认证阶段</span>
+      <div id="zl-schips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="zl-fdiv"></span>
+      <span class="zl-filters-tag">风险等级</span>
+      <div id="zl-rchips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="zl-filters-state" id="zl-filters-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="zl-kpis" id="zl-kpis"></div>
+
+    <!-- 左：物料认证台账（写死高度 452px = 13 行 × 28px + 表头）+ 阶段漏斗 / 周期对比 -->
+    <div class="zl-col">
+      <section class="zl-panel is-ledger">
+        <div class="zl-panel-head">
+          <h2>物料认证台账（认证阶段 × 风险等级）</h2>
+          <span class="zl-panel-tag" id="zl-table-tag">--</span>
+        </div>
+        <div class="zl-table">
+          <div class="zl-thead">
+            <span>物料编号</span><span>物料名</span><span>类别</span><span>供应商</span>
+            <span>当前阶段</span><span>送样 / 测试 / 认证 / 量产准入（%）</span><span>预计完成日</span><span>风险</span>
+          </div>
+          <ul class="zl-tbody" id="zl-tbody"></ul>
+        </div>
+      </section>
+      <div class="zl-row">
+        <section class="zl-panel is-funnel">
+          <div class="zl-panel-head">
+            <h2>阶段分布漏斗</h2>
+            <span class="zl-panel-tag" id="zl-funnel-tag">--</span>
+          </div>
+          <div class="zl-chart" id="zl-chart-funnel"></div>
+        </section>
+        <section class="zl-panel" style="flex:1;">
+          <div class="zl-panel-head">
+            <h2>认证周期对比 · 计划 vs 实际/预计</h2>
+            <span class="zl-panel-tag" id="zl-cycle-tag">--</span>
+          </div>
+          <div class="zl-chart" id="zl-chart-cycle"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- 右：单物料认证流转（四节点 + 认证项清单）+ 供应风险矩阵 -->
+    <div class="zl-col">
+      <section class="zl-panel is-flow">
+        <div class="zl-panel-head">
+          <h2>单物料认证流转</h2>
+          <span class="zl-panel-tag" id="zl-flow-tag">--</span>
+        </div>
+        <div class="zl-fl-head" id="zl-flow-headbox"></div>
+        <div class="zl-fl-bar" id="zl-flow-bar"></div>
+        <div class="zl-fl-list" id="zl-flow-list"></div>
+        <div class="zl-ci">
+          <div class="zl-ci-head"><span>认证项清单</span><span id="zl-ci-tag">--</span></div>
+          <div class="zl-ci-grid" id="zl-ci-grid"></div>
+        </div>
+      </section>
+      <section class="zl-panel" style="flex:1;">
+        <div class="zl-panel-head">
+          <h2>供应风险矩阵 · 供应商 × 风险维度</h2>
+          <span class="zl-panel-tag" id="zl-risk-tag">--</span>
+        </div>
+        <div class="zl-chart" id="zl-chart-risk"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="zl-foot">
+      <div class="zl-foot-tag">认证与供应研判</div>
+      <div class="zl-foot-view"><div class="zl-foot-track" id="zl-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("zl-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("zl-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 硬件供应链视角）
+         ★ 与父页 P10「硬件与样机」严格同源（docs/RndIpdThemed.md §5.3 P10 / §9.1 W8）：
+           父页 MATERIALS 十项关键物料的**物料名、编号、四阶段进度逐字复刻**（进页尾硬校验），
+           四阶段口径同父页「送样 / 测试 / 认证 / 量产准入，逐阶段不增，综合 = 四阶段均值」。
+         ★ 与兄弟页 S8「单样机批次详情」的分工：S8 做**单批次试制良率与失效模式**（工序良率连乘、
+           失效帕累托、批次 BOM 构成）；本页做**关键物料的认证进度与供应风险**（认证四阶段流转、
+           认证项清单、供应商风险矩阵、认证周期计划 vs 实际）。两页同属父页 P10，口径不重叠。
+         ★ 本页二级自编：3 项次要物料（台账内以「次」角标标注，均处送样阶段）、供应商与类别归属、
+           各阶段停留天数与计划周期、认证项清单、供应商三维风险打分。Σ 一律收敛到上级数。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，物料与供应商之间一律用索引 / 名称关联，
+           绝不用对象引用回指（setOption 深拷贝遇环会整页全空）。 ===== */
+
+  /* 4.1 契约锚点（与父页逐字，勿改） */
+  const CERT_STAGES = ["送样", "测试", "认证", "量产准入"];
+  const STAGE_HINT = ["样品送达 → 来料检验与初测", "全项电性能与环境测试", "第三方认证与体系审核", "小批试产 → 量产准入评审"];
+  const STAGE_COLORS = [C.blue, C.cyan, C.amber, C.green];
+  const KEY_REF = [
+    ["主控 SoC", "LX-9820", [100, 100, 100, 72]],
+    ["电源管理 IC", "PM-3308", [100, 100, 88, 40]],
+    ["温度传感器", "TS-77", [100, 100, 100, 100]],
+    ["毫米波雷达", "RD-24G", [100, 86, 42, 0]],
+    ["无线通信模组", "WM-6E", [100, 100, 95, 55]],
+    ["快充协议芯片", "CH-65W", [100, 100, 100, 86]],
+    ["镁铝中框", "MA-21", [100, 92, 60, 0]],
+    ["触控显示屏", "TP-58", [100, 100, 74, 20]],
+    ["存储器", "NAND-256", [100, 78, 30, 0]],
+    ["声学器件", "SPK-08", [100, 100, 100, 64]]
+  ];
+  const DATA_AS_OF = "2026-08-19";
+
+  /* 4.2 类别六档（主控 / 存储 / 电源 / 射频 / 结构 / 传感） */
+  const CATS = [
+    { name: "主控", color: C.blue },
+    { name: "存储", color: C.violet },
+    { name: "电源", color: C.orange },
+    { name: "射频", color: C.cyan },
+    { name: "结构", color: C.amber },
+    { name: "传感", color: C.green }
+  ];
+  const catIdx = (n) => CATS.findIndex((c) => c.name === n);
+
+  /* 4.3 供应商八家：交期 / 质量 / 成本三维风险分为本页自编（0–100，分越高风险越大）；
+         第四维「独家依赖」= 该供应商所供物料中独家供应占比 × 100，**现算不硬编码**。 */
+  const RISK_DIMS = ["交期", "质量", "成本", "独家依赖"];
+  const SUPPLIERS = [
+    { name: "星原微电子", r3: [68, 24, 52], note: "主控与快充芯片，产能排期紧" },
+    { name: "恒睿电子",   r3: [46, 32, 40], note: "电源与声学，二供导入中" },
+    { name: "微感科技",   r3: [30, 22, 28], note: "传感器件，双供格局稳定" },
+    { name: "锐波射频",   r3: [82, 64, 58], note: "射频前端，晶圆产能受限" },
+    { name: "立恒精密",   r3: [58, 44, 66], note: "结构件与散热，模具投入大" },
+    { name: "华显光电",   r3: [74, 38, 70], note: "显示屏独家，议价能力弱" },
+    { name: "昱存半导体", r3: [88, 46, 84], note: "存储颗粒独家，现货价波动" },
+    { name: "沃能电子",   r3: [36, 40, 26], note: "电源二供，新导入待验证" }
+  ];
+  const supIdx = (n) => SUPPLIERS.findIndex((s) => s.name === n);
+
+  /* 4.4 认证项清单（按类别定义；通过数 = floor(认证阶段进度 × 项数 / 100)，现算不硬编码） */
+  const CI_BY_CAT = {
+    "主控": ["EMC 电磁兼容", "安规 CB·CCC", "可靠性 RDT", "环保 RoHS·REACH", "降额与热设计审查"],
+    "存储": ["可靠性 RDT", "数据保持力", "EMC 电磁兼容", "环保 RoHS·REACH"],
+    "电源": ["安规 CB·CCC", "EMC 电磁兼容", "能效等级", "可靠性 RDT", "环保 RoHS·REACH"],
+    "射频": ["SRRC 型号核准", "CE·FCC 射频", "OTA 天线性能", "EMC 电磁兼容", "可靠性 RDT", "环保 RoHS·REACH"],
+    "结构": ["材料环保 RoHS·REACH", "跌落与强度", "盐雾腐蚀", "阻燃 UL94"],
+    "传感": ["精度与一致性", "EMC 电磁兼容", "可靠性 RDT", "安规 CB·CCC", "环保 RoHS·REACH"]
+  };
+
+  /* 4.5 物料台账 13 项 = 父页 10 项关键物料（name / code / p 逐字）+ 3 项次要物料（ext=1，均处送样阶段）
+         seg = 四阶段停留天数（已完成段为实际、当前与未来段为预计），Σseg = 认证周期（现算）
+         plan = 计划周期（天），sole = 是否独家供应，short = 图表短名 */
+  const MATERIALS = [
+    { name: "主控 SoC", code: "LX-9820", short: "主控SoC", cat: "主控", sup: "星原微电子", ext: 0, sole: 1,
+      p: [100, 100, 100, 72], seg: [28, 62, 74, 45], plan: 195,
+      note: "二供 XM-9820S 已立项，认证尚未启动" },
+    { name: "电源管理 IC", code: "PM-3308", short: "电源IC", cat: "电源", sup: "恒睿电子", ext: 0, sole: 1,
+      p: [100, 100, 88, 40], seg: [21, 48, 66, 38], plan: 168,
+      note: "能效等级复测中，二供 PM-3312B 同步送样" },
+    { name: "温度传感器", code: "TS-77", short: "温感", cat: "传感", sup: "微感科技", ext: 0, sole: 0,
+      p: [100, 100, 100, 100], seg: [14, 32, 45, 26], plan: 125,
+      note: "四阶段全通，量产准入评审已闭环" },
+    { name: "毫米波雷达", code: "RD-24G", short: "雷达", cat: "射频", sup: "锐波射频", ext: 0, sole: 1,
+      p: [100, 86, 42, 0], seg: [35, 78, 92, 55], plan: 225,
+      note: "低温启动复测未过，SRRC 型号核准排期后延" },
+    { name: "无线通信模组", code: "WM-6E", short: "通信模组", cat: "射频", sup: "锐波射频", ext: 0, sole: 0,
+      p: [100, 100, 95, 55], seg: [24, 55, 78, 40], plan: 190,
+      note: "CE·FCC 已过，OTA 天线性能复测收尾" },
+    { name: "快充协议芯片", code: "CH-65W", short: "快充IC", cat: "电源", sup: "星原微电子", ext: 0, sole: 0,
+      p: [100, 100, 100, 86], seg: [18, 40, 52, 32], plan: 150,
+      note: "认证闭环，量产准入待产线验证签样" },
+    { name: "镁铝中框", code: "MA-21", short: "中框", cat: "结构", sup: "立恒精密", ext: 0, sole: 1,
+      p: [100, 92, 60, 0], seg: [30, 58, 70, 42], plan: 180,
+      note: "一体成型改模后重测，盐雾腐蚀待复验" },
+    { name: "触控显示屏", code: "TP-58", short: "显示屏", cat: "结构", sup: "华显光电", ext: 0, sole: 1,
+      p: [100, 100, 74, 20], seg: [26, 60, 82, 46], plan: 200,
+      note: "独家供应，跌落与强度项整改中" },
+    { name: "存储器", code: "NAND-256", short: "存储器", cat: "存储", sup: "昱存半导体", ext: 0, sole: 1,
+      p: [100, 78, 30, 0], seg: [32, 70, 85, 48], plan: 205,
+      note: "颗粒批次一致性波动，数据保持力测试重跑" },
+    { name: "声学器件", code: "SPK-08", short: "声学", cat: "传感", sup: "恒睿电子", ext: 0, sole: 0,
+      p: [100, 100, 100, 64], seg: [16, 38, 50, 30], plan: 140,
+      note: "认证闭环，量产准入随整机 PVT 推进" },
+    { name: "二供电源 IC", code: "PM-3312B", short: "二供电源", cat: "电源", sup: "沃能电子", ext: 1, sole: 0,
+      p: [72, 0, 0, 0], seg: [25, 45, 60, 35], plan: 165,
+      note: "次要物料 · PM-3308 的第二供应商，来料初测中" },
+    { name: "光学指纹模组", code: "FP-12", short: "指纹", cat: "传感", sup: "微感科技", ext: 1, sole: 0,
+      p: [58, 0, 0, 0], seg: [28, 52, 68, 38], plan: 175,
+      note: "次要物料 · 高配机型选配件，送样批次待补齐" },
+    { name: "散热石墨片", code: "GH-04", short: "石墨片", cat: "结构", sup: "立恒精密", ext: 1, sole: 0,
+      p: [86, 0, 0, 0], seg: [15, 30, 42, 24], plan: 120,
+      note: "次要物料 · 与中框同厂配套，送样接近闭环" }
+  ];
+
+  /* 4.6 风险分权重（Σ = 1，进自检）：供应商三维均值 / 工期偏差 / 独家依赖 / 进度欠账 */
+  const RW = { sup: 0.30, delay: 0.34, sole: 0.18, prog: 0.18 };
+  const RISK_TH = [62, 45];                       /* 高 ≥ 62 · 中 ≥ 45 · 低 < 45 */
+  const RISK_LV = [
+    { name: "高", color: C.red,    badge: "is-r0" },
+    { name: "中", color: C.orange, badge: "is-r1" },
+    { name: "低", color: C.blueDeep, badge: "is-r2" }
+  ];
+
+  /* ===== 5. 日期工具（UTC 天序，避开夏令时；页面上所有日期都由 start + 累计天数现算） ===== */
+  const dayNum = (s) => Date.UTC(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10))) / 86400000;
+  const dayStr = (n) => {
+    const d = new Date(n * 86400000);
+    return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate());
+  };
+  const D0 = dayNum(DATA_AS_OF);
+
+  /* ===== 6. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 6.1 供应商：独家依赖维度现算 → 四维分 */
+  SUPPLIERS.forEach((s) => {
+    const own = MATERIALS.filter((m) => m.sup === s.name);
+    s.cnt = own.length;
+    s.soleCnt = own.filter((m) => m.sole).length;
+    s.r = s.r3.concat([s.cnt ? Math.round(100 * s.soleCnt / s.cnt) : 0]);
+    s.avg = sum(s.r) / s.r.length;
+  });
+  D.supMatCnt = sum(SUPPLIERS.map((s) => s.cnt));
+  D.supWorst = SUPPLIERS.slice().sort((a, b) => b.avg - a.avg)[0];
+
+  /* 6.2 物料层：综合进度 / 当前阶段 / 认证周期 / 起止日 / 风险分，逐项现算 */
+  MATERIALS.forEach((m) => {
+    m.avg = sum(m.p) / m.p.length;
+    m.mono = m.p.every((v, i) => i === 0 || m.p[i - 1] >= v);
+    /* 当前阶段 = 第一个未闭环阶段；四阶段全通 → 停在量产准入并置「已准入」 */
+    let cur = m.p.findIndex((v) => v < 100);
+    m.admitted = cur < 0;
+    m.cur = m.admitted ? m.p.length - 1 : cur;
+    m.cycle = sum(m.seg);
+    m.over = m.cycle - m.plan;
+    /* 当前阶段已耗天数 = 该阶段停留天数 × 该阶段进度（进度与日历严格互推） */
+    m.elapsed = Math.round(m.seg[m.cur] * m.p[m.cur] / 100);
+    m.before = sum(m.seg.slice(0, m.cur));
+    m.startN = D0 - m.before - m.elapsed;
+    m.finishN = m.startN + m.cycle;
+    m.start = dayStr(m.startN);
+    m.finish = dayStr(m.finishN);
+    m.left = m.finishN - D0;
+    /* 认证项：清单按类别取，通过数由认证阶段进度现算 */
+    m.ciList = CI_BY_CAT[m.cat];
+    m.ciN = m.ciList.length;
+    m.ciPass = Math.floor(m.p[2] * m.ciN / 100);
+    /* 风险分四项加权 */
+    m.supAvg = SUPPLIERS[supIdx(m.sup)].avg;
+    m.delayIdx = clamp(50 + 400 * (m.cycle - m.plan) / m.plan, 0, 100);
+    m.soleIdx = m.sole ? 100 : 40;
+    m.progGap = 100 - m.avg;
+    m.risk = RW.sup * m.supAvg + RW.delay * m.delayIdx + RW.sole * m.soleIdx + RW.prog * m.progGap;
+    m.rk = m.risk >= RISK_TH[0] ? 0 : (m.risk >= RISK_TH[1] ? 1 : 2);
+    /* 四节点日期：由 start 逐段累加，Σ 段天数 == 认证周期 */
+    let acc = m.startN;
+    m.nodes = m.seg.map((d, i) => {
+      const a = acc; acc += d;
+      return { i: i, a: a, b: acc, days: d,
+               state: m.admitted ? 0 : (i < m.cur ? 0 : (i === m.cur ? 1 : 2)) };
+    });
+    m.nodeEnd = acc;
+  });
+
+  D.n = MATERIALS.length;
+  D.keyN = MATERIALS.filter((m) => !m.ext).length;
+  D.extN = MATERIALS.filter((m) => m.ext).length;
+  D.avgAll = sum(MATERIALS.map((m) => m.avg)) / D.n;
+  D.avgKey = sum(MATERIALS.filter((m) => !m.ext).map((m) => m.avg)) / D.keyN;
+  D.admitted = MATERIALS.filter((m) => m.admitted).length;
+  D.inCert = MATERIALS.filter((m) => !m.admitted && m.cur === 2).length;
+  D.soleN = MATERIALS.filter((m) => m.sole).length;
+  D.cycleAvg = sum(MATERIALS.map((m) => m.cycle)) / D.n;
+  D.planAvg = sum(MATERIALS.map((m) => m.plan)) / D.n;
+  D.overN = MATERIALS.filter((m) => m.over > 0).length;
+  D.overDays = sum(MATERIALS.filter((m) => m.over > 0).map((m) => m.over));
+  D.worst = MATERIALS.slice().sort((a, b) => b.risk - a.risk)[0];
+  D.slowest = MATERIALS.slice().sort((a, b) => a.avg - b.avg)[0];
+  D.ciTotal = sum(MATERIALS.map((m) => m.ciN));
+  D.ciPass = sum(MATERIALS.map((m) => m.ciPass));
+  D.mono = MATERIALS.every((m) => m.mono);
+
+  /* 6.3 阶段分布：在办数（各阶段停留物料数，Σ = 物料总数）与累计到达数（逐级严格递减） */
+  D.stageStay = CERT_STAGES.map((s, i) => MATERIALS.filter((m) => m.cur === i).length);
+  D.stageReach = CERT_STAGES.map((s, i) => MATERIALS.filter((m) => m.cur >= i).length);
+  D.stayN = sum(D.stageStay);
+
+  /* 6.4 风险分档分布 */
+  D.riskCnt = RISK_LV.map((r, i) => MATERIALS.filter((m) => m.rk === i).length);
+  D.riskN = sum(D.riskCnt);
+
+  /* 6.5 类别分布（Σ = 物料总数） */
+  D.catCnt = CATS.map((c) => MATERIALS.filter((m) => m.cat === c.name).length);
+
+  /* ===== 7. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("zl-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("zl-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("zl-meta-n").textContent = fmtInt(D.n);
+  $("zl-meta-key").textContent = fmtInt(D.keyN);
+  $("zl-meta-ext").textContent = fmtInt(D.extN);
+  $("zl-meta-sup").textContent = fmtInt(SUPPLIERS.length);
+  $("zl-meta-ci").textContent = fmtInt(D.ciTotal);
+
+  /* ===== 8. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "在册物料", v: D.n, dec: 0, unit: "项", color: C.blue,
+      s: "父页关键物料 " + D.keyN + " 项（逐字同源）+ 次要物料 " + D.extN + " 项" },
+    { k: "已量产准入", v: D.admitted, dec: 0, unit: "项", color: C.green,
+      s: "四阶段全通 · 综合进度 100% · 占 " + fmtDec(100 * D.admitted / D.n, 1) + "%" },
+    { k: "在认证阶段", v: D.inCert, dec: 0, unit: "项", color: C.amber,
+      s: "第三方认证与体系审核在办 · 认证项已过 " + D.ciPass + " / " + D.ciTotal },
+    { k: "高风险物料", v: D.riskCnt[0], dec: 0, unit: "项", color: C.red,
+      s: "风险分 ≥ " + RISK_TH[0] + " · 最高「" + D.worst.name + "」" + fmtDec(D.worst.risk, 1) + " 分" },
+    { k: "平均认证周期", v: D.cycleAvg, dec: 1, unit: "天", color: C.violet,
+      s: "计划均值 " + fmtDec(D.planAvg, 1) + " 天 · 超期 " + D.overN + " 项 / Σ " + D.overDays + " 天" },
+    { k: "独家供应", v: D.soleN, dec: 0, unit: "项", color: C.orange,
+      s: "占 " + fmtDec(100 * D.soleN / D.n, 1) + "% · 二供导入是降风险主路径" }
+  ];
+  $("zl-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="zl-kpi" style="--zl-kc:' + p.color + '">' +
+      '<div class="zl-kpi-k">' + p.k + "</div>" +
+      '<div class="zl-kpi-v"><b id="zl-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="zl-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("zl-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 9. 一级筛选：认证阶段 chip（全部 + 四阶段；计数 = 该阶段在办物料数） ===== */
+  const SFILTERS = [{ name: "全部", color: C.blue, n: D.n, avg: D.avgAll }]
+    .concat(CERT_STAGES.map((s, i) => ({
+      name: s, color: STAGE_COLORS[i], n: D.stageStay[i],
+      avg: D.stageStay[i] ? sum(MATERIALS.filter((m) => m.cur === i).map((m) => m.avg)) / D.stageStay[i] : 0
+    })));
+  const sbox = $("zl-schips");
+  sbox.innerHTML = SFILTERS.map((f, i) => (
+    '<button class="zl-schip" type="button" data-i="' + i + '" style="--zl-cc:' + f.color + '">' +
+      "<u>" + f.name + "</u><b>" + fmtInt(f.n) + "</b>" +
+      "<i>项 · 综合 " + fmtDec(f.avg, 1) + "%</i>" +
+    "</button>"
+  )).join("");
+  const schips = Array.from(sbox.children);
+
+  /* ===== 10. 二级筛选：风险等级 chip（全部 + 高/中/低；计数随一级重算） ===== */
+  const rbox = $("zl-rchips");
+  function riskScopeCnt(si, ri) {
+    return MATERIALS.filter((m) => (si === 0 || m.cur === si - 1) && (ri === 0 || m.rk === ri - 1)).length;
+  }
+  function renderRChips(si, ri) {
+    const items = [{ name: "全部", color: C.blue }]
+      .concat(RISK_LV.map((r) => ({ name: r.name, color: r.color })));
+    rbox.innerHTML = items.map((f, i) => (
+      '<button class="zl-rchip' + (i === ri ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === ri ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + riskScopeCnt(si, i) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(rbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(sIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 11. hash 契约：父页 P10 面板「关键物料认证进度」下钻 → 子页#encodeURIComponent(物料名)
+         归一化（trim + 全角空白剔除）后查表；HASH_ALIAS 收物料简写与型号（编号）别名。
+         ★ 父页物料名含半角空格（如「主控 SoC」），归一化会剔除空白，故别名表按去空白键登记。 ===== */
+  const norm = (s) => String(s).replace(/[\s　]+/g, "");
+  const HASH_ALIAS = {};                                   /* 键 → 物料索引 */
+  const HASH_STAGE = {};                                   /* 键 → 一级筛选索引 */
+  const alias = (k, v) => { HASH_ALIAS[norm(k)] = v; };
+  const SHORT_ALIAS = [
+    ["主控", "SoC", "主控芯片"], ["电源IC", "PMIC", "电源管理"], ["温感", "温度传感"],
+    ["雷达", "毫米波"], ["通信模组", "WiFi模组", "无线模组"], ["快充IC", "快充"],
+    ["中框", "镁铝"], ["显示屏", "触控屏", "屏"], ["存储", "NAND"], ["声学", "扬声器"],
+    ["二供电源", "电源二供"], ["指纹", "指纹模组"], ["石墨片", "散热片"]
+  ];
+  MATERIALS.forEach((m, i) => {
+    alias(m.name, i);
+    alias(m.short, i);
+    alias(m.code, i);
+    alias(m.code.toLowerCase(), i);
+    alias(m.code.toUpperCase(), i);
+    alias(m.name + m.code, i);
+    (SHORT_ALIAS[i] || []).forEach((a) => alias(a, i));
+  });
+  HASH_STAGE[norm("全部")] = 0;
+  HASH_STAGE["ALL"] = 0; HASH_STAGE["all"] = 0;
+  CERT_STAGES.forEach((s, i) => {
+    HASH_STAGE[norm(s)] = i + 1;
+    HASH_STAGE[norm(s + "阶段")] = i + 1;
+    HASH_STAGE[norm(s + "中")] = i + 1;
+  });
+  HASH_STAGE[norm("关键物料认证进度")] = 0;
+  HASH_STAGE[norm("物料认证")] = 0;
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = norm(raw);
+    if (!raw) return { mat: -1, stage: -1 };
+    const mi = HASH_ALIAS[raw];
+    if (mi !== undefined) return { mat: mi, stage: -1 };
+    const si = HASH_STAGE[raw];
+    if (si !== undefined) return { mat: -1, stage: si };
+    return { mat: -1, stage: -1 };
+  }
+  let hashSuppress = false;
+  function syncHash(name) {
+    const want = "#" + encodeURIComponent(name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 12. 台账主表渲染（行高 28px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("zl-tbody");
+  let view = MATERIALS, sIdx = 0, rIdx = 0, selPos = 0;
+
+  function segColor(v, i, arr) {
+    if (v >= 100) return C.green;
+    if (v <= 0) return "rgba(96,140,255,.22)";
+    return (i > 0 && arr[i - 1] < 100) ? C.orange : C.amber;
+  }
+  function rowHtml(m, k) {
+    const cAvg = m.avg >= 100 ? C.green : m.avg >= 70 ? C.cyan : m.avg >= 40 ? C.amber : C.orange;
+    const bars = m.p.map((v, j) => (
+      '<span class="zl-ps"><span class="zl-ps-t"><u style="width:' + fmtDec(v, 0) + "%;background:" +
+        segColor(v, j, m.p) + '"></u></span><em style="color:' + (v >= 100 ? C.green : v > 0 ? C.amber : "rgba(127,146,196,.55)") +
+        '">' + fmtDec(v, 0) + "</em></span>"
+    )).join("");
+    return '<li data-i="' + MATERIALS.indexOf(m) + '" style="animation-delay:' + (k * 14) + 'ms" title="' +
+        m.name + " " + m.code + " · " + m.note + '">' +
+      '<span class="zl-code">' + m.code + "</span>" +
+      '<span class="zl-name">' + m.name + (m.ext ? "<u>次</u>" : "") + "</span>" +
+      '<span class="zl-cat" style="color:' + CATS[catIdx(m.cat)].color + '">' + m.cat + "</span>" +
+      '<span class="zl-sup">' + m.sup + (m.sole ? " ·独" : "") + "</span>" +
+      '<span class="zl-badge is-s' + m.cur + '">' + (m.admitted ? "已准入" : CERT_STAGES[m.cur]) + "</span>" +
+      '<span class="zl-prog">' + bars + '<b style="color:' + cAvg + '">' + fmtDec(m.avg, 1) + "%</b></span>" +
+      '<span class="zl-eta">' + m.finish + "</span>" +
+      '<span class="zl-badge ' + RISK_LV[m.rk].badge + '">' + RISK_LV[m.rk].name + "</span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      /* 手动点行 → 选中并暂停轮巡 20 秒（与 hash 定位同一门闩） */
+      li.addEventListener("click", () => { selPos = k; renderSel(true); pauseRotate(20000); });
+    });
+    $("zl-table-tag").textContent =
+      "全量在册 " + D.n + " 项 · 关键 " + D.keyN + " 项与父页逐字同源 · 次要 " + D.extN +
+      " 项本页补充（「次」角标）· 综合均值 " + fmtDec(D.avgAll, 1) + "%";
+    const scopeN = sIdx === 0 ? D.n : D.stageStay[sIdx - 1];
+    $("zl-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 项 / 共 " + D.n + " 项<i>|</i>该阶段在办 <em>" + fmtInt(scopeN) +
+      "</em> 项 · 独家 <em>" + view.filter((m) => m.sole).length +
+      "</em> 项<i>|</i>行点击或轮巡联动右侧认证流转";
+  }
+
+  /* ===== 13. 单物料认证流转（纯 HTML/CSS；选中行联动，四段宽度 ∝ 停留天数）
+         节点起止日由 start + 累计天数现算；未到节点 is-todo；认证项通过数由认证进度现算。 ===== */
+  function renderSel(pushHash) {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("zl-flow-tag").textContent = "当前筛选无物料";
+      $("zl-flow-headbox").innerHTML = '<div class="zl-fl-sub">调整认证阶段或风险等级筛选后，此处展示选中物料的四节点流转。</div>';
+      $("zl-flow-bar").innerHTML = "";
+      $("zl-flow-list").innerHTML = "";
+      $("zl-ci-grid").innerHTML = "";
+      $("zl-ci-tag").textContent = "--";
+      return;
+    }
+    selPos = selPos % view.length;
+    const m = view[selPos];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    $("zl-flow-tag").textContent = "送样→测试→认证→量产准入 · Σ 各段停留天数 = 认证周期";
+    $("zl-flow-headbox").innerHTML =
+      '<div class="zl-fl-no"><b>' + m.code + "</b>" +
+        '<span class="zl-badge is-s' + m.cur + '">' + (m.admitted ? "已准入" : CERT_STAGES[m.cur]) + "</span>" +
+        '<span class="zl-badge ' + RISK_LV[m.rk].badge + '">风险 ' + RISK_LV[m.rk].name + "</span>" +
+        '<span class="zl-fl-sub">' + m.cat + " · " + m.sup + (m.sole ? " · 独家供应" : " · 双供") + "</span></div>" +
+      '<div class="zl-fl-title">' + m.name + (m.ext ? "（次要物料）" : "") + " · " + m.note + "</div>" +
+      '<div class="zl-fl-sub">起始 <b>' + m.start + "</b> → 完成 <b>" + m.finish +
+        "</b> · 周期 <b>" + m.cycle + "</b> 天（计划 " + m.plan + " 天，" +
+        (m.over > 0 ? "超期 " + m.over : m.over < 0 ? "提前 " + (-m.over) : "持平 0") +
+        " 天）· 综合 <b>" + fmtDec(m.avg, 1) + "%</b> · 风险分 <b>" + fmtDec(m.risk, 1) + "</b></div>";
+    $("zl-flow-bar").innerHTML = m.nodes.map((nd) => (
+      '<span class="zl-fl-seg' + (nd.state === 1 ? " is-cur" : "") + '" style="flex:' + nd.days +
+        ";background:" + (nd.state === 2 ? "rgba(96,140,255,.18)" : STAGE_COLORS[nd.i]) +
+        '" title="' + CERT_STAGES[nd.i] + " " + nd.days + ' 天"></span>'
+    )).join("");
+    $("zl-flow-list").innerHTML = m.nodes.map((nd) => {
+      const cls = nd.state === 2 ? "is-todo" : (nd.state === 1 ? "is-cur" : "");
+      const tail = nd.state === 0 ? "实际" : (nd.state === 1 ? "已 " + m.elapsed + " 天 / 计" : "计划");
+      return '<div class="zl-fl-row ' + cls + '" style="--zl-pc:' + STAGE_COLORS[nd.i] + '">' +
+        "<b>" + CERT_STAGES[nd.i] + "</b>" +
+        "<span>" + dayStr(nd.a) + " → " + dayStr(nd.b) + " · " + STAGE_HINT[nd.i] + "</span>" +
+        "<em>" + tail + " " + nd.days + " 天</em></div>";
+    }).join("");
+    $("zl-ci-tag").innerHTML = "通过 <b>" + m.ciPass + "</b> / " + m.ciN +
+      " 项 · 认证阶段进度 " + fmtDec(m.p[2], 0) + "%";
+    $("zl-ci-grid").innerHTML = m.ciList.map((name, k) => {
+      const st = k < m.ciPass ? "is-pass" : (k === m.ciPass && m.p[2] > 0 ? "is-run" : "is-todo");
+      const mark = st === "is-pass" ? "✓ 通过" : (st === "is-run" ? "◐ 进行中" : "· 未开始");
+      return '<div class="zl-ci-item ' + st + '"><span>' + name + "</span><i>" + mark + "</i></div>";
+    }).join("");
+    $("zl-chip-key").textContent = "综合进度 · " + m.short;
+    $("zl-chip-val").textContent = fmtDec(m.avg, 1) + "%";
+    if (pushHash) syncHash(m.name);
+  }
+
+  /* ===== 14. 阶段分布漏斗（值 = 累计到达数，逐级严格递减；标签括注在办数，Σ 在办 = 物料总数） ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function funnelOption() {
+    /* ★ 只把标量与数组下发给 option，物料对象本身不进 series.data（避免任何回指） */
+    const names = CERT_STAGES.slice();
+    const reach = D.stageReach.slice();
+    const stay = D.stageStay.slice();
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const i = p.dataIndex;
+          return "<b>" + names[i] + "</b><br/>累计到达 <b>" + reach[i] + "</b> 项（占 " +
+            fmtDec(100 * reach[i] / D.n, 1) + "%）<br/>当前在办 <b style=\"color:" + STAGE_COLORS[i] + "\">" +
+            stay[i] + "</b> 项<br/><span style=\"color:" + C.textDim + "\">" + STAGE_HINT[i] + "</span>";
+        }
+      }, TIP),
+      series: [{
+        type: "funnel", top: 6, bottom: 6, left: 4, right: 4, min: 0, max: D.n,
+        minSize: "32%", maxSize: "100%", sort: "descending", gap: 4,
+        label: {
+          position: "inside", color: "#071026", fontSize: 11.5, fontWeight: 700,
+          formatter: (p) => p.name + "  到达 " + p.value + " · 在办 " + stay[p.dataIndex]
+        },
+        itemStyle: { borderColor: "rgba(8,18,49,.7)", borderWidth: 2 },
+        data: names.map((n, i) => ({ name: n, value: reach[i], itemStyle: { color: STAGE_COLORS[i] } }))
+      }]
+    };
+  }
+
+  /* ===== 15. 认证周期对比（计划 vs 实际/预计；超期柱标红，均值线现算） ===== */
+  function cycleOption() {
+    const names = MATERIALS.map((m) => m.short);
+    const plans = MATERIALS.map((m) => m.plan);
+    const cycles = MATERIALS.map((m) => m.cycle);
+    const overs = MATERIALS.map((m) => m.over);
+    const fulls = MATERIALS.map((m) => m.name);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 8, top: 26, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const o = overs[i];
+          return "<b>" + fulls[i] + "</b><br/>计划周期 <b>" + plans[i] + "</b> 天<br/>实际/预计 <b style=\"color:" +
+            (o > 0 ? C.red : C.green) + "\">" + cycles[i] + "</b> 天<br/>" +
+            (o > 0 ? "超期 <b style=\"color:" + C.red + "\">+" + o + "</b> 天" :
+             o < 0 ? "提前 <b style=\"color:" + C.green + "\">" + (-o) + "</b> 天" : "与计划持平");
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["计划周期", "实际/预计周期"]
+      },
+      xAxis: {
+        type: "category", data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10, interval: 0, rotate: 30 }
+      },
+      yAxis: {
+        type: "value", name: "天", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false }
+      },
+      series: [
+        { name: "计划周期", type: "bar", barGap: "-58%", barWidth: "46%", z: 2,
+          itemStyle: { color: "rgba(47,111,214,.42)", borderRadius: [3, 3, 0, 0] },
+          data: plans.slice() },
+        { name: "实际/预计周期", type: "bar", barWidth: "30%", z: 5,
+          label: { show: true, position: "top", fontSize: 9.5, fontWeight: 700,
+            color: "#cfdcff", formatter: (p) => (overs[p.dataIndex] > 0 ? "+" + overs[p.dataIndex] : String(p.value)) },
+          data: cycles.map((v, i) => ({
+            value: v,
+            itemStyle: { color: overs[i] > 0 ? C.red : (overs[i] < 0 ? C.green : C.cyan), borderRadius: [3, 3, 0, 0] }
+          })),
+          markLine: {
+            symbol: "none", silent: true,
+            lineStyle: { color: C.amber, type: "dashed", width: 1.4 },
+            label: { color: C.amber, fontSize: 10, fontWeight: 700, position: "insideEndTop",
+              formatter: () => "均值 " + fmtDec(D.cycleAvg, 1) + " 天" },
+            data: [{ yAxis: D.cycleAvg }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 16. 供应风险矩阵（供应商 × 四风险维度热力）
+         ★ piecewise 一旦设了两端 text，showLabel 默认变 false、各档 label 会被整体吞掉，
+           故此处显式补 showLabel: true（见 CLAUDE.md 坑位）。 ===== */
+  function riskOption() {
+    const sups = SUPPLIERS.map((s) => s.name);
+    const cells = [];
+    SUPPLIERS.forEach((s, ri) => s.r.forEach((v, ci) => cells.push([ci, ri, v])));
+    const cnts = SUPPLIERS.map((s) => s.cnt);
+    const soles = SUPPLIERS.map((s) => s.soleCnt);
+    const notes = SUPPLIERS.map((s) => s.note);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 12, top: 34, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        position: "top",
+        formatter: (p) => {
+          const ci = p.data[0], ri = p.data[1];
+          return "<b>" + sups[ri] + "</b> · " + RISK_DIMS[ci] + "<br/>风险分 <b>" + p.data[2] +
+            "</b> / 100<br/><span style=\"color:" + C.textDim + "\">在册 " + cnts[ri] + " 项 · 独家 " +
+            soles[ri] + " 项 · " + notes[ri] + "</span>";
+        }
+      }, TIP),
+      visualMap: {
+        type: "piecewise", orient: "horizontal", top: 2, right: 4, itemWidth: 12, itemHeight: 10, itemGap: 6,
+        text: ["高风险", "低风险"], showLabel: true,                 /* ★ 设了 text 必须显式 showLabel */
+        textStyle: { color: C.textDim, fontSize: 10 },
+        pieces: [
+          { min: 0,  max: 25,  label: "0–25",   color: "rgba(111,224,154,.72)" },
+          { min: 25, max: 45,  label: "25–45",  color: "rgba(70,214,200,.72)" },
+          { min: 45, max: 65,  label: "45–65",  color: "rgba(255,194,77,.78)" },
+          { min: 65, max: 85,  label: "65–85",  color: "rgba(255,157,92,.82)" },
+          { min: 85, max: 100, label: "85–100", color: "rgba(255,95,107,.86)" }
+        ]
+      },
+      xAxis: {
+        type: "category", data: RISK_DIMS.slice(), splitArea: { show: true, areaStyle: { color: ["rgba(28,48,112,.12)", "transparent"] } },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 11 }
+      },
+      yAxis: {
+        type: "category", data: sups.slice(), inverse: true,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10.5 }
+      },
+      series: [{
+        type: "heatmap", data: cells,
+        label: { show: true, color: "#0a1226", fontSize: 10.5, fontWeight: 700 },
+        itemStyle: { borderColor: "rgba(8,18,49,.65)", borderWidth: 1.5, borderRadius: 3 },
+        emphasis: { itemStyle: { shadowBlur: 8, shadowColor: "rgba(0,0,0,.5)" } }
+      }]
+    };
+  }
+
+  /* ===== 17. 筛选主流程：一次调用刷新 chip / 表 / 流转 / 页头 chip（单一入口） ===== */
+  function applyFilter(si, ri, pushHash) {
+    sIdx = clamp(si, 0, SFILTERS.length - 1);
+    rIdx = clamp(ri, 0, RISK_LV.length);
+    view = MATERIALS.filter((m) =>
+      (sIdx === 0 || m.cur === sIdx - 1) && (rIdx === 0 || m.rk === rIdx - 1));
+    selPos = 0;
+    schips.forEach((el, i) => {
+      const on = i === sIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? SFILTERS[i].color : "";
+      el.style.borderColor = on ? SFILTERS[i].color : "";
+    });
+    renderRChips(sIdx, rIdx);
+    renderTable();
+    renderSel(pushHash);
+  }
+
+  schips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), 0, false)));
+
+  /* hash 定位：命中物料则清筛选并选中该行、闪烁所属阶段 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit.mat < 0 && hit.stage < 0) { applyFilter(0, 0, false); return; }
+    if (hit.mat >= 0) {
+      const m = MATERIALS[hit.mat];
+      applyFilter(0, 0, false);
+      const pos = view.indexOf(m);
+      if (pos >= 0) { selPos = pos; renderSel(false); }
+      const chip = schips[m.cur + 1];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                 /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+      syncHash(m.name);
+    } else {
+      applyFilter(hit.stage, 0, false);
+      if (hit.stage > 0) {
+        const chip = schips[hit.stage];
+        chip.classList.remove("is-hit");
+        void chip.offsetWidth;
+        chip.classList.add("is-hit");
+      }
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发硬件与样机1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 18. kiosk 轮巡：台账行 3 秒逐行高亮并联动认证流转；hash 定位或手动点行后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel(true);
+  }, 3000);
+
+  /* ===== 19. 初始渲染：先填充全部 DOM（KPI + 表 + 流转 + 认证项），再 init 图表 ===== */
+  $("zl-funnel-tag").innerHTML = "累计到达 " + D.stageReach.join(" → ") + " · Σ 在办 <b>" + D.stayN + "</b> 项 = 在册总数";
+  $("zl-cycle-tag").innerHTML = "均值 <b>" + fmtDec(D.cycleAvg, 1) + "</b> 天 · 超期 <b>" + D.overN +
+    "</b> 项 / Σ " + D.overDays + " 天 · 提前 " + MATERIALS.filter((m) => m.over < 0).length + " 项";
+  $("zl-risk-tag").innerHTML = SUPPLIERS.length + " 家 × " + RISK_DIMS.length + " 维 · 最高「<b>" +
+    D.supWorst.name + "</b>」均值 " + fmtDec(D.supWorst.avg, 1) + " · 独家依赖列现算";
+
+  let funnelChart = null, cycleChart = null, riskChart = null;
+  applyFilter(0, 0, false);                                  /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  funnelChart = echarts.init($("zl-chart-funnel"));
+  funnelChart.setOption(funnelOption());
+  cycleChart = echarts.init($("zl-chart-cycle"));
+  cycleChart.setOption(cycleOption());
+  riskChart = echarts.init($("zl-chart-risk"));
+  riskChart.setOption(riskOption());
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* 周期图轮播提示 */
+  let tipIdx = 0;
+  setInterval(() => {
+    cycleChart.dispatchAction({ type: "showTip", seriesIndex: 1, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % MATERIALS.length;
+  }, 4200);
+
+  /* ===== 20. 底部认证与供应研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "分工", c: C.blue, t: "本页口径 = 关键物料的**认证进度与供应风险**（四阶段流转 / 认证项 / 供应商风险 / 周期偏差）；" +
+        "单批次的试制良率与失效模式见兄弟页「单样机批次详情」，两页同属「硬件与样机」，口径不重叠" },
+    { lv: "高", c: C.red, t: "高风险 " + D.riskCnt[0] + " 项：" +
+        MATERIALS.filter((m) => m.rk === 0).map((m) => m.name).join(" / ") +
+        "；最高「" + D.worst.name + "」" + fmtDec(D.worst.risk, 1) + " 分（供应商均值 " +
+        fmtDec(D.worst.supAvg, 1) + " · 超期 " + D.worst.over + " 天）" },
+    { lv: "高", c: C.red, t: "独家供应 " + D.soleN + " 项占 " + fmtDec(100 * D.soleN / D.n, 1) +
+        "%，其中「" + D.supWorst.name + "」四维均值 " + fmtDec(D.supWorst.avg, 1) +
+        " 为全表最高；" + D.supWorst.note },
+    { lv: "中", c: C.orange, t: "进度最慢「" + D.slowest.name + "」综合 " + fmtDec(D.slowest.avg, 1) +
+        "%，停在" + CERT_STAGES[D.slowest.cur] + "阶段，预计 " + D.slowest.finish + " 完成，尚需 " +
+        D.slowest.left + " 天；" + D.slowest.note },
+    { lv: "中", c: C.orange, t: "周期偏差：" + D.overN + " 项超期 Σ " + D.overDays + " 天，" +
+        MATERIALS.filter((m) => m.over < 0).length + " 项提前；实际/预计均值 " + fmtDec(D.cycleAvg, 1) +
+        " 天 vs 计划均值 " + fmtDec(D.planAvg, 1) + " 天，整体拖期 " + fmtDec(D.cycleAvg - D.planAvg, 1) + " 天" },
+    { lv: "低", c: C.amber, t: "认证项 Σ " + D.ciTotal + " 项已通过 " + D.ciPass + " 项（" +
+        fmtDec(100 * D.ciPass / D.ciTotal, 1) + "%）；逐项通过数 = ⌊认证阶段进度 × 项数 ÷ 100⌋，与四阶段进度严格互推" },
+    { lv: "低", c: C.green, t: "阶段分布：累计到达 " + D.stageReach.join(" / ") + " 逐级递减，在办 " +
+        D.stageStay.join(" / ") + " 合计 " + D.stayN + " 项 = 在册总数；已量产准入 " + D.admitted +
+        " 项、在认证阶段 " + D.inCert + " 项" },
+    { lv: "低", c: C.green, t: "勾稽：关键物料 " + D.keyN + " 项的物料名与四阶段进度与父页「硬件与样机」逐字相等；" +
+        "综合进度 = 四阶段均值，关键物料均值 " + fmtDec(D.avgKey, 1) + "% 与父页「物料认证达成」同源" }
+  ];
+  const track = $("zl-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="zl-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t.replace(/\*\*/g, "") + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                    /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 21. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(funnelOption()); JSON.stringify(cycleOption()); JSON.stringify(riskOption()); }
+  catch (e) { optAcyclic = false; console.error("[物料认证台账] option 存在循环引用：", e.message); }
+
+  const keyList = MATERIALS.filter((m) => !m.ext);
+  const checks = [
+    ["父页 10 项关键物料的物料名与编号逐字相等",
+      keyList.length === KEY_REF.length &&
+      keyList.every((m, i) => m.name === KEY_REF[i][0] && m.code === KEY_REF[i][1])],
+    ["父页 10 项关键物料的四阶段进度逐项相等（硬校验）",
+      keyList.every((m, i) => m.p.length === 4 && m.p.every((v, j) => v === KEY_REF[i][2][j]))],
+    ["四阶段进度逐阶段不增（父页单调性口径）", D.mono],
+    ["综合进度 = 四阶段均值（逐行现算）",
+      MATERIALS.every((m) => Math.abs(m.avg - sum(m.p) / 4) < 1e-9)],
+    ["在册 13 项 = 关键 10 项 + 次要 3 项", D.n === 13 && D.keyN === 10 && D.extN === 3 && D.keyN + D.extN === D.n],
+    ["四阶段在办数 Σ = 物料总数", D.stayN === D.n && D.stageStay.length === 4],
+    ["四阶段累计到达数逐级严格递减（漏斗形态）",
+      D.stageReach.every((v, i) => i === 0 || v < D.stageReach[i - 1]) && D.stageReach[0] === D.n],
+    ["到达数逐级之差 = 该阶段在办数（漏斗与分布互推）",
+      D.stageStay.every((v, i) => v === (i < 3 ? D.stageReach[i] - D.stageReach[i + 1] : D.stageReach[3]))],
+    ["单物料 Σ 各段停留天数 = 认证周期（逐行）",
+      MATERIALS.every((m) => m.cycle === sum(m.seg) && m.cycle === sum(m.nodes.map((nd) => nd.days)))],
+    ["四节点日期首尾相接且末节点终点 = 起始日 + 认证周期（逐行）",
+      MATERIALS.every((m) => m.nodes.every((nd, i) => i === 0 ? nd.a === m.startN : nd.a === m.nodes[i - 1].b) &&
+        m.nodeEnd === m.finishN)],
+    ["当前阶段窗口包含数据日 2026-08-19，且已耗天数 = 该阶段进度 × 停留天数（逐行）",
+      MATERIALS.every((m) => m.nodes[m.cur].a <= D0 && D0 <= m.nodes[m.cur].b &&
+        m.elapsed === Math.round(m.seg[m.cur] * m.p[m.cur] / 100))],
+    ["预计完成日不早于数据日（剩余天数非负，逐行）", MATERIALS.every((m) => m.left >= 0)],
+    ["认证项通过数 ≤ 总项数，且 = ⌊认证进度 × 项数 ÷ 100⌋（逐行）",
+      MATERIALS.every((m) => m.ciPass <= m.ciN && m.ciPass >= 0 &&
+        m.ciPass === Math.floor(m.p[2] * m.ciN / 100))],
+    ["认证项 Σ 通过 ≤ Σ 总项数，且清单按类别取齐",
+      D.ciPass <= D.ciTotal && MATERIALS.every((m) => m.ciN === CI_BY_CAT[m.cat].length)],
+    ["风险三档 Σ = 物料总数", D.riskN === D.n && D.riskCnt.length === 3],
+    ["风险分权重 Σ = 1，且分档由阈值 62 / 45 现算（逐行）",
+      Math.abs(RW.sup + RW.delay + RW.sole + RW.prog - 1) < 1e-9 &&
+      MATERIALS.every((m) => m.rk === (m.risk >= RISK_TH[0] ? 0 : (m.risk >= RISK_TH[1] ? 1 : 2)))],
+    ["类别六档 Σ = 物料总数（二级拆分收敛）", sum(D.catCnt) === D.n && CATS.length === 6],
+    ["供应商在册物料 Σ = 物料总数，独家 Σ = 独家供应数",
+      D.supMatCnt === D.n && sum(SUPPLIERS.map((s) => s.soleCnt)) === D.soleN],
+    ["供应风险矩阵「独家依赖」列 = 独家占比 × 100（现算，非硬编码）",
+      SUPPLIERS.every((s) => s.r[3] === (s.cnt ? Math.round(100 * s.soleCnt / s.cnt) : 0) && s.r.length === 4)],
+    ["矩阵格数 = 供应商数 × 风险维度数，且分值均落在 0–100",
+      SUPPLIERS.length * RISK_DIMS.length === sum(SUPPLIERS.map((s) => s.r.length)) &&
+      SUPPLIERS.every((s) => s.r.every((v) => v >= 0 && v <= 100))],
+    ["已量产准入项 = 四阶段全通项，且综合进度 = 100%",
+      D.admitted === MATERIALS.filter((m) => m.avg === 100).length &&
+      MATERIALS.filter((m) => m.admitted).every((m) => m.avg === 100)],
+    ["在认证阶段项数 = 当前阶段为「认证」的物料数", D.inCert === D.stageStay[2]],
+    ["平均认证周期 = Σ 认证周期 ÷ 物料数（现算）",
+      Math.abs(D.cycleAvg - sum(MATERIALS.map((m) => m.cycle)) / D.n) < 1e-9],
+    ["超期判定与 Σ 超期天数自洽（over = 周期 − 计划）",
+      MATERIALS.every((m) => m.over === m.cycle - m.plan) &&
+      D.overDays === sum(MATERIALS.filter((m) => m.over > 0).map((m) => m.over))],
+    ["抽样各阶段条数 = 一级 chip 计数（阶段筛选逐档比对）",
+      SFILTERS.every((f, i) => f.n === (i === 0 ? MATERIALS.length : MATERIALS.filter((m) => m.cur === i - 1).length))],
+    ["二级 chip 计数 = 阶段 × 风险交叉计数（逐格比对）",
+      SFILTERS.every((f, si) => RISK_LV.every((r, k) =>
+        riskScopeCnt(si, k + 1) === MATERIALS.filter((m) => (si === 0 || m.cur === si - 1) && m.rk === k).length))],
+    ["hash 13 项物料名均可解析（含空格归一化，父页逐字键）",
+      MATERIALS.every((m, i) => HASH_ALIAS[norm(m.name)] === i)],
+    ["hash 简写与型号别名均可解析（编号 / 短名）",
+      MATERIALS.every((m, i) => HASH_ALIAS[norm(m.code)] === i && HASH_ALIAS[norm(m.short)] === i) &&
+      HASH_ALIAS["主控SoC"] === 0 && HASH_ALIAS["LX-9820"] === 0 && HASH_ALIAS["雷达"] === 3],
+    ["hash 四阶段名可解析为一级筛选（面板级入口兜底）",
+      CERT_STAGES.every((s, i) => HASH_STAGE[norm(s)] === i + 1) && HASH_STAGE[norm("关键物料认证进度")] === 0],
+    ["物料编号唯一、物料名唯一",
+      (new Set(MATERIALS.map((m) => m.code))).size === D.n && (new Set(MATERIALS.map((m) => m.name))).size === D.n],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[物料认证台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

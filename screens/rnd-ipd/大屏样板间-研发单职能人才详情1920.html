@@ -1,0 +1,1237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单职能人才详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --xn-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .xn-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 104px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .xn-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .xn-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .xn-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 8px 8px;
+  }
+  .xn-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .xn-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .xn-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .xn-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .xn-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .xn-crumb em { font-style: normal; color: #d3e2ff; }
+  .xn-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .xn-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .xn-crumb-note {
+    display: none; padding: 1px 8px; border-radius: 6px; font-size: 11.5px; letter-spacing: 0.04em;
+    border: 1px solid rgba(255, 194, 77, 0.45); background: rgba(86, 60, 14, 0.45); color: #ffd489;
+  }
+  .xn-crumb-note.is-visible { display: inline-block; }
+  .xn-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .xn-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .xn-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .xn-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .xn-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .xn-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 职能切换器：六职能 tab（← → 方向键 / 14s 自动轮换 / hash 直达） */
+  .xn-switcher { display: grid; grid-template-columns: repeat(3, auto); gap: 5px 6px; }
+  .xn-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 88px; padding: 3px 10px 4px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .xn-sw-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; }
+  .xn-sw-tab span { font-size: 9.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .xn-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .xn-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .xn-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .xn-chips { display: flex; align-items: center; gap: 9px; }
+  .xn-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 156px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(169, 140, 245, 0.42); background: linear-gradient(160deg, rgba(169, 140, 245, 0.16), rgba(18, 34, 78, 0.6));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .xn-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: #8f7fc4; white-space: nowrap; }
+  .xn-chip b { font-size: 14px; font-weight: 700; letter-spacing: 0.05em; color: #cbbcf7; white-space: nowrap; }
+  .xn-chip:hover { border-color: rgba(169, 140, 245, 0.92); box-shadow: 0 0 16px -2px rgba(169, 140, 245, 0.7); }
+  .xn-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .xn-clock-time { font: 700 26px/1 var(--xn-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .xn-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（整行 6 枚，高度写死） ===== */
+  .xn-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .xn-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 8px 15px;
+  }
+  .xn-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .xn-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .xn-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .xn-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .xn-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .xn-kpi.is-good::after { background: radial-gradient(circle, rgba(111, 224, 154, 0.13), transparent 68%); }
+  .xn-kpi-label { font-size: 12.5px; letter-spacing: 0.08em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .xn-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .xn-kpi-val { font: 700 28px/1 var(--xn-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .xn-kpi.is-amber .xn-kpi-val { color: #ffd489; }
+  .xn-kpi.is-good .xn-kpi-val { color: #b8f2cf; }
+  .xn-kpi-unit { font-size: 12px; color: var(--rnd-text-dim); }
+  .xn-kpi-sub { font-size: 10.5px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .xn-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体 ===== */
+  .xn-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .xn-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .xn-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .xn-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .xn-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .xn-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .xn-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .xn-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .xn-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 右栏：人效说明条（★ 高度写死，JS 填充，避免压矮同 flex 容器里的图表） ===== */
+  .xn-effnote {
+    flex: none; height: 62px; margin-top: 6px; padding: 7px 12px; border-radius: 9px;
+    border: 1px solid rgba(96, 140, 255, 0.16); background: linear-gradient(120deg, rgba(20, 38, 92, 0.62), rgba(14, 26, 66, 0.5));
+    display: flex; flex-direction: column; justify-content: center; gap: 4px;
+    font-size: 11.5px; color: #c8d6f2; line-height: 1.35; overflow: hidden;
+  }
+  .xn-effnote b { font-weight: 700; color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  .xn-effnote u { text-decoration: none; font-weight: 700; color: #ffd489; }
+  .xn-effnote s { text-decoration: none; font-weight: 700; color: #b8f2cf; }
+
+  /* ===== 右栏：关键岗位清单（CSS grid 模拟表格，★ 面板高度写死） ===== */
+  .xn-postwrap { flex: none; height: 238px; }
+  .xn-thead, .xn-posts li {
+    display: grid; grid-template-columns: 1.35fr 0.95fr 0.5fr 1fr; align-items: center; gap: 8px;
+    padding: 0 10px; font-variant-numeric: tabular-nums;
+  }
+  .xn-thead {
+    flex: none; height: 24px; font-size: 11px; letter-spacing: 0.08em; color: rgba(127, 146, 196, 0.95);
+    border-bottom: 1px solid rgba(96, 140, 255, 0.22);
+  }
+  .xn-posts { flex: none; height: 132px; margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .xn-posts li {
+    flex: none; height: 40px; border-radius: 8px; font-size: 12px; color: #c8d6f2;
+    border: 1px solid rgba(96, 140, 255, 0.16); background: linear-gradient(120deg, rgba(20, 38, 92, 0.62), rgba(14, 26, 66, 0.5));
+  }
+  .xn-post-name { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .xn-post-name b { font-size: 13px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .xn-post-name span { font-size: 10px; color: rgba(127, 146, 196, 0.95); }
+  .xn-post-hc { font-size: 12.5px; }
+  .xn-post-hc b { font-weight: 700; color: #eaf1ff; }
+  .xn-post-gap { text-align: center; font: 700 16px/1 var(--xn-mono); color: #ffb59a; }
+  .xn-post-gap.is-ok { color: #b8f2cf; }
+  .xn-post-rate { display: flex; flex-direction: column; gap: 3px; }
+  .xn-post-rate span { font-size: 11px; font-weight: 700; color: #c8d6f2; }
+  .xn-post-bar { height: 5px; border-radius: 3px; background: rgba(96, 140, 255, 0.16); overflow: hidden; }
+  .xn-post-bar u { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--rnd-blue-deep), var(--rnd-blue)); }
+  .xn-post-bar u.is-warn { background: linear-gradient(90deg, #b4553a, var(--rnd-orange)); }
+  .xn-postsum {
+    flex: none; height: 26px; display: flex; align-items: center; gap: 10px; padding: 0 10px;
+    font-size: 11px; color: rgba(127, 146, 196, 0.95); font-variant-numeric: tabular-nums; overflow: hidden; white-space: nowrap;
+  }
+  .xn-postsum b { font-weight: 700; color: #ffd489; }
+
+  /* ===== 底部口径滚动条 ===== */
+  .xn-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .xn-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .xn-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: xn-blink 1.6s ease-in-out infinite; }
+  @keyframes xn-blink { 50% { opacity: 0.35; } }
+  .xn-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .xn-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: xn-ticker 76s linear infinite; will-change: transform; }
+  .xn-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .xn-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes xn-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .xn-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="xn-stage" id="xn-stage">
+    <!-- mockflag:begin --><div class="xn-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="xn-error" id="xn-error" role="alert">ECharts 资源加载失败，KPI、关键岗位清单与人效说明不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="xn-header">
+      <div class="xn-head-left">
+        <div class="xn-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="xn-crumb-up" href="大屏样板间-研发人才与能力1920.html" title="返回上级专题页（Esc）">‹ 返回 人才与能力</a><i>›</i>
+          <em id="xn-crumb-obj">--</em>
+          <span class="xn-crumb-note" id="xn-crumb-note"></span>
+        </div>
+        <div class="xn-head-title-row">
+          <div class="xn-head-title" id="xn-title">-- · 单职能人才详情</div>
+          <div class="xn-head-meta">
+            <span>本职能 <b id="xn-meta-hc">--</b> 人 · 占研发 <b id="xn-meta-share">--</b></span><i>|</i>
+            <span>承接 <b id="xn-meta-pts">--</b> 点 · 关键岗位 <b id="xn-meta-post">--</b> 个</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="xn-head-right">
+        <div class="xn-switcher" id="xn-switcher" aria-label="研发职能切换"></div>
+        <div class="xn-chips">
+          <a class="xn-chip" id="xn-chip-post" href="大屏样板间-研发关键岗位与招聘台账1920.html" title="切到岗位视角：关键岗位与招聘台账"><span>岗位视角 · 缺口与漏斗</span><b>关键岗位与招聘台账 ›</b></a>
+        </div>
+        <div class="xn-clock" aria-label="实时时钟">
+          <span class="xn-clock-time" id="xn-clock-time">--:--:--</span>
+          <span class="xn-clock-date" id="xn-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：人数 / 占比 / 平均职级 / 人均产出 / 关键岗位缺口 / 年化流失率 -->
+    <section class="xn-kpis" aria-label="本职能核心指标">
+      <div class="xn-kpi">
+        <div class="xn-kpi-label">本职能人数</div>
+        <div class="xn-kpi-num"><span class="xn-kpi-val" id="xn-kpi-0">0</span><span class="xn-kpi-unit">人</span></div>
+        <div class="xn-kpi-sub" id="xn-kpi-0s">--</div>
+      </div>
+      <div class="xn-kpi">
+        <div class="xn-kpi-label">占研发人员比</div>
+        <div class="xn-kpi-num"><span class="xn-kpi-val" id="xn-kpi-1">0</span><span class="xn-kpi-unit">%</span></div>
+        <div class="xn-kpi-sub" id="xn-kpi-1s">--</div>
+      </div>
+      <div class="xn-kpi is-amber">
+        <div class="xn-kpi-label">平均职级</div>
+        <div class="xn-kpi-num"><span class="xn-kpi-val" id="xn-kpi-2">0</span><span class="xn-kpi-unit">P</span></div>
+        <div class="xn-kpi-sub" id="xn-kpi-2s">--</div>
+      </div>
+      <div class="xn-kpi is-good" id="xn-kpi-3box">
+        <div class="xn-kpi-label">人均年产出</div>
+        <div class="xn-kpi-num"><span class="xn-kpi-val" id="xn-kpi-3">0</span><span class="xn-kpi-unit">点/人</span></div>
+        <div class="xn-kpi-sub" id="xn-kpi-3s">--</div>
+      </div>
+      <div class="xn-kpi">
+        <div class="xn-kpi-label">关键岗位缺口</div>
+        <div class="xn-kpi-num"><span class="xn-kpi-val" id="xn-kpi-4">0</span><span class="xn-kpi-unit">人</span></div>
+        <div class="xn-kpi-sub" id="xn-kpi-4s">--</div>
+      </div>
+      <div class="xn-kpi" id="xn-kpi-5box">
+        <div class="xn-kpi-label">年化流失率</div>
+        <div class="xn-kpi-num"><span class="xn-kpi-val" id="xn-kpi-5">0</span><span class="xn-kpi-unit">%</span></div>
+        <div class="xn-kpi-sub" id="xn-kpi-5s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：职级分布（主视觉）+ 站点分布 -->
+    <div class="xn-col">
+      <section class="xn-panel" style="flex: 1.14;">
+        <div class="xn-panel-head">
+          <h2>职级分布 · P4~P9</h2>
+          <span class="xn-panel-tag" id="xn-tag-rank">--</span>
+        </div>
+        <div class="xn-chart" id="xn-chart-rank"></div>
+      </section>
+      <section class="xn-panel" style="flex: 0.86;">
+        <div class="xn-panel-head">
+          <h2>站点分布 · 六研发站点</h2>
+          <span class="xn-panel-tag" id="xn-tag-site">--</span>
+        </div>
+        <div class="xn-chart" id="xn-chart-site"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：技能构成 + 招聘与流失 -->
+    <div class="xn-col">
+      <section class="xn-panel" style="flex: 1;">
+        <div class="xn-panel-head">
+          <h2>技能构成 · 掌握人数</h2>
+          <span class="xn-panel-tag" id="xn-tag-skill">--</span>
+        </div>
+        <div class="xn-chart" id="xn-chart-skill"></div>
+      </section>
+      <section class="xn-panel" style="flex: 1;">
+        <div class="xn-panel-head">
+          <h2>招聘与流失 · 近 12 月</h2>
+          <span class="xn-panel-tag" id="xn-tag-hire">--</span>
+        </div>
+        <div class="xn-chart" id="xn-chart-hire"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：人效对比 + 关键岗位缺口 -->
+    <div class="xn-col">
+      <section class="xn-panel" style="flex: 1;">
+        <div class="xn-panel-head">
+          <h2>人效对比 · 六职能人均产出</h2>
+          <span class="xn-panel-tag">全公司 <b id="xn-tag-eff">--</b> 点/人</span>
+        </div>
+        <div class="xn-chart" id="xn-chart-eff"></div>
+        <div class="xn-effnote" id="xn-effnote">--</div>
+      </section>
+      <section class="xn-panel xn-postwrap">
+        <div class="xn-panel-head">
+          <h2>本职能关键岗位</h2>
+          <span class="xn-panel-tag" id="xn-tag-post">--</span>
+        </div>
+        <div class="xn-thead"><span>关键岗位</span><span>在岗 / 编制</span><span style="text-align:center">缺口</span><span>饱和度</span></div>
+        <ul class="xn-posts" id="xn-posts"></ul>
+        <div class="xn-postsum" id="xn-postsum">--</div>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="xn-foot" aria-label="单职能人才详情口径说明">
+      <div class="xn-foot-label"><span class="xn-foot-dot"></span>人才口径</div>
+      <div class="xn-foot-viewport"><div class="xn-foot-track" id="xn-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("xn-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 1.1 ★ kiosk 状态量前置声明（必须早于任何 hold() 调用） =====
+     let 有暂时性死区：带 hash 冷启动时若先 hold() 再声明，会抛
+     ReferenceError: Cannot access 'holdUntil' before initialization —— 主脚本整段中断，
+     而页面此时已渲染完，肉眼看不出问题（契约 §8 批次四实测坑）。
+     因此 idx / timer / holdUntil / hold() / restart() 全部提到这里，
+     首次 hold() 调用在下方第 11 节（boot 段），行号严格大于本块。 */
+  let idx = 0;
+  let timer = null;
+  let holdUntil = 0;
+  let holdCalls = 0;                                           /* 供页尾自检做构造性断言 */
+  function hold() { holdCalls += 1; holdUntil = Date.now() + 20000; }
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyFunc(idx + 1); }, 14000);
+  }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层：单一数据源，六职能全部视图由此派生 =====
+     勾稽到契约基准盘（docs/RndIpdThemed.md §2.2）与父页/兄弟页：
+     · 六职能人数逐字：软件 1,460 + 硬件 620 + 云平台 540 + AI算法 420 + 测试 520 + PM与管理 300 = 3,860 人。
+     · 职能 × 职级 6×6 矩阵 = 父页「研发人才与能力」（前缀 rc）FUNCS[].mat 逐格复刻：
+       行和 = 本职能人数，列和 = 父页职级金字塔 P4~P9。
+     · 职能 × 站点 6×6 矩阵 = 兄弟页「研发单中心详情」（前缀 by）SITES[].funcs 的转置，逐格复刻：
+       行和 = 本职能人数，列和 = 契约六站点人数（1,240/680/720/480/420/320）。
+     · 承接故事点 = 父页 FUNCS[].pts 逐字，六职能 Σ = 19,396 点（契约 §2.2）；人均产出 = 承接 ÷ 人数现算。
+     · 关键岗位取自父页 10 个关键岗位，按兄弟页「关键岗位与招聘台账」（前缀 rl）的 func 归属划分——
+       每个岗位只归一个职能，六职能岗位并集 = 父页全 10 个、Σ在岗/编制 = 624/714。
+     · 入职/离职 12 月矩阵：按月用最大余数法把父页 HIRE.onboard / HIRE.leave 拆到六职能，列和逐月严格相等。
+     · 技能标签、职能画像文案为本页二级自编，Σ 关系全部由页尾自检硬校验。
+
+     【分工】本页 = 单个职能的人才画像（职级 / 站点 / 技能 / 人效 / 进出），
+             兄弟页「研发关键岗位与招聘台账」= 10 个关键岗位的缺口与五段招聘漏斗，两页不重复展开。 */
+
+  const LEVELS = [                                             /* 父页 rc LEVELS 逐字 */
+    { code: "P4", name: "初级", lv: 4 },
+    { code: "P5", name: "中级", lv: 5 },
+    { code: "P6", name: "高级", lv: 6 },
+    { code: "P7", name: "资深", lv: 7 },
+    { code: "P8", name: "专家", lv: 8 },
+    { code: "P9", name: "首席", lv: 9 }
+  ];
+  const SITES = ["北京总部", "上海中心", "深圳中心", "成都中心", "西安中心", "南京中心"];
+  const SITE_SHORT = ["北京", "上海", "深圳", "成都", "西安", "南京"];
+  const SITE_AUTH = [1240, 680, 720, 480, 420, 320];           /* 契约 §2.2 六站点逐字 */
+
+  /* 3.1 职能主表：mat = 职能×职级（父页 rc 逐格）；pts = 承接故事点（父页 rc 逐字） */
+  const FUNCS = [
+    { name: "软件", short: "软件", color: C.blue, role: "应用软件 · 系统软件 · 中间件",
+      mat: [460, 420, 300, 170, 86, 24], pts: 9180 },
+    { name: "硬件", short: "硬件", color: C.amber, role: "结构 · 电子 · 射频与整机",
+      mat: [180, 170, 130, 80, 46, 14], pts: 2420 },
+    { name: "云平台", short: "云平台", color: C.cyan, role: "云服务 · 数据平台 · SRE",
+      mat: [155, 145, 110, 80, 38, 12], pts: 3140 },
+    { name: "AI算法", short: "AI算法", color: C.violet, role: "视觉 · 语音 · 大模型与边缘推理",
+      mat: [110, 115, 95, 68, 24, 8], pts: 2180 },
+    { name: "测试", short: "测试", color: C.green, role: "系统验证 · 自动化 · 可靠性",
+      mat: [190, 145, 95, 63, 22, 5], pts: 1860 },
+    { name: "PM与管理", short: "PM", color: C.orange, role: "产品经理 · 项目管理 · 流程与合规",
+      mat: [85, 65, 50, 59, 28, 13], pts: 616 }
+  ];
+  /* 契约锚定串（仅供自检构造性比对，展示一律用矩阵现算值） */
+  const FUNC_AUTH = "软件|1460;硬件|620;云平台|540;AI算法|420;测试|520;PM与管理|300";
+  const PEOPLE_ALL = 3860;                                     /* 契约 §2.2 研发人员 */
+  const THROUGHPUT = 19396;                                    /* 契约 §2.2 年故事点吞吐 */
+
+  /* 3.2 站点 × 职能 6×6（兄弟页 by SITES[].funcs 逐字；列序 = FUNCS 序，行序 = SITES 序） */
+  const SITE_FUNC = [
+    [520, 120, 220, 130, 150, 100],                            /* 北京总部 1,240 */
+    [260, 60, 90, 130, 90, 50],                                /* 上海中心 680 */
+    [210, 250, 80, 50, 90, 40],                                /* 深圳中心 720 */
+    [200, 60, 60, 70, 60, 30],                                 /* 成都中心 480 */
+    [160, 100, 40, 30, 60, 30],                                /* 西安中心 420 */
+    [110, 30, 50, 10, 70, 50]                                  /* 南京中心 320 */
+  ];
+  const SITE_FUNC_AUTH = "520,120,220,130,150,100;260,60,90,130,90,50;210,250,80,50,90,40;" +
+    "200,60,60,70,60,30;160,100,40,30,60,30;110,30,50,10,70,50";
+
+  /* 3.3 技能标签（掌握人数 = 全公司掌握该标签的人数，按主归属职能归类；一人多标签 → Σ人次 > 人数）
+         src:"P" = 命中父页 rc 的 TOP30 热词表，人数与父页逐字；src:"S" = 本页二级长尾自编。 */
+  const SKILLS = {
+    "软件": [
+      { w: "Java", n: 1180, src: "P" }, { w: "Python", n: 940, src: "P" }, { w: "Go", n: 860, src: "P" },
+      { w: "微服务", n: 700, src: "P" }, { w: "分布式架构", n: 620, src: "S" }, { w: "单元测试", n: 560, src: "S" },
+      { w: "TypeScript", n: 480, src: "P" }, { w: "性能调优", n: 430, src: "S" }, { w: "前端框架", n: 380, src: "S" },
+      { w: "领域驱动设计", n: 340, src: "S" }, { w: "Rust", n: 210, src: "P" }, { w: "C#", n: 160, src: "S" }
+    ],
+    "硬件": [
+      { w: "C++", n: 620, src: "P" }, { w: "嵌入式C", n: 540, src: "P" }, { w: "PCB Layout", n: 260, src: "P" },
+      { w: "电源设计", n: 240, src: "S" }, { w: "低功耗设计", n: 220, src: "P" }, { w: "器件选型", n: 210, src: "S" },
+      { w: "EMC整改", n: 195, src: "S" }, { w: "信号完整性", n: 180, src: "P" }, { w: "结构仿真", n: 170, src: "P" },
+      { w: "热仿真", n: 150, src: "S" }, { w: "射频调试", n: 130, src: "P" }
+    ],
+    "云平台": [
+      { w: "SQL", n: 780, src: "P" }, { w: "CI-CD", n: 660, src: "P" }, { w: "K8s", n: 610, src: "P" },
+      { w: "Redis", n: 560, src: "P" }, { w: "DevOps", n: 430, src: "P" }, { w: "Kafka", n: 380, src: "P" },
+      { w: "可观测性", n: 350, src: "P" }, { w: "服务网格", n: 240, src: "S" }, { w: "Terraform", n: 190, src: "P" },
+      { w: "多云治理", n: 165, src: "S" }
+    ],
+    "AI算法": [
+      { w: "PyTorch", n: 430, src: "P" }, { w: "特征工程", n: 320, src: "S" }, { w: "计算机视觉", n: 290, src: "P" },
+      { w: "模型压缩", n: 275, src: "S" }, { w: "边缘计算", n: 260, src: "P" }, { w: "大模型微调", n: 240, src: "P" },
+      { w: "推荐算法", n: 210, src: "S" }, { w: "MLOps", n: 195, src: "S" }, { w: "数据标注", n: 175, src: "S" },
+      { w: "语音识别", n: 150, src: "P" }, { w: "强化学习", n: 120, src: "S" }
+    ],
+    "测试": [
+      { w: "自动化测试", n: 520, src: "P" }, { w: "用例设计", n: 486, src: "S" }, { w: "缺陷分析", n: 432, src: "S" },
+      { w: "接口测试", n: 405, src: "S" }, { w: "性能压测", n: 340, src: "P" }, { w: "兼容性测试", n: 305, src: "S" },
+      { w: "测试平台开发", n: 245, src: "S" }, { w: "可靠性试验", n: 232, src: "S" }, { w: "安全测试", n: 186, src: "S" },
+      { w: "硬件在环", n: 148, src: "S" }
+    ],
+    "PM与管理": [
+      { w: "安全合规", n: 300, src: "P" }, { w: "数据治理", n: 280, src: "P" }, { w: "需求分析", n: 268, src: "S" },
+      { w: "IPD流程", n: 246, src: "S" }, { w: "项目计划", n: 232, src: "S" }, { w: "干系人管理", n: 205, src: "S" },
+      { w: "成本核算", n: 168, src: "S" }, { w: "敏捷教练", n: 142, src: "S" }, { w: "风险管理", n: 130, src: "S" },
+      { w: "商业分析", n: 96, src: "S" }
+    ]
+  };
+  /* 父页 rc TOP30 热词表逐字镜像（w|n|归属职能），供自检核对命中项人数是否与父页一致 */
+  const SKILL_PARENT_AUTH = ("Java|1180|软件;Python|940|软件;Go|860|软件;SQL|780|云平台;微服务|700|软件;" +
+    "CI-CD|660|云平台;C++|620|硬件;K8s|610|云平台;Redis|560|云平台;嵌入式C|540|硬件;" +
+    "自动化测试|520|测试;TypeScript|480|软件;PyTorch|430|AI算法;DevOps|430|云平台;Kafka|380|云平台;" +
+    "可观测性|350|云平台;性能压测|340|测试;安全合规|300|PM与管理;计算机视觉|290|AI算法;数据治理|280|PM与管理;" +
+    "边缘计算|260|AI算法;PCB Layout|260|硬件;大模型微调|240|AI算法;低功耗设计|220|硬件;Rust|210|软件;" +
+    "Terraform|190|云平台;信号完整性|180|硬件;结构仿真|170|硬件;语音识别|150|AI算法;射频调试|130|硬件")
+    .split(";").map((s) => s.split("|"));
+
+  /* 3.4 关键岗位（父页 rc POSTS 的 name/on/hc 逐字；func 归属与兄弟页 rl POSTS[].func 逐字一致） */
+  const POSTS = [
+    { name: "产品经理", func: "PM与管理", on: 88, hc: 92 },
+    { name: "数据工程", func: "云平台", on: 92, hc: 98 },
+    { name: "云平台架构", func: "云平台", on: 56, hc: 60 },
+    { name: "测试架构", func: "测试", on: 48, hc: 52 },
+    { name: "硬件结构", func: "硬件", on: 58, hc: 64 },
+    { name: "系统架构师", func: "软件", on: 86, hc: 100 },
+    { name: "SRE 站点可靠性", func: "云平台", on: 74, hc: 86 },
+    { name: "算法专家", func: "AI算法", on: 62, hc: 80 },
+    { name: "安全架构", func: "软件", on: 34, hc: 44 },
+    { name: "射频与天线", func: "硬件", on: 26, hc: 38 }
+  ];
+  const POST_AUTH = "产品经理|88|92;数据工程|92|98;云平台架构|56|60;测试架构|48|52;硬件结构|58|64;" +
+    "系统架构师|86|100;SRE 站点可靠性|74|86;算法专家|62|80;安全架构|34|44;射频与天线|26|38";
+  const POST_WARN = 85;                                        /* 饱和度警戒线（%，父页同值） */
+
+  /* 3.5 近 12 月招聘/流失（父页 rc HIRE.onboard / HIRE.leave 逐字，本页按职能拆分） */
+  const MONTHS = ["25-09", "25-10", "25-11", "25-12", "26-01", "26-02", "26-03", "26-04", "26-05", "26-06", "26-07", "26-08"];
+  const ON_ALL = [92, 78, 64, 51, 38, 46, 88, 96, 84, 72, 68, 69];   /* Σ = 846 人 */
+  const LV_ALL = [24, 22, 27, 32, 44, 37, 29, 25, 23, 27, 28, 25];   /* Σ = 343 人 */
+  const ON_W = [38, 11, 17, 13, 15, 6];                        /* 入职分配基准权重（六职能） */
+  const LV_W = [35, 12, 15, 15, 17, 6];                        /* 离职分配基准权重（六职能） */
+
+  /* ===== 3.6 派生量（全部 JS 现算，页面不出现硬编码合计） ===== */
+  /* 最大余数法整数分配：Σ 结果严格等于 total */
+  function allocate(total, weights) {
+    const wsum = sum(weights);
+    const raw = weights.map((w) => total * w / wsum);
+    const base = raw.map(Math.floor);
+    const rest = total - sum(base);
+    const order = raw.map((v, i) => [v - base[i], i]).sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+    for (let k = 0; k < rest; k += 1) base[order[k][1]] += 1;
+    return base;
+  }
+
+  const FUNC_IDX = {};
+  FUNCS.forEach((f, i) => { FUNC_IDX[f.name] = i; });
+
+  /* 入职 / 离职：逐月把全量拆到六职能（权重带确定性月相扰动，最大余数法保列和严格相等） */
+  const onMat = FUNCS.map(() => []);
+  const lvMat = FUNCS.map(() => []);
+  MONTHS.forEach((m, mi) => {
+    const wOn = ON_W.map((w, i) => w + Math.sin((mi + 1) * (i + 2) * 0.8) * 2.2);
+    const wLv = LV_W.map((w, i) => w + Math.sin((mi + 2) * (i + 3) * 0.7) * 2.0);
+    const a = allocate(ON_ALL[mi], wOn);
+    const b = allocate(LV_ALL[mi], wLv);
+    a.forEach((v, i) => onMat[i].push(v));
+    b.forEach((v, i) => lvMat[i].push(v));
+  });
+
+  FUNCS.forEach((f, i) => {
+    f.n = sum(f.mat);                                          /* 行和 = 本职能人数 */
+    f.lvSum = sum(f.mat.map((v, j) => v * LEVELS[j].lv));
+    f.avgLv = f.lvSum / f.n;                                   /* 平均职级现算 */
+    f.eff = f.pts / f.n;                                       /* 人均年产出现算 */
+    f.sites = SITE_FUNC.map((row) => row[i]);                  /* 职能 × 站点：SITE_FUNC 转置一列 */
+    f.siteSum = sum(f.sites);
+    f.skills = SKILLS[f.name].slice();
+    f.skillSum = sum(f.skills.map((s) => s.n));
+    f.posts = POSTS.filter((p) => p.func === f.name).map((p) => ({
+      name: p.name, on: p.on, hc: p.hc, gap: p.hc - p.on, rate: p.on / p.hc * 100
+    })).sort((a, b) => b.gap - a.gap || b.hc - a.hc);
+    f.postOn = sum(f.posts.map((p) => p.on));
+    f.postHc = sum(f.posts.map((p) => p.hc));
+    f.postGap = f.postHc - f.postOn;
+    f.on12 = onMat[i].slice();
+    f.lv12 = lvMat[i].slice();
+    f.onYear = sum(f.on12);
+    f.lvYear = sum(f.lv12);
+    f.netYear = f.onYear - f.lvYear;
+    f.attr = f.lvYear / f.n * 100;                             /* 年化流失率现算 */
+  });
+
+  const hcAll = sum(FUNCS.map((f) => f.n));                    /* 3,860 */
+  const ptsAll = sum(FUNCS.map((f) => f.pts));                 /* 19,396 */
+  const effAll = ptsAll / hcAll;                               /* 5.02 点/人 */
+  const lvCol = LEVELS.map((l, j) => sum(FUNCS.map((f) => f.mat[j])));   /* 全公司职级金字塔 */
+  const siteCol = SITES.map((s, k) => sum(SITE_FUNC[k]));      /* 六站点人数（= 契约逐字） */
+  const avgLvAll = sum(FUNCS.map((f) => f.lvSum)) / hcAll;
+  const onAllYear = sum(ON_ALL);                               /* 846 */
+  const lvAllYear = sum(LV_ALL);                               /* 343 */
+  const attrAll = lvAllYear / hcAll * 100;                     /* 全公司年化流失率 */
+  const postOnAll = sum(POSTS.map((p) => p.on));               /* 624 */
+  const postHcAll = sum(POSTS.map((p) => p.hc));               /* 714 */
+  const postGapAll = postHcAll - postOnAll;                    /* 90 */
+  FUNCS.forEach((f) => { f.share = f.n / hcAll * 100; });
+  const effRank = FUNCS.slice().sort((a, b) => b.eff - a.eff).map((f) => f.name);
+  const hcRank = FUNCS.slice().sort((a, b) => b.n - a.n).map((f) => f.name);
+
+  /* ===== 4. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("xn-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("xn-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. 职能切换器（tab 文本 = 契约六职能名逐字，同时是 hash 键） ===== */
+  const switcher = $("xn-switcher");
+  switcher.innerHTML = FUNCS.map((f, i) => (
+    '<button class="xn-sw-tab" type="button" data-i="' + i + '" title="切换到' + f.name + '职能（← → 方向键）">' +
+      "<b>" + f.name + "</b><span>" + fmtInt(f.n) + " 人</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".xn-sw-tab"));
+
+  /* ===== 6. 非图表区渲染（不依赖 echarts；★ 全部在 echarts.init 之前完成首屏填充） ===== */
+  function countUp(el, target, fmt) {
+    const t0 = performance.now(), dur = 1400;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+  function renderKpi(f) {
+    const topLv = f.mat[3] + f.mat[4] + f.mat[5];
+    const defs = [
+      { v: f.n, fmt: (x) => fmtInt(x),
+        sub: "六职能之和 <b>" + fmtInt(hcAll) + "</b> 人（契约 §2.2 逐字）· 人数第 " + (hcRank.indexOf(f.name) + 1) + " 位" },
+      { v: f.share, fmt: (x) => fmtDec(x, 1),
+        sub: fmtInt(f.n) + " ÷ <b>" + fmtInt(hcAll) + "</b> 现算 · 站点分布覆盖 " + f.sites.filter((v) => v > 0).length + "/6 站" },
+      { v: f.avgLv, fmt: (x) => fmtDec(x, 2),
+        sub: "Σ(职级×人数) ÷ 人数现算 · 全公司 <b>" + fmtDec(avgLvAll, 2) + "</b> · P7+ 占 " + fmtDec(topLv / f.n * 100, 1) + "%" },
+      { v: f.eff, fmt: (x) => fmtDec(x, 2),
+        sub: "承接 " + fmtInt(f.pts) + " 点 ÷ " + fmtInt(f.n) + " 人 · 全公司 <b>" + fmtDec(effAll, 2) + "</b> 点/人" },
+      { v: f.postGap, fmt: (x) => fmtInt(x),
+        sub: "<b>" + f.posts.length + "</b> 个关键岗位 · 编制 " + fmtInt(f.postHc) + " / 在岗 " + fmtInt(f.postOn) +
+          " · 全量缺口 " + fmtInt(postGapAll) },
+      { v: f.attr, fmt: (x) => fmtDec(x, 2),
+        sub: "近 12 月离职 <b>" + fmtInt(f.lvYear) + "</b> 人 ÷ " + fmtInt(f.n) + " 人 · 全公司 " + fmtDec(attrAll, 2) + "%" }
+    ];
+    defs.forEach((d, i) => {
+      countUp($("xn-kpi-" + i), d.v, d.fmt);
+      $("xn-kpi-" + i + "s").innerHTML = d.sub;
+    });
+    const eb = $("xn-kpi-3box");
+    eb.classList.toggle("is-good", f.eff >= effAll);
+    eb.classList.toggle("is-amber", f.eff < effAll);
+    const ab = $("xn-kpi-5box");
+    ab.classList.toggle("is-good", f.attr <= attrAll);
+    ab.classList.toggle("is-amber", f.attr > attrAll);
+
+    $("xn-tag-rank").innerHTML = "P4~P9 Σ <b>" + fmtInt(sum(f.mat)) + "</b> 人 = 本职能人数 · 平均职级 " + fmtDec(f.avgLv, 2);
+    $("xn-tag-site").innerHTML = "六站点 Σ <b>" + fmtInt(f.siteSum) + "</b> 人 · 与「单中心详情」矩阵逐格同源";
+    $("xn-tag-skill").innerHTML = "<b>" + f.skills.length + "</b> 项 · 其中 " +
+      f.skills.filter((s) => s.src === "P").length + " 项取自父页词表 · Σ人次 " + fmtInt(f.skillSum) + "（一人多标签）";
+    $("xn-tag-hire").innerHTML = "入职 <b>" + fmtInt(f.onYear) + "</b> · 离职 " + fmtInt(f.lvYear) +
+      " · 净增 " + (f.netYear >= 0 ? "+" : "") + fmtInt(f.netYear) + " 人";
+    $("xn-tag-eff").textContent = fmtDec(effAll, 2);
+    $("xn-tag-post").innerHTML = "<b>" + f.posts.length + "</b> 个 · 取自父页 " + POSTS.length + " 岗位";
+  }
+  function renderPosts(f) {
+    $("xn-posts").innerHTML = f.posts.map((p) => (
+      "<li>" +
+        '<span class="xn-post-name"><b>' + p.name + "</b><span>缺口影响见岗位台账</span></span>" +
+        '<span class="xn-post-hc"><b>' + fmtInt(p.on) + "</b> / " + fmtInt(p.hc) + " 人</span>" +
+        '<span class="xn-post-gap' + (p.gap === 0 ? " is-ok" : "") + '">' + fmtInt(p.gap) + "</span>" +
+        '<span class="xn-post-rate"><span>' + fmtDec(p.rate, 1) + "%</span>" +
+          '<span class="xn-post-bar"><u class="' + (p.rate < POST_WARN ? "is-warn" : "") +
+            '" style="width:' + fmtDec(p.rate, 1) + '%"></u></span></span>' +
+      "</li>"
+    )).join("");
+    $("xn-postsum").innerHTML = "本职能合计 在岗 <b>" + fmtInt(f.postOn) + "</b> / 编制 <b>" + fmtInt(f.postHc) +
+      "</b> · 饱和度 " + fmtDec(f.postOn / f.postHc * 100, 1) + "% · 警戒线 " + POST_WARN +
+      "% · 全量 " + fmtInt(postOnAll) + "/" + fmtInt(postHcAll);
+  }
+  function renderEffNote(f) {
+    const ratio = f.eff / effAll * 100;
+    const tag = ratio >= 100 ? "<s>高于</s>" : "<u>低于</u>";
+    $("xn-effnote").innerHTML =
+      "<div>承接故事点 <b>" + fmtInt(f.pts) + "</b> 点 · 占全量 <b>" + fmtDec(f.pts / ptsAll * 100, 1) +
+        "%</b>（六职能 Σ = " + fmtInt(ptsAll) + " 点，契约 §2.2）· 人效排名第 <b>" + (effRank.indexOf(f.name) + 1) + "</b>/6</div>" +
+      "<div>人均 <b>" + fmtDec(f.eff, 2) + "</b> 点/人 = " + fmtInt(f.pts) + " ÷ " + fmtInt(f.n) +
+        " 现算，" + tag + "全公司 " + fmtDec(effAll, 2) + " 点/人 " + fmtDec(Math.abs(ratio - 100), 1) +
+        "%（口径：故事点仅计敏捷承接量，PM与管理等支撑型职能天然偏低）</div>";
+  }
+
+  /* 底部口径滚动（与职能无关，只建一次；★ 图表 init 之前填充） */
+  (function buildFoot() {
+    const items = [
+      ["口径", C.amber, "六职能人数与契约 §2.2 逐字：" + FUNCS.map((f) => f.name + " " + fmtInt(f.n)).join(" + ") +
+        " = " + fmtInt(hcAll) + " 人；本页所有合计现算，不复制数字"],
+      ["同源", C.blue, "职能 × 职级 6×6 矩阵与父页「研发人才与能力」逐格一致：行和 = 本职能人数，" +
+        "列和 = 职级金字塔 " + lvCol.map(fmtInt).join(" / ") + "，Σ = " + fmtInt(sum(lvCol)) + " 人"],
+      ["同源", C.blue, "职能 × 站点 6×6 矩阵与「研发单中心详情 / 多中心布局」逐格一致：行和 = 本职能人数，" +
+        "列和 = 契约六站点 " + siteCol.map(fmtInt).join(" / ") + "，Σ = " + fmtInt(sum(siteCol)) + " 人"],
+      ["口径", C.amber, "技能标签口径：掌握人数 = 全公司掌握该标签的人数，按主归属职能归类；一人可持多标签，" +
+        "故 Σ人次 > 本职能人数，个别标签人数可略超本职能人数，不与人数勾稽。命中父页 TOP30 热词表的标签人数与父页逐字，其余为本页二级长尾"],
+      ["口径", C.amber, "承接故事点六职能 Σ = " + fmtInt(ptsAll) + " 点（契约 §2.2）；人均年产出 = 承接 ÷ 人数现算，" +
+        "全公司 " + fmtInt(ptsAll) + " ÷ " + fmtInt(hcAll) + " = " + fmtDec(effAll, 2) + " 点/人"],
+      ["口径", C.amber, "入职 / 离职 12 月矩阵按月用最大余数法把父页全量拆到六职能，列和逐月严格相等：" +
+        "年入职 Σ = " + fmtInt(onAllYear) + " 人、年离职 Σ = " + fmtInt(lvAllYear) + " 人；年化流失率 = 年离职 ÷ 本职能人数"],
+      ["分工", C.violet, "本页 = 单个职能的人才画像（职级 / 站点 / 技能 / 人效 / 进出）；兄弟页「研发关键岗位与招聘台账」= " +
+        "10 个关键岗位的缺口与五段招聘漏斗。两页岗位归属同源（每岗位只归一个职能，六职能并集 = 全 10 岗、Σ在岗 " +
+        fmtInt(postOnAll) + " / 编制 " + fmtInt(postHcAll) + "），口径不重复展开"],
+      ["导航", C.cyan, "Esc 或左上角返回「人才与能力」；← → 切换职能；14 秒自动轮换、鼠标停在切换器上暂停；" +
+        "hash 支持六职能名（收 AI / 算法 / PM / 管理 / 云 等简写），父页职级金字塔传入 P4~P9 时兜底到默认职能「" +
+        FUNCS[0].name + "」并在面包屑标注"]
+    ];
+    const html = items.map((a) => '<span class="xn-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("xn-foot-track").innerHTML = html + html;                 /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* ===== 7. 静态层整页重绘（不依赖 echarts） ===== */
+  function paintStatic(f) {
+    $("xn-title").textContent = f.name + " · 单职能人才详情";
+    $("xn-crumb-obj").textContent = f.name + " · " + f.role;
+    $("xn-meta-hc").textContent = fmtInt(f.n);
+    $("xn-meta-share").textContent = fmtDec(f.share, 1) + "%";
+    $("xn-meta-pts").textContent = fmtInt(f.pts);
+    $("xn-meta-post").textContent = f.posts.length;
+    $("xn-chip-post").href = "大屏样板间-研发关键岗位与招聘台账1920.html#" + encodeURIComponent(f.posts[0].name);
+    renderKpi(f);
+    renderPosts(f);
+    renderEffNote(f);
+  }
+
+  /* ===== 7.1 hash 契约：decodeURIComponent → 归一（trim + 全角空白剔除）→ 匹配六职能名 =====
+     HASH_ALIAS 除常见简写外，还收父页职级金字塔可能传来的职级键（P4~P9 / 初级~首席），
+     统一兜底到默认职能（软件，人数最多的职能），并在面包屑用橙色小标注说明这是兜底。 */
+  const DEFAULT_FUNC = 0;
+  const HASH_ALIAS = {};
+  const LEVEL_KEY = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k).replace(/[\s　]+/g, "").toUpperCase()] = v; };
+  FUNCS.forEach((f, i) => { alias(f.name, i); });
+  alias("软件工程", 0); alias("SW", 0); alias("软件研发", 0);
+  alias("HW", 1); alias("硬件研发", 1);
+  alias("云", 2); alias("云端", 2); alias("云服务", 2); alias("平台", 2);
+  alias("AI", 3); alias("算法", 3); alias("AI算法", 3); alias("人工智能", 3);
+  alias("QA", 4); alias("测试验证", 4);
+  alias("PM", 5); alias("管理", 5); alias("项目管理", 5); alias("PM与管理", 5); alias("PMO", 5);
+  /* 父页职级键兜底（金字塔类目是职级而非职能） */
+  LEVELS.forEach((l) => {
+    [l.code, l.name, l.code + l.name, l.code + " " + l.name].forEach((k) => {
+      const nk = String(k).replace(/[\s　]+/g, "").toUpperCase();
+      LEVEL_KEY[nk] = true;
+      if (HASH_ALIAS[nk] === undefined) HASH_ALIAS[nk] = DEFAULT_FUNC;
+    });
+  });
+  function normKey(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    return s.replace(/[\s　]+/g, "");
+  }
+  function resolveHash(raw) {
+    const s = normKey(raw);
+    if (!s) return -1;
+    let k = HASH_ALIAS[s.toUpperCase()];
+    return k === undefined ? -1 : k;
+  }
+  function hashVia(raw) {
+    const s = normKey(raw);
+    if (!s) return "none";
+    const u = s.toUpperCase();
+    if (LEVEL_KEY[u]) return "level";
+    if (HASH_ALIAS[u] === undefined) return "none";
+    return FUNCS.some((f) => f.name === s) ? "exact" : "alias";
+  }
+  function paintCrumbNote(via, raw) {
+    const el = $("xn-crumb-note");
+    if (via === "level") {
+      el.textContent = "父页传入职级「" + normKey(raw) + "」· 已兜底到默认职能 " + FUNCS[DEFAULT_FUNC].name;
+      el.classList.add("is-visible");
+    } else {
+      el.textContent = "";
+      el.classList.remove("is-visible");
+    }
+  }
+
+  const bootRaw = location.hash;
+  const bootHit = resolveHash(bootRaw);
+  const bootVia = hashVia(bootRaw);
+  const bootIdx = bootHit >= 0 ? bootHit : 0;
+  paintStatic(FUNCS[bootIdx]);                                  /* ★ 非图表区先填充，再 init 图表 */
+  paintCrumbNote(bootVia, bootRaw);
+  swTabs.forEach((b, k) => b.classList.toggle("is-active", k === bootIdx));
+
+  /* ===== 8. 资源守卫（KPI / 岗位清单 / 人效说明已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("xn-error").classList.add("is-visible");
+
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const rankChart = hasEcharts ? echarts.init($("xn-chart-rank")) : null;
+  const siteChart = hasEcharts ? echarts.init($("xn-chart-site")) : null;
+  const skillChart = hasEcharts ? echarts.init($("xn-chart-skill")) : null;
+  const hireChart = hasEcharts ? echarts.init($("xn-chart-hire")) : null;
+  const effChart = hasEcharts ? echarts.init($("xn-chart-eff")) : null;
+
+  /* ===== 9. option 构造（★ 只放标量与数组，职能/岗位对象一律不进 option，避免深拷贝循环引用） ===== */
+
+  /* 9.1 职级分布金字塔（主视觉；漏斗 sort:none，数据倒序 P9→P4，Σ = 本职能人数） */
+  function rankOption(f) {
+    const order = LEVELS.map((l, j) => j).reverse();            /* P9 … P4 */
+    const vals = order.map((j) => f.mat[j]);
+    const names = order.map((j) => LEVELS[j].code + " " + LEVELS[j].name);
+    const cols = order.map((j) => PAL.series[j % PAL.series.length]);
+    const colVals = order.map((j) => lvCol[j]);
+    const total = f.n;
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const k = p.dataIndex;
+          return "<b>" + names[k] + "</b><br/>本职能 <b>" + fmtInt(vals[k]) + "</b> 人 · 占本职能 " +
+            fmtDec(vals[k] / total * 100, 1) + "%<br/>全公司该职级 " + fmtInt(colVals[k]) +
+            " 人 · 本职能占其 " + fmtDec(vals[k] / colVals[k] * 100, 1) + "%<br/>口径：职能×职级矩阵与父页逐格一致";
+        }
+      }, TIP),
+      series: [{
+        type: "funnel", sort: "none", left: "5%", right: "5%", top: 8, bottom: 6,
+        min: 0, max: Math.max.apply(null, vals), minSize: "22%", maxSize: "98%", gap: 3,
+        label: {
+          show: true, position: "inside", fontSize: 12, fontWeight: 700, color: "#08122f",
+          formatter: (p) => names[p.dataIndex] + "　" + fmtInt(p.value) + " 人 · " +
+            fmtDec(p.value / total * 100, 1) + "%"
+        },
+        itemStyle: { borderColor: "rgba(8,18,49,.85)", borderWidth: 1 },
+        data: vals.map((v, k) => ({
+          value: v,
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(cols[k], 0.2) }, { offset: 1, color: cols[k] }])
+          }
+        }))
+      }]
+    };
+  }
+
+  /* 9.2 站点分布（横向条，Σ = 本职能人数；与职能×站点矩阵逐格一致） */
+  function siteOption(f) {
+    const vals = f.sites.slice();
+    const total = f.n;
+    const colorHex = f.color;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 104, top: 6, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const k = p.dataIndex;
+          return "<b>" + SITES[k] + "</b><br/>本职能在此 <b>" + fmtInt(vals[k]) + "</b> 人 · 占本职能 " +
+            fmtDec(vals[k] / total * 100, 1) + "%<br/>该站研发 " + fmtInt(siteCol[k]) + " 人 · 本职能占其 " +
+            fmtDec(vals[k] / siteCol[k] * 100, 1) + "%";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max.apply(null, vals) * 1.42 },
+      yAxis: {
+        type: "category", inverse: true, data: SITES.slice(),
+        axisLabel: { color: C.text, fontSize: 11.5 }, axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 14,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 7 },
+        data: vals.map((v) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: 7,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(colorHex, 0.45) }, { offset: 1, color: colorHex }])
+          }
+        })),
+        label: {
+          show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => fmtInt(p.value) + " 人 · " + fmtDec(p.value / total * 100, 1) + "%"
+        }
+      }]
+    };
+  }
+
+  /* 9.3 技能构成（横向条；父页词表命中项满色，本页长尾项压暗，Σ人次 > 人数已在口径注明） */
+  function skillOption(f) {
+    const names = f.skills.map((s) => s.w);
+    const vals = f.skills.map((s) => s.n);
+    const srcs = f.skills.map((s) => s.src);
+    const total = f.skillSum;
+    const colorHex = f.color;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 96, top: 4, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const k = p.dataIndex;
+          return "<b>" + names[k] + "</b>（" + (srcs[k] === "P" ? "父页 TOP30 词表 · 人数逐字" : "本页二级长尾") +
+            "）<br/>掌握人数 <b>" + fmtInt(vals[k]) + "</b> 人 · 占本职能技能人次 " +
+            fmtDec(vals[k] / total * 100, 1) + "%<br/>相当于本职能 " + fmtInt(f.n) + " 人的 " +
+            fmtDec(vals[k] / f.n * 100, 1) + "%（一人多标签，可 > 100%）";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max.apply(null, vals) * 1.34 },
+      yAxis: {
+        type: "category", inverse: true, data: names,
+        axisLabel: { color: C.text, fontSize: 11 }, axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 11,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.07)", borderRadius: 6 },
+        data: vals.map((v, k) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: 6,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(colorHex, srcs[k] === "P" ? 0.5 : 0.66) },
+              { offset: 1, color: srcs[k] === "P" ? colorHex : darken(colorHex, 0.32) }])
+          }
+        })),
+        label: {
+          show: true, position: "right", fontSize: 10.5, fontWeight: 700, color: "#c8d6f2",
+          formatter: (p) => fmtInt(p.value) + (srcs[p.dataIndex] === "P" ? " ★" : "")
+        }
+      }]
+    };
+  }
+
+  /* 9.4 招聘与流失（12 月入职/离职双柱 + 净增折线，双轴） */
+  function hireOption(f) {
+    const on = f.on12.slice(), lv = f.lv12.slice();
+    const net = on.map((v, i) => v - lv[i]);
+    const netAbs = Math.max.apply(null, net.map(Math.abs));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 4, top: 30, bottom: 2, containLabel: true },
+      legend: { top: 0, right: 2, itemWidth: 12, itemHeight: 8, textStyle: { color: C.textDim, fontSize: 11 } },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>20" + MONTHS[i] + "</b><br/>入职 <b>" + fmtInt(on[i]) + "</b> 人 · 全量 " + fmtInt(ON_ALL[i]) +
+            " 人（占 " + fmtDec(on[i] / ON_ALL[i] * 100, 1) + "%）<br/>离职 <b>" + fmtInt(lv[i]) +
+            "</b> 人 · 全量 " + fmtInt(LV_ALL[i]) + " 人（占 " + fmtDec(lv[i] / LV_ALL[i] * 100, 1) +
+            "%）<br/>净增 <b>" + (net[i] >= 0 ? "+" : "") + fmtInt(net[i]) + "</b> 人";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: MONTHS.slice(),
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 10, rotate: 32 }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: [
+        { type: "value", name: "人/月", nameTextStyle: { color: C.textDim, fontSize: 10 }, axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
+        {
+          type: "value", name: "净增", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          min: -Math.ceil(netAbs * 1.6), max: Math.ceil(netAbs * 1.6),
+          axisLabel: AXIS_LABEL, splitLine: { show: false }
+        }
+      ],
+      series: [
+        {
+          name: "入职", type: "bar", barGap: "12%", barWidth: "30%", yAxisIndex: 0, data: on,
+          itemStyle: {
+            borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: C.green }, { offset: 1, color: "rgba(111,224,154,0.22)" }])
+          }
+        },
+        {
+          name: "离职", type: "bar", barWidth: "30%", yAxisIndex: 0, data: lv,
+          itemStyle: {
+            borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: C.red }, { offset: 1, color: "rgba(255,95,107,0.20)" }])
+          }
+        },
+        {
+          name: "净增", type: "line", yAxisIndex: 1, data: net, smooth: true,
+          symbol: "circle", symbolSize: 5,
+          lineStyle: { color: C.amber, width: 2 }, itemStyle: { color: C.amber },
+          markLine: {
+            silent: true, symbol: "none",
+            data: [{ yAxis: 0 }],
+            lineStyle: { color: "rgba(255,194,77,0.42)", type: "dashed", width: 1 },
+            label: { show: false }
+          }
+        }
+      ]
+    };
+  }
+
+  /* 9.5 人效对比（六职能人均产出条形，本职能高亮 + 全公司均值参考线） */
+  function effOption(cur) {
+    const names = FUNCS.map((f) => f.name);
+    const vals = FUNCS.map((f) => Number(fmtDec(f.eff, 2)));
+    const ptsArr = FUNCS.map((f) => f.pts);
+    const hcArr = FUNCS.map((f) => f.n);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 26, top: 34, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const k = p.dataIndex;
+          return "<b>" + names[k] + "</b><br/>人均年产出 <b>" + fmtDec(vals[k], 2) + "</b> 点/人<br/>" +
+            "承接 " + fmtInt(ptsArr[k]) + " 点 ÷ " + fmtInt(hcArr[k]) + " 人（现算）<br/>相对全公司 " +
+            fmtDec(vals[k] / effAll * 100, 1) + "%（全公司 " + fmtDec(effAll, 2) + " 点/人）";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: names,
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 10.5 }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "value", name: "点/人年", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE
+      },
+      series: [{
+        type: "bar", barWidth: "46%",
+        data: vals.map((v, k) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: [4, 4, 0, 0],
+            color: k === cur
+              ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: C.amber }, { offset: 1, color: "rgba(255,194,77,0.26)" }])
+              : new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: "rgba(92,157,255,0.72)" }, { offset: 1, color: "rgba(47,111,214,0.18)" }]),
+            borderColor: k === cur ? "rgba(255,194,77,0.9)" : "transparent",
+            borderWidth: k === cur ? 1 : 0
+          },
+          /* ★ label.color 逐项写在 data 上（不用回调形式，避免不同版本对回调色的支持差异） */
+          label: { color: k === cur ? "#ffd489" : "#c8d6f2" }
+        })),
+        label: {
+          show: true, position: "top", fontSize: 11, fontWeight: 700,
+          formatter: (p) => fmtDec(p.value, 2)
+        },
+        markLine: {
+          silent: true, symbol: "none",
+          data: [{ yAxis: Number(fmtDec(effAll, 2)), name: "全公司均值" }],
+          lineStyle: { color: C.cyan, type: "dashed", width: 1.5 },
+          label: {
+            position: "insideEndTop", color: C.cyan, fontSize: 10.5, fontWeight: 700,
+            formatter: "全公司 " + fmtDec(effAll, 2)
+          }
+        }
+      }]
+    };
+  }
+
+  /* ===== 10. 职能切换主流程：整页重绘 ===== */
+  function applyFunc(i, via, raw) {
+    const n = FUNCS.length;
+    idx = ((i % n) + n) % n;
+    const f = FUNCS[idx];
+    paintStatic(f);
+    paintCrumbNote(via || "exact", raw);
+    swTabs.forEach((b, k) => b.classList.toggle("is-active", k === idx));
+    if (hasEcharts) {
+      rankChart.setOption(rankOption(f), true);                 /* 轴上限随职能变化 → notMerge */
+      siteChart.setOption(siteOption(f), true);
+      skillChart.setOption(skillOption(f), true);
+      hireChart.setOption(hireOption(f), true);
+      effChart.setOption(effOption(idx), true);
+    }
+    /* hash 回写：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(f.name));
+  }
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 =====
+     ★ 本节只做「调用」，kiosk 状态量（idx / timer / holdUntil）与 hold() / restart()
+       已在第 1.1 节声明——声明行号严格小于此处首次 hold() 调用行号（TDZ 防护）。 */
+  const PARENT = "大屏样板间-研发人才与能力1920.html";
+
+  swTabs.forEach((b) => b.addEventListener("click", () => { applyFunc(Number(b.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyFunc(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyFunc(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  applyFunc(bootIdx, bootVia, bootRaw);
+  if (bootHit >= 0) hold();                                     /* 父页下钻进来：先保持 20 秒不轮换 */
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const raw = location.hash;
+    const k = resolveHash(raw);
+    if (k >= 0) { applyFunc(k, hashVia(raw), raw); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 14 秒切下一职能；鼠标停在切换器上时暂停 */
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const checks = [
+    ["六职能名与人数与契约 §2.2 逐字（构造性断言）",
+      FUNCS.map((f) => f.name + "|" + f.n).join(";") === FUNC_AUTH],
+    ["六职能人数 Σ = 3,860 人",
+      hcAll === PEOPLE_ALL && hcAll === 3860],
+    ["每职能 P4~P9 职级 Σ = 该职能人数（职能×职级矩阵行和）",
+      FUNCS.every((f) => sum(f.mat) === f.n)],
+    ["职能×职级矩阵与父页「人才与能力」逐格一致：列和 = 职级金字塔且 Σ = 3,860、P4→P9 逐级递减",
+      lvCol.join("|") === "1180|1060|780|520|244|76" && sum(lvCol) === PEOPLE_ALL &&
+      lvCol.every((v, j) => j === 0 || lvCol[j - 1] > v)],
+    ["每职能六站点 Σ = 该职能人数（职能×站点矩阵行和）",
+      FUNCS.every((f) => f.siteSum === f.n && f.sites.length === SITES.length)],
+    ["职能×站点矩阵与「单中心详情 / 多中心布局」逐格一致（构造性断言）+ 转置无损",
+      SITE_FUNC.map((r) => r.join(",")).join(";") === SITE_FUNC_AUTH &&
+      FUNCS.every((f, i) => f.sites.every((v, k) => v === SITE_FUNC[k][i]))],
+    ["站点列和 = 契约六站点人数 1,240/680/720/480/420/320 且 Σ = 3,860",
+      siteCol.every((v, k) => v === SITE_AUTH[k]) && sum(siteCol) === PEOPLE_ALL],
+    ["六职能承接故事点 Σ = 19,396 点（契约 §2.2）",
+      ptsAll === THROUGHPUT && ptsAll === 19396],
+    ["人均年产出 = 承接 ÷ 人数现算；全公司 = 19,396 ÷ 3,860 ≈ 5.02 点/人",
+      FUNCS.every((f) => Math.abs(f.eff - f.pts / f.n) < 1e-9) &&
+      Math.abs(effAll - ptsAll / hcAll) < 1e-9 && fmtDec(effAll, 2) === "5.02"],
+    ["平均职级 = Σ(职级序号×人数) ÷ 人数现算，且落在 P4~P9 区间",
+      FUNCS.every((f) => Math.abs(f.avgLv - sum(f.mat.map((v, j) => v * LEVELS[j].lv)) / f.n) < 1e-9 &&
+        f.avgLv > 4 && f.avgLv < 9)],
+    ["技能标签每职能 8~12 项；命中父页 TOP30 词表的标签人数与归属职能均与父页逐字",
+      FUNCS.every((f) => f.skills.length >= 8 && f.skills.length <= 12) &&
+      FUNCS.every((f) => f.skills.filter((s) => s.src === "P").every((s) =>
+        SKILL_PARENT_AUTH.some((a) => a[0] === s.w && Number(a[1]) === s.n && a[2] === f.name)))],
+    ["技能口径：Σ人次 > 本职能人数（一人多标签），且标签在职能内不重名",
+      FUNCS.every((f) => f.skillSum > f.n &&
+        new Set(f.skills.map((s) => s.w)).size === f.skills.length)],
+    ["关键岗位 ⊆ 父页 10 岗位（name/on/hc 逐字），六职能岗位互不重叠且并集 = 全 10 个",
+      POSTS.map((p) => [p.name, p.on, p.hc].join("|")).join(";") === POST_AUTH &&
+      sum(FUNCS.map((f) => f.posts.length)) === POSTS.length &&
+      FUNCS.every((f) => f.posts.every((p) => POSTS.some((q) =>
+        q.name === p.name && q.on === p.on && q.hc === p.hc && q.func === f.name)))],
+    ["关键岗位 Σ在岗 = 624 / Σ编制 = 714 / Σ缺口 = 90；每岗缺口 = 编制 − 在岗、饱和度现算",
+      sum(FUNCS.map((f) => f.postOn)) === postOnAll && postOnAll === 624 &&
+      sum(FUNCS.map((f) => f.postHc)) === postHcAll && postHcAll === 714 &&
+      sum(FUNCS.map((f) => f.postGap)) === postGapAll && postGapAll === 90 &&
+      FUNCS.every((f) => f.posts.every((p) => p.gap === p.hc - p.on &&
+        Math.abs(p.rate - p.on / p.hc * 100) < 1e-9 && p.on <= p.hc))],
+    ["入职/离职 12 月矩阵列和逐月 = 父页全量（846 / 343 人），且分项非负",
+      MONTHS.every((m, mi) => sum(FUNCS.map((f) => f.on12[mi])) === ON_ALL[mi] &&
+        sum(FUNCS.map((f) => f.lv12[mi])) === LV_ALL[mi]) &&
+      sum(FUNCS.map((f) => f.onYear)) === onAllYear && onAllYear === 846 &&
+      sum(FUNCS.map((f) => f.lvYear)) === lvAllYear && lvAllYear === 343 &&
+      FUNCS.every((f) => f.on12.every((v) => v >= 0) && f.lv12.every((v) => v >= 0))],
+    ["年化流失率 = 近 12 月离职 ÷ 本职能人数现算；净增 = 入职 − 离职",
+      FUNCS.every((f) => Math.abs(f.attr - f.lvYear / f.n * 100) < 1e-9 &&
+        f.netYear === f.onYear - f.lvYear) &&
+      Math.abs(attrAll - lvAllYear / hcAll * 100) < 1e-9],
+    ["hash 六职能名均可解析（构造性断言）",
+      FUNCS.every((f, i) => resolveHash("#" + encodeURIComponent(f.name)) === i &&
+        hashVia("#" + encodeURIComponent(f.name)) === "exact")],
+    ["hash 简写别名（AI / 算法 / PM / 管理 / 云 / QA）可解析到对应职能",
+      resolveHash("#AI") === 3 && resolveHash("#" + encodeURIComponent("算法")) === 3 &&
+      resolveHash("#PM") === 5 && resolveHash("#" + encodeURIComponent("管理")) === 5 &&
+      resolveHash("#" + encodeURIComponent("云")) === 2 && resolveHash("#QA") === 4],
+    ["父页职级键 P4~P9 / 初级~首席 全部兜底到默认职能且被标记为 level（金字塔下钻兜底）",
+      LEVELS.every((l) => resolveHash("#" + l.code) === DEFAULT_FUNC &&
+        resolveHash("#" + encodeURIComponent(l.name)) === DEFAULT_FUNC &&
+        hashVia("#" + l.code) === "level" && hashVia("#" + encodeURIComponent(l.name)) === "level")],
+    ["切换器 tab 数 = 6 且文本与契约六职能名逐字",
+      swTabs.length === FUNCS.length && swTabs.every((b, i) => b.querySelector("b").textContent === FUNCS[i].name)],
+    /* ★ TDZ 防护的构造性断言：holdUntil / hold() 声明在第 1.1 节（行号远小于第 11 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 holdCalls ≥ 1」即证明声明早于首次调用。 */
+    ["holdUntil 声明早于首次 hold() 调用（TDZ 防护，构造性断言）",
+      typeof holdUntil === "number" && typeof hold === "function" &&
+      (bootHit < 0 ? holdCalls === 0 : (holdCalls >= 1 && holdUntil > Date.now()))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单职能人才详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

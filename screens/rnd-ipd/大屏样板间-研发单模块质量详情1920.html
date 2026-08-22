@@ -1,0 +1,1255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单模块质量详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --jl-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .jl-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 104px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .jl-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .jl-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .jl-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 8px 8px;
+  }
+  .jl-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .jl-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .jl-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .jl-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .jl-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .jl-crumb em { font-style: normal; color: #d3e2ff; }
+  .jl-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .jl-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .jl-head-title-row { display: flex; align-items: baseline; gap: 14px; white-space: nowrap; }
+  .jl-head-title {
+    font-size: 29px; font-weight: 700; letter-spacing: 0.07em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .jl-head-meta { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--rnd-text-dim); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .jl-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .jl-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .jl-head-right { display: flex; align-items: center; gap: 14px; flex: none; }
+
+  /* 模块切换器：13 模块 tab（← → 方向键 / 12s 自动轮换 / hash 直达） */
+  .jl-switcher { display: grid; grid-template-columns: repeat(7, auto); gap: 4px 5px; }
+  .jl-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+    min-width: 72px; padding: 3px 7px 4px; border-radius: 7px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .jl-sw-tab b { font-size: 11.5px; font-weight: 700; letter-spacing: 0.03em; white-space: nowrap; }
+  .jl-sw-tab span { font-size: 9px; letter-spacing: 0.02em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .jl-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .jl-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.45);
+  }
+  .jl-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+  .jl-sw-tab.is-dom0 { border-left: 3px solid rgba(92, 157, 255, 0.75); }
+  .jl-sw-tab.is-dom1 { border-left: 3px solid rgba(255, 194, 77, 0.75); }
+  .jl-sw-tab.is-dom2 { border-left: 3px solid rgba(70, 214, 200, 0.75); }
+  .jl-sw-tab.is-dom3 { border-left: 3px solid rgba(169, 140, 245, 0.75); }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .jl-chips { display: flex; align-items: center; gap: 9px; }
+  .jl-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 132px; padding: 7px 12px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(169, 140, 245, 0.42); background: linear-gradient(160deg, rgba(169, 140, 245, 0.16), rgba(18, 34, 78, 0.6));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .jl-chip span { font-size: 10px; letter-spacing: 0.14em; color: #8f7fc4; white-space: nowrap; }
+  .jl-chip b { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #cbbcf7; white-space: nowrap; }
+  .jl-chip:hover { border-color: rgba(169, 140, 245, 0.92); box-shadow: 0 0 16px -2px rgba(169, 140, 245, 0.7); }
+  .jl-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 16px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .jl-clock-time { font: 700 25px/1 var(--jl-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .jl-clock-date { font-size: 11.5px; color: var(--rnd-text-dim); letter-spacing: 0.06em; }
+
+  /* ===== KPI 条（整行 6 枚，高度由行高写死） ===== */
+  .jl-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 13px; }
+  .jl-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 8px 16px;
+  }
+  .jl-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .jl-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .jl-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .jl-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .jl-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .jl-kpi.is-good::after { background: radial-gradient(circle, rgba(111, 224, 154, 0.13), transparent 68%); }
+  .jl-kpi.is-red::before { background: linear-gradient(90deg, var(--rnd-red), transparent); }
+  .jl-kpi.is-red::after { background: radial-gradient(circle, rgba(255, 95, 107, 0.13), transparent 68%); }
+  .jl-kpi-label { font-size: 12px; letter-spacing: 0.07em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .jl-kpi-num { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+  .jl-kpi-val { font: 700 29px/1 var(--jl-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .jl-kpi-val.is-text { font-size: 24px; letter-spacing: 0.06em; }
+  .jl-kpi.is-amber .jl-kpi-val { color: #ffd489; }
+  .jl-kpi.is-good .jl-kpi-val { color: #b8f2cf; }
+  .jl-kpi.is-red .jl-kpi-val { color: #ffb0b7; }
+  .jl-kpi-unit { font-size: 12px; color: var(--rnd-text-dim); }
+  .jl-kpi-sub { font-size: 10.5px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .jl-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体 ===== */
+  .jl-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .jl-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .jl-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .jl-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .jl-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .jl-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .jl-panel-tag { font-size: 11.5px; letter-spacing: 0.05em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .jl-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .jl-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 中栏：近期缺陷清单（★ 高度写死，避免 JS 填充后压矮同 flex 容器里的图表） ===== */
+  .jl-listwrap { flex: none; height: 286px; }
+  .jl-thead, .jl-list li {
+    display: grid; grid-template-columns: 112px 1fr 62px 64px 74px 58px; align-items: center; gap: 8px;
+    padding: 0 10px; font-variant-numeric: tabular-nums;
+  }
+  .jl-thead {
+    flex: none; height: 24px; font-size: 11px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.95);
+    border-bottom: 1px solid rgba(96, 140, 255, 0.22);
+  }
+  .jl-list { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 3px; overflow: hidden; }
+  .jl-list li { border-radius: 6px; font-size: 12px; color: #c8d6f2; min-height: 0; }
+  .jl-list li:nth-child(odd) { background: rgba(96, 140, 255, 0.06); }
+  .jl-list-id { font-family: var(--jl-mono); font-size: 11.5px; color: #9cc2ff; letter-spacing: 0.02em; }
+  .jl-list-t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #dce8ff; }
+  .jl-list-t i { font-style: normal; color: rgba(127, 146, 196, 0.9); margin-right: 6px; font-size: 10.5px; }
+  .jl-list-own { color: #bcd0ef; }
+  .jl-list-age { text-align: right; color: #9fb4dd; }
+  .jl-badge {
+    display: inline-block; min-width: 46px; text-align: center; padding: 1px 6px 2px; border-radius: 5px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+  }
+  .jl-badge.is-s0 { color: #ffd0d4; background: rgba(255, 95, 107, 0.24); border: 1px solid rgba(255, 95, 107, 0.5); }
+  .jl-badge.is-s1 { color: #ffdcc2; background: rgba(255, 157, 92, 0.22); border: 1px solid rgba(255, 157, 92, 0.5); }
+  .jl-badge.is-s2 { color: #cfe0ff; background: rgba(92, 157, 255, 0.20); border: 1px solid rgba(92, 157, 255, 0.5); }
+  .jl-badge.is-s3 { color: #cdf3dd; background: rgba(111, 224, 154, 0.18); border: 1px solid rgba(111, 224, 154, 0.45); }
+  .jl-badge.is-t0 { color: #ffd0d4; background: rgba(255, 95, 107, 0.20); border: 1px solid rgba(255, 95, 107, 0.42); }
+  .jl-badge.is-t1 { color: #ffdcc2; background: rgba(255, 157, 92, 0.18); border: 1px solid rgba(255, 157, 92, 0.42); }
+  .jl-badge.is-t2 { color: #ffe6ae; background: rgba(255, 194, 77, 0.18); border: 1px solid rgba(255, 194, 77, 0.42); }
+  .jl-badge.is-t3 { color: #d7c8ff; background: rgba(169, 140, 245, 0.18); border: 1px solid rgba(169, 140, 245, 0.42); }
+  .jl-badge.is-t4 { color: #cdf3dd; background: rgba(111, 224, 154, 0.16); border: 1px solid rgba(111, 224, 154, 0.4); }
+
+  /* ===== 底部口径滚动条 ===== */
+  .jl-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .jl-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .jl-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: jl-blink 1.6s ease-in-out infinite; }
+  @keyframes jl-blink { 50% { opacity: 0.35; } }
+  .jl-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .jl-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: jl-ticker 74s linear infinite; will-change: transform; }
+  .jl-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .jl-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes jl-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .jl-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="jl-stage" id="jl-stage">
+    <!-- mockflag:begin --><div class="jl-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="jl-error" id="jl-error" role="alert">ECharts 资源加载失败，KPI、缺陷清单与口径条不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="jl-header">
+      <div class="jl-head-left">
+        <div class="jl-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="jl-crumb-up" href="大屏样板间-研发质量与缺陷1920.html" title="返回上级专题页（Esc）">‹ 返回 质量与缺陷</a><i>›</i>
+          <em id="jl-crumb-obj">--</em>
+        </div>
+        <div class="jl-head-title-row">
+          <div class="jl-head-title" id="jl-title">-- · 单模块质量详情</div>
+          <div class="jl-head-meta">
+            <span>年发现 <b id="jl-meta-found">--</b> 个 · 关闭 <b id="jl-meta-closed">--</b></span><i>|</i>
+            <span>遗留 <b id="jl-meta-left">--</b> · 逃逸 <b id="jl-meta-esc">--</b></span><i>|</i>
+            <span>统计年度 <b>FY26</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="jl-head-right">
+        <div class="jl-switcher" id="jl-switcher" aria-label="研发模块切换"></div>
+        <div class="jl-chips">
+          <a class="jl-chip" id="jl-chip-led" href="大屏样板间-研发缺陷台账1920.html" title="兄弟子页：域 × 严重级双级过滤的缺陷明细台账"><span>兄弟子页 · 明细口径</span><b>缺陷台账 ›</b></a>
+        </div>
+        <div class="jl-clock" aria-label="实时时钟">
+          <span class="jl-clock-time" id="jl-clock-time">--:--:--</span>
+          <span class="jl-clock-date" id="jl-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：缺陷数 / 关闭率 / 遗留数 / 逃逸率 / 缺陷密度 / 所属域 -->
+    <section class="jl-kpis" aria-label="模块核心质量指标">
+      <div class="jl-kpi">
+        <div class="jl-kpi-label">本模块年缺陷</div>
+        <div class="jl-kpi-num"><span class="jl-kpi-val" id="jl-kpi-0">0</span><span class="jl-kpi-unit">个</span></div>
+        <div class="jl-kpi-sub" id="jl-kpi-0s">--</div>
+      </div>
+      <div class="jl-kpi is-good" id="jl-kpi-1box">
+        <div class="jl-kpi-label">缺陷关闭率</div>
+        <div class="jl-kpi-num"><span class="jl-kpi-val" id="jl-kpi-1">0</span><span class="jl-kpi-unit">%</span></div>
+        <div class="jl-kpi-sub" id="jl-kpi-1s">--</div>
+      </div>
+      <div class="jl-kpi is-amber">
+        <div class="jl-kpi-label">年末遗留</div>
+        <div class="jl-kpi-num"><span class="jl-kpi-val" id="jl-kpi-2">0</span><span class="jl-kpi-unit">个</span></div>
+        <div class="jl-kpi-sub" id="jl-kpi-2s">--</div>
+      </div>
+      <div class="jl-kpi is-red" id="jl-kpi-3box">
+        <div class="jl-kpi-label">现网逃逸率</div>
+        <div class="jl-kpi-num"><span class="jl-kpi-val" id="jl-kpi-3">0</span><span class="jl-kpi-unit">%</span></div>
+        <div class="jl-kpi-sub" id="jl-kpi-3s">--</div>
+      </div>
+      <div class="jl-kpi" id="jl-kpi-4box">
+        <div class="jl-kpi-label">缺陷密度</div>
+        <div class="jl-kpi-num"><span class="jl-kpi-val" id="jl-kpi-4">0</span><span class="jl-kpi-unit">个/百人月</span></div>
+        <div class="jl-kpi-sub" id="jl-kpi-4s">--</div>
+      </div>
+      <div class="jl-kpi">
+        <div class="jl-kpi-label">所属研发域</div>
+        <div class="jl-kpi-num"><span class="jl-kpi-val is-text" id="jl-kpi-5">--</span></div>
+        <div class="jl-kpi-sub" id="jl-kpi-5s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：五阶段拦截漏斗 + 严重级分布 -->
+    <div class="jl-col">
+      <section class="jl-panel" style="flex: 1;">
+        <div class="jl-panel-head">
+          <h2>五阶段拦截漏斗</h2>
+          <span class="jl-panel-tag" id="jl-tag-fun">--</span>
+        </div>
+        <div class="jl-chart" id="jl-chart-funnel"></div>
+      </section>
+      <section class="jl-panel" style="flex: 1;">
+        <div class="jl-panel-head">
+          <h2>严重级分布 · 四档</h2>
+          <span class="jl-panel-tag" id="jl-tag-sev">--</span>
+        </div>
+        <div class="jl-chart" id="jl-chart-sev"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：缺陷收敛曲线（主视觉） + 近期缺陷清单 -->
+    <div class="jl-col">
+      <section class="jl-panel" style="flex: 1;">
+        <div class="jl-panel-head">
+          <h2>缺陷收敛曲线 · 24 月累计发现／关闭与月末遗留</h2>
+          <span class="jl-panel-tag" id="jl-tag-conv">--</span>
+        </div>
+        <div class="jl-chart" id="jl-chart-conv"></div>
+      </section>
+      <section class="jl-panel jl-listwrap">
+        <div class="jl-panel-head">
+          <h2>本模块近期缺陷</h2>
+          <span class="jl-panel-tag" id="jl-tag-list">--</span>
+        </div>
+        <div class="jl-thead">
+          <span>缺陷编号</span><span>标题</span><span>严重级</span><span>状态</span><span>责任人</span><span class="jl-list-age">停留</span>
+        </div>
+        <ul class="jl-list" id="jl-list"></ul>
+      </section>
+    </div>
+
+    <!-- 右栏：缺陷密度对比 + Top 缺陷类型帕累托 -->
+    <div class="jl-col">
+      <section class="jl-panel" style="flex: 1;">
+        <div class="jl-panel-head">
+          <h2>缺陷密度 · 域内对比</h2>
+          <span class="jl-panel-tag" id="jl-tag-den">--</span>
+        </div>
+        <div class="jl-chart" id="jl-chart-den"></div>
+      </section>
+      <section class="jl-panel" style="flex: 1;">
+        <div class="jl-panel-head">
+          <h2>Top 缺陷类型帕累托</h2>
+          <span class="jl-panel-tag" id="jl-tag-par">--</span>
+        </div>
+        <div class="jl-chart" id="jl-chart-pareto"></div>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="jl-foot" aria-label="单模块质量详情口径说明">
+      <div class="jl-foot-label"><span class="jl-foot-dot"></span>质量口径</div>
+      <div class="jl-foot-viewport"><div class="jl-foot-track" id="jl-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("jl-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 1.1 ★ kiosk 状态量前置声明（必须早于任何 hold() 调用） =====
+     let 有暂时性死区：带 hash 冷启动时若先 hold() 再声明，会抛
+     ReferenceError: Cannot access 'holdUntil' before initialization —— 主脚本整段中断，
+     而页面此时已渲染完，肉眼看不出问题（契约 §8 批次四实测坑）。
+     因此 idx / timer / holdUntil / hold() / restart() 全部提到这里，
+     首次 hold() 调用在下方第 12 节（boot 段），行号严格大于本块。 */
+  let idx = 0;
+  let timer = null;
+  let holdUntil = 0;
+  let holdCalls = 0;                                           /* 供页尾自检做构造性断言 */
+  function hold() { holdCalls += 1; holdUntil = Date.now() + 20000; }
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyMod(idx + 1); }, 12000);
+  }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层：单一数据源，13 个模块的全部视图由此派生 =====
+     ★ 三重收敛（模块 → 域 → 全盘），全部进页尾 checks 硬校验：
+       ① 13 个模块名与父页「质量与缺陷」缺陷来源旭日外圈逐字（作 hash 键）；
+       ② 模块缺陷数按域 Σ = 软件 4,820 / 硬件 1,560 / 云端 1,340 / AI 920（契约 §2.2 逐字）；
+       ③ 全盘 Σ = 8,640 = 关闭 8,210 + 遗留 430；按拦截阶段 3,110/2,480/1,890/987/173，逃逸率 2.0%。
+     ★ 二级拆分（模块遗留、模块投入人月、拦截 13×5 矩阵、严重级 13×4 矩阵、
+       24 月 13×12 双矩阵、缺陷类型六类）全部由本页自编，但都用双边距整数拟合
+       （见 3.4 fitMatrix），行和 = 模块数、列和 = 契约/父页数，两边同时精确。
+     ★ 循环引用红线：进 option 的数据只放标量与数组，模块与域之间用下标（domIdx）关联，
+       绝不用对象引用回指。 */
+
+  /* 3.1 四域基准（与父页 P8 逐字：found / closed / 域人数） */
+  const DOMS = ["软件", "硬件", "云端", "AI"];
+  const DOM_COL = [C.blue, C.amber, C.cyan, C.violet];
+  const DOM_FOUND = [4820, 1560, 1340, 920];                   /* 契约 §2.2 按域逐字 */
+  const DOM_CLOSED = [4596, 1478, 1272, 864];                  /* 父页 P8 逐字，Σ = 8,210 */
+  const DOM_HC = [1460, 620, 540, 420];                        /* 域人数（契约六职能：软件/硬件/云平台/AI算法） */
+  const MONTHS_PER_YEAR = 12;
+  const DOM_PM = DOM_HC.map((h) => h * MONTHS_PER_YEAR);       /* 域年投入人月 = 域人数 × 12 */
+  /* 域严重级四档（与兄弟子页「缺陷台账」域级口径同源，Σ 逐域 = 域 found） */
+  const DOM_SEV = [[190, 940, 2430, 1260], [85, 330, 760, 385], [60, 280, 660, 340], [45, 190, 450, 235]];
+
+  const FOUND_REF = 8640, CLOSED_REF = 8210, OPEN_REF = 430;   /* 契约 §2.2 年缺陷盘 */
+  const STAGE_NAMES = ["单测", "集成", "系统", "Beta", "现网"];
+  const STAGE_REF = [3110, 2480, 1890, 987, 173];              /* 契约 §2.2 按拦截阶段逐字 */
+  const STAGE_COL = [C.green, C.cyan, C.blue, C.amber, C.red];
+  const SEV_NAMES = ["致命", "严重", "一般", "轻微"];
+  const SEV_COL = [C.red, C.orange, C.blue, C.green];
+  const TYPES = ["逻辑与功能", "接口与协议", "时序与并发", "资源与性能", "配置与环境", "兼容与适配"];
+
+  /* 3.2 ★ 13 个模块：name / domIdx 与父页 qa-chart-sun 旭日外圈逐字，found 逐字取自旭日；
+         left（年末遗留）与 pm（年投入人月）为本页二级自编，按域 Σ 分别回到 430 拆分与域人月。
+         sl = 左移成熟度（正 = 单测拦得多、现网逃逸少）；ss = 严重度倾向（正 = 致命/严重占比高）。 */
+  const MODS = [
+    { name: "应用框架",   domIdx: 0, found: 1480, left: 74, pm: 5760, sl:  0.55, ss: -0.15, owner: "软件一部 · 框架组" },
+    { name: "智家APP",    domIdx: 0, found: 1260, left: 62, pm: 4560, sl:  0.10, ss:  0.10, owner: "软件二部 · 终端组" },
+    { name: "固件中间件", domIdx: 0, found: 1120, left: 52, pm: 4200, sl: -0.25, ss:  0.35, owner: "软件三部 · 固件组" },
+    { name: "系统集成",   domIdx: 0, found:  960, left: 36, pm: 3000, sl: -0.45, ss:  0.05, owner: "系统工程部" },
+    { name: "主板电源",   domIdx: 1, found:  620, left: 33, pm: 3000, sl: -0.70, ss:  0.30, owner: "硬件一部 · 电源组" },
+    { name: "射频天线",   domIdx: 1, found:  480, left: 26, pm: 2400, sl: -0.60, ss:  0.00, owner: "硬件二部 · 射频组" },
+    { name: "结构散热",   domIdx: 1, found:  460, left: 23, pm: 2040, sl: -0.55, ss: -0.25, owner: "硬件三部 · 结构组" },
+    { name: "设备接入",   domIdx: 2, found:  520, left: 27, pm: 2640, sl:  0.35, ss:  0.25, owner: "云平台 · 接入组" },
+    { name: "数据管道",   domIdx: 2, found:  440, left: 22, pm: 2160, sl:  0.60, ss: -0.10, owner: "云平台 · 数据组" },
+    { name: "开放API",    domIdx: 2, found:  380, left: 19, pm: 1680, sl:  0.45, ss: -0.15, owner: "云平台 · 开放组" },
+    { name: "视觉质检",   domIdx: 3, found:  340, left: 21, pm: 1920, sl:  0.20, ss:  0.15, owner: "AI 算法 · 视觉组" },
+    { name: "语音交互",   domIdx: 3, found:  310, left: 19, pm: 1680, sl:  0.05, ss: -0.05, owner: "AI 算法 · 语音组" },
+    { name: "推荐策略",   domIdx: 3, found:  270, left: 16, pm: 1440, sl:  0.50, ss: -0.20, owner: "AI 算法 · 策略组" }
+  ];
+  /* 构造性断言基准串：模块名 + 所属域 + 缺陷数，与父页旭日外圈逐字 */
+  const MOD_AUTH =
+    "应用框架|软件|1480;智家APP|软件|1260;固件中间件|软件|1120;系统集成|软件|960;" +
+    "主板电源|硬件|620;射频天线|硬件|480;结构散热|硬件|460;" +
+    "设备接入|云端|520;数据管道|云端|440;开放API|云端|380;" +
+    "视觉质检|AI|340;语音交互|AI|310;推荐策略|AI|270";
+
+  /* 3.3 24 个月缺陷月度盘（与父页 P8 逐字同源：统计年度 = 上年 9 月—当年 8 月） */
+  const MONTHS = [
+    "24-09", "24-10", "24-11", "24-12", "25-01", "25-02", "25-03", "25-04", "25-05", "25-06", "25-07", "25-08",
+    "25-09", "25-10", "25-11", "25-12", "26-01", "26-02", "26-03", "26-04", "26-05", "26-06", "26-07", "26-08"
+  ];
+  const FY_START = 12;                                         /* FY26 起点下标（25-09） */
+  const FOUND_M = [
+    578, 604, 648, 662, 640, 668, 690, 712, 688, 664, 678, 648,   /* FY25 Σ=7,880 */
+    612, 648, 700, 726, 688, 742, 758, 812, 768, 726, 754, 706    /* FY26 Σ=8,640 */
+  ];
+  const CLOSED_M = [
+    536, 570, 622, 648, 630, 656, 678, 692, 680, 658, 668, 722,   /* FY25 Σ=7,760 */
+    548, 596, 662, 704, 668, 716, 742, 776, 758, 712, 700, 628    /* FY26 Σ=8,210 */
+  ];
+
+  /* 3.4 分配与拟合工具 ------------------------------------------------------ */
+  /* 最大余数法整数分配：Σ 结果严格等于 total */
+  function allocate(total, weights) {
+    const wsum = sum(weights);
+    const raw = weights.map((w) => total * w / wsum);
+    const base = raw.map(Math.floor);
+    const rest = total - sum(base);
+    const order = raw.map((v, i) => [v - base[i], i]).sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+    for (let k = 0; k < rest; k += 1) base[order[k][1]] += 1;
+    return base;
+  }
+  /* ★ 双边距整数矩阵拟合：行和严格 = rowT、列和严格 = colT（前提 Σrow == Σcol）。
+     ① IPF 交替归一得到实数矩阵（双边距近似）；
+     ② 逐行最大余数法取整（此时行和已精确、列和有整数残差）；
+     ③ 列和修复：在同一行内把 1 个单位从"超发列"挪到"欠发列"——行和不变，
+        列误差绝对值每次严格减 2，故必然收敛（超发列的列和 > 0 ⇒ 必存在正元可挪）。 */
+  function fitMatrix(rowT, colT, W) {
+    const R = rowT.length, K = colT.length;
+    const X = W.map((row) => row.map((v) => Math.max(1e-9, v)));
+    for (let it = 0; it < 200; it += 1) {
+      for (let i = 0; i < R; i += 1) {
+        const s = sum(X[i]); if (s > 0) for (let j = 0; j < K; j += 1) X[i][j] *= rowT[i] / s;
+      }
+      for (let j = 0; j < K; j += 1) {
+        let s = 0; for (let i = 0; i < R; i += 1) s += X[i][j];
+        if (s > 0) for (let i = 0; i < R; i += 1) X[i][j] *= colT[j] / s;
+      }
+    }
+    const M = X.map((row, i) => allocate(rowT[i], row));
+    let guard = 0;
+    for (;;) {
+      let si = -1, di = -1;
+      const err = colT.map((c, j) => sum(M.map((r) => r[j])) - c);
+      for (let j = 0; j < K; j += 1) if (err[j] > 0 && (si < 0 || err[j] > err[si])) si = j;
+      for (let j = 0; j < K; j += 1) if (err[j] < 0 && (di < 0 || err[j] < err[di])) di = j;
+      if (si < 0 || di < 0) break;
+      let best = -1, bestScore = -Infinity;
+      for (let i = 0; i < R; i += 1) {
+        if (M[i][si] <= 0) continue;
+        const sc = M[i][si] - X[i][si];
+        if (sc > bestScore) { bestScore = sc; best = i; }
+      }
+      if (best < 0) break;
+      M[best][si] -= 1; M[best][di] += 1;
+      guard += 1; if (guard > 50000) break;
+    }
+    return M;
+  }
+
+  /* ===== 3.5 派生量：全部现算，不复制数字 ===== */
+  const founds = MODS.map((m) => m.found);
+  const lefts = MODS.map((m) => m.left);
+  const closeds = MODS.map((m) => m.found - m.left);
+  const pms = MODS.map((m) => m.pm);
+  const foundAll = sum(founds), closedAll = sum(closeds), leftAll = sum(lefts), pmAll = sum(pms);
+  const densAll = foundAll / pmAll * 100;                      /* 全盘缺陷密度：个 / 百人月 */
+
+  /* 域级聚合（由模块现算，再与契约/父页比对） */
+  const domFound = DOMS.map((d, k) => sum(MODS.filter((m) => m.domIdx === k).map((m) => m.found)));
+  const domClosed = DOMS.map((d, k) => sum(MODS.filter((m) => m.domIdx === k).map((m) => m.found - m.left)));
+  const domLeft = DOMS.map((d, k) => sum(MODS.filter((m) => m.domIdx === k).map((m) => m.left)));
+  const domPm = DOMS.map((d, k) => sum(MODS.filter((m) => m.domIdx === k).map((m) => m.pm)));
+  const domDens = DOMS.map((d, k) => domFound[k] / domPm[k] * 100);
+
+  /* ① 拦截 13×5 矩阵：行和 = 模块缺陷数，列和 = 契约五段（3,110/2,480/1,890/987/173） */
+  const SL_G = [0.45, 0.15, -0.15, -0.35, -0.55];              /* 左移成熟度对各段的方向系数 */
+  const STAGE_M = fitMatrix(founds, STAGE_REF,
+    MODS.map((m) => STAGE_REF.map((c, j) => c * m.found * Math.exp(m.sl * SL_G[j]))));
+
+  /* ② 严重级 13×4 矩阵：按域分别拟合——行和 = 模块缺陷数，列和 = 该域严重级四档 */
+  const SS_H = [0.5, 0.25, -0.05, -0.3];
+  const SEV_M = MODS.map(() => null);
+  DOMS.forEach((d, k) => {
+    const ids = MODS.map((m, i) => (m.domIdx === k ? i : -1)).filter((i) => i >= 0);
+    const Md = fitMatrix(ids.map((i) => founds[i]), DOM_SEV[k].slice(),
+      ids.map((i) => DOM_SEV[k].map((c, j) => c * founds[i] * Math.exp(MODS[i].ss * SS_H[j]))));
+    ids.forEach((i, a) => { SEV_M[i] = Md[a]; });
+  });
+  const sevAll = SEV_NAMES.map((n, j) => sum(SEV_M.map((r) => r[j])));
+
+  /* ③ 24 月 13×12 双矩阵：行和 = 模块年度数，列和 = 父页月度盘逐字。
+        FY25 为上一统计年度背景（模块口径按缺陷数等比分配，Σ = 7,880 / 7,760）。 */
+  const f26 = FOUND_M.slice(FY_START), c26 = CLOSED_M.slice(FY_START);
+  const f25 = FOUND_M.slice(0, FY_START), c25 = CLOSED_M.slice(0, FY_START);
+  const prevFound = allocate(sum(f25), founds);
+  const prevClosed = allocate(sum(c25), closeds);
+  const wave = (rowT, colT, ph) => rowT.map((r, i) => colT.map((c, j) =>
+    c * r * (1 + 0.10 * Math.sin((i + ph) * (j + 1) * 0.7))));
+  const FM26 = fitMatrix(founds, f26, wave(founds, f26, 2));
+  const CM26 = fitMatrix(closeds, c26, wave(closeds, c26, 2));
+  const FM25 = fitMatrix(prevFound, f25, wave(prevFound, f25, 3));
+  const CM25 = fitMatrix(prevClosed, c25, wave(prevClosed, c25, 3));
+
+  /* ④ 缺陷类型六类帕累托：Σ = 模块缺陷数（域基准权重 + 模块确定性倾斜） */
+  const TYPE_BASE = [
+    [34, 21, 14, 12, 11, 8],                                   /* 软件 */
+    [26, 13, 19, 20, 12, 10],                                  /* 硬件 */
+    [28, 24, 13, 15, 14, 6],                                   /* 云端 */
+    [30, 16, 10, 18, 12, 14]                                   /* AI */
+  ];
+
+  /* 逐模块派生包（只放标量与数组，绝不回指域对象） */
+  MODS.forEach((m, i) => {
+    m.closed = m.found - m.left;
+    m.closeRate = m.closed / m.found * 100;
+    m.stages = STAGE_M[i].slice();
+    m.field = m.stages[STAGE_NAMES.length - 1];
+    m.escape = m.field / m.found * 100;
+    m.blocked = m.found - m.field;
+    m.sev = SEV_M[i].slice();
+    m.sevHigh = (m.sev[0] + m.sev[1]) / m.found * 100;
+    m.dens = m.found / m.pm * 100;
+    m.densDom = domDens[m.domIdx];
+    m.densIdx = m.dens / domDens[m.domIdx] * 100;
+    /* 24 月月度序列（FY25 + FY26 拼接） */
+    m.foundM = FM25[i].concat(FM26[i]);
+    m.closedM = CM25[i].concat(CM26[i]);
+    /* 累计（统计年度翻篇清零）与月末遗留 */
+    m.cumFound = []; m.cumClosed = []; m.backlog = [];
+    let cf = 0, cc = 0;
+    m.foundM.forEach((v, j) => {
+      if (j === FY_START) { cf = 0; cc = 0; }
+      cf += v; cc += m.closedM[j];
+      m.cumFound.push(cf); m.cumClosed.push(cc); m.backlog.push(cf - cc);
+    });
+    /* 帕累托：先按类型序算量，再降序排出 Top 类型与累计占比 */
+    const base = TYPE_BASE[m.domIdx];
+    const w = base.map((b, k) => b * (1 + 0.22 * Math.sin((i + 2) * (k + 1) * 0.9)));
+    const vals = allocate(m.found, w);
+    const order = vals.map((v, k) => [v, k]).sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+    m.parName = order.map((o) => TYPES[o[1]]);
+    m.parVal = order.map((o) => o[0]);
+    let acc = 0;
+    m.parCum = m.parVal.map((v) => { acc += v; return acc / m.found * 100; });
+  });
+
+  /* 全盘拦截列和与逃逸率（现算，用于口径条与自检） */
+  const stageAll = STAGE_NAMES.map((n, j) => sum(MODS.map((m) => m.stages[j])));
+  const escAll = stageAll[STAGE_NAMES.length - 1] / foundAll * 100;
+
+  /* ===== 3.6 近期缺陷清单（每模块 6~8 条，确定性生成；编号全局唯一） ===== */
+  const ST_NAMES = ["新发现", "定位中", "修复中", "验证中", "已关闭"];
+  const OWNERS = ["李承霖", "周奕辰", "陈舒南", "赵孟然", "吴清越", "郑亦丞", "孙靖辰", "何徵羽", "许知远", "林望舒"];
+  const SYMPTOM = [
+    ["边界条件判定错误导致状态机卡死", "批量操作回滚不完整", "异常分支未覆盖引发空指针"],
+    ["接口字段缺省值与文档不一致", "协议版本协商失败未正确降级", "回调超时后未按策略重试"],
+    ["并发写入产生竞态覆盖", "上电时序抖动导致初始化失败", "定时器漂移引起心跳丢失"],
+    ["长时运行内存缓慢增长", "高负载下响应时间劣化", "峰值功耗超出设计裕量"],
+    ["灰度配置下发后未生效", "环境变量缺失导致启动失败", "证书临期未触发告警"],
+    ["低版本固件不兼容", "国产化平台适配缺失", "三方 SDK 升级后行为变更"]
+  ];
+  let serial = 2600;
+  MODS.forEach((m, i) => {
+    const n = 6 + (i % 3);                                     /* 6 / 7 / 8 条 */
+    m.rows = [];
+    for (let r = 0; r < n; r += 1) {
+      const tk = (i * 3 + r * 5) % TYPES.length;
+      const sv = (i + r * 3) % SEV_NAMES.length;
+      const st = (i * 2 + r * 3) % ST_NAMES.length;
+      serial += 1;
+      m.rows.push({
+        id: "DEF-26-" + serial,
+        title: SYMPTOM[tk][(i + r) % 3],
+        type: TYPES[tk],
+        sev: sv,
+        st: st,
+        own: OWNERS[(i * 3 + r) % OWNERS.length],
+        age: 2 + ((i * 7 + r * 11) % 26)
+      });
+    }
+  });
+  /* ===== 4. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("jl-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("jl-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. 模块切换器（tab 文本与父页旭日外圈模块名逐字，即 hash 键） ===== */
+  const switcher = $("jl-switcher");
+  switcher.innerHTML = MODS.map((m, i) => (
+    '<button class="jl-sw-tab is-dom' + m.domIdx + '" type="button" data-i="' + i +
+      '" title="切换到' + m.name + "（" + DOMS[m.domIdx] + "域 · " + fmtInt(m.found) + ' 个缺陷；← → 方向键）">' +
+      "<b>" + m.name + "</b><span>" + fmtInt(m.found) + "</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".jl-sw-tab"));
+
+  /* ===== 6. 非图表区渲染（不依赖 echarts；★ 全部在 echarts.init 之前完成首屏填充） ===== */
+  function countUp(el, target, fmt) {
+    const t0 = performance.now(), dur = 1300;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+  function renderKpi(m) {
+    const d = m.domIdx;
+    const defs = [
+      { v: m.found, f: (x) => fmtInt(x),
+        sub: "占" + DOMS[d] + "域 <b>" + fmtDec(m.found / domFound[d] * 100, 1) + "%</b> · 占全盘 " +
+          fmtDec(m.found / foundAll * 100, 1) + "%（÷ " + fmtInt(foundAll) + "）" },
+      { v: m.closeRate, f: (x) => fmtDec(x, 1),
+        sub: "关闭 <b>" + fmtInt(m.closed) + "</b> ÷ 发现 " + fmtInt(m.found) + " 现算 · 域均 " +
+          fmtDec(domClosed[d] / domFound[d] * 100, 1) + "%" },
+      { v: m.left, f: (x) => fmtInt(x),
+        sub: "发现 − 关闭现算 · 占" + DOMS[d] + "域遗留 <b>" + fmtDec(m.left / domLeft[d] * 100, 1) + "%</b>（" +
+          fmtInt(domLeft[d]) + " 个）" },
+      { v: m.escape, f: (x) => fmtDec(x, 2),
+        sub: "现网 <b>" + fmtInt(m.field) + "</b> ÷ " + fmtInt(m.found) + " 现算 · 全盘 " + fmtDec(escAll, 2) + "%" },
+      { v: m.dens, f: (x) => fmtDec(x, 2),
+        sub: fmtInt(m.found) + " ÷ <b>" + fmtInt(m.pm) + "</b> 人月 × 100 · 域均 " + fmtDec(m.densDom, 2) },
+      { v: null, f: null, sub: "" }
+    ];
+    for (let i = 0; i < 5; i += 1) {
+      countUp($("jl-kpi-" + i), defs[i].v, defs[i].f);
+      $("jl-kpi-" + i + "s").innerHTML = defs[i].sub;
+    }
+    $("jl-kpi-5").textContent = DOMS[d];
+    $("jl-kpi-5s").innerHTML = "域年缺陷 <b>" + fmtInt(domFound[d]) + "</b> 个 · 域内 " +
+      MODS.filter((x) => x.domIdx === d).length + " 个模块 · 域密度 " + fmtDec(domDens[d], 2);
+    const b1 = $("jl-kpi-1box");
+    b1.classList.toggle("is-good", m.closeRate >= closedAll / foundAll * 100);
+    b1.classList.toggle("is-amber", m.closeRate < closedAll / foundAll * 100);
+    const b3 = $("jl-kpi-3box");
+    b3.classList.toggle("is-red", m.escape >= escAll);
+    b3.classList.toggle("is-good", m.escape < escAll);
+    const b4 = $("jl-kpi-4box");
+    b4.classList.toggle("is-red", m.dens > m.densDom);
+    b4.classList.toggle("is-good", m.dens <= m.densDom);
+  }
+  function renderTags(m) {
+    const d = m.domIdx;
+    $("jl-tag-fun").innerHTML = "五段 Σ <b>" + fmtInt(sum(m.stages)) + "</b> = 本模块缺陷 · 拦截 " +
+      fmtDec(m.blocked / m.found * 100, 2) + "% · 逃逸 " + fmtDec(m.escape, 2) + "%";
+    $("jl-tag-sev").innerHTML = "四档 Σ <b>" + fmtInt(sum(m.sev)) + "</b> · 致命+严重 " + fmtDec(m.sevHigh, 1) + "%";
+    $("jl-tag-conv").innerHTML = "FY26 末值 累计发现 <b>" + fmtInt(m.cumFound[MONTHS.length - 1]) +
+      "</b> = 关闭 " + fmtInt(m.cumClosed[MONTHS.length - 1]) + " + 遗留 " + fmtInt(m.backlog[MONTHS.length - 1]);
+    $("jl-tag-list").innerHTML = "<b>" + m.rows.length + "</b> 条 · " + m.owner + " · 全量明细见兄弟页「缺陷台账」";
+    $("jl-tag-den").innerHTML = "本模块 <b>" + fmtDec(m.dens, 2) + "</b> · " + DOMS[d] + "域均 " +
+      fmtDec(m.densDom, 2) + " · 指数 " + fmtDec(m.densIdx, 1);
+    $("jl-tag-par").innerHTML = "六类 Σ <b>" + fmtInt(sum(m.parVal)) + "</b> · 累计末值 " +
+      fmtDec(m.parCum[m.parCum.length - 1], 1) + "%";
+  }
+  function renderList(m) {
+    $("jl-list").innerHTML = m.rows.map((r) => (
+      "<li>" +
+        '<span class="jl-list-id">' + r.id + "</span>" +
+        '<span class="jl-list-t"><i>[' + r.type + "]</i>" + r.title + "</span>" +
+        '<span><span class="jl-badge is-s' + r.sev + '">' + SEV_NAMES[r.sev] + "</span></span>" +
+        '<span><span class="jl-badge is-t' + r.st + '">' + ST_NAMES[r.st] + "</span></span>" +
+        '<span class="jl-list-own">' + r.own + "</span>" +
+        '<span class="jl-list-age">' + r.age + " d</span>" +
+      "</li>"
+    )).join("");
+  }
+
+  /* 底部口径滚动（与模块无关，只建一次；★ 图表 init 之前填充） */
+  (function buildFoot() {
+    const items = [
+      ["分工", C.violet, "本页 = 单模块质量画像（一个模块的收敛/拦截/严重级/密度/类型 360 度）；" +
+        "兄弟子页「研发缺陷台账」= 域 × 严重级双级过滤的全量缺陷明细与单条流转穿透——" +
+        "两页同挂父页「质量与缺陷」，本页按对象纵切、台账页按条目横切，数字同源不重复"],
+      ["口径", C.amber, "13 个模块名与缺陷数逐字取自父页「质量与缺陷」缺陷来源旭日外圈：" +
+        MODS.map((m) => m.name + " " + fmtInt(m.found)).join(" + ") + " = " + fmtInt(foundAll) + " 个"],
+      ["口径", C.amber, "三重收敛：模块 → 域 Σ = 软件 " + fmtInt(domFound[0]) + " + 硬件 " + fmtInt(domFound[1]) +
+        " + 云端 " + fmtInt(domFound[2]) + " + AI " + fmtInt(domFound[3]) + " → 全盘 Σ = " + fmtInt(foundAll) +
+        " 个（契约 §2.2 逐字）；关闭 " + fmtInt(closedAll) + " + 遗留 " + fmtInt(leftAll) + " = 发现，逐模块同式成立"],
+      ["口径", C.blue, "拦截 13×5 矩阵为双边距整数拟合：行和 = 模块缺陷数，列和 = 契约五段 " +
+        stageAll.map(fmtInt).join(" / ") + "，Σ = " + fmtInt(sum(stageAll)) + "；逃逸率 = 现网 ÷ 发现现算，全盘 " +
+        fmtDec(escAll, 2) + "%"],
+      ["口径", C.blue, "严重级 13×4 矩阵按域拟合：行和 = 模块缺陷数，列和 = 该域四档（与兄弟页台账域级口径同源），" +
+        "全盘 " + SEV_NAMES.map((n, j) => n + " " + fmtInt(sevAll[j])).join(" / ") + "，Σ = " + fmtInt(sum(sevAll))],
+      ["口径", C.cyan, "缺陷密度口径 = 模块年缺陷 ÷ 模块年投入人月 × 100（个/百人月）；" +
+        "模块人月为二级自编，按域 Σ = 域人数 × 12（软件 " + fmtInt(domPm[0]) + " / 硬件 " + fmtInt(domPm[1]) +
+        " / 云端 " + fmtInt(domPm[2]) + " / AI " + fmtInt(domPm[3]) + " 人月，Σ = " + fmtInt(pmAll) +
+        "）；全盘密度 " + fmtDec(densAll, 2) + " 个/百人月"],
+      ["口径", C.green, "收敛曲线 24 月与父页同源（统计年度 = 上年 9 月—当年 8 月，25-09 翻篇清零）：" +
+        "13×12 月度矩阵行和 = 模块年度数、列和 = 父页月度盘逐字，故各月 13 模块之和即父页曲线；" +
+        "FY26 末值累计发现 = 该模块在旭日中的缺陷数"],
+      ["提示", C.orange, "13 个模块 12 秒自动轮换（鼠标停在切换器上暂停、← → 手动翻、Esc 返回父页）；" +
+        "由父页旭日下钻带 hash 进入时保持 20 秒不轮换"]
+    ];
+    const html = items.map((a) => '<span class="jl-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("jl-foot-track").innerHTML = html + html;                 /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* ===== 7. 静态层整页重绘（不依赖 echarts） ===== */
+  function paintStatic(m) {
+    $("jl-title").textContent = m.name + " · 单模块质量详情";
+    $("jl-crumb-obj").textContent = m.name + " · " + DOMS[m.domIdx] + "域 · " + m.owner;
+    $("jl-meta-found").textContent = fmtInt(m.found);
+    $("jl-meta-closed").textContent = fmtInt(m.closed);
+    $("jl-meta-left").textContent = fmtInt(m.left);
+    $("jl-meta-esc").textContent = fmtDec(m.escape, 2) + "%";
+    $("jl-chip-led").href = "大屏样板间-研发缺陷台账1920.html#" + encodeURIComponent(DOMS[m.domIdx]);
+    renderKpi(m);
+    renderTags(m);
+    renderList(m);
+  }
+
+  /* hash 契约：decodeURIComponent → trim + 全角空白剔除归一 → 匹配 13 模块名；HASH_ALIAS 收简写 */
+  const HASH_ALIAS = {
+    "框架": "应用框架", "应用": "应用框架",
+    "APP": "智家APP", "app": "智家APP", "智家App": "智家APP", "智家app": "智家APP", "智家": "智家APP",
+    "中间件": "固件中间件", "固件": "固件中间件",
+    "集成": "系统集成", "系统": "系统集成",
+    "电源": "主板电源", "主板": "主板电源",
+    "射频": "射频天线", "天线": "射频天线",
+    "散热": "结构散热", "结构": "结构散热",
+    "接入": "设备接入", "设备": "设备接入",
+    "管道": "数据管道", "数据": "数据管道",
+    "API": "开放API", "api": "开放API", "开放api": "开放API", "开放": "开放API",
+    "视觉": "视觉质检", "质检": "视觉质检",
+    "语音": "语音交互",
+    "推荐": "推荐策略", "策略": "推荐策略"
+  };
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    let k = MODS.findIndex((x) => x.name === s);
+    if (k >= 0) return k;
+    if (HASH_ALIAS[s]) return MODS.findIndex((x) => x.name === HASH_ALIAS[s]);
+    return -1;
+  }
+  const bootHit = resolveHash(location.hash);
+  const bootIdx = bootHit >= 0 ? bootHit : 0;
+  paintStatic(MODS[bootIdx]);                                   /* ★ 非图表区先填充，再 init 图表 */
+  swTabs.forEach((b, k) => b.classList.toggle("is-active", k === bootIdx));
+
+  /* ===== 8. 资源守卫（KPI / 清单 / 口径条已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("jl-error").classList.add("is-visible");
+
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const funnelChart = hasEcharts ? echarts.init($("jl-chart-funnel")) : null;
+  const sevChart = hasEcharts ? echarts.init($("jl-chart-sev")) : null;
+  const convChart = hasEcharts ? echarts.init($("jl-chart-conv")) : null;
+  const denChart = hasEcharts ? echarts.init($("jl-chart-den")) : null;
+  const parChart = hasEcharts ? echarts.init($("jl-chart-pareto")) : null;
+
+  /* ===== 9. option 构造（★ 只放标量与数组，模块/域对象一律不进 option，避免深拷贝循环引用） ===== */
+
+  /* 9.1 五阶段拦截漏斗（sort:none 保持 单测→现网 序，Σ = 本模块缺陷数） */
+  function funnelOption(m) {
+    const vals = m.stages.slice();
+    const total = m.found;
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.dataIndex;
+          return "<b>" + STAGE_NAMES[j] + "</b>（" + (j === STAGE_NAMES.length - 1 ? "逃逸段" : "拦截段") + "）<br/>" +
+            "本模块 <b>" + fmtInt(vals[j]) + "</b> 个 · 占本模块 " + fmtDec(vals[j] / total * 100, 2) + "%<br/>" +
+            "全盘该段 " + fmtInt(stageAll[j]) + " 个 · 本模块占其 " + fmtDec(vals[j] / stageAll[j] * 100, 2) + "%";
+        }
+      }, TIP),
+      series: [{
+        type: "funnel", sort: "none", left: "4%", right: "4%", top: 6, bottom: 4,
+        min: 0, max: Math.max.apply(null, vals), minSize: "22%", maxSize: "98%", gap: 3,
+        label: {
+          show: true, position: "inside", fontSize: 12, fontWeight: 700, color: "#08122f",
+          formatter: (p) => STAGE_NAMES[p.dataIndex] + "  " + fmtInt(p.value) + " 个 · " +
+            fmtDec(p.value / total * 100, 1) + "%"
+        },
+        itemStyle: { borderColor: "rgba(8,18,49,.85)", borderWidth: 1 },
+        data: vals.map((v, j) => ({
+          value: v,
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(STAGE_COL[j], 0.32) }, { offset: 1, color: STAGE_COL[j] }])
+          }
+        }))
+      }]
+    };
+  }
+
+  /* 9.2 严重级四档（南丁格尔环，中心显示 Σ = 本模块缺陷数） */
+  function sevOption(m) {
+    const vals = m.sev.slice();
+    const total = m.found, d = m.domIdx;
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.dataIndex;
+          return "<b>" + SEV_NAMES[j] + "</b><br/>本模块 <b>" + fmtInt(vals[j]) + "</b> 个 · 占本模块 " +
+            fmtDec(vals[j] / total * 100, 1) + "%<br/>" + DOMS[d] + "域该档 " + fmtInt(DOM_SEV[d][j]) +
+            " 个 · 本模块占其 " + fmtDec(vals[j] / DOM_SEV[d][j] * 100, 1) + "%";
+        }
+      }, TIP),
+      legend: {
+        top: 2, right: 2, orient: "vertical", itemWidth: 10, itemHeight: 10,
+        textStyle: { color: C.textDim, fontSize: 11 },
+        formatter: (name) => name + "  " + fmtInt(vals[SEV_NAMES.indexOf(name)])
+      },
+      series: [{
+        type: "pie", radius: ["40%", "72%"], center: ["36%", "54%"], roseType: "radius",
+        itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 2, borderRadius: 4 },
+        label: { show: true, formatter: (p) => fmtDec(p.percent, 1) + "%", color: C.text, fontSize: 11 },
+        labelLine: { length: 6, length2: 8, lineStyle: { color: "rgba(96,140,255,.4)" } },
+        data: vals.map((v, j) => ({ value: v, name: SEV_NAMES[j], itemStyle: { color: SEV_COL[j] } }))
+      }, {
+        type: "pie", radius: ["0%", "0%"], center: ["36%", "54%"], silent: true,
+        label: {
+          show: true, position: "center", formatter: fmtInt(total) + "\n个 · Σ",
+          color: "#eaf1ff", fontSize: 16, fontWeight: 700, lineHeight: 18
+        },
+        data: [{ value: 1 }]
+      }]
+    };
+  }
+
+  /* 9.3 缺陷收敛曲线（主视觉）：24 月累计发现/关闭双线 + 月末遗留柱 + FY26 统计年度标注 */
+  function convOption(m) {
+    const cf = m.cumFound.slice(), cc = m.cumClosed.slice(), bl = m.backlog.slice();
+    const fm = m.foundM.slice(), cm = m.closedM.slice();
+    const endF = cf[MONTHS.length - 1], endC = cc[MONTHS.length - 1], endB = bl[MONTHS.length - 1];
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 6, top: 34, bottom: 2, containLabel: true },
+      legend: {
+        top: 0, right: 4, itemWidth: 13, itemHeight: 8,
+        data: ["累计发现", "累计关闭", "月末遗留"], textStyle: { color: C.textDim, fontSize: 11 }
+      },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>20" + MONTHS[i] + "</b>（" + (i < FY_START ? "FY25" : "FY26") + "）<br/>" +
+            "当月发现 <b>" + fmtInt(fm[i]) + "</b> · 当月关闭 <b>" + fmtInt(cm[i]) + "</b><br/>" +
+            "累计发现 <b>" + fmtInt(cf[i]) + "</b> · 累计关闭 <b>" + fmtInt(cc[i]) + "</b><br/>" +
+            "月末遗留 <b>" + fmtInt(bl[i]) + "</b> 个 · 累计关闭率 " + fmtDec(cc[i] / cf[i] * 100, 1) + "%";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: MONTHS.slice(), boundaryGap: true,
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 9.5, rotate: 40 }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: [
+        { type: "value", name: "累计 · 个", nameTextStyle: { color: C.textDim, fontSize: 10 }, axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
+        { type: "value", name: "遗留 · 个", nameTextStyle: { color: C.textDim, fontSize: 10 }, axisLabel: AXIS_LABEL, splitLine: { show: false } }
+      ],
+      series: [
+        {
+          name: "月末遗留", type: "bar", yAxisIndex: 1, barWidth: "48%", data: bl,
+          itemStyle: {
+            borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "rgba(255,157,92,0.78)" }, { offset: 1, color: "rgba(255,157,92,0.10)" }])
+          }
+        },
+        {
+          name: "累计发现", type: "line", yAxisIndex: 0, data: cf, smooth: false,
+          symbol: "circle", symbolSize: 4,
+          lineStyle: { color: C.amber, width: 2.2 }, itemStyle: { color: C.amber },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "rgba(255,194,77,0.20)" }, { offset: 1, color: "rgba(255,194,77,0)" }])
+          },
+          markArea: {
+            silent: true, itemStyle: { color: "rgba(92,157,255,0.07)" },
+            label: { color: C.textDim, fontSize: 10, position: "insideTop" },
+            data: [[{ name: "FY26 统计年度（25-09 翻篇清零）", xAxis: MONTHS[FY_START] }, { xAxis: MONTHS[MONTHS.length - 1] }]]
+          },
+          markPoint: {
+            symbol: "pin", symbolSize: 34,
+            data: [{ coord: [MONTHS.length - 1, endF], value: fmtInt(endF) }],
+            itemStyle: { color: "rgba(255,194,77,0.9)" }, label: { color: "#08122f", fontSize: 10, fontWeight: 700 }
+          }
+        },
+        {
+          name: "累计关闭", type: "line", yAxisIndex: 0, data: cc, smooth: false,
+          symbol: "circle", symbolSize: 4,
+          lineStyle: { color: C.green, width: 2 }, itemStyle: { color: C.green },
+          markPoint: {
+            symbol: "pin", symbolSize: 30,
+            data: [{ coord: [MONTHS.length - 1, endC], value: fmtInt(endC) }],
+            itemStyle: { color: "rgba(111,224,154,0.88)" }, label: { color: "#08122f", fontSize: 10, fontWeight: 700 }
+          },
+          markLine: {
+            silent: true, symbol: "none",
+            label: {
+              formatter: "末值缺口 = 年末遗留 " + fmtInt(endB), color: C.orange, fontSize: 10,
+              position: "insideEndTop"
+            },
+            lineStyle: { color: "rgba(255,157,92,0.55)", type: "dashed", width: 1 },
+            data: [[{ coord: [MONTHS.length - 1, endC] }, { coord: [MONTHS.length - 1, endF] }]]
+          }
+        }
+      ]
+    };
+  }
+
+  /* 9.4 缺陷密度域内对比（同域模块横向条 + 域均值/全盘均值参考线） */
+  function denOption(m) {
+    const d = m.domIdx;
+    const ids = MODS.map((x, i) => (x.domIdx === d ? i : -1)).filter((i) => i >= 0)
+      .sort((a, b) => MODS[a].dens - MODS[b].dens);            /* 横向条：最大在顶 */
+    const names = ids.map((i) => MODS[i].name);
+    const vals = ids.map((i) => Number(fmtDec(MODS[i].dens, 2)));
+    const cur = ids.indexOf(MODS.indexOf(m));
+    const founds2 = ids.map((i) => MODS[i].found);
+    const pms2 = ids.map((i) => MODS[i].pm);
+    const maxV = Math.max.apply(null, vals.concat([domDens[d], densAll]));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 118, top: 26, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const k = p.dataIndex;
+          return "<b>" + names[k] + "</b><br/>缺陷密度 <b>" + fmtDec(vals[k], 2) + "</b> 个/百人月<br/>" +
+            "= " + fmtInt(founds2[k]) + " 个 ÷ " + fmtInt(pms2[k]) + " 人月 × 100<br/>" +
+            DOMS[d] + "域均 " + fmtDec(domDens[d], 2) + " · 全盘均 " + fmtDec(densAll, 2) +
+            "<br/>域内指数 " + fmtDec(vals[k] / domDens[d] * 100, 1) + "（越低越好）";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: maxV * 1.42 },
+      yAxis: {
+        type: "category", data: names,
+        axisLabel: { color: C.text, fontSize: 11.5, fontWeight: 700 },
+        axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 15,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 7 },
+        data: vals.map((v, k) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: 7,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(k === cur ? C.amber : DOM_COL[d], 0.45) },
+              { offset: 1, color: k === cur ? C.amber : DOM_COL[d] }]),
+            opacity: k === cur ? 1 : 0.55
+          }
+        })),
+        label: {
+          show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => fmtDec(p.value, 2) + " · 指数 " + fmtDec(p.value / domDens[d] * 100, 0)
+        },
+        markLine: {
+          silent: true, symbol: "none",
+          label: { color: C.textDim, fontSize: 10, position: "insideEndTop" },
+          lineStyle: { color: "rgba(92,157,255,0.6)", type: "dashed", width: 1.2 },
+          data: [
+            { xAxis: Number(fmtDec(domDens[d], 2)), label: { formatter: DOMS[d] + "域均 " + fmtDec(domDens[d], 2) } },
+            {
+              xAxis: Number(fmtDec(densAll, 2)),
+              lineStyle: { color: "rgba(169,140,245,0.6)" },
+              label: { formatter: "全盘均 " + fmtDec(densAll, 2), position: "insideEndBottom" }
+            }
+          ]
+        }
+      }]
+    };
+  }
+
+  /* 9.5 Top 缺陷类型帕累托（降序柱 + 累计占比线，末值 100%） */
+  function parOption(m) {
+    const names = m.parName.slice(), vals = m.parVal.slice();
+    const cums = m.parCum.map((v) => Number(fmtDec(v, 1)));
+    const total = m.found;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 8, top: 30, bottom: 2, containLabel: true },
+      legend: {
+        top: 0, right: 4, itemWidth: 13, itemHeight: 8,
+        data: ["缺陷数", "累计占比"], textStyle: { color: C.textDim, fontSize: 11 }
+      },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + names[i] + "</b><br/>缺陷 <b>" + fmtInt(vals[i]) + "</b> 个 · 占本模块 " +
+            fmtDec(vals[i] / total * 100, 1) + "%<br/>累计 <b>" + fmtDec(cums[i], 1) + "%</b>（Σ " +
+            fmtInt(vals.slice(0, i + 1).reduce((a, b) => a + b, 0)) + " ÷ " + fmtInt(total) + "）";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: names,
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 0, fontSize: 10, rotate: 22 }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: [
+        { type: "value", name: "个", nameTextStyle: { color: C.textDim, fontSize: 10 }, axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
+        { type: "value", name: "%", min: 0, max: 100, nameTextStyle: { color: C.textDim, fontSize: 10 }, axisLabel: AXIS_LABEL, splitLine: { show: false } }
+      ],
+      series: [
+        {
+          name: "缺陷数", type: "bar", yAxisIndex: 0, barWidth: "52%", data: vals,
+          itemStyle: {
+            borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: C.blue }, { offset: 1, color: "rgba(47,111,214,0.20)" }])
+          },
+          label: { show: true, position: "top", fontSize: 10, color: "#bcd0ef", formatter: (p) => fmtInt(p.value) }
+        },
+        {
+          name: "累计占比", type: "line", yAxisIndex: 1, data: cums, smooth: false,
+          symbol: "circle", symbolSize: 6,
+          lineStyle: { color: C.amber, width: 2 }, itemStyle: { color: C.amber },
+          label: { show: true, fontSize: 10, color: "#ffd489", fontWeight: 700, formatter: (p) => fmtDec(p.value, 0) + "%" },
+          markLine: {
+            silent: true, symbol: "none",
+            label: { formatter: "80% 帕累托线", color: C.textDim, fontSize: 10, position: "insideStartTop" },
+            lineStyle: { color: "rgba(255,95,107,0.5)", type: "dashed", width: 1 },
+            data: [{ yAxis: 80 }]
+          }
+        }
+      ]
+    };
+  }
+
+  /* ===== 10. 模块切换主流程：整页重绘 ===== */
+  function applyMod(i) {
+    const n = MODS.length;
+    idx = ((i % n) + n) % n;
+    const m = MODS[idx];
+    paintStatic(m);
+    swTabs.forEach((b, k) => b.classList.toggle("is-active", k === idx));
+    if (hasEcharts) {
+      funnelChart.setOption(funnelOption(m), true);             /* 轴上限随模块变化 → notMerge */
+      sevChart.setOption(sevOption(m), true);
+      convChart.setOption(convOption(m), true);
+      denChart.setOption(denOption(m), true);
+      parChart.setOption(parOption(m), true);
+    }
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(m.name));
+  }
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 =====
+     ★ 本节只做「调用」，kiosk 状态量（idx / timer / holdUntil）与 hold() / restart()
+       已在第 1.1 节声明——声明行号严格小于此处首次 hold() 调用行号（TDZ 防护）。 */
+  const PARENT = "大屏样板间-研发质量与缺陷1920.html";
+
+  swTabs.forEach((b) => b.addEventListener("click", () => { applyMod(Number(b.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyMod(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyMod(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* ===== 12. boot ===== */
+  applyMod(bootIdx);
+  if (bootHit >= 0) hold();                                     /* 父页旭日下钻进来：先保持 20 秒不轮换 */
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applyMod(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 12 秒切下一模块；鼠标停在切换器上时暂停 */
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 13. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const last = MONTHS.length - 1;
+  const checks = [
+    ["13 个模块名 / 所属域 / 缺陷数与父页「质量与缺陷」缺陷来源旭日外圈逐字（构造性断言）",
+      MODS.length === 13 &&
+      MODS.map((m) => [m.name, DOMS[m.domIdx], m.found].join("|")).join(";") === MOD_AUTH],
+    ["模块缺陷数按域 Σ = 软件 4,820 / 硬件 1,560 / 云端 1,340 / AI 920（契约 §2.2 逐字）",
+      domFound.every((v, k) => v === DOM_FOUND[k])],
+    ["全盘 Σ = 8,640 个（三重收敛：模块 → 域 → 全盘）",
+      foundAll === FOUND_REF && sum(domFound) === FOUND_REF && foundAll === 8640],
+    ["关闭 + 遗留 = 发现：逐模块成立，且全盘 8,210 + 430 = 8,640",
+      MODS.every((m) => m.closed + m.left === m.found) &&
+      closedAll === CLOSED_REF && leftAll === OPEN_REF && closedAll + leftAll === FOUND_REF],
+    ["模块关闭数按域 Σ = 4,596 / 1,478 / 1,272 / 864（与父页域级关闭数逐字），遗留按域 Σ = 430",
+      domClosed.every((v, k) => v === DOM_CLOSED[k]) && sum(domLeft) === OPEN_REF],
+    ["每模块 拦截五段 Σ = 该模块缺陷数（13 行行和精确）",
+      MODS.every((m) => sum(m.stages) === m.found && m.stages.every((v) => v > 0))],
+    ["拦截五段列和 = 契约 3,110 / 2,480 / 1,890 / 987 / 173，Σ = 8,640，全盘逃逸率 = 2.0%",
+      stageAll.every((v, j) => v === STAGE_REF[j]) && sum(stageAll) === FOUND_REF &&
+      Math.abs(escAll - 173 / 8640 * 100) < 1e-9 && Math.abs(escAll - 2.0) < 0.005],
+    ["每模块 逃逸率 = 现网 ÷ 该模块缺陷数现算（不复制数字）",
+      MODS.every((m) => Math.abs(m.escape - m.stages[4] / m.found * 100) < 1e-9)],
+    ["每模块 严重级四档 Σ = 该模块缺陷数；域内列和 = 该域四档；全盘 Σ = 8,640",
+      MODS.every((m) => sum(m.sev) === m.found && m.sev.every((v) => v > 0)) &&
+      DOMS.every((d, k) => SEV_NAMES.every((n, j) =>
+        sum(MODS.filter((m) => m.domIdx === k).map((m) => m.sev[j])) === DOM_SEV[k][j])) &&
+      sum(sevAll) === FOUND_REF],
+    ["每模块 帕累托六类 Σ = 该模块缺陷数，且累计占比末值 = 100%、序列降序",
+      MODS.every((m) => sum(m.parVal) === m.found && m.parVal.length === TYPES.length &&
+        Math.abs(m.parCum[m.parCum.length - 1] - 100) < 1e-9 &&
+        m.parVal.every((v, k) => k === 0 || v <= m.parVal[k - 1]))],
+    ["每模块 收敛曲线 FY26 末值：累计发现 = 该模块缺陷数、累计关闭 = 模块关闭、月末遗留 = 模块遗留",
+      MODS.every((m) => m.cumFound[last] === m.found && m.cumClosed[last] === m.closed &&
+        m.backlog[last] === m.left)],
+    ["收敛曲线 24 月列和 = 父页月度盘逐字（各月 13 模块之和即父页曲线），且月末遗留恒 ≥ 0",
+      MONTHS.every((mo, j) => sum(MODS.map((m) => m.foundM[j])) === FOUND_M[j] &&
+        sum(MODS.map((m) => m.closedM[j])) === CLOSED_M[j]) &&
+      MODS.every((m) => m.backlog.every((v) => v >= 0))],
+    ["模块年投入人月按域 Σ = 域人数 × 12（17,520 / 7,440 / 6,480 / 5,040），全盘 Σ = 36,480 人月",
+      domPm.every((v, k) => v === DOM_HC[k] * MONTHS_PER_YEAR) && pmAll === 36480],
+    ["缺陷密度 = 模块缺陷 ÷ 模块人月 × 100 现算；域均值 = 域缺陷 ÷ 域人月 × 100；全盘 23.68 个/百人月",
+      MODS.every((m) => Math.abs(m.dens - m.found / m.pm * 100) < 1e-9 &&
+        Math.abs(m.densDom - domFound[m.domIdx] / domPm[m.domIdx] * 100) < 1e-9) &&
+      Math.abs(densAll - foundAll / pmAll * 100) < 1e-9 && Math.abs(densAll - 23.68) < 0.01],
+    ["近期缺陷清单每模块 6~8 条，编号全局唯一",
+      MODS.every((m) => m.rows.length >= 6 && m.rows.length <= 8) &&
+      (function () {
+        const ids = [];
+        MODS.forEach((m) => m.rows.forEach((r) => ids.push(r.id)));
+        return ids.length === new Set(ids).size;
+      })()],
+    ["hash 13 个模块名均可解析（构造性断言），别名表全部指向合法模块",
+      MODS.every((m, i) => resolveHash("#" + encodeURIComponent(m.name)) === i) &&
+      Object.keys(HASH_ALIAS).every((k) => MODS.some((m) => m.name === HASH_ALIAS[k]))],
+    ["切换器 tab 数 = 13 且文本与父页旭日模块名逐字（即 hash 键）",
+      swTabs.length === MODS.length && swTabs.every((b, i) => b.querySelector("b").textContent === MODS[i].name)],
+    /* ★ TDZ 防护的构造性断言：holdUntil / hold() 声明在第 1.1 节（行号远小于第 12 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 holdCalls ≥ 1」即证明声明早于首次调用。 */
+    ["holdUntil 声明早于首次 hold() 调用（TDZ 防护，构造性断言）",
+      typeof holdUntil === "number" && typeof hold === "function" &&
+      (bootHit < 0 ? holdCalls === 0 : (holdCalls >= 1 && holdUntil > Date.now()))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单模块质量详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

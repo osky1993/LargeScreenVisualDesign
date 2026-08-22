@@ -89,6 +89,24 @@ SUB_PT = "大屏样板间-研发流水线运行台账1920.html"
 SUB_RY = "大屏样板间-研发跨域接口台账1920.html"
 
 
+# ---- 二期扩充 W8：A 型切换器 ×4 + B 型台账 ×2（锚点同样避开首个子页的行锚）----
+MODULES13 = ["应用框架", "智家APP", "固件中间件", "系统集成", "主板电源", "射频天线", "结构散热",
+             "设备接入", "数据管道", "开放API", "视觉质检", "语音交互", "推荐策略"]
+FUNCS6 = ["软件", "硬件", "云平台", "AI算法", "测试", "PM与管理"]
+CBBDOMS5 = ["软件基础库", "硬件模块", "云服务组件", "AI模型组件", "工具链"]
+MATS10 = ["主控 SoC", "电源管理 IC", "温度传感器", "毫米波雷达", "无线通信模组",
+          "快充协议芯片", "镁铝中框", "触控显示屏", "存储器", "声学器件"]
+# ★ 同 NODES12：匹配前会剔空白，含空格名须另给 match
+MATS10_MATCH = [n.replace(" ", "") for n in MATS10]
+
+SUB_ZJ = "大屏样板间-研发单团队看板详情1920.html"
+SUB_JL = "大屏样板间-研发单模块质量详情1920.html"
+SUB_XN = "大屏样板间-研发单职能人才详情1920.html"
+SUB_TP = "大屏样板间-研发单CBB域详情1920.html"
+SUB_ZL = "大屏样板间-研发物料认证台账1920.html"
+SUB_GP = "大屏样板间-研发数据集与训练台账1920.html"
+
+
 PAGES = [
     {
         "file": "大屏样板间-研发产品组合与路标1920.html",
@@ -126,12 +144,18 @@ PAGES = [
     },
     {
         "file": "大屏样板间-研发看板流动效率1920.html",
+        "charts": [
+            {"chartId": "ks-chart-wip", "names": TEAMS12, "sub": SUB_ZJ},
+        ],
         "targets": [
             {"rows": "#ks-tbody li", "names": BLOCKS5, "sub": SUB_BS},
         ],
     },
     {
         "file": "大屏样板间-研发质量与缺陷1920.html",
+        "charts": [
+            {"chartId": "qa-chart-sun", "names": MODULES13, "sub": SUB_JL},
+        ],
         "targets": [
             {"rows": "#qa-tbody li", "names": DOMAINS4, "sub": SUB_QX},
         ],
@@ -148,12 +172,18 @@ PAGES = [
     },
     {
         "file": "大屏样板间-研发硬件与样机1920.html",
+        "panels": [
+            {"panelTitle": "关键物料认证进度", "label": "物料台账", "sub": SUB_ZL},
+        ],
         "targets": [
             {"rows": "#hj-tbody li", "names": BATCHES5, "sub": SUB_PC},
         ],
     },
     {
         "file": "大屏样板间-研发AI模型迭代1920.html",
+        "panels": [
+            {"panelTitle": "训练排期 × 算力利用率", "label": "数据集台账", "sub": SUB_GP},
+        ],
         "targets": [
             {"rows": "#ai-tbody li", "names": MODELS5, "sub": SUB_ML},
         ],
@@ -216,6 +246,7 @@ PAGES = [
         "file": "大屏样板间-研发人才与能力1920.html",
         "charts": [
             {"chartId": "rc-chart-post", "names": POSTS10, "sub": SUB_RL},
+            {"chartId": "rc-chart-pyramid", "names": FUNCS6, "sub": SUB_XN},
         ],
         "panels": [
             {"panelTitle": "关键岗位饱和度", "label": "岗位台账", "sub": SUB_RL},
@@ -223,6 +254,9 @@ PAGES = [
     },
     {
         "file": "大屏样板间-研发技术资产与复用1920.html",
+        "charts": [
+            {"chartId": "ta-chart-shelf", "names": CBBDOMS5, "sub": SUB_TP},
+        ],
         "targets": [
             {"rows": "#ta-tbody li", "names": OSS10, "sub": SUB_SM},
         ],

@@ -1,0 +1,1209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单团队看板详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --zj-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .zj-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 440px 1fr 452px;
+    grid-template-rows: 84px 104px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .zj-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .zj-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .zj-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 8px 8px;
+  }
+  .zj-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .zj-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .zj-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .zj-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .zj-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .zj-crumb em { font-style: normal; color: #d3e2ff; }
+  .zj-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .zj-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .zj-head-title-row { display: flex; align-items: baseline; gap: 14px; white-space: nowrap; }
+  .zj-head-title {
+    font-size: 29px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .zj-head-meta { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--rnd-text-dim); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .zj-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .zj-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .zj-head-right { display: flex; align-items: center; gap: 14px; flex: none; }
+
+  /* 团队切换器：12 队 tab（← → 方向键 / 14s 自动轮换 / hash 直达） */
+  .zj-switcher { display: grid; grid-template-columns: repeat(6, auto); gap: 4px 5px; }
+  .zj-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+    min-width: 64px; padding: 3px 7px 4px; border-radius: 7px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .zj-sw-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; }
+  .zj-sw-tab span { font-size: 9px; letter-spacing: 0.02em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .zj-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .zj-sw-tab.is-over { border-color: rgba(255, 95, 107, 0.55); }
+  .zj-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .zj-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .zj-chips { display: flex; align-items: center; gap: 8px; }
+  .zj-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    min-width: 132px; padding: 6px 12px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(169, 140, 245, 0.42); background: linear-gradient(160deg, rgba(169, 140, 245, 0.16), rgba(18, 34, 78, 0.6));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .zj-chip span { font-size: 9.5px; letter-spacing: 0.13em; color: #8f7fc4; white-space: nowrap; }
+  .zj-chip b { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #cbbcf7; white-space: nowrap; }
+  .zj-chip:hover { border-color: rgba(169, 140, 245, 0.92); box-shadow: 0 0 16px -2px rgba(169, 140, 245, 0.7); }
+  .zj-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 16px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .zj-clock-time { font: 700 25px/1 var(--zj-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .zj-clock-date { font-size: 11.5px; color: var(--rnd-text-dim); letter-spacing: 0.06em; }
+
+  /* ===== KPI 条（整行 6 枚，高度写死） ===== */
+  .zj-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .zj-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 8px 16px;
+  }
+  .zj-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .zj-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .zj-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .zj-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .zj-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .zj-kpi.is-good::after { background: radial-gradient(circle, rgba(111, 224, 154, 0.13), transparent 68%); }
+  .zj-kpi.is-bad::before { background: linear-gradient(90deg, var(--rnd-red), transparent); }
+  .zj-kpi.is-bad::after { background: radial-gradient(circle, rgba(255, 95, 107, 0.14), transparent 68%); }
+  .zj-kpi-label { font-size: 12px; letter-spacing: 0.07em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .zj-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .zj-kpi-val { font: 700 29px/1 var(--zj-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .zj-kpi.is-amber .zj-kpi-val { color: #ffd489; }
+  .zj-kpi.is-good .zj-kpi-val { color: #b8f2cf; }
+  .zj-kpi.is-bad .zj-kpi-val { color: #ffb0b8; }
+  .zj-kpi-unit { font-size: 12px; color: var(--rnd-text-dim); }
+  .zj-kpi-sub { font-size: 10.5px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zj-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体 ===== */
+  .zj-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .zj-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .zj-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .zj-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .zj-panel-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.07em; color: #d6e2fa; white-space: nowrap; }
+  .zj-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .zj-panel-tag { font-size: 11px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .zj-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .zj-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 左栏：WIP 四列现状（★ 高度写死；JS 填充，不得压矮同列图表） ===== */
+  .zj-wipwrap { flex: none; height: 234px; }
+  .zj-wip { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+  .zj-wip-head, .zj-wip li {
+    display: grid; grid-template-columns: 60px 44px 44px 1fr 62px; align-items: center; gap: 8px;
+    padding: 0 8px; font-variant-numeric: tabular-nums;
+  }
+  .zj-wip-head {
+    flex: none; height: 22px; font-size: 10.5px; letter-spacing: 0.07em; color: rgba(127, 146, 196, 0.95);
+    border-bottom: 1px solid rgba(96, 140, 255, 0.22);
+  }
+  .zj-wip ul { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 5px; overflow: hidden; }
+  .zj-wip li { border-radius: 7px; font-size: 12px; color: #c8d6f2; background: rgba(96, 140, 255, 0.06); }
+  .zj-wip li.is-over { background: rgba(255, 95, 107, 0.12); }
+  .zj-wip-col { font-size: 12.5px; font-weight: 700; color: #eaf1ff; letter-spacing: 0.06em; }
+  .zj-wip-n { text-align: right; font: 700 15px/1 var(--zj-mono); color: #eaf1ff; }
+  .zj-wip-l { text-align: right; font-size: 12px; color: rgba(127, 146, 196, 0.95); }
+  .zj-wip-bar { position: relative; height: 9px; border-radius: 5px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .zj-wip-bar u { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--rnd-blue-deep), var(--rnd-blue)); }
+  .zj-wip-bar u.is-over { background: linear-gradient(90deg, #b8404c, var(--rnd-red)); }
+  .zj-wip-bar s { position: absolute; top: -2px; bottom: -2px; width: 2px; background: rgba(255, 194, 77, 0.95); text-decoration: none; }
+  .zj-wip-r { text-align: right; font-size: 11.5px; font-weight: 700; color: #9fe6dc; }
+  .zj-wip-r.is-over { color: #ff9aa4; }
+  .zj-wip-r i { font-style: normal; font-size: 9.5px; margin-left: 3px; padding: 1px 4px; border-radius: 4px; background: rgba(255, 95, 107, 0.22); color: #ffc6cb; }
+
+  /* ===== 右栏：阻塞卡清单（CSS grid 模拟表格，★ 高度写死） ===== */
+  .zj-blkwrap { flex: none; height: 300px; }
+  .zj-blk { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+  .zj-thead, .zj-blk li {
+    display: grid; grid-template-columns: 1.55fr 0.92fr 0.5fr 0.86fr; align-items: center; gap: 8px;
+    padding: 0 8px; font-variant-numeric: tabular-nums;
+  }
+  .zj-thead {
+    flex: none; height: 24px; font-size: 10.5px; letter-spacing: 0.07em; color: rgba(127, 146, 196, 0.95);
+    border-bottom: 1px solid rgba(96, 140, 255, 0.22);
+  }
+  .zj-blk ul { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 4px; overflow: hidden; }
+  .zj-blk li { border-radius: 6px; font-size: 11.5px; color: #c8d6f2; }
+  .zj-blk li:nth-child(odd) { background: rgba(96, 140, 255, 0.06); }
+  .zj-blk-card { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .zj-blk-card b { font-size: 11.5px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zj-blk-card span { font-size: 9.5px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zj-badge { justify-self: start; padding: 2px 7px; border-radius: 5px; font-size: 10.5px; letter-spacing: 0.03em; white-space: nowrap; }
+  .zj-blk-day { text-align: right; font: 700 15px/1 var(--zj-mono); }
+  .zj-blk-day.is-hot { color: #ff9aa4; }
+  .zj-blk-day.is-warm { color: #ffd489; }
+  .zj-blk-day.is-cool { color: #9fe6dc; }
+  .zj-blk-own { min-width: 0; display: flex; flex-direction: column; gap: 1px; text-align: right; }
+  .zj-blk-own b { font-size: 11.5px; font-weight: 700; color: #d3e2ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zj-blk-own span { font-size: 9.5px; color: rgba(127, 146, 196, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 底部口径滚动条 ===== */
+  .zj-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .zj-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .zj-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: zj-blink 1.6s ease-in-out infinite; }
+  @keyframes zj-blink { 50% { opacity: 0.35; } }
+  .zj-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .zj-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: zj-ticker 74s linear infinite; will-change: transform; }
+  .zj-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .zj-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes zj-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .zj-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="zj-stage" id="zj-stage">
+    <!-- mockflag:begin --><div class="zj-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="zj-error" id="zj-error" role="alert">ECharts 资源加载失败，KPI、WIP 四列现状与阻塞卡清单不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="zj-header">
+      <div class="zj-head-left">
+        <div class="zj-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="zj-crumb-up" href="大屏样板间-研发看板流动效率1920.html" title="返回上级专题页（Esc）">‹ 返回 看板流动效率</a><i>›</i>
+          <em id="zj-crumb-obj">--</em>
+        </div>
+        <div class="zj-head-title-row">
+          <div class="zj-head-title" id="zj-title">-- · 单团队看板详情</div>
+          <div class="zj-head-meta">
+            <span>站点 <b id="zj-meta-site">--</b> · 域 <b id="zj-meta-dom">--</b></span><i>|</i>
+            <span>看板列 <b>待办/进行中/评审中/完成</b></span><i>|</i>
+            <span>期次 <b>2026-W34</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="zj-head-right">
+        <div class="zj-switcher" id="zj-switcher" aria-label="Scrum 团队切换"></div>
+        <div class="zj-chips">
+          <a class="zj-chip" id="zj-chip-sprint" href="大屏样板间-研发单团队冲刺详情1920.html" title="同一团队的 Sprint 视角：燃尽 / 任务墙 / 成员负载"><span>同队 · 冲刺视角</span><b>单团队冲刺详情 ›</b></a>
+          <a class="zj-chip" id="zj-chip-block" href="大屏样板间-研发阻塞在制品台账1920.html" title="卡片级阻塞台账：按五类原因筛选全盘 109 张阻塞卡"><span>卡片级 · 阻塞台账</span><b>阻塞在制品台账 ›</b></a>
+        </div>
+        <div class="zj-clock" aria-label="实时时钟">
+          <span class="zj-clock-time" id="zj-clock-time">--:--:--</span>
+          <span class="zj-clock-date" id="zj-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：在制卡数 / 周期中位 / P85 / 流动效率 / 阻塞卡数 / 本队速率 -->
+    <section class="zj-kpis" aria-label="本队看板流动核心指标">
+      <div class="zj-kpi" id="zj-kpi-0box">
+        <div class="zj-kpi-label">在制卡数 WIP</div>
+        <div class="zj-kpi-num"><span class="zj-kpi-val" id="zj-kpi-0">0</span><span class="zj-kpi-unit">张</span></div>
+        <div class="zj-kpi-sub" id="zj-kpi-0s">--</div>
+      </div>
+      <div class="zj-kpi" id="zj-kpi-1box">
+        <div class="zj-kpi-label">周期时间中位</div>
+        <div class="zj-kpi-num"><span class="zj-kpi-val" id="zj-kpi-1">0</span><span class="zj-kpi-unit">天</span></div>
+        <div class="zj-kpi-sub" id="zj-kpi-1s">--</div>
+      </div>
+      <div class="zj-kpi is-amber" id="zj-kpi-2box">
+        <div class="zj-kpi-label">周期时间 P85</div>
+        <div class="zj-kpi-num"><span class="zj-kpi-val" id="zj-kpi-2">0</span><span class="zj-kpi-unit">天</span></div>
+        <div class="zj-kpi-sub" id="zj-kpi-2s">--</div>
+      </div>
+      <div class="zj-kpi is-good" id="zj-kpi-3box">
+        <div class="zj-kpi-label">流动效率</div>
+        <div class="zj-kpi-num"><span class="zj-kpi-val" id="zj-kpi-3">0</span><span class="zj-kpi-unit">%</span></div>
+        <div class="zj-kpi-sub" id="zj-kpi-3s">--</div>
+      </div>
+      <div class="zj-kpi is-bad" id="zj-kpi-4box">
+        <div class="zj-kpi-label">阻塞卡数</div>
+        <div class="zj-kpi-num"><span class="zj-kpi-val" id="zj-kpi-4">0</span><span class="zj-kpi-unit">张</span></div>
+        <div class="zj-kpi-sub" id="zj-kpi-4s">--</div>
+      </div>
+      <div class="zj-kpi" id="zj-kpi-5box">
+        <div class="zj-kpi-label">本队速率</div>
+        <div class="zj-kpi-num"><span class="zj-kpi-val" id="zj-kpi-5">0</span><span class="zj-kpi-unit">点/Sprint</span></div>
+        <div class="zj-kpi-sub" id="zj-kpi-5s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：WIP 四列现状 + 流动效率仪表 + 阻塞原因构成 -->
+    <div class="zj-col">
+      <section class="zj-panel zj-wipwrap">
+        <div class="zj-panel-head">
+          <h2>WIP 四列现状</h2>
+          <span class="zj-panel-tag" id="zj-tag-wip">--</span>
+        </div>
+        <div class="zj-wip">
+          <div class="zj-wip-head"><span>看板列</span><span class="zj-wip-n">在制</span><span class="zj-wip-l">上限</span><span>负荷（黄线 = 上限）</span><span class="zj-wip-r">比率</span></div>
+          <ul id="zj-wip-list"></ul>
+        </div>
+      </section>
+      <section class="zj-panel" style="flex: 1;">
+        <div class="zj-panel-head">
+          <h2>流动效率</h2>
+          <span class="zj-panel-tag" id="zj-tag-fe">--</span>
+        </div>
+        <div class="zj-chart" id="zj-chart-fe"></div>
+      </section>
+      <section class="zj-panel" style="flex: 1;">
+        <div class="zj-panel-head">
+          <h2>阻塞原因构成 · 五类</h2>
+          <span class="zj-panel-tag" id="zj-tag-blk">--</span>
+        </div>
+        <div class="zj-chart" id="zj-chart-blk"></div>
+      </section>
+    </div>
+
+    <!-- 中栏（宽）：CFD 累积流图 + 周期时间控制图 -->
+    <div class="zj-col">
+      <section class="zj-panel" style="flex: 1.22;">
+        <div class="zj-panel-head">
+          <h2>本队累积流图 CFD · 24 周</h2>
+          <span class="zj-panel-tag">期末在制 <b id="zj-tag-cfd-wip">--</b> 张 = 累计流入 <b id="zj-tag-cfd-in">--</b> − 累计流出 <b id="zj-tag-cfd-out">--</b>（逐期恒等）</span>
+        </div>
+        <div class="zj-chart" id="zj-chart-cfd"></div>
+      </section>
+      <section class="zj-panel" style="flex: 1;">
+        <div class="zj-panel-head">
+          <h2>周期时间控制图</h2>
+          <span class="zj-panel-tag">近 16 周 <b id="zj-tag-n">--</b> 张完成卡 · 中位 <b id="zj-tag-med">--</b> 天 · P85 <b id="zj-tag-p85">--</b> 天（样本现算）</span>
+        </div>
+        <div class="zj-chart" id="zj-chart-cycle"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：12 队流动排位 + 阻塞卡清单 -->
+    <div class="zj-col">
+      <section class="zj-panel" style="flex: 1;">
+        <div class="zj-panel-head">
+          <h2>12 队流动效率排位</h2>
+          <span class="zj-panel-tag" id="zj-tag-rank">--</span>
+        </div>
+        <div class="zj-chart" id="zj-chart-rank"></div>
+      </section>
+      <section class="zj-panel zj-blkwrap">
+        <div class="zj-panel-head">
+          <h2>本队阻塞卡清单</h2>
+          <span class="zj-panel-tag" id="zj-tag-list">--</span>
+        </div>
+        <div class="zj-blk">
+          <div class="zj-thead"><span>阻塞卡（按阻塞天数降序）</span><span>阻塞原因</span><span class="zj-blk-day">天数</span><span class="zj-blk-own">责任人</span></div>
+          <ul id="zj-blk-list"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="zj-foot" aria-label="单团队看板详情口径说明">
+      <div class="zj-foot-label"><span class="zj-foot-dot"></span>流动口径</div>
+      <div class="zj-foot-viewport"><div class="zj-foot-track" id="zj-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("zj-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 1.1 ★ kiosk 状态量前置声明（必须早于任何 hold() 调用） =====
+     let 有暂时性死区：带 hash 冷启动时若先 hold() 再声明，会抛
+     ReferenceError: Cannot access 'holdUntil' before initialization —— 主脚本整段中断，
+     而页面此时已渲染完，肉眼看不出问题（契约 §8 批次四实测坑）。
+     因此 idx / timer / holdUntil / hold() / restart() 全部提到这里，
+     首次 hold() 调用在下方第 12 节（boot 段），行号严格大于本块。 */
+  let idx = 0;
+  let timer = null;
+  let holdUntil = 0;
+  let holdCalls = 0;                                           /* 供页尾自检做构造性断言 */
+  function hold() { holdCalls += 1; holdUntil = Date.now() + 20000; }
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyTeam(idx + 1); }, 14000);
+  }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层：单一数据源，12 支团队的全部视图由此派生 =====
+     ★ 三页分工（同一父页「看板流动效率」下的三块子页，口径不重复）：
+       · 本页  ＝ 单队「看板流动」：CFD / 周期时间控制图 / WIP 四列 / 流动效率（队粒度、时间序列）
+       · 阻塞在制品台账（bs）＝ 卡片级阻塞按五类原因筛选（卡粒度、全盘 109 张）
+       · 单团队冲刺详情（cq）＝ 单队 Sprint 燃尽 / 任务墙 / 成员负载（Sprint 粒度、Scrum 视角）
+
+     勾稽到契约（docs/RndIpdThemed.md §2.3）与父页（大屏样板间-研发看板流动效率1920.html）：
+     · 12 团队名与速率逐字：天枢82 天璇76 天玑71 天权68 玉衡66 开阳63 摇光61 青龙58 白虎55
+       朱雀52 玄武49 紫微45，Σ = 746 点/Sprint。
+     · WIP 四列（待办/进行中/评审中/已完成）与上限逐字复制父页 WIP 违限热力矩阵的该队行，
+       12 队列和 = 200 / 210 / 110 / 48，与父页 CFD 期末（待办带宽 200、期末在制 320 =
+       进行中 210 + 评审中 110、末周完成 48）逐字一致。
+     · 五类阻塞原因逐字：跨域依赖 38 / 环境与资源 27 / 需求变更 21 / 外部供应 14 / 评审等待 9，Σ = 109。 */
+
+  const WEEKS_N = 24;                                          /* 2026-W11 → 2026-W34 */
+  const CFD_WEEKS = Array.from({ length: WEEKS_N }, (_, i) => "W" + (11 + i));
+  const COLS = ["待办", "进行中", "评审中", "已完成"];          /* 父页看板四列（逐字） */
+  const COL_COLOR = [C.violet, C.blue, C.amber, C.green];      /* 与父页 CFD 图例配色一致 */
+  const SAMPLE_WEEKS = 16;                                     /* 控制图取近 16 周完成卡 */
+  const SAMPLE_END = new Date(2026, 7, 19).getTime();          /* 2026-08-19（父页同口径） */
+  const SPRINTS = 26;                                          /* 年吞吐 = 速率 × 26 */
+  const VEL_ALL = 746;                                         /* 契约 §2.2 Σ速率 */
+  const BLOCK_ALL = 109;                                       /* 契约 §2.3 当前阻塞卡 */
+  const FE_BAND = { low: 15, high: 40, max: 60 };              /* 流动效率行业参考带（父页同源） */
+
+  /* 3.1 12 团队主表：name/vel/site/dom 引契约 §2.3 逐字；wip/lim 引父页该队行逐字 */
+  const TEAMS = [
+    { name: "天枢", vel: 82, site: "北京总部", dom: "软件",   wip: [22, 24, 12, 5], lim: [20, 18, 10, 6] },
+    { name: "天璇", vel: 76, site: "北京总部", dom: "云平台", wip: [20, 21, 11, 5], lim: [20, 20, 10, 6] },
+    { name: "天玑", vel: 71, site: "上海中心", dom: "AI算法", wip: [18, 19, 10, 4], lim: [20, 18, 10, 6] },
+    { name: "天权", vel: 68, site: "深圳中心", dom: "硬件",   wip: [17, 18, 9, 4],  lim: [20, 18, 10, 6] },
+    { name: "玉衡", vel: 66, site: "上海中心", dom: "软件",   wip: [17, 18, 10, 4], lim: [20, 18, 10, 6] },
+    { name: "开阳", vel: 63, site: "成都中心", dom: "AI算法", wip: [16, 17, 9, 4],  lim: [20, 18, 10, 6] },
+    { name: "摇光", vel: 61, site: "成都中心", dom: "软件",   wip: [15, 16, 8, 4],  lim: [18, 16, 9, 5] },
+    { name: "青龙", vel: 58, site: "深圳中心", dom: "硬件",   wip: [15, 16, 9, 4],  lim: [18, 16, 9, 5] },
+    { name: "白虎", vel: 55, site: "西安中心", dom: "硬件",   wip: [14, 15, 8, 3],  lim: [18, 16, 9, 5] },
+    { name: "朱雀", vel: 52, site: "南京中心", dom: "云平台", wip: [14, 14, 8, 3],  lim: [18, 14, 8, 5] },
+    { name: "玄武", vel: 49, site: "西安中心", dom: "测试",   wip: [12, 13, 7, 3],  lim: [16, 14, 8, 5] },
+    { name: "紫微", vel: 45, site: "北京总部", dom: "软件",   wip: [20, 19, 9, 5],  lim: [16, 14, 8, 5] }
+  ];
+  /* 构造性断言用的权威串：团队名|速率（契约 §2.3）与 团队名|四列WIP|四列上限（父页矩阵） */
+  const TEAM_AUTH = "天枢|82;天璇|76;天玑|71;天权|68;玉衡|66;开阳|63;摇光|61;青龙|58;白虎|55;朱雀|52;玄武|49;紫微|45";
+  const PARENT_WIP_AUTH =
+    "天枢|22,24,12,5|20,18,10,6;天璇|20,21,11,5|20,20,10,6;天玑|18,19,10,4|20,18,10,6;" +
+    "天权|17,18,9,4|20,18,10,6;玉衡|17,18,10,4|20,18,10,6;开阳|16,17,9,4|20,18,10,6;" +
+    "摇光|15,16,8,4|18,16,9,5;青龙|15,16,9,4|18,16,9,5;白虎|14,15,8,3|18,16,9,5;" +
+    "朱雀|14,14,8,3|18,14,8,5;玄武|12,13,7,3|16,14,8,5;紫微|20,19,9,5|16,14,8,5";
+  const PARENT_COL_SUM = [200, 210, 110, 48];                  /* 父页 CFD 期末：待办/进行中/评审中/末周完成 */
+
+  /* 3.2 五类阻塞原因（契约 §2.3 逐字；责任域与时长带引父页阻塞帕累托明细） */
+  const CAUSES = [
+    { name: "跨域依赖",   all: 38, avg: 6.8, max: 21, own: "架构与集成", color: C.red },
+    { name: "环境与资源", all: 27, avg: 4.2, max: 14, own: "DevOps 平台", color: C.orange },
+    { name: "需求变更",   all: 21, avg: 5.6, max: 18, own: "产品管理",   color: C.amber },
+    { name: "外部供应",   all: 14, avg: 9.3, max: 26, own: "供应链",     color: C.violet },
+    { name: "评审等待",   all: 9,  avg: 3.1, max: 9,  own: "PMO",        color: C.blue }
+  ];
+  const CAUSE_AUTH = "跨域依赖|38;环境与资源|27;需求变更|21;外部供应|14;评审等待|9";
+
+  /* 3.3 阻塞归属矩阵 12 队 × 5 类（二级拆分，本页自编）：
+         列和 = 契约五类卡数 38/27/21/14/9，总和 = 109（页尾硬校验）。 */
+  const BLOCK_MTX = [
+    [5, 3, 3, 1, 1],   /* 天枢 13 */
+    [4, 3, 2, 1, 1],   /* 天璇 11 */
+    [4, 3, 2, 1, 1],   /* 天玑 11 */
+    [4, 2, 2, 2, 1],   /* 天权 11 */
+    [3, 2, 2, 1, 1],   /* 玉衡  9 */
+    [3, 2, 2, 1, 1],   /* 开阳  9 */
+    [3, 2, 2, 1, 0],   /* 摇光  8 */
+    [3, 2, 1, 2, 1],   /* 青龙  9 */
+    [3, 2, 1, 2, 0],   /* 白虎  8 */
+    [2, 2, 2, 1, 1],   /* 朱雀  8 */
+    [2, 2, 1, 1, 1],   /* 玄武  7 */
+    [2, 2, 1, 0, 0]    /* 紫微  5 */
+  ];
+
+  /* 3.4 卡片文案素材（纯展示，不参与勾稽）：模块名取契约 §2.3 八个重点项目 */
+  const PROJ = ["星澜S3", "星澜Pro2", "云枢3.0", "云盾2.1", "澜芯M60", "澜芯M80", "智楼5.0", "车联1.0"];
+  const TOPIC = [
+    "蓝牙配网时序", "OTA 差分包校验", "网关限流策略", "设备影子同步", "边缘推理量化",
+    "射频前端匹配", "结构件散热验证", "多租户权限模型", "灰度路由灰度位", "指标采集埋点",
+    "证书轮转流程", "回归用例基线", "低功耗唤醒链路", "视觉质检误检回捞", "语音唤醒词模型"
+  ];
+  const OWNERS = ["陆敏", "何岩", "邵川", "顾成", "黎昭", "徐澜", "郑野", "薛宁", "崔迪", "汪茗", "彭羽", "苏禾"];
+
+  /* ===== 4. 通用工具：确定性 LCG、分位数、最大余数分配 ===== */
+  /* ★ 确定性伪随机：每支团队一个固定种子（20260819 + 队序 × 7919），
+       任何刷新/来回切换都复现同一批点，控制图不跳变。 */
+  function makeRng(seed) {
+    let s = seed >>> 0;
+    return () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
+  }
+  const quantile = (sorted, q) => {
+    const pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+  };
+  /* 带宽形状发生器：t=0 起点 → t=1 终点（终点严格等于父页该列现值），中途叠加衰减正弦波纹。
+     ★ 只用来"设计"周增量，页面存的仍是周增量流；带宽由相邻累计曲线之差还原。 */
+  function bandShape(end, ratio, ampF, cycles, phase) {
+    const start = Math.round(end * ratio), amp = end * ampF, out = [];
+    for (let j = 0; j <= WEEKS_N; j++) {
+      const t = j / WEEKS_N;
+      out.push(Math.round(start + (end - start) * t + amp * Math.sin(2 * Math.PI * cycles * t + phase) * (1 - t)));
+    }
+    out[WEEKS_N] = end;                                        /* 终点 = 父页该队该列现值 */
+    return out;
+  }
+  const cumFrom = (init, inc) => { let c = init; return inc.map((v) => (c += v)); };
+
+  /* ===== 5. 派生：每队一套看板流动画像（全部现算，只存标量与数组） ===== */
+  TEAMS.forEach((T, k) => {
+    const b = T.wip[0], d = T.wip[1], r = T.wip[2], dn = T.wip[3];
+    const rng = makeRng(20260819 + k * 7919);
+
+    /* 5.1 周增量流（存量数据就是这四条增量数组；CFD 的四条带宽全部由累计之差还原） */
+    const bs = bandShape(b, 0.74 + 0.06 * (k % 5), 0.17, 1.5 + 0.25 * (k % 3), 0.6 * k);
+    const ds = bandShape(d, 1.18 - 0.05 * (k % 4), 0.13, 1.75 + 0.2 * (k % 3), 1.7 + 0.5 * k);
+    const rs = bandShape(r, 0.86 + 0.05 * (k % 4), 0.16, 2.0 + 0.25 * (k % 2), 3.1 + 0.4 * k);
+    const fDN = [], fRV = [], fST = [], fIN = [];
+    for (let i = 0; i < WEEKS_N; i++) {
+      const u = rng();
+      fDN.push(Math.max(1, dn + (u < 0.22 ? -1 : u < 0.72 ? 0 : 1)));
+    }
+    fDN[WEEKS_N - 1] = dn;                                     /* 末周完成 = 父页该队「已完成」列 */
+    for (let i = 0; i < WEEKS_N; i++) {
+      fRV.push(fDN[i] + (rs[i + 1] - rs[i]));                  /* 进入评审中 */
+      fST.push(fRV[i] + (ds[i + 1] - ds[i]));                  /* 拉入进行中（＝流入在制） */
+      fIN.push(fST[i] + (bs[i + 1] - bs[i]));                  /* 新建入待办 */
+    }
+    T.flowIN = fIN; T.flowST = fST; T.flowRV = fRV; T.flowDN = fDN;
+
+    /* 5.2 累计曲线（期初存量由"终点锚定"反推，保证期末四带 = 父页该队四列） */
+    const cdn0 = dn * 26, crv0 = cdn0 + rs[0], cst0 = crv0 + ds[0], cin0 = cst0 + bs[0];
+    T.cumIN = cumFrom(cin0, fIN);
+    T.cumST = cumFrom(cst0, fST);
+    T.cumRV = cumFrom(crv0, fRV);
+    T.cumDN = cumFrom(cdn0, fDN);
+    /* ★ 堆叠带 = 相邻累计曲线之差；在制 = 累计流入(拉入进行中) − 累计流出(完成) 为构造恒等 */
+    T.bandBacklog = T.cumIN.map((v, i) => v - T.cumST[i]);
+    T.bandDoing   = T.cumST.map((v, i) => v - T.cumRV[i]);
+    T.bandReview  = T.cumRV.map((v, i) => v - T.cumDN[i]);
+    T.bandDone    = T.cumDN.slice();
+    T.wipSeries   = T.cumST.map((v, i) => v - T.cumDN[i]);
+    T.wipNow = T.wipSeries[WEEKS_N - 1];                       /* = 进行中 + 评审中 */
+    T.cumInNow = T.cumST[WEEKS_N - 1];
+    T.cumOutNow = T.cumDN[WEEKS_N - 1];
+
+    /* 5.3 周期时间样本：样本量 = 近 16 周完成卡之和（与 CFD 同源），LCG 确定性生成 */
+    T.sampleN = sum(fDN.slice(WEEKS_N - SAMPLE_WEEKS));
+    T.violCells = T.wip.filter((v, j) => v > T.lim[j]).length;
+    /* 尺度：违限越多、单位产出负载越重 → 周期越长（口径写在底部滚动条） */
+    const load = (d + r) / dn;
+    const scale = 0.80 + 0.045 * T.violCells + 0.035 * load;
+    const blkCnt = sum(BLOCK_MTX[k]);
+    /* 阻塞越多、违限列越多 → 排队等待占比越高、流动效率越低（活动时间占比的设计中心） */
+    const feBase = 0.5125 - 0.0125 * blkCnt - 0.018 * T.violCells;
+    const S = [];
+    for (let i = 0; i < T.sampleN; i++) {
+      const u = rng(), v = rng(), w = rng();
+      let cyc = (1.5 + 10 * u * u + 5 * v) * scale;            /* 右偏：多数短、少数长 */
+      if (w < 0.06) cyc += (6 + 6 * rng()) * scale;            /* 长尾卡（跨域依赖 / 外部供应型） */
+      cyc *= 1.10 - 0.20 * (i / Math.max(1, T.sampleN - 1));   /* 近期略有改善的时间趋势 */
+      cyc = Math.max(1, Math.round(cyc * 10) / 10);
+      const act = Math.max(0.1, Math.round(cyc * (feBase - 0.05 + 0.10 * rng()) * 10) / 10);
+      const t = SAMPLE_END - (SAMPLE_WEEKS * 7 - Math.floor(i * SAMPLE_WEEKS * 7 / T.sampleN)) * 86400000
+        + Math.floor(rng() * 20 * 3600000);
+      S.push({ t: t, cyc: cyc, act: act });                    /* 仅标量，绝不进 option */
+    }
+    T.samples = S;
+    const sorted = S.map((s) => s.cyc).sort((a, b2) => a - b2);
+    T.cycMedian = quantile(sorted, 0.5);
+    T.cycP85 = quantile(sorted, 0.85);
+    T.overP85 = S.filter((s) => s.cyc > T.cycP85).length;
+    T.actSum = sum(S.map((s) => s.act));
+    T.cycSum = sum(S.map((s) => s.cyc));
+    T.fe = T.actSum / T.cycSum * 100;                          /* 流动效率 = Σ活动 ÷ Σ周期 */
+
+    /* 5.4 阻塞卡：按 BLOCK_MTX 该队行逐类展开为卡片，天数落在父页该类时长带内 */
+    T.blockRow = BLOCK_MTX[k].slice();
+    T.blockCnt = blkCnt;
+    const cards = [];
+    CAUSES.forEach((cz, j) => {
+      const p = (cz.max - 1) / (cz.avg - 1) - 1;               /* 使 1 + (max−1)·u^p 的均值 ≈ 父页均值 */
+      for (let m = 0; m < T.blockRow[j]; m++) {
+        const days = Math.max(1, Math.min(cz.max, Math.round(1 + (cz.max - 1) * Math.pow(rng(), p))));
+        const pj = PROJ[Math.floor(rng() * PROJ.length)];
+        const tp = TOPIC[Math.floor(rng() * TOPIC.length)];
+        cards.push({
+          id: "KB-" + (2400 + k * 37 + cards.length * 3 + j),
+          title: pj + " · " + tp,
+          cause: cz.name, causeIdx: j, days: days,
+          owner: OWNERS[Math.floor(rng() * OWNERS.length)], ownTeam: cz.own
+        });
+      }
+    });
+    cards.sort((a, b2) => b2.days - a.days || a.id.localeCompare(b2.id));
+    T.cards = cards;
+    T.listN = Math.min(6, cards.length);                       /* 清单列示 TOP N（3~6 条） */
+    T.blockDayMax = cards.length ? cards[0].days : 0;
+  });
+
+  /* 全盘派生（12 队汇总，用于与父页口径对账） */
+  const COL_SUM = COLS.map((c, j) => sum(TEAMS.map((T) => T.wip[j])));
+  const WIP_ALL = sum(TEAMS.map((T) => T.wipNow));                        /* = 210 + 110 = 320 */
+  const BLOCK_SUM = sum(TEAMS.map((T) => T.blockCnt));                    /* = 109 */
+  const CAUSE_COL = CAUSES.map((c, j) => sum(BLOCK_MTX.map((r) => r[j])));
+  const VEL_SUM = sum(TEAMS.map((T) => T.vel));                           /* = 746 */
+  const FE_AVG = sum(TEAMS.map((T) => T.actSum)) / sum(TEAMS.map((T) => T.cycSum)) * 100;
+  const VIOL_ALL = sum(TEAMS.map((T) => T.violCells));
+  const SAMPLE_ALL = sum(TEAMS.map((T) => T.sampleN));
+
+  /* ===== 6. 时钟 ===== */
+  const WEEK_CN = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("zj-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("zj-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK_CN[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 7. 团队切换器（tab 文本与契约 §2.3 团队名、父页 WIP 热力类目逐字一致） ===== */
+  const switcher = $("zj-switcher");
+  switcher.innerHTML = TEAMS.map((T, i) => (
+    '<button class="zj-sw-tab' + (T.violCells > 0 ? " is-over" : "") + '" type="button" data-i="' + i +
+      '" title="切换到' + T.name + "（" + T.site + " · " + T.dom + " 域，← → 方向键）\">" +
+      "<b>" + T.name + "</b><span>WIP " + T.wipNow + "</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".zj-sw-tab"));
+
+  /* ===== 8. 非图表区渲染（不依赖 echarts；★ 全部在 echarts.init 之前完成首屏填充） ===== */
+  function countUp(el, target, fmt) {
+    const t0 = performance.now(), dur = 1200;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+  function renderKpi(T) {
+    const defs = [
+      { v: T.wipNow, f: (x) => fmtInt(x),
+        sub: "进行中 <b>" + T.wip[1] + "</b> + 评审中 <b>" + T.wip[2] + "</b> · 占 12 队 " + fmtDec(T.wipNow / WIP_ALL * 100, 1) + "%" },
+      { v: T.cycMedian, f: (x) => fmtDec(x, 1),
+        sub: "近 " + SAMPLE_WEEKS + " 周 <b>" + T.sampleN + "</b> 张完成卡样本现算" },
+      { v: T.cycP85, f: (x) => fmtDec(x, 1),
+        sub: "85% 的卡在此天数内完成 · 超限 <b>" + T.overP85 + "</b> 张" },
+      { v: T.fe, f: (x) => fmtDec(x, 1),
+        sub: "Σ活动 <b>" + fmtDec(T.actSum, 1) + "</b> ÷ Σ周期 " + fmtDec(T.cycSum, 1) + " 天现算" },
+      { v: T.blockCnt, f: (x) => fmtInt(x),
+        sub: "五类合计 · 占全盘 <b>" + fmtDec(T.blockCnt / BLOCK_ALL * 100, 1) + "%</b>（" + BLOCK_ALL + " 张）" },
+      { v: T.vel, f: (x) => fmtInt(x),
+        sub: "契约逐字 · 年吞吐 <b>" + fmtInt(T.vel * SPRINTS) + "</b> 点（× " + SPRINTS + " Sprint）" }
+    ];
+    defs.forEach((d, i) => {
+      countUp($("zj-kpi-" + i), d.v, d.f);
+      $("zj-kpi-" + i + "s").innerHTML = d.sub;
+    });
+    const k0 = $("zj-kpi-0box");
+    k0.classList.toggle("is-bad", T.violCells > 0);
+    const k3 = $("zj-kpi-3box");
+    k3.classList.toggle("is-good", T.fe >= FE_AVG);
+    k3.classList.toggle("is-amber", T.fe < FE_AVG);
+    $("zj-tag-wip").innerHTML = "违限 <b>" + T.violCells + "</b> / 4 列 · 在制 " + T.wipNow + " 张（父页该队行逐字）";
+    $("zj-tag-fe").innerHTML = "12 队均值 <b>" + fmtDec(FE_AVG, 1) + "%</b> · 参考带 " + FE_BAND.low + "~" + FE_BAND.high + "%";
+    $("zj-tag-blk").innerHTML = "本队 <b>" + T.blockCnt + "</b> 张 · 全盘 " + BLOCK_ALL + " 张（契约五类）";
+    $("zj-tag-rank").innerHTML = "本队第 <b>" + (RANK_ORDER.indexOf(T.name) + 1) + "</b> / 12 · 均值 " + fmtDec(FE_AVG, 1) + "%";
+    $("zj-tag-list").innerHTML = "共 <b>" + T.blockCnt + "</b> 张 · 列示 TOP " + T.listN;
+    $("zj-tag-cfd-wip").textContent = fmtInt(T.wipNow);
+    $("zj-tag-cfd-in").textContent = fmtInt(T.cumInNow);
+    $("zj-tag-cfd-out").textContent = fmtInt(T.cumOutNow);
+    $("zj-tag-n").textContent = fmtInt(T.sampleN);
+    $("zj-tag-med").textContent = fmtDec(T.cycMedian, 1);
+    $("zj-tag-p85").textContent = fmtDec(T.cycP85, 1);
+  }
+  function renderWip(T) {
+    $("zj-wip-list").innerHTML = COLS.map((c, j) => {
+      const v = T.wip[j], l = T.lim[j], ratio = v / l, over = v > l;
+      const barMax = Math.max(v, l) * 1.18;
+      return '<li class="' + (over ? "is-over" : "") + '">' +
+        '<span class="zj-wip-col" style="color:' + COL_COLOR[j] + '">' + c + "</span>" +
+        '<span class="zj-wip-n">' + v + "</span>" +
+        '<span class="zj-wip-l">' + l + "</span>" +
+        '<span class="zj-wip-bar"><u class="' + (over ? "is-over" : "") + '" style="width:' + fmtDec(v / barMax * 100, 1) + '%"></u>' +
+          '<s style="left:' + fmtDec(l / barMax * 100, 1) + '%"></s></span>' +
+        '<span class="zj-wip-r ' + (over ? "is-over" : "") + '">' + fmtDec(ratio, 2) + (over ? "<i>违限</i>" : "") + "</span>" +
+      "</li>";
+    }).join("");
+  }
+  function renderBlocks(T) {
+    const rows = T.cards.slice(0, T.listN);
+    $("zj-blk-list").innerHTML = rows.map((cd) => {
+      const cz = CAUSES[cd.causeIdx];
+      const hot = cd.days >= cz.max * 0.66 ? "is-hot" : (cd.days >= cz.avg ? "is-warm" : "is-cool");
+      return "<li>" +
+        '<span class="zj-blk-card"><b>' + cd.title + "</b><span>" + cd.id + " · " + T.name + " · " + T.dom + " 域</span></span>" +
+        '<span class="zj-badge" style="background:' + hexMix(cz.color, 0.74, 8) + ";color:" + cz.color + ';border:1px solid ' + hexMix(cz.color, 0.5, 8) + '">' + cd.cause + "</span>" +
+        '<span class="zj-blk-day ' + hot + '">' + cd.days + "</span>" +
+        '<span class="zj-blk-own"><b>' + cd.owner + "</b><span>" + cd.ownTeam + "</span></span>" +
+      "</li>";
+    }).join("");
+  }
+
+  /* 12 队流动效率排位（与团队无关，只算一次） */
+  const RANK_ORDER = TEAMS.slice().sort((a, b) => b.fe - a.fe).map((T) => T.name);
+
+  /* 底部口径滚动（内容与团队无关，只建一次；★ 图表 init 之前填充） */
+  (function buildFoot() {
+    const items = [
+      ["分工", C.violet, "同一父页「看板流动效率」下三块子页分工：本页 = 单队看板流动（CFD / 周期时间控制图 / WIP 四列 / 流动效率，队粒度时间序列）；" +
+        "「阻塞在制品台账」= 卡片级阻塞按五类原因筛选（卡粒度，全盘 " + BLOCK_ALL + " 张）；" +
+        "「单团队冲刺详情」= 单队 Sprint 燃尽 / 任务墙 / 成员负载（Sprint 粒度，Scrum 视角）——三页互不重复口径"],
+      ["恒等", C.cyan, "CFD 只存四条周增量流（新建入待办 / 拉入进行中 / 进入评审中 / 完成），四条堆叠带宽 = 相邻累计曲线之差；" +
+        "在制 = 累计流入（拉入进行中）− 累计流出（完成）＝ 进行中带 + 评审中带，24 期逐期恒等（页尾硬校验）"],
+      ["勾稽", C.amber, "每队 CFD 期末四带 = 父页「看板流动效率」WIP 违限热力该队行逐字（待办 / 进行中 / 评审中 / 末周完成）；" +
+        "12 队列和 = " + COL_SUM.join(" / ") + "，与父页全盘 CFD 期末（待办带宽 " + PARENT_COL_SUM[0] +
+        "、在制 " + WIP_ALL + " = 进行中 " + PARENT_COL_SUM[1] + " + 评审中 " + PARENT_COL_SUM[2] +
+        "、末周完成 " + PARENT_COL_SUM[3] + "）逐字一致——即 12 队在制卡 Σ 恰为父页全盘期末在制 WIP"],
+      ["控制图", C.blue, "样本 = 该队近 " + SAMPLE_WEEKS + " 周完成卡（张数 = 同期 CFD 完成增量之和，12 队合计 " + fmtInt(SAMPLE_ALL) +
+        " 张）；确定性 LCG（种子 20260819 + 队序 × 7919）生成，刷新与来回切换不跳变；" +
+        "中位数与 P85 由样本线性插值现算，绝不写死，超 P85 的点转橙"],
+      ["流动效率", C.green, "流动效率 = Σ活动时间 ÷ Σ周期时间（同一批完成卡样本现算），12 队合计 " + fmtDec(FE_AVG, 1) +
+        "%；行业参考带 " + FE_BAND.low + "% 以下常见病态、" + FE_BAND.low + "~" + FE_BAND.high + "% 常见带、" +
+        FE_BAND.high + "% 以上精益标杆（与父页仪表同源）；本页样本为 12 队近 " + SAMPLE_WEEKS + " 周全部完成卡（Σ " +
+        fmtInt(SAMPLE_ALL) + " 张），父页为全盘 200 张抽样，样本不同、量级一致，不做逐位勾稽"],
+      ["阻塞", C.red, "阻塞归属为 12 队 × 5 类矩阵：列和 = 契约五类卡数 " + CAUSE_COL.join(" / ") + "，总和 " + BLOCK_SUM +
+        " 张；卡片阻塞天数落在父页该类时长带内（" + CAUSES.map((c) => c.name + " ≤ " + c.max + " 天").join("、") +
+        "）；清单按阻塞天数降序列示 TOP 3~6，全量卡片级筛选见「阻塞在制品台账」"],
+      ["口径", C.textDim, "CFD 周流量与 WIP 存量为看板卡张数口径，周期时间控制图为完成卡计时口径（按卡逐张计天），" +
+        "两者不做 Little 定律逐项勾稽（与父页同一处理）；WIP 上限为各队自定，违限格 " + VIOL_ALL +
+        " 个（12 队 × 4 列 = 48 格），速率 Σ = " + VEL_SUM + " 点/Sprint（契约 §2.2）"]
+    ];
+    const html = items.map((a) => '<span class="zj-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("zj-foot-track").innerHTML = html + html;                /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* ===== 9. 静态层整页重绘（不依赖 echarts） ===== */
+  function paintStatic(T) {
+    $("zj-title").textContent = T.name + " · 单团队看板详情";
+    $("zj-crumb-obj").textContent = T.name + " · " + T.site + " · " + T.dom + " 域";
+    $("zj-meta-site").textContent = T.site;
+    $("zj-meta-dom").textContent = T.dom;
+    $("zj-chip-sprint").href = "大屏样板间-研发单团队冲刺详情1920.html#" + encodeURIComponent(T.name);
+    $("zj-chip-block").href = "大屏样板间-研发阻塞在制品台账1920.html#" + encodeURIComponent(CAUSES[T.blockRow.indexOf(Math.max.apply(null, T.blockRow))].name);
+    renderKpi(T);
+    renderWip(T);
+    renderBlocks(T);
+  }
+
+  /* hash 契约：decodeURIComponent → trim + 全角空白剔除归一 → HASH_ALIAS 收「XX队」「XX团队」 */
+  const HASH_ALIAS = {};
+  TEAMS.forEach((T) => {
+    HASH_ALIAS[T.name + "队"] = T.name;
+    HASH_ALIAS[T.name + "团队"] = T.name;
+    HASH_ALIAS[T.name + "组"] = T.name;
+  });
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    if (HASH_ALIAS[s]) s = HASH_ALIAS[s];
+    return TEAMS.findIndex((x) => x.name === s);
+  }
+  const bootHit = resolveHash(location.hash);
+  const bootIdx = bootHit >= 0 ? bootHit : 0;
+  paintStatic(TEAMS[bootIdx]);                                  /* ★ 非图表区先填充，再 init 图表 */
+  swTabs.forEach((b, k) => b.classList.toggle("is-active", k === bootIdx));
+
+  /* ===== 10. 资源守卫（KPI / WIP 四列 / 阻塞清单已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("zj-error").classList.add("is-visible");
+
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const cfdChart = hasEcharts ? echarts.init($("zj-chart-cfd")) : null;
+  const cycChart = hasEcharts ? echarts.init($("zj-chart-cycle")) : null;
+  const feChart = hasEcharts ? echarts.init($("zj-chart-fe")) : null;
+  const blkChart = hasEcharts ? echarts.init($("zj-chart-blk")) : null;
+  const rankChart = hasEcharts ? echarts.init($("zj-chart-rank")) : null;
+
+  /* ===== 11. option 构造（★ 只放标量与数组；团队/卡片对象一律不进 option，杜绝深拷贝循环引用） ===== */
+
+  /* 11.1 CFD 累积流图：四带堆叠面积，自下而上 已完成 → 评审中 → 进行中 → 待办 */
+  function cfdOption(T) {
+    const bB = T.bandBacklog.slice(), bD = T.bandDoing.slice(), bR = T.bandReview.slice(), bN = T.bandDone.slice();
+    const wp = T.wipSeries.slice(), cIn = T.cumST.slice(), cOut = T.cumDN.slice();
+    const area = (col, a1, a2) => ({
+      color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: echarts.color.modifyAlpha(col, a1) },
+        { offset: 1, color: echarts.color.modifyAlpha(col, a2) }])
+    });
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 12, top: 30, bottom: 4, containLabel: true },
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8,
+        textStyle: { color: C.textDim, fontSize: 11 },
+        data: ["已完成", "评审中", "进行中", "待办"]
+      },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "line", lineStyle: { color: "rgba(96,140,255,.45)" } },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>2026-" + CFD_WEEKS[i] + "</b><br/>" +
+            "待办 <b style=\"color:" + C.violet + "\">" + bB[i] + "</b>　进行中 <b style=\"color:" + C.blue + "\">" + bD[i] + "</b>　" +
+            "评审中 <b style=\"color:" + C.amber + "\">" + bR[i] + "</b>　累计完成 <b style=\"color:" + C.green + "\">" + fmtInt(bN[i]) + "</b><br/>" +
+            "在制 = 累计流入 " + fmtInt(cIn[i]) + " − 累计流出 " + fmtInt(cOut[i]) + " = <b style=\"color:" + C.cyan + "\">" + wp[i] + "</b> 张<br/>" +
+            "本周流入 " + T.flowST[i] + " · 本周流出 " + T.flowDN[i] + " · 净变 " + (T.flowST[i] - T.flowDN[i] >= 0 ? "+" : "") + (T.flowST[i] - T.flowDN[i]);
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: CFD_WEEKS.slice(), boundaryGap: false,
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 1, fontSize: 10 }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "value", name: "累计卡数", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+      },
+      series: [
+        { name: "已完成", type: "line", stack: "cfd", symbol: "none", smooth: 0.25, z: 2,
+          lineStyle: { width: 1, color: C.green }, areaStyle: area(C.green, 0.34, 0.10), data: bN },
+        { name: "评审中", type: "line", stack: "cfd", symbol: "none", smooth: 0.25, z: 3,
+          lineStyle: { width: 1, color: C.amber }, areaStyle: area(C.amber, 0.52, 0.22), data: bR },
+        { name: "进行中", type: "line", stack: "cfd", symbol: "none", smooth: 0.25, z: 4,
+          lineStyle: { width: 1, color: C.blue }, areaStyle: area(C.blue, 0.58, 0.26), data: bD },
+        { name: "待办", type: "line", stack: "cfd", symbol: "none", smooth: 0.25, z: 5,
+          lineStyle: { width: 1, color: C.violet }, areaStyle: area(C.violet, 0.42, 0.14), data: bB }
+      ]
+    };
+  }
+
+  /* 11.2 周期时间控制图：散点（≤P85 蓝 / >P85 橙）+ 中位线 + P85 线（均由样本现算） */
+  function cycOption(T) {
+    const ok = [], over = [];
+    T.samples.forEach((s) => { (s.cyc > T.cycP85 ? over : ok).push([s.t, s.cyc]); });
+    const med = T.cycMedian, p85 = T.cycP85;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 14, top: 28, bottom: 4, containLabel: true },
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8,
+        data: ["周期 ≤ P85", "周期 > P85"], textStyle: { color: C.textDim, fontSize: 11 }
+      },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const d = new Date(p.value[0]);
+          return "<b>" + T.name + " · 完成卡</b><br/>完成日 " + (d.getMonth() + 1) + "-" + pad(d.getDate()) +
+            "<br/>周期时间 <b>" + fmtDec(p.value[1], 1) + "</b> 天" +
+            (p.value[1] > p85 ? "　<span style=\"color:" + C.orange + "\">超 P85</span>" : "") +
+            "<br/>中位 " + fmtDec(med, 1) + " 天 · P85 " + fmtDec(p85, 1) + " 天";
+        }
+      }, TIP),
+      xAxis: {
+        type: "time",
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, {
+          fontSize: 10,
+          formatter: (v) => { const d = new Date(v); return pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+        }),
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: "value", name: "周期天数", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }
+      },
+      series: [
+        { name: "周期 ≤ P85", type: "scatter", symbolSize: 6, z: 3, data: ok,
+          itemStyle: { color: echarts.color.modifyAlpha(C.blue, 0.75) },
+          markLine: {
+            silent: true, symbol: "none",
+            data: [
+              { yAxis: med, lineStyle: { color: C.cyan, width: 1.6, type: "dashed" },
+                label: { show: true, position: "insideEndTop", color: C.cyan, fontSize: 11, formatter: "中位 " + fmtDec(med, 1) + " 天" } },
+              { yAxis: p85, lineStyle: { color: C.amber, width: 1.8, type: "dashed" },
+                label: { show: true, position: "insideEndTop", color: C.amber, fontSize: 11, formatter: "P85 " + fmtDec(p85, 1) + " 天" } }
+            ]
+          } },
+        { name: "周期 > P85", type: "scatter", symbolSize: 8, z: 4, data: over,
+          itemStyle: { color: C.orange, shadowBlur: 8, shadowColor: "rgba(255,157,92,.5)" } }
+      ]
+    };
+  }
+
+  /* 11.3 流动效率仪表（Σ活动 ÷ Σ周期 现算，参考带同父页） */
+  function feOption(T) {
+    const v = Number(fmtDec(T.fe, 1));
+    return {
+      backgroundColor: "transparent",
+      series: [{
+        type: "gauge", min: 0, max: FE_BAND.max, startAngle: 210, endAngle: -30,
+        center: ["50%", "60%"], radius: "92%", splitNumber: 6,
+        axisLine: {
+          lineStyle: {
+            width: 12,
+            color: [
+              [FE_BAND.low / FE_BAND.max, echarts.color.modifyAlpha(C.red, 0.75)],
+              [FE_BAND.high / FE_BAND.max, echarts.color.modifyAlpha(C.blue, 0.75)],
+              [1, echarts.color.modifyAlpha(C.green, 0.8)]
+            ]
+          }
+        },
+        pointer: { width: 4, length: "58%", itemStyle: { color: C.amber } },
+        anchor: { show: true, size: 10, itemStyle: { color: C.amber } },
+        axisTick: { distance: -12, length: 4, lineStyle: { color: "rgba(8,18,49,.7)" } },
+        splitLine: { distance: -12, length: 12, lineStyle: { color: "rgba(8,18,49,.85)", width: 2 } },
+        axisLabel: { distance: 14, color: C.textDim, fontSize: 10, formatter: (x) => x + "%" },
+        title: { offsetCenter: [0, "30%"], color: C.textDim, fontSize: 11 },
+        detail: {
+          offsetCenter: [0, "2%"], color: "#eaf1ff", fontSize: 26, fontWeight: 700,
+          formatter: (x) => fmtDec(x, 1) + "%"
+        },
+        data: [{ value: v, name: "Σ活动 ÷ Σ周期" }]
+      }]
+    };
+  }
+
+  /* 11.4 阻塞原因构成（该队五类卡数横向条） */
+  function blkOption(T) {
+    const rows = CAUSES.map((c, j) => ({ n: c.name, v: T.blockRow[j], j: j }))
+      .sort((a, b) => a.v - b.v || b.j - a.j);
+    const names = rows.map((r) => r.n), vals = rows.map((r) => r.v), cols = rows.map((r) => CAUSES[r.j].color);
+    const avgs = rows.map((r) => CAUSES[r.j].avg), maxs = rows.map((r) => CAUSES[r.j].max), owns = rows.map((r) => CAUSES[r.j].own);
+    const alls = rows.map((r) => CAUSES[r.j].all);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 92, top: 4, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.dataIndex;
+          return "<b>" + names[j] + "</b><br/>本队 <b>" + vals[j] + "</b> 张 · 该类全盘 " + alls[j] +
+            " 张（占 " + fmtDec(vals[j] / alls[j] * 100, 1) + "%）<br/>责任域 " + owns[j] +
+            "<br/>全盘均时长 " + fmtDec(avgs[j], 1) + " 天 · 最长 " + maxs[j] + " 天";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max(1, Math.max.apply(null, vals)) * 1.5 },
+      yAxis: {
+        type: "category", data: names,
+        axisLabel: { color: C.text, fontSize: 11.5 }, axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 12,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 6 },
+        data: vals.map((v, j) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: 6,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(cols[j], 0.45) }, { offset: 1, color: cols[j] }])
+          }
+        })),
+        label: {
+          show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => p.value + " 张 · 均 " + fmtDec(avgs[p.dataIndex], 1) + " 天"
+        }
+      }]
+    };
+  }
+
+  /* 11.5 12 队流动效率排位（本队高亮琥珀，其余星蓝） */
+  function rankOption(cur) {
+    const rows = TEAMS.map((T, j) => ({ n: T.name, v: Number(fmtDec(T.fe, 1)), j: j, w: T.wipNow, b: T.blockCnt, o: T.violCells }))
+      .sort((a, b) => a.v - b.v);
+    const names = rows.map((r) => r.n), vals = rows.map((r) => r.v), js = rows.map((r) => r.j);
+    const wips = rows.map((r) => r.w), blks = rows.map((r) => r.b), viols = rows.map((r) => r.o);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 96, top: 4, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.dataIndex;
+          return "<b>" + names[j] + "</b>　流动效率 <b style=\"color:" + C.amber + "\">" + fmtDec(vals[j], 1) + "%</b><br/>" +
+            "在制 " + wips[j] + " 张 · 阻塞 " + blks[j] + " 张 · 违限 " + viols[j] + " 列<br/>" +
+            "12 队均值 " + fmtDec(FE_AVG, 1) + "% · 排位 " + (rows.length - j) + " / 12";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max.apply(null, vals) * 1.36 },
+      yAxis: {
+        type: "category", data: names,
+        /* axisLabel.color 支持回调（按类目名着色）；fontWeight 不支持回调，故只换色不换字重 */
+        axisLabel: { fontSize: 11.5, color: (n) => (n === TEAMS[cur].name ? "#ffd489" : C.text) },
+        axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 11,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 6 },
+        data: vals.map((v, j) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: 6,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: darken(js[j] === cur ? C.amber : C.blue, 0.5) },
+              { offset: 1, color: js[j] === cur ? C.amber : C.blue }])
+          }
+        })),
+        markLine: {
+          silent: true, symbol: "none",
+          data: [{ xAxis: Number(fmtDec(FE_AVG, 1)), lineStyle: { color: C.cyan, width: 1.4, type: "dashed" },
+            label: { show: true, position: "start", color: C.cyan, fontSize: 10, formatter: "均值 " + fmtDec(FE_AVG, 1) + "%" } }]
+        },
+        label: {
+          show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#c8d6f2",
+          formatter: (p) => fmtDec(p.value, 1) + "% · 阻塞 " + blks[p.dataIndex]
+        }
+      }]
+    };
+  }
+
+  /* ===== 12. 团队切换主流程：整页重绘 ===== */
+  function applyTeam(i) {
+    const n = TEAMS.length;
+    idx = ((i % n) + n) % n;
+    const T = TEAMS[idx];
+    paintStatic(T);
+    swTabs.forEach((b, k) => b.classList.toggle("is-active", k === idx));
+    if (hasEcharts) {
+      cfdChart.setOption(cfdOption(T), true);                  /* 轴上限随团队变化 → notMerge */
+      cycChart.setOption(cycOption(T), true);
+      feChart.setOption(feOption(T), true);
+      blkChart.setOption(blkOption(T), true);
+      rankChart.setOption(rankOption(idx), true);
+    }
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(T.name));
+  }
+
+  /* ===== 13. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 =====
+     ★ 本节只做「调用」，kiosk 状态量（idx / timer / holdUntil）与 hold() / restart()
+       已在第 1.1 节声明——声明行号严格小于此处首次 hold() 调用行号（TDZ 防护）。 */
+  const PARENT = "大屏样板间-研发看板流动效率1920.html";
+
+  swTabs.forEach((b) => b.addEventListener("click", () => { applyTeam(Number(b.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyTeam(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyTeam(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  applyTeam(bootIdx);
+  if (bootHit >= 0) hold();                                    /* 父页下钻进来：先保持 20 秒不轮换 */
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applyTeam(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 14 秒切下一支团队；鼠标停在切换器上时暂停 */
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 14. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const checks = [
+    ["12 团队名与速率与契约 §2.3 逐字（构造性断言），Σ速率 = 746 点/Sprint",
+      TEAMS.map((T) => T.name + "|" + T.vel).join(";") === TEAM_AUTH && VEL_SUM === VEL_ALL && VEL_SUM === 746],
+    ["WIP 四列现状与上限与父页「看板流动效率」该队行逐字（构造性断言）",
+      TEAMS.map((T) => T.name + "|" + T.wip.join(",") + "|" + T.lim.join(",")).join(";") === PARENT_WIP_AUTH],
+    ["WIP 四列 12 队列和 = 父页 CFD 期末口径 200 / 210 / 110 / 48",
+      COL_SUM.every((v, j) => v === PARENT_COL_SUM[j])],
+    ["12 队在制卡 Σ = 320 = 父页全盘期末在制 WIP（＝进行中 210 + 评审中 110），页内口径条已注明",
+      WIP_ALL === PARENT_COL_SUM[1] + PARENT_COL_SUM[2] && WIP_ALL === 320 &&
+      TEAMS.every((T) => T.wipNow === T.wip[1] + T.wip[2])],
+    ["每队 CFD 逐期恒等：在制 = 累计流入 − 累计流出 = 进行中带 + 评审中带（24 期 × 12 队）",
+      TEAMS.every((T) => T.wipSeries.every((v, i) =>
+        v === T.cumST[i] - T.cumDN[i] && v === T.bandDoing[i] + T.bandReview[i]))],
+    ["每队 CFD 四带宽恒为正、周增量非负、四条累计曲线单调不降",
+      TEAMS.every((T) => T.bandBacklog.every((v) => v > 0) && T.bandDoing.every((v) => v > 0) &&
+        T.bandReview.every((v) => v > 0) && T.bandDone.every((v) => v > 0) &&
+        [T.flowIN, T.flowST, T.flowRV, T.flowDN].every((a) => a.every((v) => v >= 0)) &&
+        [T.cumIN, T.cumST, T.cumRV, T.cumDN].every((a) => a.every((v, i) => i === 0 || v >= a[i - 1])))],
+    ["每队 CFD 期末四带 = 该队 WIP 四列（待办/进行中/评审中带宽 + 末周完成增量）",
+      TEAMS.every((T) => {
+        const L = WEEKS_N - 1;
+        return T.bandBacklog[L] === T.wip[0] && T.bandDoing[L] === T.wip[1] &&
+          T.bandReview[L] === T.wip[2] && T.flowDN[L] === T.wip[3];
+      })],
+    ["控制图样本量 = 该队近 16 周 CFD 完成增量之和（构造性断言）",
+      TEAMS.every((T) => T.samples.length === T.sampleN &&
+        T.sampleN === sum(T.flowDN.slice(WEEKS_N - SAMPLE_WEEKS)) && T.sampleN > 0)],
+    ["每队 P85 ≥ 中位数，且均由样本线性插值现算（未写死）",
+      TEAMS.every((T) => {
+        const s = T.samples.map((x) => x.cyc).sort((a, b) => a - b);
+        return T.cycP85 >= T.cycMedian && T.cycMedian > 0 &&
+          Math.abs(T.cycMedian - quantile(s, 0.5)) < 1e-9 && Math.abs(T.cycP85 - quantile(s, 0.85)) < 1e-9;
+      })],
+    ["每队超 P85 点数 ≤ 样本量 15% 上取整",
+      TEAMS.every((T) => T.overP85 <= Math.ceil(T.sampleN * 0.15))],
+    ["每队流动效率 = Σ活动 ÷ Σ周期（|Δ| < 1e-9），且每张卡活动时间 ≤ 周期时间",
+      TEAMS.every((T) => Math.abs(T.fe - T.actSum / T.cycSum * 100) < 1e-9 &&
+        T.samples.every((s) => s.act <= s.cyc && s.act > 0))],
+    ["12 队流动效率落在参考带 15%~60% 内，12 队合计 = Σ活动 ÷ Σ周期 现算",
+      TEAMS.every((T) => T.fe > FE_BAND.low && T.fe < FE_BAND.max) &&
+      Math.abs(FE_AVG - sum(TEAMS.map((T) => T.actSum)) / sum(TEAMS.map((T) => T.cycSum)) * 100) < 1e-9],
+    ["阻塞类型 ⊆ 契约五类原因（逐卡校验），五类名与卡数与契约逐字",
+      CAUSES.map((c) => c.name + "|" + c.all).join(";") === CAUSE_AUTH &&
+      TEAMS.every((T) => T.cards.every((cd) => CAUSES.some((c) => c.name === cd.cause)))],
+    ["阻塞 12×5 矩阵列和 = 38 / 27 / 21 / 14 / 9，总和 = 109（契约 §2.3）",
+      CAUSE_COL.every((v, j) => v === CAUSES[j].all) && BLOCK_SUM === BLOCK_ALL && BLOCK_SUM === 109 &&
+      TEAMS.every((T) => T.blockCnt === sum(T.blockRow) && T.cards.length === T.blockCnt)],
+    ["每队阻塞清单列示 3~6 条且 = min(6, 本队阻塞卡数)，按阻塞天数降序",
+      TEAMS.every((T) => T.listN >= 3 && T.listN <= 6 && T.listN === Math.min(6, T.blockCnt) &&
+        T.cards.slice(0, T.listN).every((cd, i, a) => i === 0 || a[i - 1].days >= cd.days))],
+    ["阻塞天数 ≥ 1 且 ≤ 父页该类最长时长（跨域依赖 21 / 环境与资源 14 / 需求变更 18 / 外部供应 26 / 评审等待 9）",
+      TEAMS.every((T) => T.cards.every((cd) => cd.days >= 1 && cd.days <= CAUSES[cd.causeIdx].max))],
+    ["违限标记 = 在制 > 上限 重算一致；12 队 × 4 列共 48 格，违限格数与逐格重算相符",
+      TEAMS.every((T) => T.violCells === T.wip.filter((v, j) => v > T.lim[j]).length) &&
+      VIOL_ALL === sum(TEAMS.map((T) => T.wip.filter((v, j) => v > T.lim[j]).length)) &&
+      TEAMS.length * 4 === 48],
+    ["hash 12 队名均可解析，别名「XX队 / XX团队 / XX组」同样命中",
+      TEAMS.every((T, i) => resolveHash("#" + encodeURIComponent(T.name)) === i &&
+        resolveHash("#" + encodeURIComponent(T.name + "队")) === i &&
+        resolveHash("#" + encodeURIComponent(T.name + "团队")) === i &&
+        resolveHash("# " + encodeURIComponent(T.name) + " ") === i)],
+    ["切换器 tab 数 = 12 且文本与契约团队名（＝父页 WIP 热力类目）逐字",
+      swTabs.length === TEAMS.length && swTabs.every((b, i) => b.querySelector("b").textContent === TEAMS[i].name)],
+    ["看板四列名与父页逐字：待办 / 进行中 / 评审中 / 已完成",
+      COLS.join("/") === "待办/进行中/评审中/已完成"],
+    /* ★ TDZ 防护的构造性断言：holdUntil / hold() 声明在第 1.1 节（行号远小于第 13 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 holdCalls ≥ 1」即证明声明早于首次调用。 */
+    ["holdUntil 声明早于首次 hold() 调用（TDZ 防护，构造性断言）",
+      typeof holdUntil === "number" && typeof hold === "function" &&
+      (bootHit < 0 ? holdCalls === 0 : (holdCalls >= 1 && holdUntil > Date.now()))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单团队看板详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
