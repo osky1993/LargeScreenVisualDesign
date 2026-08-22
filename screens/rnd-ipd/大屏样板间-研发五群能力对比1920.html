@@ -1,0 +1,1257 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发五群能力对比</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --kj-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .kj-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 104px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .kj-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .kj-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .kj-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 8px 8px;
+  }
+  .kj-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .kj-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .kj-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .kj-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .kj-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .kj-crumb em { font-style: normal; color: #d3e2ff; }
+  .kj-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .kj-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .kj-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .kj-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .kj-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .kj-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .kj-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .kj-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 群高亮器：五群 tab（← → 方向键 / 4s 轮巡 / hash 直达）——只做高亮，不整页重绘 */
+  .kj-picker { display: flex; align-items: center; gap: 6px; }
+  .kj-picker-label { font-size: 10.5px; letter-spacing: 0.14em; color: rgba(127, 146, 196, 0.9); writing-mode: vertical-rl; text-orientation: upright; line-height: 1; }
+  .kj-pk-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 68px; padding: 3px 8px 4px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .kj-pk-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+  .kj-pk-tab span { font-size: 9.5px; letter-spacing: 0.02em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .kj-pk-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .kj-pk-tab.is-active { color: #04101f; border-color: transparent; box-shadow: 0 0 16px rgba(92, 157, 255, 0.4); }
+  .kj-pk-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .kj-chips { display: flex; align-items: center; gap: 9px; }
+  .kj-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 168px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(169, 140, 245, 0.42); background: linear-gradient(160deg, rgba(169, 140, 245, 0.16), rgba(18, 34, 78, 0.6));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .kj-chip span { font-size: 10.5px; letter-spacing: 0.14em; color: #8f7fc4; white-space: nowrap; }
+  .kj-chip b { font-size: 13.5px; font-weight: 700; letter-spacing: 0.04em; color: #cbbcf7; white-space: nowrap; }
+  .kj-chip:hover { border-color: rgba(169, 140, 245, 0.92); box-shadow: 0 0 16px -2px rgba(169, 140, 245, 0.7); }
+  .kj-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .kj-clock-time { font: 700 26px/1 var(--kj-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .kj-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（整行 6 枚，高度由 grid 行写死） ===== */
+  .kj-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .kj-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 8px 16px;
+  }
+  .kj-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .kj-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .kj-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .kj-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .kj-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .kj-kpi.is-good::after { background: radial-gradient(circle, rgba(111, 224, 154, 0.13), transparent 68%); }
+  .kj-kpi-label { font-size: 12px; letter-spacing: 0.06em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .kj-kpi-num { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+  .kj-kpi-val { font: 700 28px/1 var(--kj-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .kj-kpi.is-amber .kj-kpi-val { color: #ffd489; }
+  .kj-kpi.is-good .kj-kpi-val { color: #b8f2cf; }
+  .kj-kpi-unit { font-size: 12px; color: var(--rnd-text-dim); }
+  .kj-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kj-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体 ===== */
+  .kj-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .kj-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .kj-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .kj-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .kj-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.06em; color: #d6e2fa; white-space: nowrap; }
+  .kj-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .kj-panel-tag { font-size: 11.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .kj-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .kj-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 右栏下：能力短板诊断（★ 高度写死，DOM 在 init 之前填充完） ===== */
+  .kj-gapwrap { flex: none; height: 390px; }
+  .kj-gaps { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+  .kj-thead, .kj-gaps li {
+    display: grid; grid-template-columns: 62px 78px 82px 52px 1fr; align-items: center; gap: 6px;
+    padding: 0 8px; font-variant-numeric: tabular-nums;
+  }
+  .kj-thead {
+    flex: none; height: 24px; font-size: 10.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.95);
+    border-bottom: 1px solid rgba(96, 140, 255, 0.22);
+  }
+  .kj-gaps ul { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 3px; overflow: hidden; }
+  .kj-gaps li {
+    border-radius: 6px; font-size: 11.5px; color: #c8d6f2; border-left: 3px solid transparent;
+    transition: opacity .2s, background .2s, border-color .2s;
+  }
+  .kj-gaps li:nth-child(odd) { background: rgba(96, 140, 255, 0.06); }
+  .kj-gaps li.is-focus { background: rgba(92, 157, 255, 0.18); }
+  .kj-gaps li.is-mute { opacity: 0.26; }
+  .kj-gap-g { font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kj-gap-d { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kj-gap-v { text-align: right; color: #d8e4fb; }
+  .kj-gap-v i { font-style: normal; color: rgba(127, 146, 196, 0.85); }
+  .kj-gap-p { text-align: right; font-weight: 700; }
+  .kj-gap-p.is-worse { color: #ffb0b7; }
+  .kj-gap-p.is-better { color: #b8f2cf; }
+  .kj-gap-a { color: rgba(169, 190, 232, 0.95); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 底部口径滚动条 ===== */
+  .kj-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .kj-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .kj-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: kj-blink 1.6s ease-in-out infinite; }
+  @keyframes kj-blink { 50% { opacity: 0.35; } }
+  .kj-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .kj-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: kj-ticker 78s linear infinite; will-change: transform; }
+  .kj-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .kj-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes kj-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .kj-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="kj-stage" id="kj-stage">
+    <!-- mockflag:begin --><div class="kj-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="kj-error" id="kj-error" role="alert">ECharts 资源加载失败，KPI 与能力短板诊断清单不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="kj-header">
+      <div class="kj-head-left">
+        <div class="kj-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="kj-crumb-up" href="大屏样板间-研发工程效能1920.html" title="返回上级专题页（Esc）">‹ 返回 工程效能</a><i>›</i>
+          <em>五仓库群工程能力对比</em>
+        </div>
+        <div class="kj-head-title-row">
+          <div class="kj-head-title">五仓库群工程能力对比</div>
+          <div class="kj-head-meta">
+            <span>视角 <b>N 群同屏横向 PK</b>（不切换、不重绘）</span><i>|</i>
+            <span>高亮 <b id="kj-meta-focus">--</b></span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="kj-head-right">
+        <div class="kj-picker" id="kj-picker" aria-label="仓库群高亮">
+          <span class="kj-picker-label">高亮</span>
+        </div>
+        <div class="kj-chips">
+          <a class="kj-chip" href="大屏样板间-研发单仓库群工程详情1920.html" title="同父兄弟子页：单个仓库群的 360 度纵深"><span>同父子页 · 单群 360°</span><b>单仓库群工程详情 ›</b></a>
+        </div>
+        <div class="kj-clock" aria-label="实时时钟">
+          <span class="kj-clock-time" id="kj-clock-time">--:--:--</span>
+          <span class="kj-clock-date" id="kj-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：群数 / Σ仓库 / 覆盖率最高群 / XP 最高群 / 达标群数 / 差异最大维 -->
+    <section class="kj-kpis" aria-label="五群对比核心指标">
+      <div class="kj-kpi">
+        <div class="kj-kpi-label">参与对比仓库群</div>
+        <div class="kj-kpi-num"><span class="kj-kpi-val" id="kj-kpi-0">0</span><span class="kj-kpi-unit">个</span></div>
+        <div class="kj-kpi-sub" id="kj-kpi-0s">--</div>
+      </div>
+      <div class="kj-kpi">
+        <div class="kj-kpi-label">五群仓库总数</div>
+        <div class="kj-kpi-num"><span class="kj-kpi-val" id="kj-kpi-1">0</span><span class="kj-kpi-unit">个</span></div>
+        <div class="kj-kpi-sub" id="kj-kpi-1s">--</div>
+      </div>
+      <div class="kj-kpi is-good">
+        <div class="kj-kpi-label">覆盖率最高群</div>
+        <div class="kj-kpi-num"><span class="kj-kpi-val" id="kj-kpi-2">0</span><span class="kj-kpi-unit">% 中位</span></div>
+        <div class="kj-kpi-sub" id="kj-kpi-2s">--</div>
+      </div>
+      <div class="kj-kpi is-good">
+        <div class="kj-kpi-label">XP 采纳最高群</div>
+        <div class="kj-kpi-num"><span class="kj-kpi-val" id="kj-kpi-3">0</span><span class="kj-kpi-unit">分</span></div>
+        <div class="kj-kpi-sub" id="kj-kpi-3s">--</div>
+      </div>
+      <div class="kj-kpi is-amber">
+        <div class="kj-kpi-label">覆盖率达标群数</div>
+        <div class="kj-kpi-num"><span class="kj-kpi-val" id="kj-kpi-4">0</span><span class="kj-kpi-unit">/ 5 群</span></div>
+        <div class="kj-kpi-sub" id="kj-kpi-4s">--</div>
+      </div>
+      <div class="kj-kpi is-amber">
+        <div class="kj-kpi-label">能力差异最大维度</div>
+        <div class="kj-kpi-num"><span class="kj-kpi-val" id="kj-kpi-5">0</span><span class="kj-kpi-unit">× 极差比</span></div>
+        <div class="kj-kpi-sub" id="kj-kpi-5s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：XP 六维五群叠加雷达 + 覆盖率箱线五群并置 -->
+    <div class="kj-col">
+      <section class="kj-panel" style="flex: 1;">
+        <div class="kj-panel-head">
+          <h2>XP 实践采纳 · 五群叠加</h2>
+          <span class="kj-panel-tag" id="kj-tag-radar">--</span>
+        </div>
+        <div class="kj-chart" id="kj-chart-radar"></div>
+      </section>
+      <section class="kj-panel" style="flex: 1;">
+        <div class="kj-panel-head">
+          <h2>单测覆盖率箱线 · 五群并置</h2>
+          <span class="kj-panel-tag" id="kj-tag-box">--</span>
+        </div>
+        <div class="kj-chart" id="kj-chart-box"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：★主视觉 五群 × 8 维平行坐标 + 规模 vs 质量散点 -->
+    <div class="kj-col">
+      <section class="kj-panel" style="flex: 1.22;">
+        <div class="kj-panel-head">
+          <h2>★ 五群 × 8 维工程能力平行坐标</h2>
+          <span class="kj-panel-tag" id="kj-tag-par">--</span>
+        </div>
+        <div class="kj-chart" id="kj-chart-parallel"></div>
+      </section>
+      <section class="kj-panel" style="flex: 0.78;">
+        <div class="kj-panel-head">
+          <h2>规模 vs 质量 · 仓库数 × 覆盖率（气泡 = 年构建量）</h2>
+          <span class="kj-panel-tag" id="kj-tag-sc">--</span>
+        </div>
+        <div class="kj-chart" id="kj-chart-scatter"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：排名矩阵热力 + 能力短板诊断 -->
+    <div class="kj-col">
+      <section class="kj-panel" style="flex: 1;">
+        <div class="kj-panel-head">
+          <h2>多指标排名矩阵</h2>
+          <span class="kj-panel-tag" id="kj-tag-rank">--</span>
+        </div>
+        <div class="kj-chart" id="kj-chart-rank"></div>
+      </section>
+      <section class="kj-panel kj-gapwrap">
+        <div class="kj-panel-head">
+          <h2>能力短板诊断 · 5 群 × 2 维</h2>
+          <span class="kj-panel-tag" id="kj-tag-gap">--</span>
+        </div>
+        <div class="kj-gaps">
+          <div class="kj-thead">
+            <span>仓库群</span><span>相对短板</span><span class="kj-gap-v">现值 / 基准</span><span class="kj-gap-p">劣化</span><span>改进建议</span>
+          </div>
+          <ul id="kj-gap-list"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="kj-foot" aria-label="五群能力对比口径说明">
+      <div class="kj-foot-label"><span class="kj-foot-dot"></span>对比口径</div>
+      <div class="kj-foot-viewport"><div class="kj-foot-track" id="kj-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（整台靠 CSS transform 缩放，init 后不调 chart.resize()） ===== */
+  const stage = document.getElementById("kj-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const round1 = (v) => Math.round(v * 10) / 10;
+
+  /* ===== 1.1 ★ kiosk 状态量前置声明（必须早于任何 pauseRotate() 调用） =====
+     let 有暂时性死区：带 hash 冷启动时若先调用后声明，会抛
+     ReferenceError: Cannot access 'pauseUntil' before initialization —— 主脚本整段中断，
+     而页面此时已渲染完，肉眼看不出问题（docs/RndIpdThemed.md §8 批次四实测坑）。
+     故 focusIdx / rotTimer / pauseUntil / pauseRotate() / restartRotate() 全部提到这里；
+     首次 pauseRotate() 调用在下方第 11 节，行号严格大于本块。 */
+  let focusIdx = 0;
+  let rotTimer = null;
+  let pauseUntil = 0;
+  let pauseCalls = 0;                                        /* 供页尾自检做构造性断言 */
+  function pauseRotate(ms) { pauseCalls += 1; pauseUntil = Date.now() + (ms || 20000); }
+  function restartRotate() {
+    clearInterval(rotTimer);
+    rotTimer = setInterval(() => {
+      if (Date.now() < pauseUntil) return;
+      applyFocus((focusIdx + 1) % GROUPS.length);
+    }, 4000);
+  }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const fade = (hex, a) => {
+    const n = parseInt(hex.slice(1), 16);
+    return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+  };
+
+  /* ===== 3. 数据层：单一数据源，五群全部视图由此派生 =====
+     ★ 三页分工（docs/RndIpdThemed.md §9.1 W9 / §6 P7）：
+       · 本页 kj「五群能力对比」= C 型横向对比——五个仓库群同屏并排 PK，
+         不做对象切换器、不整页重绘，交互只有「高亮 / 刷选」。
+       · 姊妹子页 gc「单仓库群工程详情」= A 型对象切换器——一个群的 360 度纵深
+         （逐仓清单、覆盖率总体分桶、24 周走势、评审分位）。
+       · 姊妹子页 pt「流水线运行台账」= B 型台账——一次次构建运行的流水明细
+         （构建号 / 分支 / 触发人 / 阶段截断 / 失败原因）。
+     ★ 与父页 dx「研发工程效能」及姊妹页 gc 的逐格同源关系：
+       · 五群名与仓库数：应用软件 84 / 嵌入式 37 / 云服务 96 / AI 平台 42 / 工具链 58，Σ = 317 个（父页 COVERAGE 逐字）。
+       · 覆盖率箱线五数 [min, Q1, 中位, Q3, max] 引父页 COVERAGE 逐字，目标线 80%。
+       · XP 六维全局值引父页 XP_DIMS.cur 逐字（62/58/92/74/84/66）；五群分值与 gc 页**同一反解**
+         （free 列序 = [应用软件, 嵌入式, AI 平台, 工具链]，云服务为平差项），故与 gc 页逐格一致，
+         且按仓库数加权精确回归父页全局值 → 本页把这条全局值画成基准虚线。
+       · 构建成功率 / 构建时长 / 评审时长 / 部署频率：与 gc 页同一发生器与同一平差口径
+         （成功率零和偏移、时长因子加权归一、评审五桶列和 = 父页 REVIEW_BUCKETS、部署 Σ = 14.2 次/日）。
+       · 变更失败率：契约 §2.2 全局 8.4%，本页按**部署量加权**拆到五群，加权精确回归 8.4%（本页新增二级拆分）。
+       · 年构建量：引姊妹页 pt 逐字（18,620 / 5,780 / 21,840 / 8,240 / 9,860，Σ = 64,340 次）。 */
+
+  const GROUP_AUTH = "应用软件|84|68,76,82,87,93;嵌入式|37|52,61,68,74,82;云服务|96|72,80,85,89,95;" +
+    "AI 平台|42|58,66,73,80,88;工具链|58|63,71,78,84,91";
+  const XP_AUTH = "结对编程|62;TDD|58;持续集成|92;重构|74;小步发布|84;集体代码所有权|66";
+  /* gc 页 XP_DIMS.free 逐字（列序 = [应用软件, 嵌入式, AI 平台, 工具链]，云服务由加权方程解出） */
+  const XP_FREE_AUTH = "64,52,58,66;58,38,48,72;94,78,88,96;76,64,68,80;86,62,80,84;68,54,62,74";
+  const MR_AUTH = "486,1042,694,318,92";                     /* 父页 REVIEW_BUCKETS 各桶总量 */
+  const BUILDS_AUTH = "18620,5780,21840,8240,9860";          /* 姊妹页 pt 年度构建数逐字 */
+  const REPO_ALL = 317;                                      /* Σ 五群仓库数 */
+  const DEPLOY_ALL_T = 142;                                  /* 部署频率 14.2 次/日，以「十分之一次」计整 */
+  const FAIL_ALL = 8.4;                                      /* 契约 §2.2 变更失败率 */
+  const COV_TARGET = 80;                                     /* 父页 COV_TARGET 逐字 */
+  const CAL_WEEKS = 26;                                      /* 父页日历热力周数 */
+  const BUILD_WEEKS = 24;                                    /* 父页构建走势周数 */
+
+  /* 3.1 五群主表（name 与契约 §6 P7→S13 对象集逐字；box / repos 引父页逐字；
+         dep / srOff / bfac / mr 引姊妹页 gc 逐字；builds 引姊妹页 pt 逐字；
+         failFree = 变更失败率自由项，云服务为平差项） */
+  const GROUPS = [
+    { name: "应用软件", short: "应用", repos: 84, box: [68, 76, 82, 87, 93], color: C.blue,
+      role: "智家终端 App / 场景引擎 / 端侧 SDK",
+      dep: 0.049, srOff: 0.5, bfac: 0.95, mr: [140, 300, 200, 84, 16],
+      builds: 18620, failFree: 6.8 },
+    { name: "嵌入式", short: "嵌入", repos: 37, box: [52, 61, 68, 74, 82], color: C.orange,
+      role: "澜芯模组固件 / RTOS / 驱动与协议栈",
+      dep: 0.024, srOff: -3.4, bfac: 2.00, mr: [22, 78, 88, 52, 20],
+      builds: 5780, failFree: 9.2 },
+    { name: "云服务", short: "云服", repos: 96, box: [72, 80, 85, 89, 95], color: C.cyan,
+      role: "云枢平台 / 云盾鉴权 / 计费与租户面",
+      dep: 0.060, srOff: null, bfac: 0.70, mr: [210, 360, 190, 60, 10],
+      builds: 21840, failFree: null },
+    { name: "AI 平台", short: "AI", repos: 42, box: [58, 66, 73, 80, 88], color: C.violet,
+      role: "灵犀/慧眼/澜音训练与推理、特征与评测",
+      dep: 0.038, srOff: -1.6, bfac: 1.30, mr: [44, 124, 106, 62, 14],
+      builds: 8240, failFree: 11.2 },
+    { name: "工具链", short: "工具", repos: 58, box: [63, 71, 78, 84, 91], color: C.green,
+      role: "CI Runner / 构建缓存 / 环境与镜像",
+      dep: 0.031, srOff: 0.3, bfac: null, mr: [70, 180, 110, 60, 32],
+      builds: 9860, failFree: 6.2 }
+  ];
+  const SOLVE_SR = 2;                                        /* 成功率偏移平差项 = 云服务（与 gc 页一致） */
+  const SOLVE_BF = 4;                                        /* 构建时长因子平差项 = 工具链（与 gc 页一致） */
+  const SOLVE_XP = 2;                                        /* XP 六维平差项 = 云服务（与 gc 页一致） */
+  const SOLVE_FL = 2;                                        /* 变更失败率平差项 = 云服务（本页新增） */
+
+  /* 3.2 评审时长五桶（父页 REVIEW_BUCKETS 逐字：名称 / 小时界 / 总量） */
+  const MR_BUCKETS = [
+    { name: "<2h", lo: 0, hi: 2, n: 486 },
+    { name: "2-8h", lo: 2, hi: 8, n: 1042 },
+    { name: "8-24h", lo: 8, hi: 24, n: 694 },
+    { name: "1-3d", lo: 24, hi: 72, n: 318 },
+    { name: ">3d", lo: 72, hi: 120, n: 92 }
+  ];
+
+  /* 3.3 XP 六维（父页 XP_DIMS 的 cur / prev 逐字；free 与 gc 页逐字一致，
+         列序 = [应用软件, 嵌入式, AI 平台, 工具链]，云服务由加权回归方程解出） */
+  const XP_DIMS = [
+    { dim: "结对编程", cur: 62, prev: 54, free: [64, 52, 58, 66] },
+    { dim: "TDD", cur: 58, prev: 49, free: [58, 38, 48, 72] },
+    { dim: "持续集成", cur: 92, prev: 86, free: [94, 78, 88, 96] },
+    { dim: "重构", cur: 74, prev: 68, free: [76, 64, 68, 80] },
+    { dim: "小步发布", cur: 84, prev: 76, free: [86, 62, 80, 84] },
+    { dim: "集体代码所有权", cur: 66, prev: 61, free: [68, 54, 62, 74] }
+  ];
+
+  /* 3.4 复刻父页发生器（种子 / LCG / 公式与 dx 逐字一致，与 gc 页同源），
+         得到 24 周全局成功率均值与构建时长周均值——五群以此为基准线做零和 / 归一偏移。 */
+  let dxSeed = 20260819;
+  const rnd = () => ((dxSeed = (dxSeed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const CAL_WEEK_MEAN = [];
+  for (let w = 0; w < CAL_WEEKS; w += 1) {
+    let s = 0;
+    for (let d = 0; d < 5; d += 1) s += Math.min(100, round1(84 + w * 0.35 + rnd() * 8));
+    CAL_WEEK_MEAN.push(s / 5);
+  }
+  const SR_BASE = CAL_WEEK_MEAN.slice(CAL_WEEKS - BUILD_WEEKS);
+  const SR_BASE_AVG = sum(SR_BASE) / BUILD_WEEKS;             /* 全局工作日构建成功率均值 */
+  const BUILD_BASE = [];
+  for (let i = 0; i < BUILD_WEEKS; i += 1) BUILD_BASE.push(round1(14.8 - 0.16 * i + 0.6 * Math.sin(i * 1.3)));
+  const BUILD_BASE_AVG = sum(BUILD_BASE) / BUILD_WEEKS;       /* 全局构建时长周均值 */
+
+  /* 3.5 平差：四组「按仓库数（部署量）加权回归全局值」的自由度各放在一个群上 */
+  const repoArr = GROUPS.map((g) => g.repos);
+  const repoSum = sum(repoArr);
+
+  (function () {                                             /* (a) 成功率偏移：Σ 仓库数 × 偏移 = 0 */
+    let acc = 0;
+    GROUPS.forEach((g, i) => { if (i !== SOLVE_SR) acc += g.repos * g.srOff; });
+    GROUPS[SOLVE_SR].srOff = -acc / GROUPS[SOLVE_SR].repos;
+  })();
+  (function () {                                             /* (b) 构建时长因子：Σ 仓库数 × 因子 = Σ 仓库数 */
+    let acc = 0;
+    GROUPS.forEach((g, i) => { if (i !== SOLVE_BF) acc += g.repos * g.bfac; });
+    GROUPS[SOLVE_BF].bfac = (repoSum - acc) / GROUPS[SOLVE_BF].repos;
+  })();
+  /* (c) XP 六维：Σ 仓库数 × 群值 = Σ仓库数 × 全局值 → 加权回归父页 XP_DIMS.cur（与 gc 页同一算式） */
+  const XP_VAL = XP_DIMS.map((x) => {
+    const v = [x.free[0], x.free[1], 0, x.free[2], x.free[3]];   /* 列序 = GROUPS 序，索引 2 待解 */
+    let acc = 0;
+    for (let i = 0; i < GROUPS.length; i += 1) if (i !== SOLVE_XP) acc += repoArr[i] * v[i];
+    v[SOLVE_XP] = (repoSum * x.cur - acc) / repoArr[SOLVE_XP];
+    return v;
+  });
+
+  /* 3.6 部署频次按群拆分：权重 = 仓库数 × 每仓部署强度，最大余数法分配到「十分之一次」（与 gc 页一致） */
+  function allocate(total, weights) {
+    const wsum = sum(weights);
+    const raw = weights.map((w) => total * w / wsum);
+    const base = raw.map(Math.floor);
+    const rest = total - sum(base);
+    const order = raw.map((v, i) => [v - base[i], i]).sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+    for (let k = 0; k < rest; k += 1) base[order[k][1]] += 1;
+    return base;
+  }
+  const DEPLOY_T = allocate(DEPLOY_ALL_T, GROUPS.map((g) => g.repos * g.dep));   /* 单位：0.1 次/日 */
+
+  /* 3.7 变更失败率按群拆分：Σ(部署量 × 群失败率) ÷ Σ部署量 = 8.4%（云服务为平差项） */
+  const FAIL_VAL = GROUPS.map((g) => g.failFree);
+  (function () {
+    const dep = DEPLOY_T.map((t) => t / 10);
+    let acc = 0;
+    for (let i = 0; i < GROUPS.length; i += 1) if (i !== SOLVE_FL) acc += dep[i] * FAIL_VAL[i];
+    FAIL_VAL[SOLVE_FL] = (FAIL_ALL * sum(dep) - acc) / dep[SOLVE_FL];
+  })();
+
+  /* 3.8 评审时长分位（桶内线性插值，口径与 gc / 父页一致） */
+  function quantileFromBuckets(counts, p) {
+    const tot = sum(counts), tgt = tot * p;
+    let cum = 0;
+    for (let i = 0; i < counts.length; i += 1) {
+      if (counts[i] > 0 && cum + counts[i] >= tgt) {
+        return MR_BUCKETS[i].lo + (tgt - cum) / counts[i] * (MR_BUCKETS[i].hi - MR_BUCKETS[i].lo);
+      }
+      cum += counts[i];
+    }
+    return MR_BUCKETS[MR_BUCKETS.length - 1].hi;
+  }
+  const MR_COL = MR_BUCKETS.map((b, j) => sum(GROUPS.map((g) => g.mr[j])));      /* 列和，应 == 父页各桶总量 */
+  const MR_TOTAL = sum(MR_COL);
+  const MR_G50 = quantileFromBuckets(MR_COL, 0.5);            /* 全局评审中位（父页 D.mrMedianH 同源） */
+
+  /* 3.9 逐群派生量（全部现算，不复制数字） */
+  GROUPS.forEach((g, k) => {
+    g.cov = g.box[2];                                        /* 覆盖率中位 */
+    g.succ = SR_BASE_AVG + g.srOff;                          /* 构建成功率 % */
+    g.buildMin = BUILD_BASE_AVG * g.bfac;                    /* 构建时长 min（逆向维） */
+    g.mrP50 = quantileFromBuckets(g.mr, 0.5);                /* 评审时长 P50 h（逆向维） */
+    g.mrTotal = sum(g.mr);
+    g.deploy = DEPLOY_T[k] / 10;                             /* 部署频率 次/日 */
+    g.fail = FAIL_VAL[k];                                    /* 变更失败率 %（逆向维） */
+    g.xp = XP_VAL.map((v) => v[k]);                          /* XP 六维（与 gc 页逐格一致） */
+    g.xpAvg = sum(g.xp) / g.xp.length;                       /* XP 综合采纳度 */
+    g.covPass = g.cov >= COV_TARGET;
+  });
+  const XP_WAVG = XP_DIMS.map((x, d) => sum(GROUPS.map((g) => g.repos * g.xp[d])) / repoSum);
+  const XP_GLOBAL_AVG = sum(XP_DIMS.map((x) => x.cur)) / XP_DIMS.length;
+  const BUILDS_ALL = sum(GROUPS.map((g) => g.builds));
+  const DEPLOY_ALL = sum(DEPLOY_T) / 10;                     /* 现算，应恒等于 14.2 */
+  const FAIL_WAVG = sum(GROUPS.map((g) => g.deploy * g.fail)) / sum(GROUPS.map((g) => g.deploy));
+
+  /* ===== 3.10 八个对比维度：dir = +1 正向（越大越好） / −1 逆向（越小越好） =====
+     ★ 逆向维处理口径（页内 + 页脚双处注明）：不做倒数变换（倒数会扭曲刻度、读不出真实分钟数），
+       而是在平行坐标上给逆向轴设 inverse: true —— **原值刻度照常显示**，只是轴向翻转，
+       于是全图统一为「线越靠上 = 越好」，五群的交叉关系可以直接读。
+       轴名带 ↓ 标记的即逆向维；⑧ 仓库数是规模维（scale: true），只作规模参照、不判优劣，
+       也不参与「能力短板诊断」。 */
+  const METRICS = [
+    { key: "cov", axis: "① 覆盖率 %", name: "单测覆盖率", unit: "%", dir: 1, dec: 0,
+      min: 62, max: 92, val: (g) => g.cov, base: () => sum(GROUPS.map((x) => x.repos * x.cov)) / repoSum },
+    { key: "succ", axis: "② 成功率 %", name: "构建成功率", unit: "%", dir: 1, dec: 2,
+      min: 88, max: 96, val: (g) => g.succ, base: () => SR_BASE_AVG },
+    { key: "build", axis: "③ 构建时长 min ↓", name: "构建时长", unit: "min", dir: -1, dec: 1,
+      min: 6, max: 28, val: (g) => g.buildMin, base: () => BUILD_BASE_AVG },
+    { key: "mr", axis: "④ 评审 P50 h ↓", name: "评审时长 P50", unit: "h", dir: -1, dec: 2,
+      min: 4, max: 15, val: (g) => g.mrP50, base: () => MR_G50 },
+    { key: "dep", axis: "⑤ 部署 次/日", name: "部署频率", unit: "次/日", dir: 1, dec: 1,
+      min: 0, max: 6.5, val: (g) => g.deploy, base: (g) => DEPLOY_ALL_T / 10 * g.repos / repoSum },
+    { key: "fail", axis: "⑥ 变更失败率 % ↓", name: "变更失败率", unit: "%", dir: -1, dec: 2,
+      min: 5, max: 11.5, val: (g) => g.fail, base: () => FAIL_ALL },
+    { key: "xp", axis: "⑦ XP 采纳 分", name: "XP 综合采纳度", unit: "分", dir: 1, dec: 2,
+      min: 54, max: 82, val: (g) => g.xpAvg, base: () => XP_GLOBAL_AVG },
+    { key: "repos", axis: "⑧ 仓库数 个", name: "仓库数", unit: "个", dir: 1, dec: 0, scale: true,
+      min: 28, max: 104, val: (g) => g.repos, base: () => repoSum / GROUPS.length }
+  ];
+
+  /* 排名矩阵：每个指标内按方向排序，1 = 领先、5 = 落后（五群取值两两不等，故每列必为 1~5 的排列） */
+  const RANK = METRICS.map((m) => {
+    const vals = GROUPS.map((g) => m.val(g) * m.dir * -1);    /* 统一成「越小越好」 */
+    const sorted = vals.slice().sort((a, b) => a - b);
+    return vals.map((v) => sorted.indexOf(v) + 1);
+  });
+  GROUPS.forEach((g, k) => {
+    g.ranks = METRICS.map((m, i) => RANK[i][k]);
+    g.rankAvg = sum(g.ranks) / g.ranks.length;
+  });
+
+  /* 劣化幅度：正 = 不如基准，负 = 优于基准（逆向维符号已按 dir 翻转） */
+  function gapOf(g, mi) {
+    const m = METRICS[mi];
+    const b = m.base(g);
+    const v = m.val(g);
+    return m.dir === 1 ? (b - v) / b : (v - b) / b;
+  }
+
+  /* 能力短板诊断：由排名矩阵现算——取该群名次最靠后的两维（同名次以劣化幅度大者优先），
+     规模维（仓库数）不参与。10 条 = 5 群 × 2 维，页尾自检硬校验与排名矩阵一致。 */
+  const ADVICE = {
+    cov: "存量仓补测 + 新增行 80% 门禁",
+    succ: "稳定 Runner 池 + 依赖镜像预热",
+    build: "分布式编译 + 增量缓存复用",
+    mr: "拆小 MR + 24h 评审 SLA 看板",
+    dep: "小步合流，按仓设每日发布窗",
+    fail: "灰度批次减半 + 自动回滚门禁",
+    xp: "TDD 训练营 + 结对轮值排班"
+  };
+  const ADVICE_SP = {
+    "嵌入式|build": "交叉编译容器预热 + 固件分层打包",
+    "嵌入式|mr": "固件评审前置静态分析，减少往返",
+    "云服务|fail": "多租户变更按租户分批 + 影子流量",
+    "云服务|xp": "把 CI 优势迁移到 TDD 与结对",
+    "AI 平台|build": "依赖瘦身 + 算力队列错峰",
+    "工具链|dep": "工具仓也纳入每日发布节奏"
+  };
+  const DIAG = [];
+  GROUPS.forEach((g, k) => {
+    const cand = METRICS.map((m, i) => i).filter((i) => !METRICS[i].scale);
+    cand.sort((a, b) => (g.ranks[b] - g.ranks[a]) || (gapOf(g, b) - gapOf(g, a)) || (a - b));
+    const picked = cand.slice(0, 2).sort((a, b) => gapOf(g, b) - gapOf(g, a));
+    picked.forEach((mi) => {
+      const m = METRICS[mi];
+      DIAG.push({
+        gi: k, mi: mi, group: g.name, short: g.short, dim: m.name,
+        rank: g.ranks[mi], val: m.val(g), base: m.base(g), unit: m.unit, dec: m.dec,
+        gap: gapOf(g, mi),
+        advice: ADVICE_SP[g.name + "|" + m.key] || ADVICE[m.key] || "纳入季度改进行动池"
+      });
+    });
+  });
+
+  /* 能力差异最大维度：极差 ÷ 五群按仓库数加权均值（规模维不参与） */
+  const SPREAD = METRICS.map((m, i) => {
+    const vals = GROUPS.map((g) => m.val(g));
+    const wavg = sum(GROUPS.map((g) => g.repos * m.val(g))) / repoSum;
+    return { i: i, name: m.name, ratio: (Math.max.apply(null, vals) - Math.min.apply(null, vals)) / wavg };
+  });
+  const SPREAD_TOP = SPREAD.filter((s) => !METRICS[s.i].scale)
+    .slice().sort((a, b) => b.ratio - a.ratio)[0];
+
+  /* 规模 vs 质量：仓库数与覆盖率中位的皮尔逊相关系数（现算） */
+  const PEARSON = (function () {
+    const xs = GROUPS.map((g) => g.repos), ys = GROUPS.map((g) => g.cov);
+    const mx = sum(xs) / xs.length, my = sum(ys) / ys.length;
+    let sxy = 0, sxx = 0, syy = 0;
+    for (let i = 0; i < xs.length; i += 1) {
+      sxy += (xs[i] - mx) * (ys[i] - my);
+      sxx += (xs[i] - mx) * (xs[i] - mx);
+      syy += (ys[i] - my) * (ys[i] - my);
+    }
+    return sxy / Math.sqrt(sxx * syy);
+  })();
+
+  const COV_PASS_N = GROUPS.filter((g) => g.covPass).length;
+  const BEST_COV = GROUPS.slice().sort((a, b) => b.cov - a.cov)[0];
+  const BEST_XP = GROUPS.slice().sort((a, b) => b.xpAvg - a.xpAvg)[0];
+
+  /* ===== 4. 顶部时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("kj-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("kj-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. ★ 先把所有非图表 DOM 填充完，再 init 图表 =====
+     （与图表同属一个 flex 容器的兄弟块若在 init 之后填充，会把 flex:1 的图表容器压矮） ===== */
+
+  /* 5.1 群高亮器 tab（文本与契约 §6 P7→S13 对象集逐字，含带空格的「AI 平台」） */
+  const picker = $("kj-picker");
+  GROUPS.forEach((g, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "kj-pk-tab";
+    b.dataset.i = String(i);
+    b.style.setProperty("--c", g.color);
+    b.innerHTML = "<b>" + g.name + "</b><span>" + g.repos + " repos</span>";
+    picker.appendChild(b);
+  });
+  const pkTabs = Array.prototype.slice.call(picker.querySelectorAll(".kj-pk-tab"));
+
+  /* 5.2 KPI 条（翻牌缓动；文本类 KPI 的名字写在副标里） */
+  const KPIS = [
+    { v: GROUPS.length, dec: 0, sub: "五域仓库群同屏横向 PK · 不切换不重绘" },
+    { v: repoSum, dec: 0, sub: GROUPS.map((g) => g.short + " " + g.repos).join(" + ") + " = <b>" + repoSum + "</b>" },
+    { v: BEST_COV.cov, dec: 0, sub: "<b>" + BEST_COV.name + "</b> · 五数 " + BEST_COV.box.join("/") },
+    { v: BEST_XP.xpAvg, dec: 1, sub: "<b>" + BEST_XP.name + "</b> · 六维均分（全局 " + fmtDec(XP_GLOBAL_AVG, 1) + "）" },
+    { v: COV_PASS_N, dec: 0, sub: "中位 ≥ <b>" + COV_TARGET + "%</b> 目标线：" + GROUPS.filter((g) => g.covPass).map((g) => g.short).join(" / ") },
+    { v: SPREAD_TOP.ratio, dec: 2, sub: "<b>" + SPREAD_TOP.name + "</b> · 极差 ÷ 仓库数加权均值" }
+  ];
+  KPIS.forEach((k, i) => { $("kj-kpi-" + i + "s").innerHTML = k.sub; });
+
+  /* 5.3 能力短板诊断清单（10 条，panel 高度已写死 390px） */
+  $("kj-gap-list").innerHTML = DIAG.map((d) => (
+    '<li data-gi="' + d.gi + '">' +
+      '<span class="kj-gap-g" title="' + d.group + '">' + d.group + "</span>" +
+      '<span class="kj-gap-d">' + d.dim + "（第 " + d.rank + " 名）</span>" +
+      '<span class="kj-gap-v">' + fmtDec(d.val, d.dec) + " <i>/ " + fmtDec(d.base, d.dec) + "</i></span>" +
+      '<span class="kj-gap-p ' + (d.gap > 0 ? "is-worse" : "is-better") + '">' +
+        (d.gap > 0 ? "+" : "") + fmtDec(d.gap * 100, 1) + "%</span>" +
+      '<span class="kj-gap-a" title="' + d.advice + '">' + d.advice + "</span>" +
+    "</li>"
+  )).join("");
+  const gapRows = Array.prototype.slice.call($("kj-gap-list").querySelectorAll("li"));
+  $("kj-tag-gap").innerHTML = "名次最靠后 <b>2</b> 维 · 同名次比劣化幅度";
+
+  /* 5.4 面板标签（静态部分） */
+  $("kj-tag-radar").innerHTML = "六维与「单仓库群工程详情」逐格一致 · 虚线 = 仓库数加权全局值";
+  $("kj-tag-box").innerHTML = "目标线 <b>" + COV_TARGET + "%</b> · 中位达标 <b>" + COV_PASS_N + "</b>/5 群";
+  $("kj-tag-rank").innerHTML = "1 = 领先 · 5 = 落后 · 每列必为 1~5 的排列";
+  $("kj-tag-sc").innerHTML = "皮尔逊 r = <b>" + fmtDec(PEARSON, 3) + "</b> · 年构建量 Σ <b>" + fmtInt(BUILDS_ALL) + "</b> 次";
+
+  /* 5.5 底部口径滚动条 */
+  const FOOT = [
+    ["三页分工", C.amber, "本页 = 五群工程能力**横向 PK**（同屏可比，交互为高亮/刷选）；「单仓库群工程详情」= 单群 360° 纵深；「流水线运行台账」= 一次次构建的流水明细"],
+    ["逆向维", C.orange, "③构建时长 ④评审 P50 ⑥变更失败率 为逆向维（越小越好）——平行坐标对这三轴设 inverse 反转轴向、**刻度仍是原值**，故全图统一「越靠上越好」，不做倒数变换"],
+    ["规模维", C.violet, "⑧仓库数为规模参照维，不判优劣、不进「能力短板诊断」；⑤部署频率是绝对量，其基准按仓库数比例摊分（14.2 次/日 × 本群仓库数 ÷ " + repoSum + "）"],
+    ["XP 口径", C.green, "五群六维与「单仓库群工程详情」同一反解（云服务为平差项），按仓库数加权 Σ(仓库数 × 群得分) ÷ " + repoSum + " 逐维精确回归父页全局值 " + XP_DIMS.map((x) => x.dim + " " + x.cur).join(" / ")],
+    ["箱线口径", C.blue, "五群五数 [min, Q1, 中位, Q3, max] 与父页「工程效能」单测覆盖率箱线逐格相等；达标判据 = 中位 ≥ " + COV_TARGET + "%"],
+    ["DORA", C.cyan, "部署频率五群 Σ = " + fmtDec(DEPLOY_ALL, 1) + " 次/日、变更失败率按部署量加权 = " + fmtDec(FAIL_WAVG, 1) + "%，均回归契约 §2.2 全局值"],
+    ["数据源", C.textDim, "全部为模拟数据 · 期次 2026 年 8 月 · 云麓智联科技 · 年构建量引「流水线运行台账」逐字（Σ " + fmtInt(BUILDS_ALL) + " 次）"]
+  ];
+  (function () {
+    const html = FOOT.map((f) => (
+      '<span class="kj-foot-item"><i style="color:' + f[1] + '">' + f[0] + "</i><span>" +
+      String(f[2]).replace(/\*\*(.+?)\*\*/g, '<b style="color:#eaf1ff">$1</b>') + "</span></span>"
+    )).join("");
+    $("kj-foot-track").innerHTML = html + html;              /* 两份拼接实现无缝滚动 */
+  })();
+
+  /* ===== 6. 资源守卫（KPI / 短板清单已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("kj-error").classList.add("is-visible");
+
+  /* ===== 7. 图表通用配置 ===== */
+  const AXIS_LABEL = { color: C.textDim, fontSize: 10.5 };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  function makeChart(id) { return hasEcharts ? echarts.init($(id)) : null; }
+
+  const radarChart = makeChart("kj-chart-radar");
+  const boxChart = makeChart("kj-chart-box");
+  const parChart = makeChart("kj-chart-parallel");
+  const scChart = makeChart("kj-chart-scatter");
+  const rankChart = makeChart("kj-chart-rank");
+
+  /* ===== 8. option 构造（★ 进 option 的数据只放标量与数组，群与维之间用索引/名称关联，绝不用对象回指） ===== */
+
+  /* 8.1 XP 六维雷达：五群叠加 + 仓库数加权全局值基准虚线 */
+  function radarOption(focus) {
+    const series = GROUPS.map((g, i) => ({
+      value: g.xp.map((v) => Number(fmtDec(v, 2))),
+      name: g.name,
+      lineStyle: { color: g.color, width: i === focus ? 3 : 1.6, opacity: i === focus ? 1 : 0.5 },
+      itemStyle: { color: g.color, opacity: i === focus ? 1 : 0.55 },
+      areaStyle: i === focus ? { color: fade(g.color, 0.22) } : { opacity: 0 },
+      symbolSize: i === focus ? 5 : 3
+    }));
+    series.push({
+      value: XP_WAVG.map((v) => Number(fmtDec(v, 2))),
+      name: "全局（仓库数加权）",
+      lineStyle: { color: C.amber, width: 2, type: "dashed" },
+      itemStyle: { color: C.amber },
+      areaStyle: { opacity: 0 },
+      symbolSize: 4
+    });
+    return {
+      animationDuration: 420,
+      tooltip: Object.assign({ trigger: "item", formatter: (p) => (
+        "<b>" + p.name + "</b><br/>" +
+        XP_DIMS.map((x, i) => x.dim + "　<b>" + fmtDec(p.value[i], 1) + "</b>").join("<br/>")
+      ) }, TIP),
+      legend: {
+        top: 0, left: "center", itemWidth: 11, itemHeight: 7, itemGap: 8,
+        textStyle: { color: C.textDim, fontSize: 10 },
+        data: GROUPS.map((g) => g.name).concat(["全局（仓库数加权）"])
+      },
+      radar: {
+        center: ["50%", "58%"], radius: "62%",
+        indicator: XP_DIMS.map((x) => ({ name: x.dim, max: 100, min: 30 })),
+        axisName: { color: C.text, fontSize: 10.5 },
+        splitLine: { lineStyle: { color: "rgba(96,140,255,.18)" } },
+        splitArea: { areaStyle: { color: ["rgba(92,157,255,.045)", "transparent"] } },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.2)" } }
+      },
+      series: [{ type: "radar", symbol: "circle", data: series }]
+    };
+  }
+
+  /* 8.2 覆盖率箱线：五群并置（五数引父页逐字）+ 80% 目标线 */
+  function boxOption(focus) {
+    return {
+      animationDuration: 420,
+      grid: { left: 44, right: 14, top: 26, bottom: 26 },
+      tooltip: Object.assign({ trigger: "item", formatter: (p) => {
+        const g = GROUPS[p.dataIndex];
+        return "<b>" + g.name + "</b>（" + g.repos + " repos）<br/>" +
+          "max <b>" + g.box[4] + "%</b><br/>Q3 <b>" + g.box[3] + "%</b><br/>" +
+          "中位 <b style=\"color:" + (g.covPass ? C.green : C.orange) + "\">" + g.box[2] + "%</b><br/>" +
+          "Q1 <b>" + g.box[1] + "%</b><br/>min <b>" + g.box[0] + "%</b><br/>" +
+          "目标线 " + COV_TARGET + "% · " + (g.covPass ? "达标" : "未达标");
+      } }, TIP),
+      xAxis: {
+        type: "category", data: GROUPS.map((g) => g.short),
+        axisLabel: { color: C.text, fontSize: 11.5, fontWeight: 700 },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "value", min: 45, max: 100, name: "覆盖率 %", nameGap: 14,
+        nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE
+      },
+      series: [{
+        type: "boxplot", boxWidth: [16, 40],
+        data: GROUPS.map((g, i) => ({
+          value: g.box.slice(),
+          itemStyle: {
+            color: fade(g.color, i === focus ? 0.42 : 0.16),
+            borderColor: g.color, borderWidth: i === focus ? 2.4 : 1.4,
+            opacity: i === focus ? 1 : 0.72
+          }
+        })),
+        markLine: {
+          silent: true, symbol: "none",
+          lineStyle: { color: C.amber, width: 1.6, type: "dashed" },
+          label: { color: "#ffd489", fontSize: 10.5, fontWeight: 700, position: "insideEndTop",
+            formatter: () => "目标 " + COV_TARGET + "%" },
+          data: [{ yAxis: COV_TARGET }]
+        }
+      }]
+    };
+  }
+
+  /* 8.3 ★ 主视觉：五群 × 8 维平行坐标
+         · 每群一条 series（data 只放一行**纯数值数组**，群名走 series.name，绝无对象回指）
+         · 逆向维（③④⑥）设 inverse: true —— 刻度仍是原值，全图统一「越靠上越好」
+         · 支持在任一轴上拖拽刷选，命中结果联动散点与短板清单 */
+  const PAR_DATA = GROUPS.map((g) => METRICS.map((m) => Number(fmtDec(m.val(g), m.dec))));
+  function parOption(focus) {
+    return {
+      animationDuration: 420,
+      tooltip: Object.assign({ trigger: "item", formatter: (p) => {
+        const g = GROUPS[p.seriesIndex];
+        return "<b>" + g.name + "</b>（" + g.repos + " repos · 综合名次 " + fmtDec(g.rankAvg, 2) + "）<br/>" +
+          "<span style=\"color:" + C.textDim + "\">" + g.role + "</span><br/>" +
+          METRICS.map((m, i) => (
+            (m.dir === -1 ? "↓ " : "　") + m.name + "　<b>" + fmtDec(m.val(g), m.dec) + "</b> " + m.unit +
+            "　<span style=\"color:" + C.textDim + "\">第 " + g.ranks[i] + " 名</span>"
+          )).join("<br/>");
+      } }, TIP),
+      legend: {
+        top: 0, left: "center", itemWidth: 14, itemHeight: 7, itemGap: 14,
+        textStyle: { color: C.textDim, fontSize: 11 },
+        data: GROUPS.map((g) => g.name)
+      },
+      parallel: {
+        left: 46, right: 30, top: 58, bottom: 26,
+        parallelAxisDefault: {
+          type: "value",
+          nameLocation: "start", nameGap: 16,
+          nameTextStyle: { color: "#9cc2ff", fontSize: 10.5, fontWeight: 700 },
+          axisLabel: { color: C.textDim, fontSize: 9.5 },
+          axisLine: { lineStyle: { color: "rgba(96,140,255,.34)" } },
+          axisTick: { lineStyle: { color: "rgba(96,140,255,.34)" } },
+          splitLine: { show: false },
+          realtime: true,
+          areaSelectStyle: { width: 16, borderWidth: 1, borderColor: C.amber, color: fade(C.amber, 0.22), opacity: 1 }
+        }
+      },
+      parallelAxis: METRICS.map((m, i) => ({
+        dim: i, name: m.axis, min: m.min, max: m.max,
+        inverse: m.dir === -1,                               /* ★ 逆向维翻转轴向，刻度仍为原值 */
+        nameTextStyle: { color: m.dir === -1 ? "#ffc48a" : (m.scale ? "#b6a6ef" : "#9cc2ff"), fontSize: 10.5, fontWeight: 700 }
+      })),
+      series: GROUPS.map((g, i) => ({
+        name: g.name, type: "parallel", smooth: false,
+        lineStyle: {
+          color: g.color,
+          width: i === focus ? 4 : 2.2,
+          opacity: focus < 0 ? 0.9 : (i === focus ? 1 : 0.3),
+          shadowBlur: i === focus ? 12 : 0, shadowColor: fade(g.color, 0.7)
+        },
+        emphasis: { lineStyle: { width: 4.4, opacity: 1 } },
+        data: [PAR_DATA[i].slice()]                          /* ★ 纯数值数组 */
+      }))
+    };
+  }
+
+  /* 8.4 规模 vs 质量散点：x = 仓库数、y = 覆盖率中位、气泡 = 年构建量（引 pt 页逐字） */
+  const SC_MAXB = Math.max.apply(null, GROUPS.map((g) => g.builds));
+  function scOption(focus, sel) {
+    return {
+      animationDuration: 420,
+      grid: { left: 46, right: 22, top: 20, bottom: 34 },
+      tooltip: Object.assign({ trigger: "item", formatter: (p) => {
+        const g = GROUPS[p.dataIndex];
+        return "<b>" + g.name + "</b><br/>仓库数 <b>" + g.repos + "</b> 个<br/>" +
+          "覆盖率中位 <b>" + g.cov + "%</b>（" + (g.covPass ? "达标" : "未达标") + "）<br/>" +
+          "年构建量 <b>" + fmtInt(g.builds) + "</b> 次<br/>" +
+          "单仓年构建 <b>" + fmtDec(g.builds / g.repos, 0) + "</b> 次";
+      } }, TIP),
+      xAxis: {
+        type: "value", min: 20, max: 110, name: "仓库数 个", nameGap: 20,
+        nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, axisLine: { lineStyle: { color: C.line } }, splitLine: SPLIT_LINE
+      },
+      yAxis: {
+        type: "value", min: 60, max: 92, name: "覆盖率中位 %", nameGap: 14,
+        nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE
+      },
+      series: [{
+        type: "scatter",
+        symbolSize: (v) => 16 + 30 * Math.sqrt(v[2] / SC_MAXB),
+        itemStyle: {
+          color: (p) => GROUPS[p.dataIndex].color,
+          opacity: (p) => (sel && sel.indexOf(p.dataIndex) < 0) ? 0.16
+            : (focus < 0 || p.dataIndex === focus ? 0.92 : 0.42),
+          borderColor: "rgba(4,16,31,.6)", borderWidth: 1
+        },
+        label: {
+          show: true, position: "top", fontSize: 10.5, fontWeight: 700, color: "#cfdcf6",
+          formatter: (p) => GROUPS[p.dataIndex].short
+        },
+        data: GROUPS.map((g) => [g.repos, g.cov, g.builds]),  /* ★ 纯数值数组 */
+        markLine: {
+          silent: true, symbol: "none",
+          lineStyle: { color: C.amber, width: 1.4, type: "dashed" },
+          label: { color: "#ffd489", fontSize: 10, position: "insideEndTop", formatter: () => "目标 " + COV_TARGET + "%" },
+          data: [{ yAxis: COV_TARGET }]
+        }
+      }]
+    };
+  }
+
+  /* 8.5 多指标排名矩阵：y = 8 指标、x = 5 群、值 = 名次（1~5）
+         ★ piecewise 设了两端 text 必须显式补 showLabel: true，否则每档 label 被整体吞掉 */
+  const RANK_COLORS = [C.green, C.cyan, C.blue, C.amber, C.red];
+  function rankOption(focus, sel) {
+    const data = [];
+    for (let i = 0; i < METRICS.length; i += 1) {
+      for (let k = 0; k < GROUPS.length; k += 1) data.push([k, METRICS.length - 1 - i, RANK[i][k]]);
+    }
+    return {
+      animationDuration: 420,
+      grid: { left: 92, right: 12, top: 10, bottom: 44 },
+      tooltip: Object.assign({ trigger: "item", formatter: (p) => {
+        const k = p.data[0], i = METRICS.length - 1 - p.data[1], m = METRICS[i], g = GROUPS[k];
+        return "<b>" + g.name + " · " + m.name + "</b><br/>" +
+          "取值 <b>" + fmtDec(m.val(g), m.dec) + "</b> " + m.unit +
+          (m.dir === -1 ? "（逆向维，越小越好）" : (m.scale ? "（规模维）" : "")) + "<br/>" +
+          "名次 <b>第 " + p.data[2] + " 名</b> / 5 群";
+      } }, TIP),
+      visualMap: {
+        type: "piecewise", show: true, orient: "horizontal", left: "center", bottom: 2,
+        itemWidth: 13, itemHeight: 10, itemGap: 6,
+        text: ["落后", "领先"], showLabel: true,             /* ★ 设了 text 就必须补 showLabel */
+        textStyle: { color: C.textDim, fontSize: 10 },
+        pieces: RANK_COLORS.map((c, i) => ({ value: i + 1, label: String(i + 1) + " 名", color: c }))
+      },
+      xAxis: {
+        type: "category", data: GROUPS.map((g) => g.short), splitArea: { show: true },
+        axisLabel: { color: C.text, fontSize: 11, fontWeight: 700 },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "category", data: METRICS.map((m) => m.name).slice().reverse(),
+        splitArea: { show: true },
+        axisLabel: { color: C.textDim, fontSize: 10.5 },
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      series: [{
+        type: "heatmap", data: data,
+        label: { show: true, fontSize: 12, fontWeight: 700, color: "#08122f", formatter: (p) => p.data[2] },
+        itemStyle: {
+          borderColor: "rgba(8,18,49,.75)", borderWidth: 1,
+          opacity: (p) => {
+            if (sel && sel.indexOf(p.data[0]) < 0) return 0.16;
+            return focus < 0 || p.data[0] === focus ? 1 : 0.42;
+          }
+        },
+        emphasis: { itemStyle: { borderColor: C.amber, borderWidth: 2 } }
+      }]
+    };
+  }
+
+  /* ===== 9. 高亮联动（C 型：只改样式，不整页重绘、不切数据源） ===== */
+  let selection = null;                                      /* 刷选命中的群索引数组；null = 未刷选 */
+
+  function applyFocus(k) {
+    focusIdx = ((k % GROUPS.length) + GROUPS.length) % GROUPS.length;
+    const g = GROUPS[focusIdx];
+    pkTabs.forEach((b, i) => {
+      const on = i === focusIdx;
+      b.classList.toggle("is-active", on);
+      b.style.background = on ? "linear-gradient(160deg," + GROUPS[i].color + "," + hexMix(GROUPS[i].color, 0.4, 0) + ")" : "";
+    });
+    $("kj-meta-focus").textContent = g.name + "（第 " + fmtDec(g.rankAvg, 2) + " 均名次）";
+    gapRows.forEach((li) => li.classList.toggle("is-focus", Number(li.dataset.gi) === focusIdx));
+    if (hasEcharts) {
+      radarChart.setOption(radarOption(focusIdx), true);
+      boxChart.setOption(boxOption(focusIdx), true);
+      parChart.setOption(parOption(focusIdx), true);
+      scChart.setOption(scOption(focusIdx, selection), true);
+      rankChart.setOption(rankOption(focusIdx, selection), true);
+    }
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(g.name));
+  }
+
+  function applySelection(idxs) {
+    selection = idxs;
+    const all = !idxs || idxs.length === GROUPS.length;
+    $("kj-tag-par").innerHTML = all
+      ? "拖拽任一轴可刷选 · ↓ 轴已反转，<b>越靠上 = 越好</b>"
+      : "刷选命中 <b>" + idxs.length + "</b> 群：" + (idxs.length ? idxs.map((i) => GROUPS[i].short).join(" / ") : "无");
+    gapRows.forEach((li) => li.classList.toggle("is-mute", !all && idxs.indexOf(Number(li.dataset.gi)) < 0));
+    if (hasEcharts) {
+      scChart.setOption(scOption(focusIdx, all ? null : idxs), true);
+      rankChart.setOption(rankOption(focusIdx, all ? null : idxs), true);
+    }
+  }
+  applySelection(null);
+
+  /* 平行坐标轴刷选 → 读各 series 的 active 状态（官方示例口径，包 try/catch 防版本差异） */
+  if (hasEcharts) {
+    parChart.on("axisareaselected", function () {
+      let hit = null;
+      try {
+        const seriesList = parChart.getModel().getSeries();
+        hit = [];
+        seriesList.forEach((s, i) => {
+          const raw = s.getRawIndicesByActiveState("active");
+          if (raw && raw.length) hit.push(i);
+        });
+      } catch (e) { hit = null; }
+      applySelection(hit);
+      pauseRotate(20000);
+    });
+  }
+
+  /* ===== 10. 首屏渲染 ===== */
+  if (hasEcharts) {
+    radarChart.setOption(radarOption(0));
+    boxChart.setOption(boxOption(0));
+    parChart.setOption(parOption(0));
+    scChart.setOption(scOption(0, null));
+    rankChart.setOption(rankOption(0, null));
+  }
+
+  /* KPI 翻牌缓动 */
+  (function countUp() {
+    const t0 = performance.now(), DUR = 1100;
+    function step(now) {
+      const p = Math.min(1, (now - t0) / DUR);
+      const e = 1 - Math.pow(1 - p, 3);
+      KPIS.forEach((k, i) => { $("kj-kpi-" + i).textContent = fmtDec(k.v * e, k.dec); });
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  })();
+
+  /* ===== 11. 交互：高亮器 / 键盘 / hash 契约 / kiosk 轮巡 =====
+     ★ 本节只做「调用」，kiosk 状态量（focusIdx / rotTimer / pauseUntil）与
+       pauseRotate() / restartRotate() 已在第 1.1 节声明——声明行号严格小于此处首次调用（TDZ 防护）。 */
+  const PARENT = "大屏样板间-研发工程效能1920.html";
+
+  /* hash 契约：decodeURIComponent → trim + 全角空白剔除归一 → 匹配五群名。
+     ★ 契约对象名「AI 平台」含空格：归一化对 hash 与群名**两侧同时**做，否则永远匹配不上。 */
+  const NORM = (s) => String(s == null ? "" : s).replace(/[\s　]+/g, "");
+  const HASH_ALIAS = {
+    "AI平台": "AI 平台", "AI": "AI 平台", "ai平台": "AI 平台", "算法平台": "AI 平台",
+    "应用": "应用软件", "应用软件群": "应用软件", "app": "应用软件",
+    "嵌入": "嵌入式", "嵌入式软件": "嵌入式", "固件": "嵌入式",
+    "云": "云服务", "云服": "云服务", "云平台": "云服务",
+    "工具": "工具链", "工具链群": "工具链", "CI": "工具链"
+  };
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = NORM(s);
+    if (!s) return -1;
+    if (HASH_ALIAS[s]) s = NORM(HASH_ALIAS[s]);
+    return GROUPS.findIndex((g) => NORM(g.name) === s);
+  }
+
+  pkTabs.forEach((b) => b.addEventListener("click", () => {
+    applyFocus(Number(b.dataset.i));
+    pauseRotate(20000);
+  }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyFocus(focusIdx - 1); pauseRotate(20000); }
+    else if (e.key === "ArrowRight") { applyFocus(focusIdx + 1); pauseRotate(20000); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  const bootHit = resolveHash(location.hash);
+  applyFocus(bootHit >= 0 ? bootHit : 0);
+  if (bootHit >= 0) pauseRotate(20000);                      /* 父页下钻进来：先保持 20 秒不轮巡 */
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== focusIdx) { applyFocus(k); pauseRotate(20000); }
+  });
+
+  /* kiosk 常驻：每 4 秒轮巡高亮下一群；鼠标停在高亮器上时暂停 */
+  restartRotate();
+  picker.addEventListener("mouseenter", () => clearInterval(rotTimer));
+  picker.addEventListener("mouseleave", restartRotate);
+
+  /* ===== 12. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const EPS = 1e-9;
+  const checks = [
+    ["五群名 / 仓库数 / 箱线五数与父页「工程效能」逐字（构造性断言）",
+      GROUPS.map((g) => g.name + "|" + g.repos + "|" + g.box.join(",")).join(";") === GROUP_AUTH],
+    ["五群仓库数 Σ = 317 个",
+      repoSum === REPO_ALL && repoSum === 317],
+    ["箱线五数逐箱严格有序 min < Q1 < 中位 < Q3 < max",
+      GROUPS.every((g) => g.box.every((v, i) => i === 0 || v > g.box[i - 1]))],
+    ["XP 六维反解口径与「单仓库群工程详情」逐字同构（free 列序 + 云服务平差），故五群六维逐格一致",
+      XP_DIMS.map((x) => x.free.join(",")).join(";") === XP_FREE_AUTH &&
+      XP_DIMS.map((x) => x.dim + "|" + x.cur).join(";") === XP_AUTH && SOLVE_XP === 2],
+    ["XP 六维按仓库数加权逐维回归父页全局值 62/58/92/74/84/66（残差 < 1e-9）",
+      XP_WAVG.every((v, d) => Math.abs(v - XP_DIMS[d].cur) < EPS) &&
+      GROUPS.every((g) => g.xp.length === 6 && g.xp.every((v) => v > 0 && v < 100))],
+    ["XP 综合采纳度按仓库数加权 = 六维全局均值（雷达基准虚线自洽）",
+      Math.abs(sum(GROUPS.map((g) => g.repos * g.xpAvg)) / repoSum - XP_GLOBAL_AVG) < EPS],
+    ["构建成功率按仓库数加权 = 全局 24 周工作日均值（零和偏移，残差 < 1e-9）",
+      Math.abs(sum(GROUPS.map((g) => g.repos * g.succ)) / repoSum - SR_BASE_AVG) < EPS],
+    ["构建时长按仓库数加权 = 全局 24 周周均值（因子归一，残差 < 1e-9）",
+      Math.abs(sum(GROUPS.map((g) => g.repos * g.buildMin)) / repoSum - BUILD_BASE_AVG) < EPS],
+    ["评审五桶列和 = 父页 REVIEW_BUCKETS 逐字（486/1042/694/318/92），Σ = 2,632 条",
+      MR_COL.join(",") === MR_AUTH && MR_TOTAL === sum(MR_BUCKETS.map((b) => b.n)) && MR_TOTAL === 2632],
+    ["部署频率五群 Σ = 14.2 次/日（契约 §2.2 DORA 逐字）",
+      sum(DEPLOY_T) === DEPLOY_ALL_T && Math.abs(DEPLOY_ALL - 14.2) < EPS],
+    ["变更失败率按部署量加权 = 8.4%（契约 §2.2 DORA，残差 < 1e-9）",
+      Math.abs(FAIL_WAVG - FAIL_ALL) < EPS && GROUPS.every((g) => g.fail > 0 && g.fail < 100)],
+    ["年构建量五群与姊妹页「流水线运行台账」逐字，Σ = 64,340 次",
+      GROUPS.map((g) => g.builds).join(",") === BUILDS_AUTH && BUILDS_ALL === 64340],
+    ["排名矩阵每列（每指标）都是 1~5 的排列，无并列",
+      RANK.length === METRICS.length && RANK.every((col) =>
+        col.slice().sort((a, b) => a - b).join(",") === "1,2,3,4,5")],
+    ["能力短板诊断 10 条 = 5 群 × 2 维，规模维不入选",
+      DIAG.length === GROUPS.length * 2 &&
+      GROUPS.every((g, k) => DIAG.filter((d) => d.gi === k).length === 2) &&
+      DIAG.every((d) => !METRICS[d.mi].scale)],
+    ["短板与排名矩阵一致：每群入选两维的名次 ≥ 其余五个能力维的名次（现算校验）",
+      GROUPS.every((g, k) => {
+        const picked = DIAG.filter((d) => d.gi === k).map((d) => d.mi);
+        const rest = METRICS.map((m, i) => i).filter((i) => !METRICS[i].scale && picked.indexOf(i) < 0);
+        return picked.every((pi) => rest.every((ri) => g.ranks[pi] >= g.ranks[ri]));
+      })],
+    ["短板劣化幅度 = 现值相对基准的方向化偏离（逆向维符号已翻转，现算校验）",
+      DIAG.every((d) => {
+        const m = METRICS[d.mi];
+        const want = m.dir === 1 ? (d.base - d.val) / d.base : (d.val - d.base) / d.base;
+        return Math.abs(d.gap - want) < EPS;
+      })],
+    ["覆盖率达标群数 = 中位 ≥ 80% 的群数，与 KPI 展示一致",
+      COV_PASS_N === GROUPS.filter((g) => g.box[2] >= COV_TARGET).length && COV_PASS_N === 2],
+    ["规模 vs 质量相关系数现算且落在 [−1, 1]",
+      isFinite(PEARSON) && PEARSON >= -1 && PEARSON <= 1],
+    ["★ 平行坐标 data 只放数值数组（构造性断言：逐行逐格均为有限数，无对象回指）",
+      PAR_DATA.length === GROUPS.length &&
+      PAR_DATA.every((row) => Array.isArray(row) && row.length === METRICS.length &&
+        row.every((v) => typeof v === "number" && isFinite(v)))],
+    ["hash 五群名均可解析（含带空格的「AI 平台」；两侧同时归一）",
+      GROUPS.every((g, i) => resolveHash("#" + encodeURIComponent(g.name)) === i) &&
+      resolveHash("#AI%20%E5%B9%B3%E5%8F%B0") === 3 && resolveHash("#AI平台") === 3],
+    ["HASH_ALIAS 别名全部可解析到五群之一",
+      Object.keys(HASH_ALIAS).every((k) => resolveHash("#" + encodeURIComponent(k)) >= 0)],
+    ["高亮器 tab 数 = 5 且文本与契约 §6 P7→S13 对象集逐字",
+      pkTabs.length === GROUPS.length &&
+      pkTabs.every((b, i) => b.querySelector("b").textContent === GROUPS[i].name)],
+    /* ★ TDZ 防护的构造性断言：pauseUntil / pauseRotate() 声明在第 1.1 节（行号远小于第 11 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 pauseCalls ≥ 1」即证明声明早于首次调用。 */
+    ["pauseUntil 声明早于首次 pauseRotate() 调用（TDZ 防护，构造性断言）",
+      typeof pauseUntil === "number" && typeof pauseRotate === "function" &&
+      (bootHit < 0 ? pauseCalls === 0 : (pauseCalls >= 1 && pauseUntil > Date.now()))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[五群能力对比] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发数据集与训练台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --gp-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 数据集台账列宽：编号 / 名称 / 归属模型 / 样本量 / 标注完成度 / 版本 / 存储 / 最近更新 / 状态 */
+    --gp-dcols: 94px 1fr 58px 78px 116px 44px 68px 56px 62px;
+    /* 训练任务台账列宽：任务号 / 模型 / 类型 / 起止 / 卡数 / 卡时 / 状态 / 结果 */
+    --gp-tcols: 56px 44px 46px 88px 42px 62px 52px 1fr;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .gp-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(169, 140, 245, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 660px;
+    grid-template-rows: 84px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .gp-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .gp-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .gp-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .gp-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(169, 140, 245, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(169, 140, 245, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .gp-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .gp-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .gp-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .gp-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .gp-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到 AI模型迭代，琥珀描边与本页星蓝主色区分 */
+  .gp-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .gp-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .gp-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .gp-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .gp-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .gp-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .gp-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .gp-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .gp-chips { display: flex; align-items: center; gap: 9px; }
+  .gp-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 126px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .gp-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .gp-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .gp-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .gp-chip.is-key b { color: var(--rnd-blue); }
+  .gp-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .gp-clock-time { font: 700 26px/1 var(--gp-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .gp-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 筛选条：模型 chip（hash 契约目标 = 五模型名）+ 资产类别二级过滤 ===== */
+  .gp-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .gp-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .gp-mchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 6px 14px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13.5px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .gp-mchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .gp-mchip b { font: 700 14px/1 var(--gp-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .gp-mchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .gp-mchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .gp-mchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .gp-mchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .gp-mchip.is-hit { animation: gp-hit 0.9s ease-in-out 2; }
+  @keyframes gp-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--gp-cc, rgba(92, 157, 255, 0.8)); } }
+  .gp-fdiv { flex: none; width: 1px; height: 24px; margin: 0 4px; background: rgba(96, 140, 255, 0.28); }
+  .gp-schip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 4px 11px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .gp-schip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .gp-schip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .gp-schip.is-on { color: #071026; font-weight: 700; }
+  .gp-schip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  .gp-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .gp-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .gp-filters-state em { font-style: normal; color: #d3e2ff; }
+  .gp-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .gp-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .gp-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .gp-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--gp-kc, var(--rnd-blue)); }
+  .gp-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .gp-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .gp-kpi-v b { font: 700 24px/1 var(--gp-mono); color: var(--gp-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .gp-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .gp-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .gp-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .gp-row { display: flex; gap: 14px; flex: 1; min-height: 0; min-width: 0; }
+  .gp-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .gp-row > .gp-panel { flex: 1; min-width: 0; }
+  .gp-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .gp-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .gp-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .gp-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .gp-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .gp-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .gp-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 三块由 JS 填充的区域一律写死高度（任务卡硬性）：
+     数据集台账 474 = 16 行 × 24px + 90px 表头/内边距开销；训练任务台账 452 = 14 行 × 26px + 88px 开销；
+     单条详情 276（左右两列各自 474+14+254 / 452+14+276 = 742，与舞台主行等高）。
+     min-height:0 + overflow:hidden 防内容撑破，也防止填充后把同列 flex:1 的图表容器压矮。 */
+  .gp-panel.is-ledger { flex: none; height: 474px; min-height: 0; overflow: hidden; }
+  .gp-panel.is-tasks  { flex: none; height: 452px; min-height: 0; overflow: hidden; }
+  .gp-panel.is-detail { flex: none; height: 276px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .gp-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .gp-thead, .gp-dbody li { display: grid; grid-template-columns: var(--gp-dcols); align-items: center; gap: 8px; }
+  .gp-thead.is-t, .gp-tbody li { display: grid; grid-template-columns: var(--gp-tcols); align-items: center; gap: 8px; }
+  .gp-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .gp-dbody, .gp-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .gp-dbody li, .gp-tbody li {
+    padding: 0 8px; border-radius: 5px; cursor: pointer;
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: gp-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  .gp-dbody li { height: 24px; }
+  .gp-tbody li { height: 26px; }
+  @keyframes gp-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .gp-dbody li:nth-child(odd), .gp-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .gp-dbody li:hover, .gp-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .gp-dbody li.is-sel, .gp-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .gp-dbody li > span, .gp-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gp-no { font: 700 11px/1 var(--gp-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.02em; }
+  .gp-name { color: #dfe9ff; }
+  .gp-name i { font-style: normal; margin-left: 6px; padding: 1px 4px; border-radius: 3px; font-size: 9.5px;
+    border: 1px solid rgba(169, 140, 245, 0.45); color: #c9b6ff; }
+  .gp-own { font-size: 11.5px; font-weight: 700; }
+  .gp-dim { font-size: 11px; color: rgba(127, 146, 196, 0.9); }
+  .gp-num { text-align: right; font: 700 11.5px/1 var(--gp-mono); color: #cfdcff; }
+  .gp-badge {
+    padding: 2px 6px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  /* 数据集状态四档 */
+  .gp-badge.is-d0 { color: #063a25; background: var(--rnd-green); }
+  .gp-badge.is-d1 { color: #3a2a05; background: var(--rnd-amber); }
+  .gp-badge.is-d2 { color: #3a1c05; background: var(--rnd-orange); }
+  .gp-badge.is-d3 { border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+  /* 训练任务状态三档 */
+  .gp-badge.is-s0 { color: #063a25; background: var(--rnd-green); }
+  .gp-badge.is-s1 { color: #041b3a; background: var(--rnd-blue); }
+  .gp-badge.is-s2 { border: 1px solid rgba(169, 140, 245, 0.45); color: #c9b6ff; background: rgba(38, 26, 78, 0.5); }
+  /* 微条 + 数值（标注完成度 / 卡时占比共用） */
+  .gp-bar { display: flex; align-items: center; gap: 7px; }
+  .gp-bar-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .gp-bar-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .gp-bar em { flex: none; width: 46px; text-align: right; font-style: normal; font: 700 11.5px/1 var(--gp-mono); }
+
+  /* ===== 右中：单条详情（数据集 → 标注与质检；训练任务 → 资源与阶段耗时） ===== */
+  .gp-dt-head {
+    flex: none; display: flex; flex-direction: column; gap: 5px; padding: 7px 10px 8px; border-radius: 8px;
+    background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 8px; min-height: 66px;
+  }
+  .gp-dt-no { display: flex; align-items: center; gap: 9px; }
+  .gp-dt-no b { font: 700 13px/1 var(--gp-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .gp-dt-title { font-size: 13px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gp-dt-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gp-dt-sub b { font-weight: 700; color: #c9d8f8; }
+  .gp-dt-bar { flex: none; display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; background: rgba(14, 26, 66, 0.5); }
+  .gp-dt-seg { position: relative; min-width: 10px; }
+  .gp-dt-seg + .gp-dt-seg { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .gp-dt-seg.is-cur {
+    background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px) !important;
+    animation: gp-breath 1.6s ease-in-out infinite;
+  }
+  @keyframes gp-breath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+  .gp-dt-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .gp-dt-row { flex: 1; display: grid; grid-template-columns: 76px 1fr 96px; align-items: center; gap: 10px; padding: 0 4px; border-radius: 5px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .gp-dt-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .gp-dt-row b { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.04em; }
+  .gp-dt-row b::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--gp-pc, var(--rnd-blue)); }
+  .gp-dt-row.is-todo b { color: rgba(127, 146, 196, 0.6); }
+  .gp-dt-row.is-todo b::before { opacity: 0.3; }
+  .gp-dt-row span { color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gp-dt-row em { font-style: normal; text-align: right; font: 700 13px/1 var(--gp-mono); color: var(--rnd-cyan); }
+  .gp-dt-row.is-cur em { color: var(--rnd-amber); }
+  .gp-dt-row.is-todo em { color: rgba(127, 146, 196, 0.5); }
+
+  /* ===== 底部滚动条 ===== */
+  .gp-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .gp-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange);
+  }
+  .gp-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: gp-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes gp-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .gp-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .gp-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .gp-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .gp-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .gp-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .gp-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="gp-stage" id="gp-stage">
+    <!-- mockflag:begin --><div class="gp-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="gp-error" id="gp-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="gp-header">
+      <div class="gp-head-left">
+        <div class="gp-crumb">
+          <a class="gp-crumb-up" href="大屏样板间-研发AI模型迭代1920.html" title="返回上级专题页（Esc）">‹ 返回 AI模型迭代</a>
+          <b>云麓智联科技</b><i>›</i><span>AI模型迭代</span><i>›</i><em>数据集与训练台账</em>
+        </div>
+        <div class="gp-head-title-row">
+          <div class="gp-head-title">数据集与训练台账</div>
+          <div class="gp-head-meta">
+            <span>数据集 <b id="gp-meta-ds">--</b> 个 · 训练任务 <b id="gp-meta-tk">--</b> 项（近 8 周窗口）</span><i>|</i>
+            <span>口径分工：<b>单模型详情</b> 看单模型版本谱系 / 训练曲线 / 线上推理；<b>本页</b> 看数据集资产与训练任务的<b>全量台账</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="gp-head-right">
+        <div class="gp-chips">
+          <div class="gp-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="gp-chip is-key"><span id="gp-chip-key">样本量 · 全部</span><b id="gp-chip-val">--</b></div>
+        </div>
+        <div class="gp-clock" aria-label="实时时钟">
+          <span class="gp-clock-time" id="gp-clock-time">--:--:--</span>
+          <span class="gp-clock-date" id="gp-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 筛选条：模型 chip（hash 契约目标 = 五模型名）+ 资产类别二级过滤 -->
+    <div class="gp-filters">
+      <span class="gp-filters-tag">模型筛选</span>
+      <div id="gp-mchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="gp-fdiv"></span>
+      <span class="gp-filters-tag">资产来源</span>
+      <div id="gp-schips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="gp-filters-state" id="gp-filters-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="gp-kpis" id="gp-kpis"></div>
+
+    <!-- 左：数据集资产台账（写死 466px）+ 两张图（样本量构成 / GPU 利用率） -->
+    <div class="gp-col">
+      <section class="gp-panel is-ledger">
+        <div class="gp-panel-head">
+          <h2>数据集资产台账（样本量 · 标注 · 版本 · 存储）</h2>
+          <span class="gp-panel-tag" id="gp-ds-tag">--</span>
+        </div>
+        <div class="gp-table">
+          <div class="gp-thead">
+            <span>数据集编号</span><span>数据集名称</span><span>归属模型</span><span>样本量/万</span>
+            <span>标注完成度</span><span>版本</span><span>存储/TB</span><span>最近更新</span><span>状态</span>
+          </div>
+          <ul class="gp-dbody" id="gp-tbody"></ul>
+        </div>
+      </section>
+      <div class="gp-row">
+        <section class="gp-panel">
+          <div class="gp-panel-head">
+            <h2>五模型数据集样本量构成</h2>
+            <span class="gp-panel-tag" id="gp-stack-tag">--</span>
+          </div>
+          <div class="gp-chart" id="gp-chart-stack"></div>
+        </section>
+        <section class="gp-panel">
+          <div class="gp-panel-head">
+            <h2>GPU 集群利用率 · 近 8 周</h2>
+            <span class="gp-panel-tag" id="gp-gpu-tag">--</span>
+          </div>
+          <div class="gp-chart" id="gp-chart-gpu"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- 右：训练任务台账（写死 446px）+ 单条详情（写死 282px） -->
+    <div class="gp-col">
+      <section class="gp-panel is-tasks">
+        <div class="gp-panel-head">
+          <h2>训练任务台账（近 8 周排期）</h2>
+          <span class="gp-panel-tag" id="gp-tk-tag">--</span>
+        </div>
+        <div class="gp-table">
+          <div class="gp-thead is-t">
+            <span>任务号</span><span>模型</span><span>类型</span><span>起止（周）</span>
+            <span>卡数</span><span>卡时</span><span>状态</span><span>结果 / 进度</span>
+          </div>
+          <ul class="gp-tbody" id="gp-tkbody"></ul>
+        </div>
+      </section>
+      <section class="gp-panel is-detail">
+        <div class="gp-panel-head">
+          <h2 id="gp-dt-h2">单条详情</h2>
+          <span class="gp-panel-tag" id="gp-dt-tag">--</span>
+        </div>
+        <div class="gp-dt-head" id="gp-dt-headbox"></div>
+        <div class="gp-dt-bar" id="gp-dt-bar"></div>
+        <div class="gp-dt-list" id="gp-dt-list"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="gp-foot">
+      <div class="gp-foot-tag">数据与算力研判</div>
+      <div class="gp-foot-view"><div class="gp-foot-track" id="gp-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("gp-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("gp-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const mean = (arr) => sum(arr) / arr.length;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const r1 = (v) => Math.round(v * 10) / 10;
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 数据与算力资产视角）
+         ★ 契约口径 docs/RndIpdThemed.md §2.3：五个 AI 模型
+           灵犀（对话）/ 慧眼（视觉质检）/ 澜音（语音）/ 智荐（推荐）/ 御风（边缘）逐字使用；
+           §2.2「年度研发投入 21.4 亿 = …云资源与算力 3.1 亿…」，本页只引用不重复拆分。
+         ★ 与父页 P11「AI模型迭代」严格同源：父页 DATASETS 7 条（名称/归属/样本量/标注完成度/版本/更新）
+           与父页 TRAIN 8 项（任务名/归属/起止周/申请卡数）在本页逐字在册，且进页尾勾稽自检硬校验；
+           父页 GPU_UTIL 8 周利用率逐字，本页累计均值线末值恰回归父页 8 周均值 79.9%。
+         ★ 与兄弟页 S9「单模型详情」（前缀 ml）的分工：那页做单个模型的
+           版本谱系 / 训练曲线 / 线上推理；本页做**数据集资产与训练任务的全量台账**，两页不重复展示。
+         ★ 二级拆分（标注三态、存储量、任务五阶段耗时、9 条补充数据集、6 项补充训练任务）为本页自编，
+           Σ 一律收敛到上级数，全部进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，行与模型/类型之间一律用索引或名称字符串
+           关联，绝不用对象引用回指（setOption 深拷贝遇环会整页全空）。 ===== */
+
+  /* 4.1 五模型（契约 §2.3 逐字；use = 用途，同时作 hash 别名来源） */
+  const MODELS = [
+    { name: "灵犀", use: "对话",     full: "对话大模型",   color: C.blue },
+    { name: "慧眼", use: "视觉质检", full: "视觉质检",     color: C.cyan },
+    { name: "澜音", use: "语音",     full: "语音识别合成", color: C.violet },
+    { name: "智荐", use: "推荐",     full: "推荐与增长",   color: C.amber },
+    { name: "御风", use: "边缘",     full: "端侧边缘推理", color: C.green }
+  ];
+  const NAMES5 = MODELS.map((m) => m.name);
+  const NAMES5_REF = ["灵犀", "慧眼", "澜音", "智荐", "御风"];
+  const USES5_REF  = ["对话", "视觉质检", "语音", "推荐", "边缘"];
+
+  /* 4.2 父页 P11 数据集台账（DATASETS）逐字副本，仅作硬校验基准，不直接渲染 */
+  const PARENT_DS = [
+    { name: "多轮对话语料",   owner: "灵犀", n: 1240, label: 98.2,  ver: "v6",  at: "08-14" },
+    { name: "产线缺陷图像集", owner: "慧眼", n: 386,  label: 94.5,  ver: "v9",  at: "08-18" },
+    { name: "中文语音转写集", owner: "澜音", n: 512,  label: 91.3,  ver: "v5",  at: "08-11" },
+    { name: "用户行为序列集", owner: "智荐", n: 2480, label: 100.0, ver: "v12", at: "08-19" },
+    { name: "端侧传感时序集", owner: "御风", n: 168,  label: 87.6,  ver: "v4",  at: "08-09" },
+    { name: "通用指令微调集", owner: "灵犀", n: 96,   label: 96.4,  ver: "v3",  at: "08-16" },
+    { name: "质检负样本集",   owner: "慧眼", n: 74,   label: 89.2,  ver: "v2",  at: "08-07" }
+  ];
+  const PARENT_DS_N_REF = 4956;   /* 父页 D.dsN = Σ 七条样本量（万条） */
+
+  /* 4.3 父页 P11 训练任务（TRAIN）逐字副本，仅作硬校验基准 */
+  const PARENT_TRAIN = [
+    { task: "灵犀·预训练续训", model: "灵犀", s: 1.0, e: 4.5, gpu: 96 },
+    { task: "慧眼·增量训练",   model: "慧眼", s: 2.0, e: 5.5, gpu: 64 },
+    { task: "澜音·声学训练",   model: "澜音", s: 1.5, e: 4.0, gpu: 48 },
+    { task: "智荐·召回重训",   model: "智荐", s: 3.0, e: 6.0, gpu: 40 },
+    { task: "御风·端侧蒸馏",   model: "御风", s: 4.0, e: 7.0, gpu: 24 },
+    { task: "灵犀·指令微调",   model: "灵犀", s: 4.5, e: 6.5, gpu: 32 },
+    { task: "慧眼·量化蒸馏",   model: "慧眼", s: 5.5, e: 7.5, gpu: 16 },
+    { task: "智荐·在线学习",   model: "智荐", s: 6.0, e: 8.0, gpu: 12 }
+  ];
+  const PARENT_CARDS_REF = 332;   /* 父页 D.gpuCards = Σ 八项申请卡数 */
+
+  /* 4.4 GPU 集群周利用率（父页 GPU_UTIL 逐字，同一 8 周窗口） */
+  const GPU_UTIL = [62.4, 71.8, 79.5, 86.2, 91.4, 88.7, 82.3, 76.9];
+  const GPU_AVG_REF = 79.9;       /* 父页 D.gpuAvg = mean(GPU_UTIL) */
+  const GPU_BUDGET = 3.1;         /* 亿元/年 · 契约 §2.2「云资源与算力」，本页只引用不再拆分 */
+  const WEEK_LABELS = ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"];
+  const HOURS_PER_WEEK = 168;     /* 卡时 = 卡数 × 周数 × 168 h */
+  const NOW_W = 6.2;              /* 窗口内「今日」位置（第 6.2 周），任务状态由它现算 */
+
+  /* 4.5 数据集状态四档 */
+  const DST = [
+    { name: "在训用", cls: "is-d0", color: C.green,  note: "已进训练管道" },
+    { name: "标注中", cls: "is-d1", color: C.amber,  note: "标注仍在推进" },
+    { name: "待质检", cls: "is-d2", color: C.orange, note: "标注完成待抽检" },
+    { name: "已冻结", cls: "is-d3", color: C.blueDeep, note: "版本冻结作对照" }
+  ];
+
+  /* 4.6 数据集资产台账 16 条（样本量单位：万条）
+         src: 0 = 父页在册（前 7 条，名称/归属/样本量/版本/更新逐字），1 = 本页补充的次要数据集
+         lab = 已标注、rej = 质检驳回（均为万条），待标注 = n − lab − rej **现算**（不另写一份）；
+         标注完成度% = 100 × lab ÷ n **现算**，其一位小数显示值与父页 label 逐条相等（进自检）。 */
+  const DS = [
+    { no: "DS-2026-01", name: "多轮对话语料",     owner: "灵犀", n: 1240, lab: 1217.7, rej: 8.6, tb: 3.6,  ver: "v6",  at: "08-14", st: 0, src: 0,
+      qc: "多轮一致性抽检 5%，驳回集中在指代消解" },
+    { no: "DS-2026-02", name: "通用指令微调集",   owner: "灵犀", n: 96,   lab: 92.5,   rej: 1.2, tb: 0.4,  ver: "v3",  at: "08-16", st: 0, src: 0,
+      qc: "指令-响应对双人复核，驳回多为格式不合规" },
+    { no: "DS-2026-03", name: "工单意图标注集",   owner: "灵犀", n: 248,  lab: 226.4,  rej: 5.8, tb: 0.7,  ver: "v4",  at: "08-13", st: 1, src: 1,
+      qc: "38 类意图体系，长尾类目仍在补标" },
+    { no: "DS-2026-04", name: "多语种问答集",     owner: "灵犀", n: 132,  lab: 118.9,  rej: 3.4, tb: 0.5,  ver: "v2",  at: "08-06", st: 1, src: 1,
+      qc: "英/日/德三语，翻译回译一致性抽检" },
+    { no: "DS-2026-05", name: "产线缺陷图像集",   owner: "慧眼", n: 386,  lab: 364.8,  rej: 5.4, tb: 42.8, ver: "v9",  at: "08-18", st: 1, src: 0,
+      qc: "像素级分割掩膜，驳回主因边界毛刺" },
+    { no: "DS-2026-06", name: "质检负样本集",     owner: "慧眼", n: 74,   lab: 66.0,   rej: 3.1, tb: 8.2,  ver: "v2",  at: "08-07", st: 2, src: 0,
+      qc: "误检回流样本，需产线工艺工程师复核" },
+    { no: "DS-2026-07", name: "器件微缺陷图像集", owner: "慧眼", n: 196,  lab: 171.5,  rej: 6.2, tb: 24.6, ver: "v3",  at: "08-15", st: 2, src: 1,
+      qc: "显微成像，0.1mm 级缺陷标注一致率待提升" },
+    { no: "DS-2026-08", name: "中文语音转写集",   owner: "澜音", n: 512,  lab: 467.5,  rej: 9.2, tb: 28.6, ver: "v5",  at: "08-11", st: 1, src: 0,
+      qc: "口音分层抽检，方言片区仍在补标" },
+    { no: "DS-2026-09", name: "远场唤醒语料",     owner: "澜音", n: 204,  lab: 180.6,  rej: 5.1, tb: 11.4, ver: "v6",  at: "08-12", st: 2, src: 1,
+      qc: "5m 远场 + 噪声混响，信噪比分档质检" },
+    { no: "DS-2026-10", name: "TTS 发音人语料",   owner: "澜音", n: 88,   lab: 83.2,   rej: 1.6, tb: 6.8,  ver: "v3",  at: "08-04", st: 0, src: 1,
+      qc: "六发音人录音棚素材，音素对齐已复核" },
+    { no: "DS-2026-11", name: "用户行为序列集",   owner: "智荐", n: 2480, lab: 2480.0, rej: 0.0, tb: 9.4,  ver: "v12", at: "08-19", st: 3, src: 0,
+      qc: "隐式反馈自动标注，无人工待标注与驳回" },
+    { no: "DS-2026-12", name: "商品内容特征集",   owner: "智荐", n: 640,  lab: 608.0,  rej: 9.6, tb: 2.6,  ver: "v7",  at: "08-17", st: 0, src: 1,
+      qc: "类目/属性/图文多模态特征，类目树对齐中" },
+    { no: "DS-2026-13", name: "曝光点击对照集",   owner: "智荐", n: 1120, lab: 1097.6, rej: 6.7, tb: 4.2,  ver: "v5",  at: "08-18", st: 0, src: 1,
+      qc: "A/B 对照组曝光去偏，作弊流量已剔除" },
+    { no: "DS-2026-14", name: "端侧传感时序集",   owner: "御风", n: 168,  lab: 147.2,  rej: 4.5, tb: 2.1,  ver: "v4",  at: "08-09", st: 2, src: 0,
+      qc: "多传感器时间戳对齐，漂移样本待剔除" },
+    { no: "DS-2026-15", name: "模组功耗时序集",   owner: "御风", n: 112,  lab: 94.1,   rej: 3.8, tb: 1.4,  ver: "v3",  at: "08-10", st: 1, src: 1,
+      qc: "低功耗场景打标，休眠段落界定仍在收敛" },
+    { no: "DS-2026-16", name: "断网降级样本集",   owner: "御风", n: 56,   lab: 44.8,   rej: 2.2, tb: 0.7,  ver: "v2",  at: "08-05", st: 2, src: 1,
+      qc: "断网重连场景构造样本，需现场复现验证" }
+  ];
+
+  /* 4.7 训练任务状态三档（由 NOW_W 现算得到，不硬写） */
+  const TKT = [
+    { name: "已完成", cls: "is-s0", color: C.green },
+    { name: "进行中", cls: "is-s1", color: C.blue },
+    { name: "排队中", cls: "is-s2", color: C.violet }
+  ];
+  /* 四类训练任务（任务卡口径：预训练 / 微调 / 评测 / 蒸馏），
+     ph = 五阶段（数据准备/环境就绪/训练/评测/交付）占比，末段由「总时长 − 前四段」现算保证 Σ 恒等 */
+  const CATS = [
+    { name: "预训练", color: C.blue,   ph: [0.10, 0.06, 0.68, 0.11, 0.05] },
+    { name: "微调",   color: C.amber,  ph: [0.14, 0.08, 0.58, 0.14, 0.06] },
+    { name: "评测",   color: C.cyan,   ph: [0.20, 0.12, 0.22, 0.40, 0.06] },
+    { name: "蒸馏",   color: C.violet, ph: [0.12, 0.10, 0.54, 0.18, 0.06] }
+  ];
+  const PHASES = ["数据准备", "环境就绪", "训练迭代", "评测验收", "交付归档"];
+  const PHASE_COLORS = [C.amber, C.cyan, C.blue, C.green, C.violet];
+  const PHASE_HINT = ["数据集拉取 / 切分 / 特征物化", "算力申请 → 集群就位 / 镜像校验",
+                      "多轮迭代与中间 ckpt 落盘", "指标评测 + 回归 + 合规审查", "权重归档 / 模型卡 / 版本入库"];
+
+  /* 4.8 训练任务台账 14 项（前 8 项 = 父页 TRAIN 逐字，src 0；后 6 项为本页补充的评测/微调任务，src 1）
+         ★ 任务只用「模型名字符串」关联模型，绝不持有模型对象 */
+  const TASKS = [
+    { no: "TR-01", task: "灵犀·预训练续训",  model: "灵犀", kind: "预训练",   cat: 0, s: 1.0, e: 4.5, gpu: 96, src: 0, ds: "多轮对话语料",     res: "产出 v2.5-beta 基座权重" },
+    { no: "TR-02", task: "慧眼·增量训练",    model: "慧眼", kind: "增量训练", cat: 1, s: 2.0, e: 5.5, gpu: 64, src: 0, ds: "产线缺陷图像集",   res: "产出 v3.2-rc，检出率 +0.7pt" },
+    { no: "TR-03", task: "澜音·声学训练",    model: "澜音", kind: "声学建模", cat: 0, s: 1.5, e: 4.0, gpu: 48, src: 0, ds: "中文语音转写集",   res: "产出 v2.0-beta 声学侧" },
+    { no: "TR-04", task: "智荐·召回重训",    model: "智荐", kind: "双塔重训", cat: 0, s: 3.0, e: 6.0, gpu: 40, src: 0, ds: "用户行为序列集",   res: "产出 v2.6-rc，命中率 +1.8pt" },
+    { no: "TR-05", task: "御风·端侧蒸馏",    model: "御风", kind: "蒸馏压缩", cat: 3, s: 4.0, e: 7.0, gpu: 24, src: 0, ds: "端侧传感时序集",   res: "" },
+    { no: "TR-06", task: "灵犀·指令微调",    model: "灵犀", kind: "SFT 微调", cat: 1, s: 4.5, e: 6.5, gpu: 32, src: 0, ds: "通用指令微调集",   res: "" },
+    { no: "TR-07", task: "慧眼·量化蒸馏",    model: "慧眼", kind: "量化部署", cat: 3, s: 5.5, e: 7.5, gpu: 16, src: 0, ds: "质检负样本集",     res: "" },
+    { no: "TR-08", task: "智荐·在线学习",    model: "智荐", kind: "在线学习", cat: 1, s: 6.0, e: 8.0, gpu: 12, src: 0, ds: "曝光点击对照集",   res: "" },
+    { no: "TR-09", task: "澜音·远场评测",    model: "澜音", kind: "唤醒评测", cat: 2, s: 4.0, e: 5.0, gpu: 6,  src: 1, ds: "远场唤醒语料",     res: "远场唤醒率 +1.4pt，回归通过" },
+    { no: "TR-10", task: "灵犀·长上下文微调", model: "灵犀", kind: "长上下文", cat: 1, s: 5.0, e: 7.0, gpu: 20, src: 1, ds: "工单意图标注集",   res: "" },
+    { no: "TR-11", task: "智荐·AB 离线评测", model: "智荐", kind: "离线评测", cat: 2, s: 6.0, e: 7.0, gpu: 4,  src: 1, ds: "商品内容特征集",   res: "" },
+    { no: "TR-12", task: "灵犀·多轮评测",    model: "灵犀", kind: "多轮评测", cat: 2, s: 6.5, e: 7.5, gpu: 8,  src: 1, ds: "多语种问答集",     res: "" },
+    { no: "TR-13", task: "御风·量化回归",    model: "御风", kind: "量化回归", cat: 2, s: 7.0, e: 8.0, gpu: 4,  src: 1, ds: "断网降级样本集",   res: "" },
+    { no: "TR-14", task: "慧眼·产线回归评测", model: "慧眼", kind: "回归评测", cat: 2, s: 7.5, e: 8.0, gpu: 6,  src: 1, ds: "器件微缺陷图像集", res: "" }
+  ];
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 5.1 数据集维度：标注三态逐条闭合（待标注 = 样本量 − 已标注 − 质检驳回） */
+  DS.forEach((d) => {
+    d.wait = r1(d.n - d.lab - d.rej);
+    d.pct = 100 * d.lab / d.n;
+    d.mi = NAMES5.indexOf(d.owner);
+  });
+  D.dsCnt = DS.length;
+  D.dsN = sum(DS.map((d) => d.n));
+  D.dsLab = sum(DS.map((d) => d.lab));
+  D.dsWait = sum(DS.map((d) => d.wait));
+  D.dsRej = sum(DS.map((d) => d.rej));
+  D.dsPct = 100 * D.dsLab / D.dsN;                       /* 样本量加权平均标注完成度 */
+  D.dsTB = sum(DS.map((d) => d.tb));
+  D.dsParentN = sum(DS.filter((d) => d.src === 0).map((d) => d.n));
+  D.dsSubN = sum(DS.filter((d) => d.src === 1).map((d) => d.n));
+  D.dsBig = DS.slice().sort((a, b) => b.n - a.n)[0];
+  D.dsLow = DS.slice().sort((a, b) => a.pct - b.pct)[0];
+  D.dsMax = Math.max.apply(null, DS.map((d) => d.n));
+
+  /* 5.2 训练任务维度：周数 / 卡周 / 卡时 / 状态 / 进度 / 五阶段耗时（天）全部现算 */
+  TASKS.forEach((t) => {
+    t.w = r1(t.e - t.s);
+    t.cw = t.gpu * t.w;                                   /* 卡周 */
+    t.ch = t.cw * HOURS_PER_WEEK;                         /* 卡时 */
+    t.st = t.e <= NOW_W ? 0 : (t.s <= NOW_W ? 1 : 2);
+    t.prog = t.st === 0 ? 100 : (t.st === 1 ? 100 * (NOW_W - t.s) / (t.e - t.s) : 0);
+    t.mi = NAMES5.indexOf(t.model);
+    const days = r1(t.w * 7);
+    const rr = CATS[t.cat].ph;
+    const seg = rr.slice(0, 4).map((x) => r1(days * x));
+    seg.push(r1(days - sum(seg)));                        /* 末段取余，Σ 恒等于总时长 */
+    t.days = days;
+    t.seg = seg;
+    /* 当前所处阶段索引（按已耗天数落位；已完成 → 5，排队中 → -1） */
+    if (t.st === 2) { t.cur = -1; }
+    else if (t.st === 0) { t.cur = seg.length; }
+    else {
+      const done = (NOW_W - t.s) * 7;
+      let acc = 0, k = 0;
+      for (; k < seg.length; k++) { acc += seg[k]; if (done < acc) break; }
+      t.cur = Math.min(k, seg.length - 1);
+    }
+  });
+  D.tkCnt = TASKS.length;
+  D.cards = sum(TASKS.map((t) => t.gpu));
+  D.parentCards = sum(TASKS.filter((t) => t.src === 0).map((t) => t.gpu));
+  D.cw = sum(TASKS.map((t) => t.cw));
+  D.ch = sum(TASKS.map((t) => t.ch));
+  D.chMax = Math.max.apply(null, TASKS.map((t) => t.ch));
+  D.byTkSt = TKT.map((s, si) => TASKS.filter((t) => t.st === si).length);
+  D.byCat = CATS.map((c, ci) => TASKS.filter((t) => t.cat === ci).length);
+  /* 8 周窗口摊分的算力预算（元）与折算单位卡时成本 —— 与契约「云资源与算力 3.1 亿/年」呼应 */
+  D.winBudget = GPU_BUDGET * 1e8 * 8 / 52;
+  D.unitCost = D.winBudget / D.ch;
+
+  /* 5.3 GPU 利用率：周值为父页逐字，累计均值线末值 == 父页 8 周均值（硬校验） */
+  D.gpuAvg = mean(GPU_UTIL);
+  D.gpuMax = Math.max.apply(null, GPU_UTIL);
+  D.gpuMaxWeek = GPU_UTIL.indexOf(D.gpuMax) + 1;
+  /* 累计均值线：第 i 点 = 前 i+1 周利用率的算术均值（保留两位小数，避免逐点四舍五入误差累积）；
+     按定义，末点恒等于全窗口 8 周均值，即父页 D.gpuAvg = 79.9%——这正是本页与父页的回归锚点。 */
+  const GPU_CUM = GPU_UTIL.map((v, i) =>
+    Math.round(sum(GPU_UTIL.slice(0, i + 1)) / (i + 1) * 100) / 100);
+  D.gpuCumLast = GPU_CUM[GPU_CUM.length - 1];
+
+  /* 5.4 模型维度：数据集数 / 样本量（父页在册 + 本页补充）/ 任务数 / Σ卡时 */
+  const BYM = MODELS.map((m, mi) => {
+    const ds = DS.filter((d) => d.mi === mi);
+    const tk = TASKS.filter((t) => t.mi === mi);
+    return {
+      name: m.name, use: m.use, full: m.full, color: m.color,
+      dsCnt: ds.length,
+      dsN: sum(ds.map((d) => d.n)),
+      dsParent: sum(ds.filter((d) => d.src === 0).map((d) => d.n)),
+      dsSub: sum(ds.filter((d) => d.src === 1).map((d) => d.n)),
+      lab: sum(ds.map((d) => d.lab)),
+      tkCnt: tk.length,
+      ch: sum(tk.map((t) => t.ch)),
+      cards: sum(tk.map((t) => t.gpu))
+    };
+  });
+  BYM.forEach((b) => { b.pct = 100 * b.lab / b.dsN; b.share = 100 * b.dsN / D.dsN; });
+  D.bymN = sum(BYM.map((b) => b.dsN));
+  D.bymCh = sum(BYM.map((b) => b.ch));
+  D.bymDsCnt = sum(BYM.map((b) => b.dsCnt));
+  D.bymTkCnt = sum(BYM.map((b) => b.tkCnt));
+  D.chTop = BYM.slice().sort((a, b) => b.ch - a.ch)[0];
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("gp-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("gp-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("gp-meta-ds").textContent = fmtInt(D.dsCnt);
+  $("gp-meta-tk").textContent = fmtInt(D.tkCnt);
+
+  /* ===== 7. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "数据集总数", v: D.dsCnt, dec: 0, unit: "个", color: C.blue,
+      s: "父页在册 " + DS.filter((d) => d.src === 0).length + " 个 + 本页补充 " + DS.filter((d) => d.src === 1).length + " 个次要集" },
+    { k: "总样本量", v: D.dsN, dec: 0, unit: "万条", color: C.cyan,
+      s: "父页口径 " + fmtInt(D.dsParentN) + " + 补充 " + fmtInt(D.dsSubN) + " · 五模型 Σ 现算" },
+    { k: "平均标注完成度", v: D.dsPct, dec: 1, unit: "%", color: C.green,
+      s: "样本量加权 = " + fmtInt(D.dsLab) + " ÷ " + fmtInt(D.dsN) + " 万条现算" },
+    { k: "训练任务数", v: D.tkCnt, dec: 0, unit: "项", color: C.amber,
+      s: "已完成 " + D.byTkSt[0] + " · 进行中 " + D.byTkSt[1] + " · 排队 " + D.byTkSt[2] + "（W" + fmtDec(NOW_W, 1) + " 现算）" },
+    { k: "Σ GPU 卡时", v: D.ch, dec: 0, unit: "卡时", color: C.violet,
+      s: fmtInt(D.cw) + " 卡周 × " + HOURS_PER_WEEK + " h · 折 " + fmtDec(D.unitCost, 0) + " 元/卡时" },
+    { k: "算力利用率", v: D.gpuAvg, dec: 1, unit: "%", color: C.orange,
+      s: "8 周均值 · 峰值 " + fmtDec(D.gpuMax, 1) + "%（W" + D.gpuMaxWeek + "）· 预算 " + fmtDec(GPU_BUDGET, 1) + " 亿/年" }
+  ];
+  $("gp-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="gp-kpi" style="--gp-kc:' + p.color + '">' +
+      '<div class="gp-kpi-k">' + p.k + "</div>" +
+      '<div class="gp-kpi-v"><b id="gp-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="gp-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("gp-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 模型筛选 chip（全部 + 五模型；每 chip 带该模型的数据集数与训练任务数） ===== */
+  const MFILTERS = [{ name: "全部", use: "五模型全量", color: C.blue, dsCnt: D.dsCnt, tkCnt: D.tkCnt, dsN: D.dsN, ch: D.ch }]
+    .concat(BYM.map((b) => ({ name: b.name, use: b.use, color: b.color, dsCnt: b.dsCnt, tkCnt: b.tkCnt, dsN: b.dsN, ch: b.ch })));
+  const mbox = $("gp-mchips");
+  mbox.innerHTML = MFILTERS.map((f, i) => (
+    '<button class="gp-mchip" type="button" data-i="' + i + '" style="--gp-cc:' + f.color + '" title="' + f.use + '">' +
+      "<u>" + f.name + "</u><b>" + f.dsCnt + "</b><i>集 · " + f.tkCnt + " 任务</i>" +
+    "</button>"
+  )).join("");
+  const mchips = Array.from(mbox.children);
+
+  /* ===== 9. 资产来源二级过滤 chip（全部 / 父页在册 / 本页补充；计数随模型筛选联动重算） ===== */
+  const SRC_NAMES = ["父页在册", "本页补充"];
+  const SRC_COLORS = [C.green, C.violet];
+  const sbox = $("gp-schips");
+  function srcScopeCnt(mi, si) {
+    const d = DS.filter((x) => (mi === 0 || x.mi === mi - 1) && (si === 0 || x.src === si - 1)).length;
+    const t = TASKS.filter((x) => (mi === 0 || x.mi === mi - 1) && (si === 0 || x.src === si - 1)).length;
+    return d + t;
+  }
+  function renderSChips(mi, si) {
+    const items = [{ name: "全部", color: C.blue }]
+      .concat(SRC_NAMES.map((n, k) => ({ name: n, color: SRC_COLORS[k] })));
+    sbox.innerHTML = items.map((f, i) => (
+      '<button class="gp-schip' + (i === si ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === si ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + srcScopeCnt(mi, i) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(sbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(mIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 10. hash 契约：父页 P11 面板「训练排期 × 算力利用率」下钻
+         → 子页#encodeURIComponent(模型名)，五模型名逐字匹配；
+         归一化（decodeURIComponent + trim + 全角空白剔除）后查 HASH_ALIAS，
+         别名表收「对话」「视觉」「语音」「推荐」「边缘」等用途别名及其常见变体。 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  ["全部", "ALL", "all", "全量", "五模型", "全部模型"].forEach((k) => alias(k, 0));
+  const USE_ALIAS = [
+    ["对话", "对话大模型", "对话模型", "大模型", "灵犀模型"],
+    ["视觉", "视觉质检", "质检", "视觉模型", "慧眼模型"],
+    ["语音", "语音识别", "语音合成", "语音识别合成", "澜音模型"],
+    ["推荐", "推荐与增长", "推荐模型", "增长", "智荐模型"],
+    ["边缘", "端侧", "边缘推理", "端侧边缘推理", "御风模型"]
+  ];
+  MODELS.forEach((m, mi) => {
+    alias(m.name, mi + 1);
+    alias(m.use, mi + 1);
+    alias(m.full, mi + 1);
+    alias(m.name + "模型", mi + 1);
+    alias(m.name + "数据集", mi + 1);
+    alias(m.name + "训练", mi + 1);
+    USE_ALIAS[mi].forEach((a) => alias(a, mi + 1));
+  });
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                      /* trim + 全角空白剔除归一化 */
+    if (!raw) return -1;                                     /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(mi) {
+    const want = "#" + encodeURIComponent(MFILTERS[mi].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 双表渲染（左：数据集资产台账；右：训练任务台账）
+         两表写死高度 + overflow hidden，行高固定，DOM 在 echarts.init 之前填充完。 ===== */
+  const dbody = $("gp-tbody"), tkbody = $("gp-tkbody");
+  let dsView = DS, tkView = TASKS, mIdx = 0, sIdx = 0, selPos = 0, SEQ = [];
+
+  function dsRowHtml(d, k) {
+    const w = clamp(d.pct, 6, 100);
+    const cPct = d.pct >= 95 ? C.green : d.pct >= 90 ? C.cyan : C.amber;
+    return "<li data-no=\"" + d.no + "\" style=\"animation-delay:" + (k * 10) + "ms\">" +
+      '<span class="gp-no">' + d.no + "</span>" +
+      '<span class="gp-name">' + d.name + (d.src ? "<i>补</i>" : "") + "</span>" +
+      '<span class="gp-own" style="color:' + MODELS[d.mi].color + '">' + d.owner + "</span>" +
+      '<span class="gp-num">' + fmtInt(d.n) + "</span>" +
+      '<span class="gp-bar"><span class="gp-bar-t"><u style="width:' + fmtDec(w, 1) + "%;background:" + cPct +
+        '"></u></span><em style="color:' + cPct + '">' + fmtDec(d.pct, 1) + "%</em></span>" +
+      '<span class="gp-dim">' + d.ver + "</span>" +
+      '<span class="gp-num">' + fmtDec(d.tb, 1) + "</span>" +
+      '<span class="gp-dim">' + d.at + "</span>" +
+      '<span class="gp-badge ' + DST[d.st].cls + '">' + DST[d.st].name + "</span>" +
+    "</li>";
+  }
+  function tkRowHtml(t, k) {
+    const res = t.st === 0
+      ? (t.res || "已完成 · 权重与模型卡已归档")
+      : (t.st === 1 ? "进度 " + fmtDec(t.prog, 0) + "% · 余 " + fmtDec(t.e - NOW_W, 1) + " 周"
+                    : "T-" + fmtDec(t.s - NOW_W, 1) + " 周排产");
+    const cRes = t.st === 0 ? C.green : t.st === 1 ? C.blue : "rgba(127,146,196,.85)";
+    return "<li data-no=\"" + t.no + "\" style=\"animation-delay:" + (k * 10) + "ms\">" +
+      '<span class="gp-no">' + t.no + "</span>" +
+      '<span class="gp-own" style="color:' + MODELS[t.mi].color + '">' + t.model + "</span>" +
+      '<span class="gp-dim" style="color:' + CATS[t.cat].color + '">' + CATS[t.cat].name + "</span>" +
+      '<span class="gp-dim">W' + fmtDec(t.s, 1) + " → W" + fmtDec(t.e, 1) + "</span>" +
+      '<span class="gp-num">' + t.gpu + "</span>" +
+      '<span class="gp-num">' + fmtInt(t.ch) + "</span>" +
+      '<span class="gp-badge ' + TKT[t.st].cls + '">' + TKT[t.st].name + "</span>" +
+      '<span class="gp-dim" style="color:' + cRes + '" title="' + t.kind + " · 数据集 " + t.ds + '">' + res + "</span>" +
+    "</li>";
+  }
+  function renderTables() {
+    dbody.innerHTML = dsView.map(dsRowHtml).join("");
+    tkbody.innerHTML = tkView.map(tkRowHtml).join("");
+    /* 轮巡序列：先走完数据集行，再走训练任务行（一条轮巡贯穿双表） */
+    SEQ = dsView.map((d, i) => ["ds", i]).concat(tkView.map((t, i) => ["tk", i]));
+    Array.from(dbody.children).forEach((li, k) => {
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    Array.from(tkbody.children).forEach((li, k) => {
+      li.addEventListener("click", () => { selPos = dsView.length + k; renderSel(); pauseRotate(20000); });
+    });
+    const scopeLab = sum(dsView.map((d) => d.lab));
+    const scopeN = sum(dsView.map((d) => d.n));
+    $("gp-ds-tag").innerHTML = "Σ 样本 <b>" + fmtInt(scopeN) + "</b> 万条 · 加权标注 <b>" +
+      (scopeN ? fmtDec(100 * scopeLab / scopeN, 1) : "0.0") + "%</b> · Σ 存储 <b>" +
+      fmtDec(sum(dsView.map((d) => d.tb)), 1) + "</b> TB";
+    $("gp-tk-tag").innerHTML = "Σ 卡时 <b>" + fmtInt(sum(tkView.map((t) => t.ch))) + "</b> · Σ 卡数 <b>" +
+      fmtInt(sum(tkView.map((t) => t.gpu))) + "</b> · 卡时 = 卡数 × 周数 × " + HOURS_PER_WEEK + " h 现算";
+    $("gp-filters-state").innerHTML =
+      "当前口径 <em>" + MFILTERS[mIdx].name + "</em>：数据集 <b>" + dsView.length + "</b> / " + D.dsCnt +
+      " · 训练任务 <b>" + tkView.length + "</b> / " + D.tkCnt +
+      "<i>|</i>Σ 样本 <em>" + fmtInt(scopeN) + "</em> 万条 · Σ 卡时 <em>" + fmtInt(sum(tkView.map((t) => t.ch))) +
+      "</em><i>|</i>行点击或 3 秒轮巡联动右下「单条详情」";
+  }
+
+  /* ===== 12. 单条详情：数据集 → 标注三态与质检；训练任务 → 资源占用与五阶段耗时
+         ★ 标注口径：已标注 + 待标注 + 质检驳回 ≡ 样本量（逐条闭合，进自检）；
+           「质检驳回」= 已完成标注但抽检不通过、需返工的样本，计入完成度分母不计分子。 ===== */
+  function renderSel() {
+    if (!SEQ.length) {
+      $("gp-dt-h2").textContent = "单条详情";
+      $("gp-dt-tag").textContent = "当前筛选无在册资产";
+      $("gp-dt-headbox").innerHTML = '<div class="gp-dt-sub">调整模型或资产来源筛选后，此处展示选中数据集的标注质检，或选中训练任务的资源与阶段耗时。</div>';
+      $("gp-dt-bar").innerHTML = "";
+      $("gp-dt-list").innerHTML = "";
+      return;
+    }
+    selPos = ((selPos % SEQ.length) + SEQ.length) % SEQ.length;
+    const cur = SEQ[selPos];
+    Array.from(dbody.children).forEach((li, k) => li.classList.toggle("is-sel", cur[0] === "ds" && k === cur[1]));
+    Array.from(tkbody.children).forEach((li, k) => li.classList.toggle("is-sel", cur[0] === "tk" && k === cur[1]));
+    if (cur[0] === "ds") renderDsDetail(dsView[cur[1]]);
+    else renderTkDetail(tkView[cur[1]]);
+  }
+
+  function renderDsDetail(d) {
+    $("gp-dt-h2").textContent = "单数据集详情 · 标注进度与质检";
+    $("gp-dt-tag").textContent = "已标注 + 待标注 + 质检驳回 = 样本量（万条，逐条闭合）";
+    $("gp-dt-headbox").innerHTML =
+      '<div class="gp-dt-no"><b>' + d.no + "</b>" +
+        '<span class="gp-badge ' + DST[d.st].cls + '">' + DST[d.st].name + "</span>" +
+        '<span class="gp-badge" style="background:' + MODELS[d.mi].color + ';color:#071026">' + d.owner + "</span>" +
+        '<span class="gp-dt-sub">' + MODELS[d.mi].full + " · 版本 " + d.ver + " · 更新 " + d.at +
+        " · " + (d.src ? "本页补充次要集" : "父页在册") + "</span></div>" +
+      '<div class="gp-dt-title">' + d.name + "</div>" +
+      '<div class="gp-dt-sub">样本量 <b>' + fmtInt(d.n) + "</b> 万条 · 标注完成度 <b>" + fmtDec(d.pct, 1) +
+        "%</b>（" + fmtDec(d.lab, 1) + " ÷ " + fmtInt(d.n) + " 现算）· 存储 <b>" + fmtDec(d.tb, 1) +
+        "</b> TB · 质检：" + d.qc + "</div>";
+    const parts = [
+      { name: "已标注", v: d.lab, color: C.green,  hint: "已完成标注并通过抽检，可直接进训练管道" },
+      { name: "待标注", v: d.wait, color: C.amber, hint: "尚未进入标注队列或标注中，= 样本量 − 已标注 − 驳回" },
+      { name: "质检驳回", v: d.rej, color: C.red,  hint: d.qc }
+    ];
+    const tot = sum(parts.map((p) => p.v));
+    $("gp-dt-bar").innerHTML = parts.map((p) => (
+      '<span class="gp-dt-seg" style="flex:' + Math.max(p.v, 0.001) + ";background:" + p.color +
+        '" title="' + p.name + " " + fmtDec(p.v, 1) + ' 万条"></span>'
+    )).join("");
+    $("gp-dt-list").innerHTML = parts.map((p, k) => (
+      '<div class="gp-dt-row' + (p.v === 0 ? " is-todo" : "") + '" style="--gp-pc:' + p.color + '">' +
+        "<b>" + p.name + "</b><span>" + p.hint + "</span><em style=\"color:" + p.color + "\">" +
+        fmtDec(p.v, 1) + " 万</em></div>"
+    )).join("") +
+      '<div class="gp-dt-row" style="--gp-pc:' + C.blue + '"><b>合计</b>' +
+      "<span>三态之和 ≡ 样本量（" + fmtDec(parts[0].v, 1) + " + " + fmtDec(parts[1].v, 1) + " + " +
+      fmtDec(parts[2].v, 1) + "）</span><em>" + fmtDec(tot, 1) + " 万</em></div>";
+  }
+
+  function renderTkDetail(t) {
+    $("gp-dt-h2").textContent = "单训练任务详情 · 资源占用与阶段耗时";
+    $("gp-dt-tag").textContent = "五阶段耗时 Σ = 任务总时长（天）· 卡时 = 卡数 × 周数 × " + HOURS_PER_WEEK + " h";
+    $("gp-dt-headbox").innerHTML =
+      '<div class="gp-dt-no"><b>' + t.no + "</b>" +
+        '<span class="gp-badge ' + TKT[t.st].cls + '">' + TKT[t.st].name + "</span>" +
+        '<span class="gp-badge" style="background:' + MODELS[t.mi].color + ';color:#071026">' + t.model + "</span>" +
+        '<span class="gp-dt-sub">' + CATS[t.cat].name + " · " + t.kind + " · " + (t.src ? "本页补充" : "父页在册") + "</span></div>" +
+      '<div class="gp-dt-title">' + t.task + "</div>" +
+      '<div class="gp-dt-sub">排期 <b>W' + fmtDec(t.s, 1) + " → W" + fmtDec(t.e, 1) + "</b>（" + fmtDec(t.w, 1) +
+        " 周 / " + fmtDec(t.days, 1) + " 天）· <b>" + t.gpu + "</b> 卡 × <b>" + fmtDec(t.w, 1) + "</b> 周 = <b>" +
+        fmtInt(t.ch) + "</b> 卡时（占窗口 " + fmtDec(100 * t.ch / D.ch, 1) + "%，折 " +
+        fmtInt(t.ch * D.unitCost / 1e4) + " 万元）· 训练集 " + t.ds + "</div>";
+    $("gp-dt-bar").innerHTML = t.seg.map((v, k) => (
+      '<span class="gp-dt-seg' + (k === t.cur ? " is-cur" : "") + '" style="flex:' + Math.max(v, 0.001) +
+        ";background:" + PHASE_COLORS[k] + (t.st === 2 ? ";opacity:.42" : "") +
+        '" title="' + PHASES[k] + " " + fmtDec(v, 1) + ' 天"></span>'
+    )).join("");
+    $("gp-dt-list").innerHTML = PHASES.map((name, k) => {
+      const done = t.st === 0 || (t.st === 1 && k < t.cur);
+      const cur = t.st === 1 && k === t.cur;
+      const cls = t.st === 2 || (t.st === 1 && k > t.cur) ? " is-todo" : (cur ? " is-cur" : "");
+      const body = t.st === 2 ? "待排产 · " + PHASE_HINT[k]
+        : (done ? "已完成 · " + PHASE_HINT[k] : (cur ? "进行中 · " + PHASE_HINT[k] : "未开始 · " + PHASE_HINT[k]));
+      return '<div class="gp-dt-row' + cls + '" style="--gp-pc:' + PHASE_COLORS[k] + '">' +
+        "<b>" + name + "</b><span>" + body + "</span><em>" + fmtDec(t.seg[k], 1) + " 天</em></div>";
+    }).join("");
+  }
+
+  /* ===== 13. 五模型数据集样本量构成（横向堆叠：父页在册 + 本页补充，Σ = 总样本量） ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  function stackOption(mi) {
+    /* ★ 只把标量与数组下发给 option，BYM 对象本身不进 series.data（避免任何回指） */
+    const names = BYM.map((b) => b.name + "（" + b.use + "）");
+    const parentV = BYM.map((b) => b.dsParent);
+    const subV = BYM.map((b) => b.dsSub);
+    const totV = BYM.map((b) => b.dsN);
+    const cnts = BYM.map((b) => b.dsCnt);
+    const pcts = BYM.map((b) => Number(fmtDec(b.pct, 1)));
+    const dim = (i) => (mi === 0 || mi - 1 === i ? 1 : 0.28);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 58, top: 26, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + names[i] + "</b><br/>父页在册 <b style=\"color:" + C.green + "\">" + fmtInt(parentV[i]) +
+            "</b> 万条<br/>本页补充 <b style=\"color:" + C.violet + "\">" + fmtInt(subV[i]) +
+            "</b> 万条<br/>合计 <b>" + fmtInt(totV[i]) + "</b> 万条 · " + cnts[i] + " 个数据集<br/>" +
+            "<span style=\"color:" + C.textDim + "\">加权标注完成度 " + fmtDec(pcts[i], 1) + "%</span>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["父页在册", "本页补充"]
+      },
+      xAxis: {
+        type: "value", name: "万条", nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false }
+      },
+      yAxis: {
+        type: "category", inverse: true, data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10.5 }
+      },
+      series: [
+        { name: "父页在册", type: "bar", stack: "ds", barWidth: "56%",
+          data: parentV.map((v, i) => ({ value: v, itemStyle: { color: C.green, opacity: dim(i), borderRadius: [3, 0, 0, 3] } })) },
+        { name: "本页补充", type: "bar", stack: "ds",
+          label: {
+            show: true, position: "right", color: "#cfdcff", fontSize: 10, fontWeight: 700,
+            formatter: (p) => fmtInt(totV[p.dataIndex])
+          },
+          data: subV.map((v, i) => ({ value: v, itemStyle: { color: C.violet, opacity: dim(i), borderRadius: [0, 3, 3, 0] } })) }
+      ]
+    };
+  }
+
+  /* ===== 14. GPU 集群利用率 8 周（柱 = 父页周值逐字，线 = 累计均值，末值恒回归父页 8 周均值） ===== */
+  function gpuOption() {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 10, top: 26, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>第 " + (i + 1) + " 周</b><br/>周利用率 <b style=\"color:" + C.blue + "\">" +
+            fmtDec(GPU_UTIL[i], 1) + "%</b><br/>累计均值 <b style=\"color:" + C.amber + "\">" +
+            fmtDec(GPU_CUM[i], 2) + "%</b>" +
+            (i === GPU_UTIL.length - 1 ? "<br/><span style=\"color:" + C.textDim +
+              "\">末值 = 父页 8 周均值 " + fmtDec(GPU_AVG_REF, 1) + "%</span>" : "");
+        }
+      }, TIP),
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["周利用率", "累计均值"]
+      },
+      xAxis: {
+        type: "category", data: WEEK_LABELS.slice(),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10 }
+      },
+      yAxis: {
+        type: "value", name: "%", min: 40, max: 100, nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false }
+      },
+      series: [
+        { name: "周利用率", type: "bar", barWidth: "46%", data: GPU_UTIL.slice(),
+          itemStyle: { borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: C.blue }, { offset: 1, color: "rgba(47,111,214,.3)" }]) } },
+        { name: "累计均值", type: "line", smooth: true, symbol: "circle", symbolSize: 5, z: 5,
+          data: GPU_CUM.slice(),
+          lineStyle: { width: 2.4, color: C.amber }, itemStyle: { color: C.amber },
+          markLine: {
+            symbol: "none", silent: true,
+            lineStyle: { color: C.orange, type: "dashed", width: 1.6 },
+            label: { color: C.orange, fontSize: 10.5, fontWeight: 700, position: "insideEndTop",
+              formatter: () => "父页均值 " + fmtDec(GPU_AVG_REF, 1) + "%" },
+            data: [{ yAxis: GPU_AVG_REF }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 15. 筛选主流程：一次调用刷新 chip / 双表 / 详情 / 构成图 / 页头 chip（单一入口） ===== */
+  function applyFilter(mi, si, pushHash) {
+    mIdx = clamp(mi, 0, MFILTERS.length - 1);
+    sIdx = clamp(si, 0, SRC_NAMES.length);
+    dsView = DS.filter((d) => (mIdx === 0 || d.mi === mIdx - 1) && (sIdx === 0 || d.src === sIdx - 1));
+    tkView = TASKS.filter((t) => (mIdx === 0 || t.mi === mIdx - 1) && (sIdx === 0 || t.src === sIdx - 1));
+    selPos = 0;
+    mchips.forEach((el, i) => {
+      const on = i === mIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? MFILTERS[i].color : "";
+      el.style.borderColor = on ? MFILTERS[i].color : "";
+    });
+    renderSChips(mIdx, sIdx);
+    $("gp-chip-key").textContent = "样本量 · " + MFILTERS[mIdx].name;
+    $("gp-chip-val").textContent = fmtInt(MFILTERS[mIdx].dsN) + " 万";
+    $("gp-stack-tag").innerHTML = "五模型 Σ <b>" + fmtInt(D.bymN) + "</b> 万条 ≡ 总样本量 · 口径 " + MFILTERS[mIdx].name;
+    $("gp-gpu-tag").innerHTML = "峰值 <b>" + fmtDec(D.gpuMax, 1) + "%</b>（W" + D.gpuMaxWeek +
+      "）· 累计均值末值 <b>" + fmtDec(D.gpuCumLast, 1) + "%</b> = 父页均值";
+    renderTables();
+    renderSel();
+    if (stackChart) stackChart.setOption(stackOption(mIdx), true);
+    if (pushHash) syncHash(mIdx);
+  }
+
+  mchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), 0, true)));
+
+  /* hash 定位：命中模型则激活筛选 chip、闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyFilter(0, 0, false); return; }
+    applyFilter(hit, 0, false);
+    if (hit > 0) {
+      const chip = mchips[hit];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                 /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发AI模型迭代1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 16. kiosk 轮巡：双表行 3 秒逐行高亮并联动单条详情；hash 定位或手动点行后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !SEQ.length) return;
+    selPos = (selPos + 1) % SEQ.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 17. 初始渲染：先填充全部 DOM（KPI + 双表 + 详情），再 init 图表 ===== */
+  let stackChart = null, gpuChart = null;
+  applyFilter(0, 0, false);                                  /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  stackChart = echarts.init($("gp-chart-stack"));
+  stackChart.setOption(stackOption(0));
+  gpuChart = echarts.init($("gp-chart-gpu"));
+  gpuChart.setOption(gpuOption());
+  locateByHash();                                            /* 初始解析 hash（无 hash 落全部） */
+
+  /* GPU 图轮播提示 */
+  let tipIdx = 0;
+  setInterval(() => {
+    gpuChart.dispatchAction({ type: "showTip", seriesIndex: 1, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % WEEK_LABELS.length;
+  }, 4200);
+
+  /* ===== 18. 底部数据与算力研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "标注完成度最低「" + D.dsLow.name + "」" + fmtDec(D.dsLow.pct, 1) + "%（" +
+        D.dsLow.owner + "），待标注 " + fmtDec(D.dsLow.wait, 1) + " 万条 + 驳回 " + fmtDec(D.dsLow.rej, 1) +
+        " 万条，建议优先补标以免拖累 " + D.dsLow.owner + " 下一轮训练" },
+    { lv: "高", c: C.red, t: "全盘质检驳回 " + fmtDec(D.dsRej, 1) + " 万条（占 " +
+        fmtDec(100 * D.dsRej / D.dsN, 2) + "%），返工工时按 8 周窗口摊分需持续投入，驳回主因集中在边界与一致性" },
+    { lv: "中", c: C.orange, t: "算力集中度：Σ 卡时 " + fmtInt(D.ch) + " 中「" + D.chTop.name + "」占 " +
+        fmtDec(100 * D.chTop.ch / D.ch, 1) + "%（" + fmtInt(D.chTop.ch) + " 卡时 / " + D.chTop.tkCnt +
+        " 项任务），单模型独占度偏高" },
+    { lv: "中", c: C.orange, t: "利用率 W" + D.gpuMaxWeek + " 触及峰值 " + fmtDec(D.gpuMax, 1) +
+        "%，同期在跑任务 " + TASKS.filter((t) => t.s <= D.gpuMaxWeek && t.e >= D.gpuMaxWeek).length +
+        " 项，排队任务 " + D.byTkSt[2] + " 项需等窗口后段释放卡位" },
+    { lv: "低", c: C.amber, t: "样本量头部集中：「" + D.dsBig.name + "」" + fmtInt(D.dsBig.n) + " 万条，占全盘 " +
+        fmtDec(100 * D.dsBig.n / D.dsN, 1) + "%；父页在册 " + fmtInt(D.dsParentN) + " + 本页补充 " +
+        fmtInt(D.dsSubN) + " = " + fmtInt(D.dsN) + " 万条" },
+    { lv: "低", c: C.green, t: "算力口径：8 周摊分预算 " + fmtDec(D.winBudget / 1e8, 4) + " 亿元（年度云资源与算力 " +
+        fmtDec(GPU_BUDGET, 1) + " 亿 × 8/52），Σ " + fmtInt(D.ch) + " 卡时折 " + fmtDec(D.unitCost, 1) + " 元/卡时" },
+    { lv: "低", c: C.green, t: "勾稽：数据集 " + D.dsCnt + " 个 Σ 样本 " + fmtInt(D.dsN) + " 万条 = 五模型 Σ " +
+        fmtInt(D.bymN) + "；训练任务 " + D.tkCnt + " 项 Σ 卡时 " + fmtInt(D.ch) +
+        "；父页 8 项申请卡数 Σ " + fmtInt(D.parentCards) + " 卡逐字在册" },
+    { lv: "低", c: C.cyan, t: "与「单模型详情」分工：该页看单模型版本谱系 / 训练曲线 / 线上推理，本页看数据集资产与训练任务全量台账，两页不重复展示同一口径" }
+  ];
+  const track = $("gp-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="gp-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                    /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 19. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try { JSON.stringify(stackOption(0)); JSON.stringify(stackOption(3)); JSON.stringify(gpuOption()); }
+  catch (e) { optAcyclic = false; console.error("[数据集与训练台账] option 存在循环引用：", e.message); }
+
+  const parentRows = DS.filter((d) => d.src === 0);
+  const checks = [
+    ["五模型名与契约 §2.3 逐字（灵犀/慧眼/澜音/智荐/御风）",
+      NAMES5.length === 5 && NAMES5.every((n, i) => n === NAMES5_REF[i])],
+    ["五模型用途与契约逐字（对话/视觉质检/语音/推荐/边缘）",
+      MODELS.every((m, i) => m.use === USES5_REF[i])],
+    ["父页在册数据集 = 7 条，且名称/归属/样本量/版本/更新逐项与父页一致",
+      parentRows.length === PARENT_DS.length &&
+      PARENT_DS.every((p) => {
+        const d = DS.filter((x) => x.name === p.name)[0];
+        return d && d.src === 0 && d.owner === p.owner && d.n === p.n && d.ver === p.ver && d.at === p.at;
+      })],
+    ["父页在册数据集标注完成度显示值逐条与父页相等（一位小数）",
+      PARENT_DS.every((p) => {
+        const d = DS.filter((x) => x.name === p.name)[0];
+        return d && fmtDec(d.pct, 1) === fmtDec(p.label, 1);
+      })],
+    ["父页在册 Σ 样本量 = 4,956 万条（父页 D.dsN 逐字）", D.dsParentN === PARENT_DS_N_REF],
+    ["数据集条数 16 且编号唯一、格式 DS-2026-NN",
+      D.dsCnt === 16 && (new Set(DS.map((d) => d.no))).size === 16 &&
+      DS.every((d) => /^DS-2026-\d{2}$/.test(d.no))],
+    ["标注三态 Σ = 样本量（逐条闭合：已标注 + 待标注 + 质检驳回）",
+      DS.every((d) => Math.abs(d.lab + d.wait + d.rej - d.n) < 1e-6)],
+    ["标注三态均非负、标注完成度 ∈ (0, 100]",
+      DS.every((d) => d.lab > 0 && d.wait >= 0 && d.rej >= 0 && d.pct > 0 && d.pct <= 100)],
+    ["总样本量 = 逐条 Σ，加权标注完成度 = Σ已标注 ÷ Σ样本量 现算",
+      D.dsN === sum(DS.map((x) => x.n)) && Math.abs(D.dsPct - 100 * D.dsLab / D.dsN) < 1e-9],
+    ["三态总量同样闭合：Σ已标注 + Σ待标注 + Σ驳回 = 总样本量",
+      Math.abs(D.dsLab + D.dsWait + D.dsRej - D.dsN) < 1e-6],
+    ["样本量构成 Σ = 总样本量（五模型堆叠两段之和）",
+      D.bymN === D.dsN && BYM.every((b) => b.dsParent + b.dsSub === b.dsN) &&
+      sum(BYM.map((b) => b.dsParent)) === D.dsParentN && sum(BYM.map((b) => b.dsSub)) === D.dsSubN],
+    ["父页在册 + 本页补充 = 总样本量（4,956 + 2,796 = 7,752）",
+      D.dsParentN + D.dsSubN === D.dsN && D.dsSubN === D.dsN - PARENT_DS_N_REF],
+    ["数据集归属模型全部落在五模型之内", DS.every((d) => d.mi >= 0 && d.mi < 5)],
+    ["父页 8 项训练任务逐字在册（任务名/归属/起止周/申请卡数）",
+      PARENT_TRAIN.every((p, i) => {
+        const t = TASKS[i];
+        return t && t.src === 0 && t.task === p.task && t.model === p.model &&
+               t.s === p.s && t.e === p.e && t.gpu === p.gpu;
+      })],
+    ["父页在册 8 项 Σ 申请卡数 = 332 卡（父页 D.gpuCards 逐字）", D.parentCards === PARENT_CARDS_REF],
+    ["训练任务 14 项，编号唯一且格式 TR-NN",
+      D.tkCnt === 14 && (new Set(TASKS.map((t) => t.no))).size === 14 &&
+      TASKS.every((t) => /^TR-\d{2}$/.test(t.no))],
+    ["训练任务 start < end 且全部落在 8 周窗口内",
+      TASKS.every((t) => t.s < t.e && t.s >= 0 && t.e <= 8)],
+    ["Σ 卡时现算 = Σ(卡数 × 周数 × 168 h)，且 = Σ卡周 × 168",
+      Math.abs(D.ch - sum(TASKS.map((t) => t.gpu * (t.e - t.s) * HOURS_PER_WEEK))) < 1e-6 &&
+      Math.abs(D.ch - D.cw * HOURS_PER_WEEK) < 1e-6],
+    ["Σ 卡时按模型拆分收敛（五模型 Σ 卡时 = 全盘 Σ 卡时）", Math.abs(D.bymCh - D.ch) < 1e-6],
+    ["算力口径与契约呼应：8 周摊分预算 = 3.1 亿 × 8/52，单位卡时成本 > 0",
+      Math.abs(D.winBudget - GPU_BUDGET * 1e8 * 8 / 52) < 1e-6 && D.unitCost > 0],
+    ["任务状态由 W6.2 现算且三档之和 = 任务数",
+      sum(D.byTkSt) === D.tkCnt &&
+      TASKS.every((t) => t.st === (t.e <= NOW_W ? 0 : (t.s <= NOW_W ? 1 : 2)))],
+    ["任务五阶段耗时 Σ = 任务总时长（天，逐项闭合且各段为正）",
+      TASKS.every((t) => Math.abs(sum(t.seg) - t.days) < 1e-6 && t.seg.length === 5 && t.seg.every((v) => v > 0))],
+    ["任务类型四档齐全（预训练 / 微调 / 评测 / 蒸馏）且分项之和 = 任务数",
+      CATS.length === 4 && sum(D.byCat) === D.tkCnt && D.byCat.every((v) => v > 0)],
+    ["GPU 周利用率与父页逐字（8 周）且 ∈ (0, 100]",
+      GPU_UTIL.length === 8 && GPU_UTIL.every((u) => u > 0 && u <= 100)],
+    ["GPU 利用率累计均值末值 = 父页 8 周均值 79.9%（容差 0.05）",
+      Math.abs(D.gpuCumLast - GPU_AVG_REF) < 0.05 && Math.abs(D.gpuAvg - GPU_AVG_REF) < 0.05],
+    ["累计均值序列首值 = 首周值、逐点等于前缀均值",
+      Math.abs(GPU_CUM[0] - GPU_UTIL[0]) < 1e-9 &&
+      GPU_CUM.every((v, i) => Math.abs(v - sum(GPU_UTIL.slice(0, i + 1)) / (i + 1)) < 0.005)],
+    ["各模型数据集条数 = chip 计数（抽样口径一致）",
+      MFILTERS.every((f, i) => f.dsCnt === (i === 0 ? DS.length : DS.filter((d) => d.mi === i - 1).length)) &&
+      D.bymDsCnt === D.dsCnt],
+    ["各模型训练任务条数 = chip 计数（抽样口径一致）",
+      MFILTERS.every((f, i) => f.tkCnt === (i === 0 ? TASKS.length : TASKS.filter((t) => t.mi === i - 1).length)) &&
+      D.bymTkCnt === D.tkCnt],
+    ["任务引用的训练集全部在数据集台账在册（名称字符串关联，无对象回指）",
+      TASKS.every((t) => DS.some((d) => d.name === t.ds))],
+    ["hash 五模型名均可解析（契约逐字）",
+      NAMES5.every((n, i) => HASH_ALIAS[n] === i + 1)],
+    ["hash 用途别名均可解析（对话/视觉/语音/推荐/边缘 及变体）",
+      HASH_ALIAS["对话"] === 1 && HASH_ALIAS["视觉"] === 2 && HASH_ALIAS["视觉质检"] === 2 &&
+      HASH_ALIAS["语音"] === 3 && HASH_ALIAS["推荐"] === 4 && HASH_ALIAS["边缘"] === 5 &&
+      HASH_ALIAS["端侧"] === 5 && HASH_ALIAS["全部"] === 0 && HASH_ALIAS["灵犀模型"] === 1],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[数据集与训练台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

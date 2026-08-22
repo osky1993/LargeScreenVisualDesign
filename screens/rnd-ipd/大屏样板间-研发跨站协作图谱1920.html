@@ -1,0 +1,1330 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发跨站协作图谱</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --nv-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 协作对清单列宽：序号 / 协作对 / 强度 / 占比 / 主要协作内容 */
+    --nv-pcols: 26px 140px 64px 50px 1fr;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .nv-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.11), transparent 44%),
+      radial-gradient(circle at 88% 4%, rgba(169, 140, 245, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 468px 1fr 604px;
+    grid-template-rows: 84px 64px 1fr 54px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .nv-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .nv-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .nv-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .nv-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(169, 140, 245, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(70, 214, 200, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .nv-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .nv-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .nv-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .nv-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .nv-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到多中心布局，琥珀描边与本页星蓝主色区分 */
+  .nv-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .nv-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .nv-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .nv-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .nv-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .nv-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .nv-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .nv-head-right { display: flex; align-items: center; gap: 20px; flex: none; }
+  .nv-chips { display: flex; align-items: center; gap: 9px; }
+  .nv-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 118px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .nv-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: #6079b0; white-space: nowrap; }
+  .nv-chip b { font-size: 14px; font-weight: 700; letter-spacing: 0.05em; color: #cfdcff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .nv-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .nv-chip.is-key b { color: var(--rnd-blue); }
+  /* 姊妹页跳转 chip（同目录相对路径） */
+  a.nv-chip { transition: border-color .18s, box-shadow .18s; }
+  a.nv-chip:hover { border-color: rgba(70, 214, 200, 0.8); box-shadow: 0 0 14px rgba(70, 214, 200, 0.28); }
+  a.nv-chip b { color: var(--rnd-cyan); }
+  .nv-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .nv-clock-time { font: 700 26px/1 var(--nv-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .nv-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .nv-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .nv-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .nv-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--nv-kc, var(--rnd-blue)); }
+  .nv-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .nv-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .nv-kpi-v b { font: 700 24px/1 var(--nv-mono); color: var(--nv-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .nv-kpi-v b.is-txt { font-size: 18px; font-family: inherit; letter-spacing: 0.04em; }
+  .nv-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .nv-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .nv-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .nv-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .nv-panel::before { content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .nv-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .nv-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .nv-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .nv-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+  .nv-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .nv-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 协作对清单由 JS 填充且与两块图表同属 .nv-col 一个 flex 容器：
+     写死高度 + min-height:0 + overflow:hidden，避免填充后把 flex:1 的图表容器压矮。 */
+  .nv-panel.is-list { flex: none; height: 288px; min-height: 0; overflow: hidden; }
+  /* ★ 弦图主视觉：SVG 自绘（非 ECharts），底部摘要条同样写死高度 */
+  .nv-panel.is-chord { flex: 1; }
+
+  /* ===== 弦图（纯 SVG 自绘，viewBox 等比缩放） ===== */
+  .nv-chord-wrap { position: relative; flex: 1; min-height: 0; width: 100%; }
+  .nv-chord-wrap svg { display: block; width: 100%; height: 100%; }
+  .nv-rib { cursor: pointer; transition: opacity .28s ease; }
+  .nv-rib.is-dim { opacity: 0.05; }
+  .nv-rib.is-hi { opacity: 0.9; }
+  .nv-band { cursor: pointer; transition: filter .28s ease, opacity .28s ease; }
+  .nv-band.is-dim { opacity: 0.3; }
+  .nv-band.is-hi { filter: drop-shadow(0 0 10px currentColor); }
+  .nv-blabel { font-size: 12.5px; font-weight: 700; fill: #dfe9ff; letter-spacing: 0.05em; pointer-events: none; }
+  .nv-blabel.is-dim { fill: rgba(127, 146, 196, 0.5); }
+  .nv-bval { font: 700 11.5px var(--nv-mono); fill: rgba(127, 146, 196, 0.95); pointer-events: none; }
+  .nv-ctitle { font-size: 12px; fill: rgba(127, 146, 196, 0.75); letter-spacing: 0.12em; text-anchor: middle; pointer-events: none; }
+  .nv-cnum { font: 700 30px var(--nv-mono); fill: #eaf1ff; text-anchor: middle; pointer-events: none; }
+  .nv-cunit { font-size: 11.5px; fill: rgba(127, 146, 196, 0.8); text-anchor: middle; pointer-events: none; }
+  .nv-tip {
+    position: absolute; z-index: 12; pointer-events: none; display: none;
+    padding: 7px 11px 8px; border-radius: 8px; max-width: 260px;
+    border: 1px solid rgba(96, 140, 255, 0.45); background: rgba(9, 20, 52, 0.94);
+    font-size: 12px; line-height: 1.55; color: #cfdcff; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  }
+  .nv-tip.is-on { display: block; }
+  .nv-tip b { color: #eaf1ff; }
+  .nv-tip em { font-style: normal; color: var(--rnd-amber); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .nv-tip i { font-style: normal; color: rgba(127, 146, 196, 0.85); }
+  /* 弦图底部摘要（写死高度，init 前填充） */
+  .nv-chord-foot {
+    flex: none; height: 74px; min-height: 0; overflow: hidden; margin-top: 6px;
+    display: flex; align-items: center; gap: 12px; padding: 0 12px;
+    border-radius: 9px; border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.5);
+  }
+  .nv-cf-dot { flex: none; width: 12px; height: 12px; border-radius: 3px; background: var(--rnd-blue); box-shadow: 0 0 10px currentColor; }
+  .nv-cf-main { flex: none; display: flex; flex-direction: column; gap: 3px; min-width: 190px; }
+  .nv-cf-name { font-size: 16px; font-weight: 700; color: #eaf1ff; letter-spacing: 0.06em; }
+  .nv-cf-role { font-size: 11px; color: rgba(127, 146, 196, 0.85); }
+  .nv-cf-cells { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .nv-cf-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .nv-cf-cell span { font-size: 10.5px; letter-spacing: 0.1em; color: #6079b0; white-space: nowrap; }
+  .nv-cf-cell b { font: 700 17px/1 var(--nv-mono); color: #cfdcff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .nv-cf-cell b s { text-decoration: none; font-size: 11px; color: rgba(127, 146, 196, 0.85); margin-left: 3px; }
+  .nv-cf-cell b.is-txt { font: 700 13.5px/1.2 inherit; }
+  .nv-cf-hint { flex: none; font-size: 11px; color: rgba(127, 146, 196, 0.7); letter-spacing: 0.06em; text-align: right; line-height: 1.7; }
+
+  /* ===== CSS grid 模拟协作对清单（非 <table>） ===== */
+  .nv-plist { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .nv-thead, .nv-plist li { display: grid; grid-template-columns: var(--nv-pcols); align-items: center; gap: 8px; }
+  .nv-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px; margin-bottom: 3px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .nv-pbody { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; overflow: hidden; }
+  .nv-pbody li {
+    padding: 0 8px; height: 23px; border-radius: 5px; cursor: pointer;
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    transition: background .2s, box-shadow .2s;
+  }
+  .nv-pbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.24); }
+  .nv-pbody li:hover { background: rgba(92, 157, 255, 0.11); }
+  .nv-pbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue); }
+  .nv-pbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nv-pbody li .nv-prk { font: 700 11px/1 var(--nv-mono); color: rgba(127, 146, 196, 0.9); }
+  .nv-pbody li .nv-ppair { color: #dfe9ff; font-size: 12px; display: flex; align-items: center; gap: 5px; }
+  .nv-pbody li .nv-ppair u { text-decoration: none; flex: none; width: 7px; height: 7px; border-radius: 2px; }
+  .nv-pbody li .nv-pval { font: 700 12.5px/1 var(--nv-mono); color: var(--rnd-amber); }
+  .nv-pbody li .nv-pshare { font-size: 11px; color: rgba(127, 146, 196, 0.9); }
+  .nv-pbody li .nv-ptopic { font-size: 11px; color: rgba(191, 210, 246, 0.9); }
+  .nv-pdiv {
+    display: flex; align-items: center; gap: 8px; height: 22px; padding: 0 8px;
+    font-size: 11px; letter-spacing: 0.1em; color: var(--rnd-orange);
+  }
+  .nv-pdiv::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255, 157, 92, 0.45), transparent); }
+  .nv-pbody li.is-weak .nv-pval { color: var(--rnd-orange); }
+  .nv-wtag {
+    flex: none; margin-left: 4px; padding: 1px 5px; border-radius: 3px;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;
+    color: #3a1c05; background: var(--rnd-orange);
+  }
+
+  /* ===== 底部口径滚动条 ===== */
+  .nv-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .nv-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-cyan); }
+  .nv-foot-tag::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-cyan); box-shadow: 0 0 10px var(--rnd-cyan); animation: nv-blink 1.6s ease-in-out infinite; }
+  @keyframes nv-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .nv-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .nv-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .nv-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .nv-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .nv-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .nv-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="nv-stage" id="nv-stage">
+    <!-- mockflag:begin --><div class="nv-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="nv-error" id="nv-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="nv-header">
+      <div class="nv-head-left">
+        <div class="nv-crumb">
+          <a class="nv-crumb-up" href="大屏样板间-研发多中心布局1920.html" title="返回上级专题页（Esc）">‹ 返回 多中心布局</a>
+          <b>云麓智联科技</b><i>›</i><span>多中心布局</span><i>›</i><em>跨站协作图谱</em>
+        </div>
+        <div class="nv-head-title-row">
+          <div class="nv-head-title">跨站协作图谱</div>
+          <div class="nv-head-meta">
+            <span>六站点 <b>3,860</b> 人 · <b>15</b> 个无序协作对 · Σ <b id="nv-meta-sum">--</b> 事项/月</span><i>|</i>
+            <span>关系视角 · 边为主角</span><i>|</i>
+            <span>统计窗口 <b>FY2026 月均（2025-09 ~ 2026-08）</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="nv-head-right">
+        <div class="nv-chips">
+          <a class="nv-chip" href="大屏样板间-研发单中心详情1920.html" title="切到指标视角：研发单中心详情"><span>姊妹页 · 指标视角</span><b>单中心详情 ›</b></a>
+          <a class="nv-chip" href="大屏样板间-研发园区数字孪生1920.html" title="切到空间视角：研发园区数字孪生"><span>姊妹页 · 空间视角</span><b>园区数字孪生 ›</b></a>
+          <div class="nv-chip is-key"><span id="nv-chip-key">高亮站点</span><b id="nv-chip-val">--</b></div>
+        </div>
+        <div class="nv-clock" aria-label="实时时钟">
+          <span class="nv-clock-time" id="nv-clock-time">--:--:--</span>
+          <span class="nv-clock-date" id="nv-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 六格 -->
+    <div class="nv-kpis" id="nv-kpis"></div>
+
+    <!-- 左栏：协作类型构成 + 站点协作中心度与密度 -->
+    <div class="nv-col">
+      <section class="nv-panel" style="flex: 0.84;">
+        <div class="nv-panel-head">
+          <h2>协作类型构成</h2>
+          <span class="nv-panel-tag" id="nv-tag-type">--</span>
+        </div>
+        <div class="nv-chart" id="nv-chart-type"></div>
+      </section>
+      <section class="nv-panel" style="flex: 1.16;">
+        <div class="nv-panel-head">
+          <h2>站点协作中心度 × 协作密度</h2>
+          <span class="nv-panel-tag" id="nv-tag-rank">--</span>
+        </div>
+        <div class="nv-chart" id="nv-chart-rank"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：★ 主视觉 六站点协作弦图 -->
+    <div class="nv-col">
+      <section class="nv-panel is-chord">
+        <div class="nv-panel-head">
+          <h2>六站点协作弦图 · 弦宽 ∝ 协作强度</h2>
+          <span class="nv-panel-tag" id="nv-tag-chord">--</span>
+        </div>
+        <div class="nv-chord-wrap" id="nv-chart-chord">
+          <div class="nv-tip" id="nv-tip"></div>
+        </div>
+        <div class="nv-chord-foot" id="nv-chord-foot"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：对称矩阵 + 强协作对/协作洼地 + 团队级协作网络 -->
+    <div class="nv-col">
+      <section class="nv-panel" style="flex: 1;">
+        <div class="nv-panel-head">
+          <h2>协作强度对称矩阵 · 6×6</h2>
+          <span class="nv-panel-tag" id="nv-tag-matrix">--</span>
+        </div>
+        <div class="nv-chart" id="nv-chart-matrix"></div>
+      </section>
+      <section class="nv-panel is-list">
+        <div class="nv-panel-head">
+          <h2>强协作对 TOP5 与协作洼地</h2>
+          <span class="nv-panel-tag" id="nv-tag-pair">--</span>
+        </div>
+        <div class="nv-plist">
+          <div class="nv-thead">
+            <span>#</span><span>协作对</span><span>强度</span><span>占比</span><span>主要协作内容</span>
+          </div>
+          <ul class="nv-pbody" id="nv-pbody"></ul>
+        </div>
+      </section>
+      <section class="nv-panel" style="flex: 1;">
+        <div class="nv-panel-head">
+          <h2>跨站团队协作网络 · 12 团队</h2>
+          <span class="nv-panel-tag" id="nv-tag-team">--</span>
+        </div>
+        <div class="nv-chart" id="nv-chart-team"></div>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="nv-foot" aria-label="跨站协作图谱口径说明">
+      <div class="nv-foot-tag">协作口径</div>
+      <div class="nv-foot-view"><div class="nv-foot-track" id="nv-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("nv-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("nv-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 跨站协作关系视角）
+         ★ 权威同源（docs/RndIpdThemed.md §2.2 / §2.3 + 姊妹页「研发单中心详情」by 页）：
+           - 六站点名与人数逐字：北京总部 1,240 / 上海中心 680 / 深圳中心 720 /
+             成都中心 480 / 西安中心 420 / 南京中心 320，Σ = 3,860 人；
+           - 15 个无序站点对的协作强度（事项/月）与 by 页 PAIRS 数组**逐对一致**，
+             Σ对 = 1,542；镜像成 6×6 对称矩阵后 Σ行和 = 3,084 = 2 × Σ对；
+           - 12 团队的名/速率/站点归属与契约 §2.3 逐字（每站 3/2/2/2/2/1 支）。
+         ★ 与父页「研发多中心布局」gq 的关系：gq 的力导向图画的是**跨站点联合项目数**
+           （12 条链路，Σ = 32 个联合项目）；本页画的是**协作强度**（15 个对，Σ = 1,542 事项/月）。
+           两者口径不同但可互证：gq 里没有链路的 3 个对（上海↔西安、深圳↔南京、成都↔南京）
+           在本页正是强度垫底区间，构成「协作洼地」判断的交叉证据。
+         ★ 二级自编（Σ 必须收敛到上级，全部进页尾勾稽自检）：
+           三类协作构成（跨站需求交接 / 联调工单 / 联合评审）按对分摊，Σ三类 = 1,542；
+           团队级协作边按「团队速率乘积」在站点对内分摊，Σ边 = 1,542、按站点对聚合 == 对值。
+         ★ 循环引用红线：进 option 与进 SVG 的数据只放 name 与标量，站点/团队/对之间
+           一律用索引关联，绝不用对象引用回指（弦图与力导向最易踩的坑）。 ===== */
+
+  /* 4.1 六站点（契约 §2.2 逐字；idx 即本页全局站点序） */
+  const SITES = [
+    { name: "北京总部", short: "北京", people: 1240, color: C.blue,   role: "集团总部 · 软件与云平台主基地" },
+    { name: "上海中心", short: "上海", people: 680,  color: C.cyan,   role: "AI 算法与行业方案中心" },
+    { name: "深圳中心", short: "深圳", people: 720,  color: C.amber,  role: "硬件与终端整机研发中心" },
+    { name: "成都中心", short: "成都", people: 480,  color: C.green,  role: "AI 推理与软件交付中心" },
+    { name: "西安中心", short: "西安", people: 420,  color: C.violet, role: "射频硬件与测试验证中心" },
+    { name: "南京中心", short: "南京", people: 320,  color: C.orange, role: "云平台与自动化测试中心" }
+  ];
+  const N = SITES.length;
+  const SITE_AUTH = "北京总部|1240;上海中心|680;深圳中心|720;成都中心|480;西安中心|420;南京中心|320";
+  const PEOPLE_ALL = 3860;                          /* 契约 §2.2 研发人员 */
+
+  /* 4.2 ★ 权威同源：15 个无序站点对的协作强度（事项/月），与 by 页 PAIRS 逐字。
+         口径 = 跨站需求交接 + 联调工单 + 联合评审 的月均事项数。 */
+  const PAIRS = [
+    [0, 1, 186], [0, 2, 214], [0, 3, 152], [0, 4, 128], [0, 5, 96],
+    [1, 2, 118], [1, 3, 104], [1, 4, 62], [1, 5, 74],
+    [2, 3, 88], [2, 4, 96], [2, 5, 54],
+    [3, 4, 70], [3, 5, 58],
+    [4, 5, 42]
+  ];
+  /* by 页 PAIRS 的逐对校验副本（字符串形态，防止改动时两边悄悄走偏） */
+  const PAIRS_AUTH = "0-1:186;0-2:214;0-3:152;0-4:128;0-5:96;1-2:118;1-3:104;1-4:62;1-5:74;" +
+    "2-3:88;2-4:96;2-5:54;3-4:70;3-5:58;4-5:42";
+  const PAIR_SUM_AUTH = 1542;
+  const ROW_SUM_AUTH = 3084;
+
+  /* 4.3 协作主题（与 by 页 PAIR_TOPIC 同源，仅作文案，不参与勾稽） */
+  const PAIR_TOPIC = {
+    "0|1": "行业方案联合交付 · AI 模型接入", "0|2": "智家终端软硬联调 · 整机集成",
+    "0|3": "软件交付外协 · 推理服务对接", "0|4": "射频认证与系统测试排期",
+    "0|5": "云枢平台灰度与自动化回归", "1|2": "视觉质检模型下沉终端",
+    "1|3": "AI 训练/推理算力互备", "1|4": "车联 EMC 与整车路测",
+    "1|5": "行业方案云侧对接", "2|3": "澜芯模组固件与驱动协同",
+    "2|4": "样机可靠性与射频暗室共享", "2|5": "终端 OTA 与云端灰度",
+    "3|4": "西部双中心测试资源池", "3|5": "自动化用例库共建",
+    "4|5": "夜间全量回归接力"
+  };
+
+  /* 4.4 三类协作的按对分摊权重（二级自编，Σ 由最大余数法保证 == 对值） */
+  const TYPES = [
+    { name: "跨站需求交接", color: C.blue },
+    { name: "联调工单", color: C.amber },
+    { name: "联合评审", color: C.cyan }
+  ];
+  const TYPE_W = {
+    "0|1": [38, 34, 28], "0|2": [30, 48, 22], "0|3": [36, 40, 24], "0|4": [26, 46, 28], "0|5": [30, 46, 24],
+    "1|2": [28, 50, 22], "1|3": [34, 42, 24], "1|4": [24, 50, 26], "1|5": [36, 40, 24],
+    "2|3": [26, 50, 24], "2|4": [22, 52, 26], "2|5": [28, 46, 26],
+    "3|4": [30, 44, 26], "3|5": [32, 42, 26], "4|5": [26, 48, 26]
+  };
+
+  /* 4.5 12 团队（契约 §2.3 逐字：名 / 速率 / 站点；si = 站点索引，现算不硬写） */
+  const TEAMS = [
+    { name: "天枢", vel: 82, site: "北京总部" },
+    { name: "天璇", vel: 76, site: "北京总部" },
+    { name: "天玑", vel: 71, site: "上海中心" },
+    { name: "天权", vel: 68, site: "深圳中心" },
+    { name: "玉衡", vel: 66, site: "上海中心" },
+    { name: "开阳", vel: 63, site: "成都中心" },
+    { name: "摇光", vel: 61, site: "成都中心" },
+    { name: "青龙", vel: 58, site: "深圳中心" },
+    { name: "白虎", vel: 55, site: "西安中心" },
+    { name: "朱雀", vel: 52, site: "南京中心" },
+    { name: "玄武", vel: 49, site: "西安中心" },
+    { name: "紫微", vel: 45, site: "北京总部" }
+  ];
+  const TEAM_AUTH = "天枢|82|北京总部;天璇|76|北京总部;天玑|71|上海中心;天权|68|深圳中心;" +
+    "玉衡|66|上海中心;开阳|63|成都中心;摇光|61|成都中心;青龙|58|深圳中心;" +
+    "白虎|55|西安中心;朱雀|52|南京中心;玄武|49|西安中心;紫微|45|北京总部";
+  const TEAM_CNT_AUTH = [3, 2, 2, 2, 2, 1];         /* 每站团队数（契约 §2.3 派生） */
+
+  /* 4.6 父页 gq「跨站点联合项目」12 条链路（Σ = 32），本页只作交叉印证，不参与强度勾稽 */
+  const JOINT = {
+    "0|1": 5, "0|2": 6, "0|3": 4, "0|4": 3, "0|5": 3,
+    "1|2": 2, "1|3": 2, "1|5": 1,
+    "2|3": 1, "2|4": 3,
+    "3|4": 1,
+    "4|5": 1
+  };
+  const JOINT_SUM_AUTH = 32;
+
+  /* ===== 5. 派生量（全部 JS 现算，不复制数字） ===== */
+  /* 最大余数法整数分配：Σ 结果严格等于 total */
+  function allocate(total, weights) {
+    const wsum = sum(weights);
+    const raw = weights.map((w) => total * w / wsum);
+    const base = raw.map(Math.floor);
+    const rest = total - sum(base);
+    const order = raw.map((v, i) => [v - base[i], i]).sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+    for (let k = 0; k < rest; k += 1) base[order[k][1]] += 1;
+    return base;
+  }
+  const key2 = (i, j) => (i < j ? i + "|" + j : j + "|" + i);
+
+  const peopleSum = sum(SITES.map((s) => s.people));                       /* 3,860 */
+  const pairSum = sum(PAIRS.map((p) => p[2]));                             /* 1,542 */
+
+  /* 5.1 对称矩阵（由 15 个无序对镜像生成，对角为 null —— 站内协作不计入跨站口径） */
+  const COLLAB = SITES.map(() => SITES.map(() => 0));
+  PAIRS.forEach((p) => { COLLAB[p[0]][p[1]] = p[2]; COLLAB[p[1]][p[0]] = p[2]; });
+  const rowSum = COLLAB.map((r) => sum(r));                                /* 776/544/570/472/398/324 */
+  const grand = sum(rowSum);                                               /* 3,084 = 2 × 1,542 */
+
+  /* 5.2 站点派生：协作密度 = 协作量 ÷ 人数（换算成「事项/百人·月」便于读数） */
+  SITES.forEach((s, i) => {
+    s.idx = i;
+    s.collab = rowSum[i];
+    s.density = s.collab / s.people * 100;                                 /* 事项/百人·月 */
+    s.share = 100 * s.collab / grand;
+    s.degree = PAIRS.filter((p) => p[0] === i || p[1] === i).length;        /* 恒为 5（全连通） */
+    s.teams = TEAMS.filter((t) => t.site === s.name).map((t) => t.name);    /* 只放团队名标量 */
+    /* 该站最强/最弱伙伴（索引，不放对象） */
+    const partners = SITES.map((x, j) => j).filter((j) => j !== i)
+      .sort((a, b) => COLLAB[i][b] - COLLAB[i][a]);
+    s.topPartner = partners[0];
+    s.lowPartner = partners[partners.length - 1];
+  });
+  const hubIdx = SITES.map((s) => s.idx).sort((a, b) => SITES[b].collab - SITES[a].collab)[0];
+  const denseIdx = SITES.map((s) => s.idx).sort((a, b) => SITES[b].density - SITES[a].density)[0];
+
+  /* 5.3 三类协作按对分摊（Σ 每对 == 对值；三类总量 = 列和现算，Σ = 1,542） */
+  const PAIR_TYPE = {};
+  PAIRS.forEach((p) => {
+    const k = key2(p[0], p[1]);
+    PAIR_TYPE[k] = allocate(p[2], TYPE_W[k]);
+  });
+  const typeTotal = TYPES.map((t, ti) => sum(PAIRS.map((p) => PAIR_TYPE[key2(p[0], p[1])][ti])));
+  const typeSum = sum(typeTotal);                                          /* 1,542 */
+
+  /* 5.4 协作对排序：TOP5 强协作 + 末 3 位协作洼地 */
+  const pairRank = PAIRS.map((p, k) => k).sort((a, b) => PAIRS[b][2] - PAIRS[a][2]);
+  const TOP5 = pairRank.slice(0, 5);
+  const WEAK3 = pairRank.slice(-3);                                        /* 仍按强度降序，末位即最弱 */
+
+  /* 5.5 团队级协作边：在每个站点对内，按「团队速率乘积」把对值分摊到团队对
+         → Σ 全部边 = 1,542，且按站点对聚合恒等于站点对值。边只放 name / 标量。 */
+  const TEAM_SITE = TEAMS.map((t) => SITES.findIndex((s) => s.name === t.site));
+  const TEAM_EDGES = [];
+  PAIRS.forEach((p) => {
+    const ta = TEAMS.map((t, k) => k).filter((k) => TEAM_SITE[k] === p[0]);
+    const tb = TEAMS.map((t, k) => k).filter((k) => TEAM_SITE[k] === p[1]);
+    const combo = [];
+    ta.forEach((a) => tb.forEach((b) => combo.push([a, b])));
+    const alloc = allocate(p[2], combo.map((c) => TEAMS[c[0]].vel * TEAMS[c[1]].vel));
+    combo.forEach((c, k) => TEAM_EDGES.push({ a: c[0], b: c[1], v: alloc[k], si: p[0], sj: p[1] }));
+  });
+  const teamEdgeSum = sum(TEAM_EDGES.map((e) => e.v));                     /* 1,542 */
+  const teamEdgeMax = Math.max.apply(null, TEAM_EDGES.map((e) => e.v));
+  const teamEdgeMin = Math.min.apply(null, TEAM_EDGES.map((e) => e.v));
+  /* 团队协作度（该团队参与的全部跨站边之和），仅用于节点大小 */
+  const teamDeg = TEAMS.map((t, k) => sum(TEAM_EDGES.filter((e) => e.a === k || e.b === k).map((e) => e.v)));
+  const teamDegMax = Math.max.apply(null, teamDeg);
+  /* 按站点对聚合回检（勾稽用） */
+  const teamAggOk = PAIRS.every((p) => sum(
+    TEAM_EDGES.filter((e) => e.si === p[0] && e.sj === p[1]).map((e) => e.v)
+  ) === p[2]);
+  const teamCnt = SITES.map((s, i) => TEAM_SITE.filter((x) => x === i).length);
+
+  const D = {
+    sites: N,
+    pairs: PAIRS.length,
+    pairSum: pairSum,
+    grand: grand,
+    hub: SITES[hubIdx].name,
+    hubVal: SITES[hubIdx].collab,
+    hubShare: SITES[hubIdx].share,
+    dense: SITES[denseIdx].name,
+    denseVal: SITES[denseIdx].density,
+    weakPair: SITES[PAIRS[WEAK3[WEAK3.length - 1]][0]].short + "↔" + SITES[PAIRS[WEAK3[WEAK3.length - 1]][1]].short,
+    weakVal: PAIRS[WEAK3[WEAK3.length - 1]][2],
+    strongPair: SITES[PAIRS[TOP5[0]][0]].short + "↔" + SITES[PAIRS[TOP5[0]][1]].short,
+    strongVal: PAIRS[TOP5[0]][2],
+    avgPair: pairSum / PAIRS.length,
+    jointSum: sum(Object.keys(JOINT).map((k) => JOINT[k])),
+    jointLinks: Object.keys(JOINT).length,
+    noJoint: PAIRS.map((p, k) => k).filter((k) => JOINT[key2(PAIRS[k][0], PAIRS[k][1])] === undefined)
+  };
+
+  /* ===== 6. 顶栏时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tick() {
+    const d = new Date();
+    $("nv-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("nv-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) +
+      "日 星期" + WEEK[d.getDay()];
+  }
+  tick();
+  setInterval(tick, 1000);
+  $("nv-meta-sum").textContent = fmtInt(pairSum);
+
+  /* ===== 7. KPI 六格（翻牌缓动；init 之前全部填充完毕） ===== */
+  const KPIS = [
+    { k: "研发站点", v: D.sites, dec: 0, unit: "个", c: C.blue, s: "纯国内 · Σ 人数 " + fmtInt(peopleSum) + " 人（契约逐字）" },
+    { k: "协作对", v: D.pairs, dec: 0, unit: "对", c: C.cyan, s: "C(6,2) = 15，六站点两两全连通、无孤岛" },
+    { k: "Σ 协作量", v: D.pairSum, dec: 0, unit: "事项/月", c: C.amber, s: "对均 " + fmtDec(D.avgPair, 1) + " · Σ行和 " + fmtInt(D.grand) + " = 2 × Σ对" },
+    { k: "枢纽站点", t: D.hub, c: C.blue, s: "协作 " + fmtInt(D.hubVal) + " 事项/月 · 占全网 " + fmtDec(D.hubShare, 1) + "%" },
+    { k: "协作密度最高", t: D.dense, c: C.green, s: fmtDec(D.denseVal, 1) + " 事项/百人·月 · 小站点协作负担更重" },
+    { k: "最弱连接", t: D.weakPair, c: C.orange, s: fmtInt(D.weakVal) + " 事项/月 · 仅为最强对的 " + fmtDec(100 * D.weakVal / D.strongVal, 0) + "%" }
+  ];
+  $("nv-kpis").innerHTML = KPIS.map((it, i) => (
+    '<div class="nv-kpi" style="--nv-kc:' + it.c + '">' +
+    '<div class="nv-kpi-k">' + it.k + "</div>" +
+    '<div class="nv-kpi-v">' +
+      (it.t
+        ? '<b class="is-txt">' + it.t + "</b>"
+        : '<b id="nv-kpi-' + i + '">0</b><s>' + it.unit + "</s>") +
+    "</div>" +
+    '<div class="nv-kpi-s">' + it.s + "</div></div>"
+  )).join("");
+  function countUp(el, target, dec, ms) {
+    const t0 = Date.now();
+    const timer = setInterval(() => {
+      const p = clamp((Date.now() - t0) / ms, 0, 1);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = dec > 0 ? fmtDec(target * e, dec) : fmtInt(target * e);
+      if (p >= 1) clearInterval(timer);
+    }, 40);
+  }
+  KPIS.forEach((it, i) => { if (!it.t) countUp($("nv-kpi-" + i), it.v, it.dec, 1100); });
+
+  /* ===== 8. 面板 tag 文案（★ 全部在 echarts.init 之前写好，避免填充后压矮图表容器） ===== */
+  $("nv-tag-type").innerHTML = "三类 Σ <b>" + fmtInt(typeSum) + "</b> 事项/月 · 按 15 对分摊现算";
+  $("nv-tag-rank").innerHTML = "行和 Σ <b>" + fmtInt(grand) + "</b> · 密度 = 协作量 ÷ 人数 × 100";
+  $("nv-tag-matrix").innerHTML = "对角 null · Σ行和 <b>" + fmtInt(grand) + "</b> = 2 × " + fmtInt(pairSum);
+  $("nv-tag-pair").innerHTML = "TOP5 占 <b>" + fmtDec(100 * sum(TOP5.map((k) => PAIRS[k][2])) / pairSum, 1) +
+    "%</b> · 末 3 对占 " + fmtDec(100 * sum(WEAK3.map((k) => PAIRS[k][2])) / pairSum, 1) + "%";
+  $("nv-tag-team").innerHTML = TEAM_EDGES.length + " 条跨站团队链路 · Σ <b>" + fmtInt(teamEdgeSum) + "</b> = 站点级 Σ对";
+  $("nv-tag-chord").innerHTML = "15 弦 · Σ <b>" + fmtInt(pairSum) + "</b> 事项/月 · 与单中心详情页逐对同源";
+
+  /* ===== 9. 强协作对 TOP5 与协作洼地清单（CSS grid 模拟表；写死高度容器内） ===== */
+  function pairRow(k, rank, weak) {
+    const p = PAIRS[k], a = SITES[p[0]], b = SITES[p[1]];
+    const kk = key2(p[0], p[1]);
+    const jn = JOINT[kk];
+    const topic = weak
+      ? (jn === undefined ? "联合项目 0 个 · 建议设联合专项" : "联合项目 " + jn + " 个 · 协作面偏窄")
+      : PAIR_TOPIC[kk];
+    return '<li class="' + (weak ? "is-weak" : "") + '" data-p="' + k + '">' +
+      '<span class="nv-prk">' + rank + "</span>" +
+      '<span class="nv-ppair"><u style="background:' + a.color + '"></u>' + a.name.slice(0, 2) +
+        ' <i style="font-style:normal;color:rgba(127,146,196,.7)">↔</i> <u style="background:' + b.color + '"></u>' +
+        b.name.slice(0, 2) + (weak ? '<em class="nv-wtag">协作洼地</em>' : "") + "</span>" +
+      '<span class="nv-pval">' + fmtInt(p[2]) + "</span>" +
+      '<span class="nv-pshare">' + fmtDec(100 * p[2] / pairSum, 1) + "%</span>" +
+      '<span class="nv-ptopic">' + topic + "</span></li>";
+  }
+  $("nv-pbody").innerHTML =
+    TOP5.map((k, i) => pairRow(k, "T" + (i + 1), false)).join("") +
+    '<li class="nv-pdiv" style="display:flex">协作洼地 · 强度末 3 对</li>' +
+    WEAK3.map((k, i) => pairRow(k, "W" + (i + 1), true)).join("");
+
+  /* ===== 10. ★ 主视觉：六站点协作弦图（纯 SVG 自绘，viewBox 等比缩放）
+         几何：站点弧长 ∝ 该站行和（Σ = 3,084），站内再按伙伴切子弧（∝ 对值）；
+               每条弦 = 两段子弧 + 两条经圆心的二次贝塞尔，弦宽 ∝ 协作强度；
+               两端用两站点色做 userSpaceOnUse 线性渐变。
+         ★ 数据只放标量与索引，DOM 上只留 data-p / data-s 索引，无对象回指。 ===== */
+  const CW = 740, CH = 664, CX = 370, CY = 332, R_OUT = 236, BAND = 16, R_IN = R_OUT - BAND;
+  const GAP_DEG = 3.2;                                     /* 站点之间的留白角 */
+  const SPAN_ALL = 360 - N * GAP_DEG;                      /* 340.8°，按行和分配 */
+  const toRad = (deg) => (deg - 90) * Math.PI / 180;       /* 0° 落在正上方，顺时针递增 */
+  const px = (r, deg) => (CX + r * Math.cos(toRad(deg))).toFixed(2);
+  const py = (r, deg) => (CY + r * Math.sin(toRad(deg))).toFixed(2);
+  const pt = (r, deg) => px(r, deg) + "," + py(r, deg);
+
+  /* 10.1 站点主弧 + 站内子弧（只存角度标量） */
+  const ARC = [];                                          /* ARC[i] = [a0, a1] */
+  const SUB = SITES.map(() => SITES.map(() => null));       /* SUB[i][j] = [a0, a1] */
+  let cursor = 0;
+  SITES.forEach((s, i) => {
+    const span = SPAN_ALL * rowSum[i] / grand;
+    ARC.push([cursor, cursor + span]);
+    let c = cursor;
+    for (let j = 0; j < N; j += 1) {
+      if (j === i) continue;
+      const w = span * COLLAB[i][j] / rowSum[i];
+      SUB[i][j] = [c, c + w];
+      c += w;
+    }
+    cursor += span + GAP_DEG;
+  });
+  /* 角度守恒自检量：每站子弧之和应等于主弧跨度 */
+  const arcOk = SITES.every((s, i) => {
+    const span = ARC[i][1] - ARC[i][0];
+    const subSpan = sum(SITES.map((x, j) => (j === i ? 0 : SUB[i][j][1] - SUB[i][j][0])));
+    return Math.abs(span - subSpan) < 1e-9;
+  });
+
+  /* 10.2 渐变 defs + 弦 path + 站点色带 + 站点标签 */
+  const defs = [];
+  const ribs = [];
+  PAIRS.forEach((p, k) => {
+    const i = p[0], j = p[1];
+    const a = SUB[i][j], b = SUB[j][i];
+    const am = (a[0] + a[1]) / 2, bm = (b[0] + b[1]) / 2;
+    const gid = "nv-grad-" + i + "-" + j;
+    defs.push('<linearGradient id="' + gid + '" gradientUnits="userSpaceOnUse" x1="' + px(R_IN, am) +
+      '" y1="' + py(R_IN, am) + '" x2="' + px(R_IN, bm) + '" y2="' + py(R_IN, bm) + '">' +
+      '<stop offset="0%" stop-color="' + SITES[i].color + '"/>' +
+      '<stop offset="100%" stop-color="' + SITES[j].color + '"/></linearGradient>');
+    const d = "M" + pt(R_IN, a[0]) +
+      " A" + R_IN + " " + R_IN + " 0 0 1 " + pt(R_IN, a[1]) +
+      " Q" + CX + " " + CY + " " + pt(R_IN, b[0]) +
+      " A" + R_IN + " " + R_IN + " 0 0 1 " + pt(R_IN, b[1]) +
+      " Q" + CX + " " + CY + " " + pt(R_IN, a[0]) + " Z";
+    const op = (0.3 + 0.34 * p[2] / PAIRS[TOP5[0]][2]).toFixed(3);
+    ribs.push('<path class="nv-rib" data-p="' + k + '" d="' + d + '" fill="url(#' + gid + ')" opacity="' + op +
+      '" stroke="rgba(6,14,36,.55)" stroke-width="0.6"></path>');
+  });
+
+  const bands = [];
+  const labels = [];
+  SITES.forEach((s, i) => {
+    const a0 = ARC[i][0], a1 = ARC[i][1], rb = R_IN + 3;
+    bands.push('<path class="nv-band" data-s="' + i + '" style="color:' + s.color + '" d="' +
+      "M" + pt(R_OUT, a0) + " A" + R_OUT + " " + R_OUT + " 0 0 1 " + pt(R_OUT, a1) +
+      " L" + pt(rb, a1) + " A" + rb + " " + rb + " 0 0 0 " + pt(rb, a0) + ' Z" fill="' + s.color +
+      '" fill-opacity="0.88"></path>');
+    /* 站内子弧分隔刻度（细线，纯装饰不参与交互） */
+    for (let j = 0; j < N; j += 1) {
+      if (j === i) continue;
+      const t = SUB[i][j][1];
+      if (Math.abs(t - a1) < 1e-9) continue;
+      bands.push('<line x1="' + px(R_OUT, t) + '" y1="' + py(R_OUT, t) + '" x2="' + px(rb, t) +
+        '" y2="' + py(rb, t) + '" stroke="rgba(6,14,36,.5)" stroke-width="1"></line>');
+    }
+    const m = (a0 + a1) / 2;
+    const right = m < 180;
+    labels.push('<text class="nv-blabel" data-s="' + i + '" x="' + px(R_OUT + 13, m) + '" y="' + py(R_OUT + 13, m) +
+      '" text-anchor="' + (right ? "start" : "end") + '" dy="-0.1em">' + s.name + "</text>" +
+      '<text class="nv-bval" data-s="' + i + '" x="' + px(R_OUT + 13, m) + '" y="' + py(R_OUT + 13, m) +
+      '" text-anchor="' + (right ? "start" : "end") + '" dy="1.15em">' + fmtInt(s.collab) + " · " +
+      fmtDec(s.density, 0) + "/百人</text>");
+  });
+
+  $("nv-chart-chord").insertAdjacentHTML("afterbegin",
+    '<svg viewBox="0 0 ' + CW + " " + CH + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="六站点协作弦图">' +
+    "<defs>" + defs.join("") + "</defs>" +
+    '<circle cx="' + CX + '" cy="' + CY + '" r="' + (R_IN - 4) + '" fill="none" stroke="rgba(96,140,255,.10)" stroke-width="1"></circle>' +
+    '<g id="nv-ribs">' + ribs.join("") + "</g>" +
+    '<g id="nv-bands">' + bands.join("") + "</g>" +
+    '<g id="nv-labels">' + labels.join("") + "</g>" +
+    '<text class="nv-ctitle" x="' + CX + '" y="' + (CY - 26) + '">Σ 跨站协作</text>' +
+    '<text class="nv-cnum" x="' + CX + '" y="' + (CY + 8) + '" id="nv-chord-num">' + fmtInt(pairSum) + "</text>" +
+    '<text class="nv-cunit" x="' + CX + '" y="' + (CY + 28) + '" id="nv-chord-unit">事项/月 · 15 弦</text>' +
+    "</svg>");
+
+  const svgRoot = $("nv-chart-chord").querySelector("svg");
+  const ribNodes = Array.prototype.slice.call(svgRoot.querySelectorAll(".nv-rib"));
+  const bandNodes = Array.prototype.slice.call(svgRoot.querySelectorAll(".nv-band"));
+  const labNodes = Array.prototype.slice.call(svgRoot.querySelectorAll(".nv-blabel, .nv-bval"));
+
+  /* 10.3 弦图底部摘要（写死高度容器，init 前先渲染一次） */
+  function renderChordFoot(si) {
+    const box = $("nv-chord-foot");
+    if (si < 0) {
+      box.innerHTML =
+        '<span class="nv-cf-dot" style="background:' + C.blue + '"></span>' +
+        '<div class="nv-cf-main"><div class="nv-cf-name">全网总览 · 六站点</div>' +
+        '<div class="nv-cf-role">15 条弦覆盖全部无序站点对，无孤岛</div></div>' +
+        '<div class="nv-cf-cells">' +
+          '<div class="nv-cf-cell"><span>Σ 协作量</span><b>' + fmtInt(pairSum) + '<s>事项/月</s></b></div>' +
+          '<div class="nv-cf-cell"><span>对均强度</span><b>' + fmtDec(D.avgPair, 1) + '<s>事项/月</s></b></div>' +
+          '<div class="nv-cf-cell"><span>最强弦</span><b class="is-txt">' + D.strongPair + " " + fmtInt(D.strongVal) + "</b></div>" +
+          '<div class="nv-cf-cell"><span>最弱弦</span><b class="is-txt">' + D.weakPair + " " + fmtInt(D.weakVal) + "</b></div>" +
+        "</div>" +
+        '<div class="nv-cf-hint">点击色带 / 弦查看单站点<br/>Esc 返回多中心布局</div>';
+      return;
+    }
+    const s = SITES[si];
+    const tp = SITES[s.topPartner], lp = SITES[s.lowPartner];
+    box.innerHTML =
+      '<span class="nv-cf-dot" style="background:' + s.color + '"></span>' +
+      '<div class="nv-cf-main"><div class="nv-cf-name">' + s.name + "</div>" +
+      '<div class="nv-cf-role">' + s.role + "</div></div>" +
+      '<div class="nv-cf-cells">' +
+        '<div class="nv-cf-cell"><span>本站协作量</span><b>' + fmtInt(s.collab) + '<s>事项/月</s></b></div>' +
+        '<div class="nv-cf-cell"><span>协作密度</span><b>' + fmtDec(s.density, 1) + '<s>/百人·月</s></b></div>' +
+        '<div class="nv-cf-cell"><span>最强伙伴</span><b class="is-txt">' + tp.short + " " + fmtInt(COLLAB[si][s.topPartner]) + "</b></div>" +
+        '<div class="nv-cf-cell"><span>最弱伙伴</span><b class="is-txt">' + lp.short + " " + fmtInt(COLLAB[si][s.lowPartner]) + "</b></div>" +
+      "</div>" +
+      '<div class="nv-cf-hint">' + s.degree + " 条弦 · 占全网 " + fmtDec(s.share, 1) + "%<br/>本站 " +
+      fmtInt(s.people) + " 人 · " + s.teams.length + " 支团队</div>";
+  }
+
+  /* 10.4 弦图 tooltip（自绘，跟随鼠标） */
+  const tip = $("nv-tip");
+  function showTip(html, ev) {
+    tip.innerHTML = html;
+    tip.classList.add("is-on");
+    /* ★ 舞台整体 CSS transform 缩放，getBoundingClientRect 已含缩放；
+       tip 是 .nv-chord-wrap 的绝对定位子元素，同样被缩放，故按缩放后的比例换算回本地坐标。 */
+    const box = $("nv-chart-chord").getBoundingClientRect();
+    const k = Math.min(window.innerWidth / 1920, window.innerHeight / 1080) || 1;
+    let x = (ev.clientX - box.left) / k + 16, y = (ev.clientY - box.top) / k + 14;
+    const localW = box.width / k, localH = box.height / k;
+    x = clamp(x, 6, Math.max(6, localW - tip.offsetWidth - 6));
+    y = clamp(y, 6, Math.max(6, localH - tip.offsetHeight - 6));
+    tip.style.left = x + "px";
+    tip.style.top = y + "px";
+  }
+  function hideTip() { tip.classList.remove("is-on"); }
+
+  ribNodes.forEach((node) => {
+    const k = Number(node.dataset.p);
+    const p = PAIRS[k], i = p[0], j = p[1], kk = key2(i, j);
+    node.addEventListener("mousemove", (ev) => {
+      const tv = PAIR_TYPE[kk];
+      const jn = JOINT[kk];
+      showTip("<b>" + SITES[i].name + " ↔ " + SITES[j].name + "</b><br/>" +
+        "协作强度 <em>" + fmtInt(p[2]) + "</em> 事项/月 · 占全网 " + fmtDec(100 * p[2] / pairSum, 1) + "%<br/>" +
+        "<i>" + TYPES[0].name + " " + tv[0] + " · " + TYPES[1].name + " " + tv[1] + " · " + TYPES[2].name + " " + tv[2] + "</i><br/>" +
+        "<i>联合项目 " + (jn === undefined ? 0 : jn) + " 个（多中心布局页口径）</i><br/>" +
+        "<i>" + PAIR_TOPIC[kk] + "</i>", ev);
+    });
+    node.addEventListener("mouseleave", hideTip);
+    node.addEventListener("click", () => { select(i, true); pauseRotate(20000); });
+  });
+  bandNodes.forEach((node) => {
+    const i = Number(node.dataset.s);
+    node.addEventListener("mousemove", (ev) => {
+      const s = SITES[i];
+      showTip("<b>" + s.name + "</b><br/>" + s.role + "<br/>" +
+        "协作量 <em>" + fmtInt(s.collab) + "</em> 事项/月（" + s.degree + " 条弦）<br/>" +
+        "<i>人数 " + fmtInt(s.people) + " · 密度 " + fmtDec(s.density, 1) + " 事项/百人·月</i>", ev);
+    });
+    node.addEventListener("mouseleave", hideTip);
+    node.addEventListener("click", () => { select(i, true); pauseRotate(20000); });
+  });
+
+  /* ===== 11. ECharts option 工厂（★ 只放标量与数组，站点/团队一律用索引或 name 关联） ===== */
+  const AXIS_TXT = { color: C.textDim, fontSize: 11 };
+  const baseTip = {
+    backgroundColor: "rgba(9,20,52,.94)", borderColor: "rgba(96,140,255,.45)", borderWidth: 1,
+    textStyle: { color: "#cfdcff", fontSize: 12 }, confine: true
+  };
+
+  /* 11.1 协作类型构成（三类环形，Σ = 1,542） */
+  function typeOption() {
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({ trigger: "item" }, baseTip, {
+        formatter: (o) => o.name + "<br/>" + fmtInt(o.value) + " 事项/月 · " + fmtDec(o.percent, 1) + "%"
+      }),
+      legend: {
+        bottom: 2, itemWidth: 10, itemHeight: 10, itemGap: 14,
+        textStyle: { color: C.textDim, fontSize: 11 },
+        formatter: (name) => {
+          const k = TYPES.map((t) => t.name).indexOf(name);
+          return name + "  " + fmtInt(typeTotal[k]);
+        }
+      },
+      series: [{
+        type: "pie", radius: ["48%", "72%"], center: ["50%", "44%"], avoidLabelOverlap: true,
+        itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 2, borderRadius: 4 },
+        label: {
+          show: true, color: "#dfe9ff", fontSize: 11,
+          formatter: (o) => o.name + "\n" + fmtDec(o.percent, 1) + "%"
+        },
+        labelLine: { length: 8, length2: 10, lineStyle: { color: "rgba(96,140,255,.4)" } },
+        data: TYPES.map((t, k) => ({ name: t.name, value: typeTotal[k], itemStyle: { color: t.color } }))
+      }]
+    };
+  }
+
+  /* 11.2 站点协作中心度（条形，行和降序）× 协作密度（第二数值轴折线） */
+  const rankIdx = SITES.map((s) => s.idx).sort((a, b) => SITES[a].collab - SITES[b].collab);  /* 升序，y 轴自下而上 */
+  function rankOption(hi) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 62, right: 52, top: 30, bottom: 24 },
+      tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" } }, baseTip, {
+        formatter: (arr) => {
+          const i = rankIdx[arr[0].dataIndex];
+          const s = SITES[i];
+          return "<b>" + s.name + "</b><br/>协作量 " + fmtInt(s.collab) + " 事项/月（占 " + fmtDec(s.share, 1) + "%）<br/>" +
+            "人数 " + fmtInt(s.people) + " 人 · 密度 " + fmtDec(s.density, 1) + " 事项/百人·月<br/>" +
+            "最强伙伴 " + SITES[s.topPartner].short + " " + fmtInt(COLLAB[i][s.topPartner]);
+        }
+      }),
+      legend: {
+        top: 0, right: 4, itemWidth: 10, itemHeight: 8, itemGap: 12,
+        textStyle: { color: C.textDim, fontSize: 10.5 },
+        data: ["协作量", "协作密度"]
+      },
+      xAxis: [
+        {
+          type: "value", name: "事项/月", nameTextStyle: { color: C.textDim, fontSize: 10 }, nameGap: 6,
+          axisLabel: AXIS_TXT, axisLine: { show: false }, axisTick: { show: false },
+          splitLine: { lineStyle: { color: C.grid } }
+        },
+        {
+          type: "value", name: "/百人", nameTextStyle: { color: C.textDim, fontSize: 10 }, nameGap: 6,
+          min: 0, max: 120, axisLabel: AXIS_TXT, axisLine: { show: false }, axisTick: { show: false },
+          splitLine: { show: false }
+        }
+      ],
+      yAxis: {
+        type: "category", data: rankIdx.map((i) => SITES[i].name),
+        axisLabel: {
+          color: C.text, fontSize: 11.5,
+          formatter: (v) => (SITES[hi] && SITES[hi].name === v ? "{hi|" + v + "}" : v),
+          rich: { hi: { color: "#fff", fontWeight: 700, fontSize: 11.5 } }
+        },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.28)" } }, axisTick: { show: false }
+      },
+      series: [
+        {
+          name: "协作量", type: "bar", barWidth: 13, xAxisIndex: 0, z: 2,
+          label: {
+            show: true, position: "right", color: "#cfdcff", fontSize: 11,
+            formatter: (o) => fmtInt(o.value)
+          },
+          data: rankIdx.map((i) => ({
+            value: SITES[i].collab,
+            itemStyle: {
+              borderRadius: [0, 4, 4, 0],
+              color: SITES[i].color,
+              opacity: (hi < 0 || hi === i) ? 0.95 : 0.34
+            }
+          }))
+        },
+        {
+          name: "协作密度", type: "line", xAxisIndex: 1, z: 3,
+          symbol: "diamond", symbolSize: 9, smooth: false,
+          lineStyle: { color: C.orange, width: 2, type: "dashed" },
+          itemStyle: { color: C.orange },
+          label: {
+            show: true, position: "top", color: C.orange, fontSize: 10,
+            formatter: (o) => fmtDec(o.value, 0)
+          },
+          data: rankIdx.map((i) => SITES[i].density)
+        }
+      ]
+    };
+  }
+
+  /* 11.3 协作强度对称矩阵（6×6 热力，对角 null 不入 data） */
+  const MAT_DATA = [];
+  for (let i = 0; i < N; i += 1) {
+    for (let j = 0; j < N; j += 1) {
+      if (i === j) continue;
+      MAT_DATA.push([j, i, COLLAB[i][j]]);
+    }
+  }
+  function matrixOption(hi) {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 46, right: 12, top: 22, bottom: 52 },
+      tooltip: Object.assign({ trigger: "item" }, baseTip, {
+        formatter: (o) => {
+          const j = o.data[0], i = o.data[1], kk = key2(i, j);
+          const tv = PAIR_TYPE[kk];
+          return "<b>" + SITES[i].name + " ↔ " + SITES[j].name + "</b><br/>" +
+            "协作强度 " + fmtInt(o.data[2]) + " 事项/月<br/>" +
+            TYPES[0].name + " " + tv[0] + " · " + TYPES[1].name + " " + tv[1] + " · " + TYPES[2].name + " " + tv[2] + "<br/>" +
+            SITES[i].short + " 行和 " + fmtInt(rowSum[i]) + " · " + SITES[j].short + " 行和 " + fmtInt(rowSum[j]);
+        }
+      }),
+      xAxis: {
+        type: "category", data: SITES.map((s) => s.short), splitArea: { show: true, areaStyle: { color: ["rgba(20,38,96,.18)", "transparent"] } },
+        axisLabel: { color: C.text, fontSize: 11 }, axisLine: { lineStyle: { color: "rgba(96,140,255,.28)" } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "category", data: SITES.map((s) => s.short), inverse: true,
+        axisLabel: {
+          color: C.text, fontSize: 11,
+          formatter: (v) => {
+            const i = SITES.map((s) => s.short).indexOf(v);
+            return v + " " + fmtInt(rowSum[i]);
+          }
+        },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.28)" } }, axisTick: { show: false }
+      },
+      /* ★ piecewise 一旦设了两端 text，showLabel 默认变 false、每档 label 会被吞掉；
+         本页不设 text 并显式 showLabel:true，图例每档都带数值区间。 */
+      visualMap: {
+        type: "piecewise", min: 40, max: 220, calculable: false, showLabel: true,
+        orient: "horizontal", left: "center", bottom: 2, itemWidth: 13, itemHeight: 11, itemGap: 6,
+        textStyle: { color: C.textDim, fontSize: 10 },
+        pieces: [
+          { min: 180, label: "≥180 极强", color: "#ffc24d" },
+          { min: 130, max: 180, label: "130–180", color: "#ff9d5c" },
+          { min: 90, max: 130, label: "90–130", color: "#5c9dff" },
+          { min: 60, max: 90, label: "60–90", color: "#2f6fd6" },
+          { max: 60, label: "<60 洼地", color: "#1d3f80" }
+        ]
+      },
+      series: [{
+        type: "heatmap", data: MAT_DATA,
+        label: { show: true, color: "#08122e", fontSize: 10.5, fontWeight: 700, formatter: (o) => fmtInt(o.data[2]) },
+        itemStyle: { borderColor: "rgba(8,18,49,.85)", borderWidth: 1.5, borderRadius: 3 },
+        emphasis: { itemStyle: { borderColor: "#fff", borderWidth: 1.5 } },
+        selectedMode: false,
+        /* 高亮站点的行列十字（category 轴用**索引**定位，避免同名解析歧义） */
+        markLine: hi < 0 ? undefined : {
+          silent: true, symbol: "none", animation: false,
+          lineStyle: { color: "rgba(255,194,77,.8)", width: 1.4, type: "solid" },
+          label: { show: false },
+          data: [{ yAxis: hi }, { xAxis: hi }]
+        }
+      }]
+    };
+  }
+
+  /* 11.4 跨站团队协作网络（12 节点力导向；★ layoutAnimation:false，跑完即固定） */
+  function teamOption(hi) {
+    const cat = SITES.map((s) => ({ name: s.short, itemStyle: { color: s.color } }));
+    const nodes = TEAMS.map((t, k) => {
+      const si = TEAM_SITE[k];
+      const on = (hi < 0 || hi === si);
+      return {
+        name: t.name,
+        value: teamDeg[k],
+        category: si,
+        symbolSize: 14 + 18 * teamDeg[k] / teamDegMax,
+        itemStyle: { color: SITES[si].color, opacity: on ? 0.96 : 0.24, borderColor: "rgba(8,18,49,.8)", borderWidth: 1 },
+        label: { show: true, color: on ? "#eaf1ff" : "rgba(127,146,196,.45)", fontSize: 10.5, position: "right" }
+      };
+    });
+    const links = TEAM_EDGES.map((e) => {
+      const on = (hi < 0 || hi === e.si || hi === e.sj);
+      return {
+        source: TEAMS[e.a].name,
+        target: TEAMS[e.b].name,
+        value: e.v,
+        lineStyle: {
+          color: on ? SITES[e.si].color : "rgba(96,140,255,.18)",
+          width: 0.5 + 2.6 * (e.v - teamEdgeMin) / (teamEdgeMax - teamEdgeMin),
+          opacity: on ? (0.2 + 0.42 * (e.v - teamEdgeMin) / (teamEdgeMax - teamEdgeMin)) : 0.07,
+          curveness: 0.14
+        }
+      };
+    });
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({ trigger: "item" }, baseTip, {
+        formatter: (o) => {
+          if (o.dataType === "edge") {
+            return "<b>" + o.data.source + " ↔ " + o.data.target + "</b><br/>团队级协作 " + fmtInt(o.data.value) + " 事项/月";
+          }
+          const k = TEAMS.map((t) => t.name).indexOf(o.name);
+          return "<b>" + TEAMS[k].name + "</b> · " + TEAMS[k].site + "<br/>速率 " + TEAMS[k].vel +
+            " 点/Sprint<br/>跨站协作 " + fmtInt(teamDeg[k]) + " 事项/月";
+        }
+      }),
+      legend: [{
+        top: 0, left: "center", itemWidth: 9, itemHeight: 9, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10 },
+        data: cat.map((c) => c.name)
+      }],
+      series: [{
+        type: "graph", layout: "force", roam: false, draggable: false, zlevel: 1,
+        top: 22, bottom: 6, left: 8, right: 8,
+        categories: cat,
+        /* ★ layoutAnimation:false —— 布局静默迭代跑完再一次性绘制，kiosk 不抖 */
+        force: { repulsion: 210, edgeLength: [42, 96], gravity: 0.16, friction: 0.24, layoutAnimation: false },
+        emphasis: { focus: "adjacency", lineStyle: { opacity: 0.85 } },
+        data: nodes,
+        links: links
+      }]
+    };
+  }
+
+  /* ===== 12. 图表实例化（★ DOM 已全部填充完毕；整台靠 CSS transform 缩放，init 后不调 resize） ===== */
+  renderChordFoot(-1);
+  const typeChart = echarts.init($("nv-chart-type"));
+  typeChart.setOption(typeOption());
+  const rankChart = echarts.init($("nv-chart-rank"));
+  rankChart.setOption(rankOption(-1));
+  const matrixChart = echarts.init($("nv-chart-matrix"));
+  matrixChart.setOption(matrixOption(-1));
+  const teamChart = echarts.init($("nv-chart-team"));
+  teamChart.setOption(teamOption(-1));
+
+  /* ===== 13. 站点高亮联动（弦图 + 中心度条 + 矩阵十字 + 团队网络 + chip + 摘要） ===== */
+  let selIdx = -1;
+  function select(si, pushHash) {
+    selIdx = si;
+    ribNodes.forEach((node) => {
+      const p = PAIRS[Number(node.dataset.p)];
+      const on = (si < 0) || (p[0] === si || p[1] === si);
+      node.classList.toggle("is-dim", si >= 0 && !on);
+      node.classList.toggle("is-hi", si >= 0 && on);
+    });
+    bandNodes.forEach((node) => {
+      const on = (si < 0) || Number(node.dataset.s) === si;
+      node.classList.toggle("is-dim", si >= 0 && !on);
+      node.classList.toggle("is-hi", si >= 0 && on);
+    });
+    labNodes.forEach((node) => {
+      const on = (si < 0) || Number(node.dataset.s) === si;
+      node.classList.toggle("is-dim", si >= 0 && !on);
+    });
+    $("nv-chord-num").textContent = si < 0 ? fmtInt(pairSum) : fmtInt(SITES[si].collab);
+    $("nv-chord-unit").textContent = si < 0 ? "事项/月 · 15 弦" : "事项/月 · " + SITES[si].degree + " 弦";
+    $("nv-chip-key").textContent = si < 0 ? "高亮站点" : "高亮 · " + SITES[si].name;
+    $("nv-chip-val").textContent = si < 0 ? "全网总览" : fmtInt(SITES[si].collab) + " 事项/月";
+    renderChordFoot(si);
+    /* 清单行随高亮联动 */
+    Array.prototype.forEach.call($("nv-pbody").querySelectorAll("li[data-p]"), (li) => {
+      const p = PAIRS[Number(li.dataset.p)];
+      li.classList.toggle("is-sel", si >= 0 && (p[0] === si || p[1] === si));
+    });
+    rankChart.setOption(rankOption(si), false);
+    matrixChart.setOption(matrixOption(si), false);
+    teamChart.setOption(teamOption(si), false);
+    if (pushHash) syncHash(si);
+  }
+
+  /* 清单行点击 → 高亮该对的首站点 */
+  Array.prototype.forEach.call($("nv-pbody").querySelectorAll("li[data-p]"), (li) => {
+    li.addEventListener("click", () => {
+      const p = PAIRS[Number(li.dataset.p)];
+      select(p[0], true);
+      pauseRotate(20000);
+    });
+  });
+
+  /* ===== 14. hash 定位（父页「多中心布局」跨站点协作力导向图节点名 = 六站点名）
+         归一化：decodeURIComponent + trim + 全角空白剔除；HASH_ALIAS 收「北京」等简写。 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  alias("全览", -1); alias("全部", -1); alias("全网", -1); alias("ALL", -1); alias("all", -1);
+  SITES.forEach((s, i) => {
+    alias(s.name, i);                         /* 北京总部 / 上海中心 … 契约逐字 */
+    alias(s.short, i);                        /* 北京 / 上海 … 简写 */
+    alias(s.short + "中心", i);                /* 北京中心（容错） */
+    alias(s.short + "总部", i);                /* 上海总部（容错） */
+    alias(s.short + "站点", i);
+    alias(s.short + "研发中心", i);
+  });
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");
+    if (!raw) return -2;                       /* 无 hash：保持全览且不触发定位暂停 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -2 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(si) {
+    const want = "#" + encodeURIComponent(si < 0 ? "全览" : SITES[si].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit === -2) { select(-1, false); return; }
+    select(hit, false);
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发多中心布局1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  locateByHash();                              /* 初始解析 hash（无 hash 落全览） */
+
+  /* ===== 15. kiosk 轮巡：逐站高亮 3.5 秒，末位回到全览；hash 定位或手动交互后暂停 20 秒 ===== */
+  let rotPos = 0;
+  setInterval(() => {
+    if (Date.now() < pauseUntil) return;
+    rotPos = (rotPos + 1) % (N + 1);
+    select(rotPos === N ? -1 : rotPos, true);
+  }, 3500);
+
+  /* ===== 16. 底部口径滚动条（文案数字全部由派生量现算） ===== */
+  const NOTES = [
+    { lv: "口径", c: C.blue, t: "协作强度 = 跨站需求交接 + 联调工单 + 联合评审 的月均事项数；15 个无序站点对 Σ = " +
+        fmtInt(pairSum) + " 事项/月，镜像成 6×6 对称矩阵后 Σ行和 = " + fmtInt(grand) + " = 2 × Σ对，与姊妹页「研发单中心详情」逐对同源" },
+    { lv: "分工", c: C.cyan, t: "本页（跨站协作图谱）= 关系视角，主角是边——弦图 / 对称矩阵 / 中心度 / 团队级网络回答「谁和谁协作、强度多少、有没有孤岛」" },
+    { lv: "分工", c: C.cyan, t: "姊妹页「研发单中心详情」= 指标视角，单站 360 度（人员 / 职级 / 产品线 / 团队 / 对标），协作只是该站的一栏；本页把那一栏铺成全网" },
+    { lv: "分工", c: C.cyan, t: "姊妹页「研发园区数字孪生」= 空间视角，单站园区等距孪生（楼宇 = 职能、楼高 = 人数）；三页六站点人数逐字一致，Σ = " +
+        fmtInt(peopleSum) + " 人" },
+    { lv: "枢纽", c: C.amber, t: "枢纽站点 " + D.hub + "：协作 " + fmtInt(D.hubVal) + " 事项/月，占全网 " +
+        fmtDec(D.hubShare, 1) + "%，5 条弦全部为该站所在对的强端——最强弦 " + D.strongPair + " " + fmtInt(D.strongVal) + " 事项/月" },
+    { lv: "密度", c: C.green, t: "协作密度 = 协作量 ÷ 人数 × 100（事项/百人·月）：" + D.dense + " " + fmtDec(D.denseVal, 1) +
+        " 为全网最高，" + D.hub + " 仅 " + fmtDec(SITES[hubIdx].density, 1) + "——枢纽站体量大但人均协作负担轻，小站点反而更重" },
+    { lv: "洼地", c: C.orange, t: "协作洼地（强度末 3 对）：" + WEAK3.map((k) => SITES[PAIRS[k][0]].short + "↔" + SITES[PAIRS[k][1]].short +
+        " " + PAIRS[k][2]).join(" · ") + " 事项/月，建议设联合专项拉起" },
+    { lv: "互证", c: C.violet, t: "父页「多中心布局」的联合项目链路 " + D.jointLinks + " 条 Σ = " + fmtInt(D.jointSum) +
+        " 个（口径不同：项目数 vs 事项/月）；其中未成链的 " + D.noJoint.length + " 对 —— " +
+        D.noJoint.map((k) => SITES[PAIRS[k][0]].short + "↔" + SITES[PAIRS[k][1]].short).join("、") +
+        " —— 正落在本页强度垫底区间，两套口径互相印证" },
+    { lv: "团队", c: C.blue, t: "团队级网络：12 支 Scrum 团队按站点归属（每站 " + TEAM_CNT_AUTH.join(" / ") + " 支）展开 " +
+        TEAM_EDGES.length + " 条跨站链路，按团队速率乘积在站点对内分摊，Σ = " + fmtInt(teamEdgeSum) +
+        " 事项/月，逐对聚合恒等于站点级对值" },
+    { lv: "勾稽", c: C.green, t: "三类协作 " + TYPES.map((t, k) => t.name + " " + fmtInt(typeTotal[k])).join(" + ") +
+        " = " + fmtInt(typeSum) + " 事项/月；弦图 15 条弦的宽度权重与对称矩阵逐条一致，全部进页尾自检" }
+  ];
+  const track = $("nv-foot-track");
+  const noteHtml = NOTES.map((a) => (
+    '<div class="nv-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = noteHtml + noteHtml;       /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 17. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try {
+    JSON.stringify(typeOption());
+    JSON.stringify(rankOption(-1)); JSON.stringify(rankOption(0));
+    JSON.stringify(matrixOption(-1)); JSON.stringify(matrixOption(2));
+    JSON.stringify(teamOption(-1)); JSON.stringify(teamOption(5));
+  } catch (e) {
+    optAcyclic = false;
+    console.error("[跨站协作图谱] option 存在循环引用：", e.message);
+  }
+
+  const pairsStr = PAIRS.map((p) => p[0] + "-" + p[1] + ":" + p[2]).join(";");
+  const checks = [
+    ["六站点名与人数与契约 §2.2 逐字，Σ = 3,860 人",
+      SITES.map((s) => s.name + "|" + s.people).join(";") === SITE_AUTH && peopleSum === PEOPLE_ALL],
+    ["15 个无序协作对与姊妹页「单中心详情」逐对相等",
+      PAIRS.length === 15 && pairsStr === PAIRS_AUTH],
+    ["Σ对 = 1,542 事项/月（契约同源）", pairSum === PAIR_SUM_AUTH],
+    ["矩阵对称且对角为 0（跨站口径不含站内协作）",
+      COLLAB.every((r, i) => r.every((v, j) => v === COLLAB[j][i]) && COLLAB[i][i] === 0)],
+    ["Σ行和 = 3,084 = 2 × Σ对", grand === ROW_SUM_AUTH && grand === 2 * pairSum],
+    ["逐站行和 = 其余五站之和（每站 5 条弦，六站点全连通无孤岛）",
+      SITES.every((s, i) => s.degree === N - 1 &&
+        s.collab === sum(SITES.map((x, j) => (j === i ? 0 : COLLAB[i][j]))))],
+    ["弦图边权与对称矩阵逐条一致（15 条弦无遗漏无重复）",
+      PAIRS.every((p) => COLLAB[p[0]][p[1]] === p[2] && COLLAB[p[1]][p[0]] === p[2]) &&
+      (new Set(PAIRS.map((p) => key2(p[0], p[1])))).size === 15],
+    ["弦图角度守恒：每站子弧角之和 == 该站主弧跨度", arcOk],
+    ["弦图主弧总角 + 间隔角 = 360°",
+      Math.abs(sum(SITES.map((s, i) => ARC[i][1] - ARC[i][0])) + N * GAP_DEG - 360) < 1e-9],
+    ["弦图弧长 ∝ 行和（弧跨度比 == 行和比）",
+      SITES.every((s, i) => Math.abs((ARC[i][1] - ARC[i][0]) / SPAN_ALL - rowSum[i] / grand) < 1e-12)],
+    ["三类协作逐对 Σ == 对值，三类总量 Σ = 1,542",
+      PAIRS.every((p) => sum(PAIR_TYPE[key2(p[0], p[1])]) === p[2]) && typeSum === pairSum && TYPES.length === 3],
+    ["12 团队名/速率/站点归属与契约 §2.3 逐字",
+      TEAMS.map((t) => t.name + "|" + t.vel + "|" + t.site).join(";") === TEAM_AUTH &&
+      sum(TEAMS.map((t) => t.vel)) === 746],
+    ["每站团队数 = 3 / 2 / 2 / 2 / 2 / 1 且 Σ = 12",
+      teamCnt.join(",") === TEAM_CNT_AUTH.join(",") && sum(teamCnt) === TEAMS.length],
+    ["团队级链路 Σ = 1,542，且按站点对聚合恒等于站点级对值",
+      teamEdgeSum === pairSum && teamAggOk],
+    ["团队级链路只连跨站团队（无同站自环）",
+      TEAM_EDGES.every((e) => TEAM_SITE[e.a] !== TEAM_SITE[e.b] &&
+        TEAM_SITE[e.a] === e.si && TEAM_SITE[e.b] === e.sj)],
+    ["协作密度 = 协作量 ÷ 人数 × 100 现算（逐站验算）",
+      SITES.every((s) => Math.abs(s.density - s.collab / s.people * 100) < 1e-9)],
+    ["枢纽站点 = 北京总部（行和最大且唯一）",
+      D.hub === "北京总部" && SITES.every((s, i) => i === hubIdx || s.collab < SITES[hubIdx].collab)],
+    ["协作密度最高 = 南京中心（人少而协作重）",
+      D.dense === "南京中心" && SITES.every((s, i) => i === denseIdx || s.density < SITES[denseIdx].density)],
+    ["枢纽站协作密度低于全网密度中位（体量大 ≠ 人均重）",
+      SITES[hubIdx].density < SITES.map((s) => s.density).sort((a, b) => a - b)[Math.floor(N / 2)]],
+    ["TOP5 按强度严格降序，首位 = 北京总部↔深圳中心 214",
+      TOP5.every((k, i) => i === 0 || PAIRS[k][2] <= PAIRS[TOP5[i - 1]][2]) &&
+      PAIRS[TOP5[0]][2] === 214 && key2(PAIRS[TOP5[0]][0], PAIRS[TOP5[0]][1]) === "0|2"],
+    ["协作洼地 = 强度末 3 对，最弱 = 西安中心↔南京中心 42",
+      WEAK3.length === 3 && D.weakVal === 42 &&
+      key2(PAIRS[WEAK3[2]][0], PAIRS[WEAK3[2]][1]) === "4|5" &&
+      WEAK3.every((k) => PAIRS[k][2] <= PAIRS[pairRank[PAIRS.length - 4]][2])],
+    ["父页联合项目 12 条链路 Σ = 32，两端均为契约站点索引",
+      D.jointLinks === 12 && D.jointSum === JOINT_SUM_AUTH &&
+      Object.keys(JOINT).every((k) => {
+        const ab = k.split("|").map(Number);
+        return ab.length === 2 && ab[0] >= 0 && ab[1] < N && ab[0] < ab[1];
+      })],
+    ["未成联合项目的 3 对全部落在强度末 5 对（两套口径互证）",
+      D.noJoint.length === 3 && D.noJoint.every((k) => pairRank.indexOf(k) >= PAIRS.length - 5)],
+    ["hash 六站点名均可解析（契约逐字 + 简写别名）",
+      SITES.every((s, i) => HASH_ALIAS[s.name] === i && HASH_ALIAS[s.short] === i) &&
+      HASH_ALIAS["北京总部"] === 0 && HASH_ALIAS["南京中心"] === 5 && HASH_ALIAS["全览"] === -1],
+    ["KPI 与派生量自洽（协作对 15 = C(6,2)、对均 = Σ对 ÷ 15）",
+      D.pairs === N * (N - 1) / 2 && Math.abs(D.avgPair - pairSum / 15) < 1e-9],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[跨站协作图谱] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

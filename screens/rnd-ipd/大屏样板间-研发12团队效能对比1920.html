@@ -1,0 +1,1266 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发12团队效能对比</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --hf-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .hf-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 470px 1fr 470px;
+    grid-template-rows: 84px 104px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .hf-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .hf-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .hf-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 8px 8px;
+  }
+  .hf-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .hf-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .hf-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .hf-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .hf-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .hf-crumb em { font-style: normal; color: #d3e2ff; }
+  .hf-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .hf-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .hf-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .hf-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .hf-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .hf-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .hf-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .hf-head-right { display: flex; align-items: center; gap: 14px; flex: none; }
+
+  /* 焦点指示（C 型不做整页重绘：只标注「当前高亮的是谁」） */
+  .hf-focus {
+    display: flex; flex-direction: column; gap: 2px; min-width: 176px; padding: 5px 12px 6px; border-radius: 9px;
+    border: 1px solid rgba(255, 194, 77, 0.42); background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+  }
+  .hf-focus span { font-size: 10.5px; letter-spacing: 0.14em; color: rgba(255, 194, 77, 0.9); white-space: nowrap; }
+  .hf-focus b { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; color: #ffe0a6; white-space: nowrap; }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .hf-chips { display: flex; align-items: center; gap: 9px; }
+  .hf-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 132px; padding: 6px 12px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(169, 140, 245, 0.42); background: linear-gradient(160deg, rgba(169, 140, 245, 0.16), rgba(18, 34, 78, 0.6));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .hf-chip span { font-size: 10px; letter-spacing: 0.14em; color: #8f7fc4; white-space: nowrap; }
+  .hf-chip b { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #cbbcf7; white-space: nowrap; }
+  .hf-chip:hover { border-color: rgba(169, 140, 245, 0.92); box-shadow: 0 0 16px -2px rgba(169, 140, 245, 0.7); }
+  .hf-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 18px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .hf-clock-time { font: 700 26px/1 var(--hf-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .hf-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（整行 6 枚，行高写死 104px） ===== */
+  .hf-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .hf-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 8px 16px;
+  }
+  .hf-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .hf-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .hf-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .hf-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .hf-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .hf-kpi.is-good::after { background: radial-gradient(circle, rgba(111, 224, 154, 0.13), transparent 68%); }
+  .hf-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-red), transparent); }
+  .hf-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 95, 107, 0.13), transparent 68%); }
+  .hf-kpi-label { font-size: 12.5px; letter-spacing: 0.08em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .hf-kpi-num { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+  .hf-kpi-val { font: 700 30px/1 var(--hf-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .hf-kpi-val.is-name { font-size: 24px; letter-spacing: 0.1em; font-family: inherit; }
+  .hf-kpi.is-amber .hf-kpi-val { color: #ffd489; }
+  .hf-kpi.is-good .hf-kpi-val { color: #b8f2cf; }
+  .hf-kpi.is-warn .hf-kpi-val { color: #ffb0b7; }
+  .hf-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .hf-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hf-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体（每块面板显式高度，无 flex 争抢） ===== */
+  .hf-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .hf-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .hf-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .hf-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .hf-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .hf-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .hf-panel-tag { font-size: 11.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .hf-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .hf-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin: 0 3px 0 7px; vertical-align: middle; }
+  .hf-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* 面板高度（左 442+320 / 中 420+342 / 右 380+382，各列 Σ+gap = 776px 主体高） */
+  .hf-h-rank { flex: none; height: 442px; }
+  .hf-h-insight { flex: none; height: 320px; }
+  .hf-h-par { flex: none; height: 420px; }
+  .hf-h-heat { flex: none; height: 342px; }
+  .hf-h-radar { flex: none; height: 380px; }
+  .hf-h-quad { flex: none; height: 382px; }
+
+  /* ===== 左栏①：综合效能得分排行（权重条 + CSS grid 表 + 条形） ===== */
+  .hf-wrow {
+    flex: none; height: 26px; display: flex; align-items: center; gap: 5px; margin-bottom: 5px;
+    overflow: hidden; white-space: nowrap;
+  }
+  .hf-wchip {
+    display: inline-flex; align-items: baseline; gap: 3px; padding: 2px 5px; border-radius: 5px;
+    font-size: 10px; letter-spacing: 0.02em; color: #a9bde6; font-variant-numeric: tabular-nums;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(20, 38, 92, 0.55);
+  }
+  .hf-wchip b { font-weight: 700; color: #ffd489; }
+  .hf-wchip.is-rev { border-color: rgba(255, 194, 77, 0.3); }
+  .hf-wsum { margin-left: auto; font-size: 10.5px; color: #b8f2cf; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .hf-thead, .hf-rows li {
+    display: grid; grid-template-columns: 24px 50px 1fr 46px 118px; align-items: center; gap: 8px;
+    padding: 0 8px; font-variant-numeric: tabular-nums;
+  }
+  .hf-thead {
+    flex: none; height: 20px; font-size: 10.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.95);
+    border-bottom: 1px solid rgba(96, 140, 255, 0.22);
+  }
+  .hf-rows {
+    flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none;
+    display: grid; grid-auto-rows: 1fr; gap: 3px; overflow-y: auto; overflow-x: hidden;
+  }
+  .hf-rows::-webkit-scrollbar { width: 4px; }
+  .hf-rows::-webkit-scrollbar-thumb { background: rgba(92, 157, 255, 0.35); border-radius: 2px; }
+  .hf-rows li {
+    min-height: 0; border-radius: 7px; font-size: 11.5px; color: #c8d6f2; cursor: pointer;
+    border: 1px solid transparent; transition: border-color .16s, background .16s, opacity .16s;
+  }
+  .hf-rows li:nth-child(odd) { background: rgba(96, 140, 255, 0.06); }
+  .hf-rows li:hover { border-color: rgba(92, 157, 255, 0.45); }
+  .hf-rows li.is-sel { border-color: rgba(255, 194, 77, 0.85); background: rgba(255, 194, 77, 0.13); box-shadow: 0 0 14px -4px rgba(255, 194, 77, 0.7); }
+  .hf-rows li.is-dim { opacity: 0.3; }
+  .hf-r-no { font: 700 13px/1 var(--hf-mono); color: #8fa6d8; text-align: center; }
+  .hf-rows li.is-top .hf-r-no { color: #ffd489; }
+  .hf-rows li.is-bot .hf-r-no { color: #ffb0b7; }
+  .hf-r-name { font-size: 13.5px; font-weight: 700; letter-spacing: 0.06em; color: #eaf1ff; white-space: nowrap; }
+  .hf-r-bar { height: 9px; border-radius: 4px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .hf-r-bar u { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--rnd-blue-deep), var(--rnd-blue)); }
+  .hf-rows li.is-top .hf-r-bar u { background: linear-gradient(90deg, #b6791f, var(--rnd-amber)); }
+  .hf-rows li.is-bot .hf-r-bar u { background: linear-gradient(90deg, #8c3038, var(--rnd-red)); }
+  .hf-r-score { text-align: right; font: 700 14px/1 var(--hf-mono); color: #eaf1ff; }
+  .hf-r-tags { display: flex; gap: 4px; justify-content: flex-end; }
+  .hf-tag {
+    padding: 1px 5px; border-radius: 4px; font-size: 9.5px; letter-spacing: 0.02em; white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .hf-tag.is-best { color: #b8f2cf; border-color: rgba(111, 224, 154, 0.42); background: rgba(111, 224, 154, 0.1); }
+  .hf-tag.is-worst { color: #ffb59a; border-color: rgba(255, 157, 92, 0.42); background: rgba(255, 157, 92, 0.1); }
+
+  /* ===== 左栏②：此消彼长洞察（现算生成，非写死文案） ===== */
+  .hf-ins { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 7px; overflow: hidden; }
+  .hf-ins li {
+    min-height: 0; display: grid; grid-template-columns: 22px 1fr; gap: 9px; align-items: center;
+    padding: 6px 11px; border-radius: 9px;
+    border: 1px solid rgba(96, 140, 255, 0.16); background: linear-gradient(120deg, rgba(20, 38, 92, 0.62), rgba(14, 26, 66, 0.5));
+  }
+  .hf-ins-no { font: 700 15px/1 var(--hf-mono); color: rgba(92, 157, 255, 0.7); text-align: center; }
+  .hf-ins-tx { min-width: 0; font-size: 11.5px; line-height: 1.45; color: #c2d3f0; }
+  .hf-ins-tx b { font-weight: 700; color: #ffd489; }
+  .hf-ins-tx u { text-decoration: none; font-weight: 700; color: #eaf1ff; }
+  .hf-ins-tx i { font-style: normal; color: #9ad9ce; }
+
+  /* ===== 底部口径滚动条 ===== */
+  .hf-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .hf-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .hf-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: hf-blink 1.6s ease-in-out infinite; }
+  @keyframes hf-blink { 50% { opacity: 0.35; } }
+  .hf-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .hf-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: hf-ticker 78s linear infinite; will-change: transform; }
+  .hf-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .hf-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes hf-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .hf-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="hf-stage" id="hf-stage">
+    <!-- mockflag:begin --><div class="hf-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="hf-error" id="hf-error" role="alert">ECharts 资源加载失败，得分排行与对比洞察不受影响，平行坐标 / 排名矩阵 / 雷达 / 象限散点请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="hf-header">
+      <div class="hf-head-left">
+        <div class="hf-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="hf-crumb-up" href="大屏样板间-研发敏捷交付总览1920.html" title="返回上级专题页（Esc）">‹ 返回 敏捷交付总览</a><i>›</i>
+          <em id="hf-crumb-obj">12 团队 · 横向对比（同屏并置，非单体详情）</em>
+        </div>
+        <div class="hf-head-title-row">
+          <div class="hf-head-title">12 团队效能横向对比</div>
+          <div class="hf-head-meta">
+            <span>参评 <b>12</b> 支 · 对比维度 <b>8</b> 维</span><i>|</i>
+            <span>Σ速率 <b id="hf-meta-vel">--</b> 点/Sprint · 年吞吐 <b id="hf-meta-thr">--</b> 点</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="hf-head-right">
+        <div class="hf-focus" aria-live="polite">
+          <span id="hf-focus-cap">当前高亮</span>
+          <b id="hf-focus-val">全量 12 队</b>
+        </div>
+        <div class="hf-chips">
+          <a class="hf-chip" id="hf-chip-cq" href="大屏样板间-研发单团队冲刺详情1920.html" title="兄弟子页：单队 Sprint 360 度（Scrum 视角）"><span>兄弟页 · 单队 SPRINT</span><b>单团队冲刺详情 ›</b></a>
+          <a class="hf-chip" id="hf-chip-zj" href="大屏样板间-研发单团队看板详情1920.html" title="兄弟子页：单队看板流动（CFD / 控制图）"><span>兄弟页 · 单队看板</span><b>单团队看板详情 ›</b></a>
+        </div>
+        <div class="hf-clock" aria-label="实时时钟">
+          <span class="hf-clock-time" id="hf-clock-time">--:--:--</span>
+          <span class="hf-clock-date" id="hf-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：参评队数 / Σ速率 / 年吞吐 / 得分首位 / 得分末位 / 差异最大维度 -->
+    <section class="hf-kpis" aria-label="横向对比核心指标">
+      <div class="hf-kpi">
+        <div class="hf-kpi-label">参评团队数</div>
+        <div class="hf-kpi-num"><span class="hf-kpi-val" id="hf-kpi-0">0</span><span class="hf-kpi-unit">支</span></div>
+        <div class="hf-kpi-sub" id="hf-kpi-0s">--</div>
+      </div>
+      <div class="hf-kpi">
+        <div class="hf-kpi-label">Σ 团队速率</div>
+        <div class="hf-kpi-num"><span class="hf-kpi-val" id="hf-kpi-1">0</span><span class="hf-kpi-unit">点/Sprint</span></div>
+        <div class="hf-kpi-sub" id="hf-kpi-1s">--</div>
+      </div>
+      <div class="hf-kpi is-amber">
+        <div class="hf-kpi-label">年故事点吞吐</div>
+        <div class="hf-kpi-num"><span class="hf-kpi-val" id="hf-kpi-2">0</span><span class="hf-kpi-unit">点</span></div>
+        <div class="hf-kpi-sub" id="hf-kpi-2s">--</div>
+      </div>
+      <div class="hf-kpi is-good">
+        <div class="hf-kpi-label">综合得分首位</div>
+        <div class="hf-kpi-num"><span class="hf-kpi-val is-name" id="hf-kpi-3">--</span><span class="hf-kpi-unit" id="hf-kpi-3u">--</span></div>
+        <div class="hf-kpi-sub" id="hf-kpi-3s">--</div>
+      </div>
+      <div class="hf-kpi is-warn">
+        <div class="hf-kpi-label">综合得分末位</div>
+        <div class="hf-kpi-num"><span class="hf-kpi-val is-name" id="hf-kpi-4">--</span><span class="hf-kpi-unit" id="hf-kpi-4u">--</span></div>
+        <div class="hf-kpi-sub" id="hf-kpi-4s">--</div>
+      </div>
+      <div class="hf-kpi">
+        <div class="hf-kpi-label">队际差异最大维度</div>
+        <div class="hf-kpi-num"><span class="hf-kpi-val is-name" id="hf-kpi-5">--</span><span class="hf-kpi-unit" id="hf-kpi-5u">--</span></div>
+        <div class="hf-kpi-sub" id="hf-kpi-5s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：综合效能得分排行（hash 定位目标行） + 此消彼长洞察 -->
+    <div class="hf-col">
+      <section class="hf-panel hf-h-rank">
+        <div class="hf-panel-head">
+          <h2>综合效能得分排行</h2>
+          <span class="hf-panel-tag">8 维归一加权 · 满分 <b>100</b></span>
+        </div>
+        <div class="hf-wrow" id="hf-wrow" aria-label="八维权重（权重和 = 1）"></div>
+        <div class="hf-thead"><span>名</span><span>团队</span><span>得分条（满分 100）</span><span style="text-align:right;">总分</span><span style="text-align:right;">最强维 / 最弱维</span></div>
+        <ul class="hf-rows" id="hf-rows"></ul>
+      </section>
+      <section class="hf-panel hf-h-insight">
+        <div class="hf-panel-head">
+          <h2>此消彼长 · 对比洞察</h2>
+          <span class="hf-panel-tag">结论由排名矩阵<b>现算</b>生成</span>
+        </div>
+        <ul class="hf-ins" id="hf-ins"></ul>
+      </section>
+    </div>
+
+    <!-- 中栏：★ 主视觉 12 队 × 8 维平行坐标 + 多指标排名矩阵 -->
+    <div class="hf-col">
+      <section class="hf-panel hf-h-par">
+        <div class="hf-panel-head">
+          <h2>12 队 × 8 维平行坐标</h2>
+          <span class="hf-panel-tag">
+            <span class="hf-dot" style="background:var(--rnd-blue);"></span>软件
+            <span class="hf-dot" style="background:var(--rnd-cyan);"></span>云平台
+            <span class="hf-dot" style="background:var(--rnd-violet);"></span>AI算法
+            <span class="hf-dot" style="background:var(--rnd-amber);"></span>硬件
+            <span class="hf-dot" style="background:var(--rnd-green);"></span>测试
+            　琥珀轴名 = 逆向维（已倒置，<b>↑ 越上越优</b>）· 轴上拖拽可刷选
+          </span>
+        </div>
+        <div class="hf-chart" id="hf-chart-par"></div>
+      </section>
+      <section class="hf-panel hf-h-heat">
+        <div class="hf-panel-head">
+          <h2>多指标排名矩阵 · 12 队 × 8 维</h2>
+          <span class="hf-panel-tag">格内为名次，<b>1 名最亮</b> · 逆向维按「越优越靠前」排位 · 同值按契约队序稳定排位</span>
+        </div>
+        <div class="hf-chart" id="hf-chart-heat"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：能力雷达叠加 + 速率×质量四象限 -->
+    <div class="hf-col">
+      <section class="hf-panel hf-h-radar">
+        <div class="hf-panel-head">
+          <h2>能力雷达叠加</h2>
+          <span class="hf-panel-tag" id="hf-tag-radar">--</span>
+        </div>
+        <div class="hf-chart" id="hf-chart-radar"></div>
+      </section>
+      <section class="hf-panel hf-h-quad">
+        <div class="hf-panel-head">
+          <h2>速率 × 质量 四象限</h2>
+          <span class="hf-panel-tag" id="hf-tag-quad">--</span>
+        </div>
+        <div class="hf-chart" id="hf-chart-quad"></div>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="hf-foot" aria-label="12 团队效能横向对比口径说明">
+      <div class="hf-foot-label"><span class="hf-foot-dot"></span>对比口径</div>
+      <div class="hf-foot-viewport"><div class="hf-foot-track" id="hf-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("hf-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad2 = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 1.1 ★ kiosk 门闩状态量前置声明（必须早于任何 pauseRotate() 调用） =====
+     C 型「横向对比」不做整页重绘，因此不用 A 型切换器的 restart()/idx 机制，
+     改用 B 型台账的门闩：一个常驻 setInterval 逐队轮巡高亮，pauseUntil 之前一律空转。
+     let 有暂时性死区——带 hash 冷启动会先走 pauseRotate(20000)，若声明晚于调用会抛
+     ReferenceError 使主脚本整段中断（页面已渲染、肉眼看不出）。故全部提到这里，
+     首次 pauseRotate() 调用在下方第 12 节，行号严格大于本块。 */
+  let pauseUntil = 0;
+  let pauseCalls = 0;                                          /* 供页尾自检做构造性断言 */
+  let hoverHold = false;
+  let kioskIdx = -1;
+  function pauseRotate(ms) { pauseCalls += 1; pauseUntil = Date.now() + ms; }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层：单一数据源，12 队全部视图由此派生 =====
+
+     ★ 本页形态 = C 型「横向对比」：12 支团队**同屏并置 PK**，不做整页重绘式的对象切换；
+       交互是「高亮 / 刷选某队或某几队」，回答的问题是「谁强谁弱、强在哪、弱在哪、
+       有没有此消彼长」。同一批团队对象在本专题下的三页分工（口径互不重复）：
+       · 本页（hf）＝ 12 队横向 PK：8 维平行坐标 / 排名矩阵 / 象限 / 加权总分（队际比较粒度）
+       · 单团队冲刺详情（cq）＝ 单队 Sprint 360 度：燃尽 / 任务墙 / 成员负载（Sprint 粒度）
+       · 单团队看板详情（zj）＝ 单队看板流动：CFD / 周期时间控制图 / WIP 四列（时间序列粒度）
+
+     勾稽到契约（docs/RndIpdThemed.md §2.2 / §2.3）与父页（大屏样板间-研发敏捷交付总览1920.html）：
+     · 12 团队名 / 速率 / 站点 / 域逐字：天枢82北京总部软件、天璇76北京总部云平台、
+       天玑71上海中心AI算法、天权68深圳中心硬件、玉衡66上海中心软件、开阳63成都中心AI算法、
+       摇光61成都中心软件、青龙58深圳中心硬件、白虎55西安中心硬件、朱雀52南京中心云平台、
+       玄武49西安中心测试、紫微45北京总部软件；Σ速率 = 746，年吞吐 = 746 × 26 = 19,396 点。
+     · 承诺 / 完成：完成 = 速率 × 12（近 12 个已收口 Sprint，Σ = 8,952 = 父页 Σ完成），
+       承诺为本页二级自编，Σ = 9,659 = 父页近 12 Sprint Σ承诺；全量承诺达成率
+       = 8,952 ÷ 9,659 = 92.68%（与父页「承诺 vs 完成」双轴同源现算）。
+     · 缺陷：12 队 Σ = 8,640（契约年发现），按域四分逐字回契约 软件 4,820 / 硬件 1,560 /
+       云端 1,340 / AI 920 —— 测试域团队（玄武）无独立缺陷域，其缺陷计入软件域（口径见底栏）。
+     · 障碍数：直取 12 队 × 5 类阻塞归属矩阵的行和，列和 = 契约五类 38/27/21/14/9，Σ = 109
+       （与「单团队看板详情」「阻塞在制品台账」同源）。
+     · 周期时间中位 / 流动效率 / 评审时长 / 自动化率为二级自编（队际可比口径，见底栏）。 */
+
+  const SPRINTS_PER_YEAR = 26;                                 /* 年吞吐 = 速率 × 26 */
+  const SPRINTS_CLOSED = 12;                                   /* 近 12 个已收口 Sprint（父页同口径） */
+  const VEL_ALL = 746;                                         /* 契约 §2.2 Σ速率 */
+  const THROUGHPUT_ALL = 19396;                                /* 契约 §2.2 年故事点吞吐 */
+  const DEF_ALL = 8640;                                        /* 契约 §2.2 年缺陷发现 */
+  const BLOCK_ALL = 109;                                       /* 契约 §2.3 当前阻塞卡 */
+  const COMMIT_ALL = 9659;                                     /* 父页近 12 Sprint Σ承诺 */
+
+  /* 3.1 12 队主表（name/vel/site/dom 逐字引契约 §2.3；其余为本页对比维原始值） */
+  const TEAMS = [
+    { name: "天枢", vel: 82, site: "北京总部", dom: "软件",   commit: 1034, def: 1240, cyc: 6.2, flow: 42.6, rev: 4.8, auto: 86.4 },
+    { name: "天璇", vel: 76, site: "北京总部", dom: "云平台", commit:  981, def:  760, cyc: 6.8, flow: 38.4, rev: 5.6, auto: 82.1 },
+    { name: "天玑", vel: 71, site: "上海中心", dom: "AI算法", commit:  930, def:  500, cyc: 7.4, flow: 34.7, rev: 6.4, auto: 74.6 },
+    { name: "天权", vel: 68, site: "深圳中心", dom: "硬件",   commit:  902, def:  620, cyc: 8.6, flow: 27.3, rev: 8.2, auto: 61.2 },
+    { name: "玉衡", vel: 66, site: "上海中心", dom: "软件",   commit:  825, def:  890, cyc: 5.4, flow: 45.2, rev: 4.2, auto: 84.7 },
+    { name: "开阳", vel: 63, site: "成都中心", dom: "AI算法", commit:  808, def:  420, cyc: 6.5, flow: 36.1, rev: 5.9, auto: 76.3 },
+    { name: "摇光", vel: 61, site: "成都中心", dom: "软件",   commit:  775, def:  960, cyc: 5.8, flow: 41.8, rev: 4.5, auto: 80.5 },
+    { name: "青龙", vel: 58, site: "深圳中心", dom: "硬件",   commit:  766, def:  490, cyc: 8.1, flow: 29.5, rev: 7.6, auto: 63.8 },
+    { name: "白虎", vel: 55, site: "西安中心", dom: "硬件",   commit:  736, def:  450, cyc: 7.9, flow: 30.8, rev: 7.1, auto: 65.4 },
+    { name: "朱雀", vel: 52, site: "南京中心", dom: "云平台", commit:  675, def:  580, cyc: 6.9, flow: 35.6, rev: 6.1, auto: 78.9 },
+    { name: "玄武", vel: 49, site: "西安中心", dom: "测试",   commit:  620, def:  850, cyc: 5.1, flow: 44.3, rev: 3.8, auto: 88.2 },
+    { name: "紫微", vel: 45, site: "北京总部", dom: "软件",   commit:  607, def:  880, cyc: 7.2, flow: 32.4, rev: 6.8, auto: 71.5 }
+  ];
+  /* 构造性断言用的权威串（契约 §2.3 逐字） */
+  const TEAM_AUTH =
+    "天枢|82|北京总部|软件;天璇|76|北京总部|云平台;天玑|71|上海中心|AI算法;天权|68|深圳中心|硬件;" +
+    "玉衡|66|上海中心|软件;开阳|63|成都中心|AI算法;摇光|61|成都中心|软件;青龙|58|深圳中心|硬件;" +
+    "白虎|55|西安中心|硬件;朱雀|52|南京中心|云平台;玄武|49|西安中心|测试;紫微|45|北京总部|软件";
+
+  /* 3.2 阻塞归属矩阵 12 队 × 5 类（与「单团队看板详情」「阻塞在制品台账」逐字同源）：
+         列和 = 契约五类卡数 38/27/21/14/9，总和 = 109（页尾硬校验）。 */
+  const BLOCK_CATS = ["跨域依赖", "环境与资源", "需求变更", "外部供应", "评审等待"];
+  const BLOCK_CAT_AUTH = [38, 27, 21, 14, 9];
+  const BLOCK_MTX = [
+    [5, 3, 3, 1, 1],   /* 天枢 13 */
+    [4, 3, 2, 1, 1],   /* 天璇 11 */
+    [4, 3, 2, 1, 1],   /* 天玑 11 */
+    [4, 2, 2, 2, 1],   /* 天权 11 */
+    [3, 2, 2, 1, 1],   /* 玉衡  9 */
+    [3, 2, 2, 1, 1],   /* 开阳  9 */
+    [3, 2, 2, 1, 0],   /* 摇光  8 */
+    [3, 2, 1, 2, 1],   /* 青龙  9 */
+    [3, 2, 1, 2, 0],   /* 白虎  8 */
+    [2, 2, 2, 1, 1],   /* 朱雀  8 */
+    [2, 2, 1, 1, 1],   /* 玄武  7 */
+    [2, 2, 1, 0, 0]    /* 紫微  5 */
+  ];
+
+  /* 3.3 缺陷域映射：契约按域四分（软件 / 硬件 / 云端 / AI），测试域团队缺陷计入软件域 */
+  const DEF_DOM_OF = { "软件": "软件", "测试": "软件", "硬件": "硬件", "云平台": "云端", "AI算法": "AI" };
+  const DEF_DOM_AUTH = { "软件": 4820, "硬件": 1560, "云端": 1340, "AI": 920 };
+
+  /* 3.4 域配色（平行坐标按团队所属域着色） */
+  const DOM_COLOR = { "软件": C.blue, "云平台": C.cyan, "AI算法": C.violet, "硬件": C.amber, "测试": C.green };
+
+  /* ===== 3.5 派生量：全部现算，页面上不出现硬编码合计 ===== */
+  TEAMS.forEach((t, i) => {
+    t.pts = t.vel * SPRINTS_PER_YEAR;                          /* 年故事点吞吐 */
+    t.done = t.vel * SPRINTS_CLOSED;                           /* 近 12 Sprint 完成 = 速率 × 12 */
+    t.rate = t.done / t.commit * 100;                          /* 承诺达成率（现算） */
+    t.dens = t.def / t.pts * 1000;                             /* 缺陷密度 个/千点（现算） */
+    t.blkRow = BLOCK_MTX[i].slice();
+    t.blk = sum(t.blkRow);                                     /* 障碍数 = 五类之和 */
+  });
+  const velSum = sum(TEAMS.map((t) => t.vel));
+  const ptsSum = sum(TEAMS.map((t) => t.pts));
+  const defSum = sum(TEAMS.map((t) => t.def));
+  const blkSum = sum(TEAMS.map((t) => t.blk));
+  const commitSum = sum(TEAMS.map((t) => t.commit));
+  const doneSum = sum(TEAMS.map((t) => t.done));
+  const rateAll = doneSum / commitSum * 100;                   /* 全量承诺达成率 92.68% */
+  const densAll = defSum / ptsSum * 1000;                      /* 全量缺陷密度 445.5 个/千点 */
+  const velAvg = velSum / TEAMS.length;                        /* 象限 x 分界线 = 均速 62.17 */
+  const blkColSum = BLOCK_CATS.map((c, j) => sum(BLOCK_MTX.map((r) => r[j])));
+  const defByDom = {};
+  TEAMS.forEach((t) => { const k = DEF_DOM_OF[t.dom]; defByDom[k] = (defByDom[k] || 0) + t.def; });
+
+  /* ===== 3.6 八个对比维（dir = +1 正向越大越优 / −1 逆向越小越优；w = 综合得分权重，Σw = 1） =====
+     ★ 逆向维处理口径（页内三处落地，底栏亦有说明）：
+       ① 平行坐标：逆向轴 inverse: true —— 轴被倒置，最优值落在轴顶，
+          轴名标 "↑优" 且用琥珀色区分，读图规则对八根轴完全统一（越靠上越优）；
+       ② 排名矩阵：逆向维按「值越小名次越前」排位，1 名恒为最优；
+       ③ 综合得分：逆向维归一取 (max − v) / (max − min)，与正向维同向后再加权。
+       —— 全程不做倒数变换（倒数会改变分布形状、放大小值端差异），只做方向翻转。 */
+  const DIMS = [
+    { key: "vel",  name: "速率",         short: "速率",   unit: " 点/Sprint", dec: 0, dir:  1, w: 0.18, core: true },
+    { key: "rate", name: "承诺达成率",   short: "承诺达成", unit: "%",         dec: 2, dir:  1, w: 0.16, core: true },
+    { key: "cyc",  name: "周期时间中位", short: "周期中位", unit: " 天",       dec: 1, dir: -1, w: 0.12, core: true },
+    { key: "flow", name: "流动效率",     short: "流动效率", unit: "%",         dec: 1, dir:  1, w: 0.12, core: true },
+    { key: "dens", name: "缺陷密度",     short: "缺陷密度", unit: " 个/千点",  dec: 1, dir: -1, w: 0.14, core: true },
+    { key: "rev",  name: "评审时长",     short: "评审时长", unit: " h/次",     dec: 1, dir: -1, w: 0.08, core: false },
+    { key: "auto", name: "自动化率",     short: "自动化率", unit: "%",         dec: 1, dir:  1, w: 0.10, core: true },
+    { key: "blk",  name: "障碍数",       short: "障碍数",  unit: " 张",       dec: 0, dir: -1, w: 0.10, core: false }
+  ];
+  const ND = DIMS.length;
+  const NT = TEAMS.length;
+  const WSUM = DIMS.reduce((a, d) => a + d.w, 0);              /* 现算，页内可见，必须 = 1 */
+
+  /* 每维原始值序列 + 极值 + 归一（min-max，方向翻转后统一「越大越优」） */
+  DIMS.forEach((d) => {
+    d.vals = TEAMS.map((t) => t[d.key]);
+    d.min = Math.min.apply(null, d.vals);
+    d.max = Math.max.apply(null, d.vals);
+    d.span = d.max - d.min;
+    d.mean = sum(d.vals) / NT;
+    d.spread = d.span / d.mean;                                /* 极差比：队际差异强度 */
+    d.norm = d.vals.map((v) => (d.span === 0 ? 100 : (d.dir === 1 ? (v - d.min) : (d.max - v)) / d.span * 100));
+    /* 名次：1 = 最优；同值按契约队序（速率降序 = 数组序）稳定排位，保证每维恰是 1~12 的排列 */
+    const order = d.vals.map((v, i) => i).sort((a, b) => (d.dir === 1 ? d.vals[b] - d.vals[a] : d.vals[a] - d.vals[b]) || (a - b));
+    d.rank = new Array(NT);
+    order.forEach((ti, p) => { d.rank[ti] = p + 1; });
+  });
+
+  /* 综合得分 = Σ(归一值 × 权重)，逐队现算 */
+  const scores = TEAMS.map((t, i) => DIMS.reduce((a, d) => a + d.norm[i] * d.w, 0));
+  const scoreOrder = scores.map((s, i) => i).sort((a, b) => scores[b] - scores[a] || (a - b));
+  const scoreRank = new Array(NT);
+  scoreOrder.forEach((ti, p) => { scoreRank[ti] = p + 1; });
+  const bestIdx = scoreOrder[0];
+  const worstIdx = scoreOrder[NT - 1];
+  /* 每队最强 / 最弱维（按归一值） */
+  const bestDim = TEAMS.map((t, i) => DIMS.map((d, j) => j).sort((a, b) => DIMS[b].norm[i] - DIMS[a].norm[i] || (a - b))[0]);
+  const worstDim = TEAMS.map((t, i) => DIMS.map((d, j) => j).sort((a, b) => DIMS[a].norm[i] - DIMS[b].norm[i] || (a - b))[0]);
+  /* 队际差异最大的维（极差比最大） */
+  const spreadDim = DIMS.map((d, j) => j).sort((a, b) => DIMS[b].spread - DIMS[a].spread || (a - b))[0];
+
+  /* 象限：x = 速率（分界 = 均速），y = 缺陷密度（分界 = 全量密度，契约现算） */
+  const QUADS = ["高产高质", "高产低质", "低产高质", "待提升"];
+  const quadOf = (i) => {
+    const hi = TEAMS[i].vel >= velAvg, good = TEAMS[i].dens <= densAll;
+    return hi ? (good ? 0 : 1) : (good ? 2 : 3);
+  };
+  const quadCnt = [0, 0, 0, 0];
+  const quadPts = [0, 0, 0, 0];
+  TEAMS.forEach((t, i) => { const q = quadOf(i); quadCnt[q] += 1; quadPts[q] += t.pts; });
+
+  const fmtDim = (j, i) => fmtDec(DIMS[j].vals[i], DIMS[j].dec) + DIMS[j].unit;
+
+  /* ===== 4. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("hf-clock-time").textContent = pad2(t.getHours()) + ":" + pad2(t.getMinutes()) + ":" + pad2(t.getSeconds());
+    $("hf-clock-date").textContent = t.getFullYear() + "年" + pad2(t.getMonth() + 1) + "月" + pad2(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. KPI（翻牌缓动；文本型 KPI 直接落字） ===== */
+  function countUp(el, target, dec, dur) {
+    const t0 = performance.now(), from = 0;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / (dur || 1100));
+      const e = 1 - Math.pow(1 - p, 3);
+      const v = from + (target - from) * e;
+      el.textContent = dec ? fmtDec(v, dec) : fmtInt(v);
+      if (p < 1) requestAnimationFrame(step);
+    })(performance.now());
+  }
+  $("hf-meta-vel").textContent = fmtInt(velSum);
+  $("hf-meta-thr").textContent = fmtInt(ptsSum);
+  countUp($("hf-kpi-0"), NT, 0);
+  countUp($("hf-kpi-1"), velSum, 0);
+  countUp($("hf-kpi-2"), ptsSum, 0);
+  $("hf-kpi-0s").innerHTML = "契约 §2.3 全部 <b>12</b> 支 Scrum 团队同屏并置，非单体详情";
+  $("hf-kpi-1s").innerHTML = "12 队速率之和 · 均速 <b>" + fmtDec(velAvg, 2) + "</b> 点/Sprint";
+  $("hf-kpi-2s").innerHTML = "= Σ速率 <b>" + fmtInt(velSum) + "</b> × <b>" + SPRINTS_PER_YEAR + "</b> Sprint（现算）";
+  $("hf-kpi-3").textContent = TEAMS[bestIdx].name;
+  $("hf-kpi-3u").textContent = fmtDec(scores[bestIdx], 1) + " 分";
+  $("hf-kpi-3s").innerHTML = TEAMS[bestIdx].site + " · " + TEAMS[bestIdx].dom + "域 · 最强维 <b>" + DIMS[bestDim[bestIdx]].name + "</b>";
+  $("hf-kpi-4").textContent = TEAMS[worstIdx].name;
+  $("hf-kpi-4u").textContent = fmtDec(scores[worstIdx], 1) + " 分";
+  $("hf-kpi-4s").innerHTML = TEAMS[worstIdx].site + " · " + TEAMS[worstIdx].dom + "域 · 最弱维 <b>" + DIMS[worstDim[worstIdx]].name + "</b>";
+  $("hf-kpi-5").textContent = DIMS[spreadDim].name;
+  $("hf-kpi-5u").textContent = "极差比 " + fmtDec(DIMS[spreadDim].spread, 2);
+  $("hf-kpi-5s").innerHTML = "最优 <b>" + fmtDec(DIMS[spreadDim].dir === 1 ? DIMS[spreadDim].max : DIMS[spreadDim].min, DIMS[spreadDim].dec) +
+    "</b> ↔ 最差 <b>" + fmtDec(DIMS[spreadDim].dir === 1 ? DIMS[spreadDim].min : DIMS[spreadDim].max, DIMS[spreadDim].dec) +
+    "</b>" + DIMS[spreadDim].unit + " · 极差 ÷ 均值";
+
+  /* ===== 6. 权重条（★ 权重和 = 1 页内可见，现算） ===== */
+  $("hf-wrow").innerHTML =
+    DIMS.map((d) => '<span class="hf-wchip' + (d.dir === -1 ? " is-rev" : "") + '">' +
+      (d.dir === -1 ? "↓" : "↑") + d.short + "<b>" + fmtDec(d.w, 2) + "</b></span>").join("") +
+    '<span class="hf-wsum">Σw = ' + fmtDec(WSUM, 2) + "</span>";
+
+  /* ===== 7. 排行榜 12 行（★ hash 定位目标；init 之前填充完） ===== */
+  const rowsEl = $("hf-rows");
+  rowsEl.innerHTML = scoreOrder.map((i, p) => {
+    const t = TEAMS[i];
+    const cls = p < 3 ? " is-top" : (p >= NT - 3 ? " is-bot" : "");
+    return '<li data-i="' + i + '" class="' + cls.trim() + '" title="' + t.name + "队 · " + t.site + " · " + t.dom + '域｜点击高亮，联动平行坐标 / 排名矩阵 / 雷达 / 象限">' +
+      '<span class="hf-r-no">' + (p + 1) + "</span>" +
+      '<span class="hf-r-name">' + t.name + "</span>" +
+      '<span class="hf-r-bar"><u style="width:' + fmtDec(scores[i], 1) + '%"></u></span>' +
+      '<span class="hf-r-score">' + fmtDec(scores[i], 1) + "</span>" +
+      '<span class="hf-r-tags"><i class="hf-tag is-best">强 ' + DIMS[bestDim[i]].short + "</i>" +
+        '<i class="hf-tag is-worst">弱 ' + DIMS[worstDim[i]].short + "</i></span>" +
+    "</li>";
+  }).join("");
+  const rowEls = Array.prototype.slice.call(rowsEl.querySelectorAll("li"));
+
+  /* ===== 8. 此消彼长洞察（★ 由排名矩阵与归一值现算，不写死文案） ===== */
+  const insights = [];
+  /* 8.1 首末总分差 + 差距最大的单维贡献 */
+  (function () {
+    let jm = 0, gm = -1;
+    DIMS.forEach((d, j) => { const g = (d.norm[bestIdx] - d.norm[worstIdx]) * d.w; if (g > gm) { gm = g; jm = j; } });
+    insights.push({
+      kind: "gap", dims: [jm], teams: [bestIdx, worstIdx],
+      html: "总分首位 <u>" + TEAMS[bestIdx].name + "</u> " + fmtDec(scores[bestIdx], 1) + " 分 ↔ 末位 <u>" +
+        TEAMS[worstIdx].name + "</u> " + fmtDec(scores[worstIdx], 1) + " 分，差 <b>" + fmtDec(scores[bestIdx] - scores[worstIdx], 1) +
+        "</b> 分；单维贡献最大的是 <b>" + DIMS[jm].name + "</b>（加权差 " + fmtDec(gm, 1) + " 分，占总差 <i>" +
+        fmtDec(gm / (scores[bestIdx] - scores[worstIdx]) * 100, 0) + "%</i>）"
+    });
+  })();
+  /* 8.2 全场最大「此消彼长」：同一队两维名次落差最大 */
+  (function () {
+    let ti = 0, ja = 0, jb = 0, gap = -1;
+    TEAMS.forEach((t, i) => {
+      for (let a = 0; a < ND; a++) for (let b = a + 1; b < ND; b++) {
+        const g = Math.abs(DIMS[a].rank[i] - DIMS[b].rank[i]);
+        if (g > gap) { gap = g; ti = i; ja = a; jb = b; }
+      }
+    });
+    const hiJ = DIMS[ja].rank[ti] < DIMS[jb].rank[ti] ? ja : jb;
+    const loJ = hiJ === ja ? jb : ja;
+    insights.push({
+      kind: "seesaw", dims: [hiJ, loJ], teams: [ti],
+      html: "此消彼长之最：<u>" + TEAMS[ti].name + "</u> 的 <b>" + DIMS[hiJ].name + "</b> 排第 <b>" + DIMS[hiJ].rank[ti] +
+        "</b>（" + fmtDim(hiJ, ti) + "），<b>" + DIMS[loJ].name + "</b> 却掉到第 <b>" + DIMS[loJ].rank[ti] +
+        "</b>（" + fmtDim(loJ, ti) + "）—— 落差 <i>" + gap + " 名</i>，全场最大"
+    });
+  })();
+  /* 8.3 域共性：≥2 队的域在某维平均名次最靠后 */
+  (function () {
+    const doms = {};
+    TEAMS.forEach((t, i) => { (doms[t.dom] = doms[t.dom] || []).push(i); });
+    let dn = "", jm = 0, mr = -1, cnt = 0;
+    Object.keys(doms).forEach((k) => {
+      if (doms[k].length < 2) return;
+      DIMS.forEach((d, j) => {
+        const m = sum(doms[k].map((i) => d.rank[i])) / doms[k].length;
+        if (m > mr) { mr = m; dn = k; jm = j; cnt = doms[k].length; }
+      });
+    });
+    const names = doms[dn].map((i) => TEAMS[i].name + "（" + DIMS[jm].rank[i] + "）").join("、");
+    insights.push({
+      kind: "domain", dims: [jm], teams: doms[dn],
+      html: "域级共性：<u>" + dn + "</u>域 " + cnt + " 队在 <b>" + DIMS[jm].name + "</b> 上平均第 <b>" + fmtDec(mr, 1) +
+        "</b> 名——" + names + "，是全域最弱项，属结构性差距而非个别队问题"
+    });
+  })();
+  /* 8.4 速率与缺陷密度的秩相关（Spearman，验证「快 = 糙」是否成立） */
+  (function () {
+    const jv = DIMS.findIndex((d) => d.key === "vel"), jd = DIMS.findIndex((d) => d.key === "dens");
+    const d2 = sum(TEAMS.map((t, i) => Math.pow(DIMS[jv].rank[i] - DIMS[jd].rank[i], 2)));
+    const rho = 1 - 6 * d2 / (NT * (NT * NT - 1));
+    const word = Math.abs(rho) < 0.3 ? "几乎无关" : (Math.abs(rho) < 0.6 ? "弱相关" : "强相关");
+    insights.push({
+      kind: "rho", dims: [jv, jd], teams: [],
+      html: "速率名次 vs 缺陷密度名次 Spearman <b>ρ = " + fmtDec(rho, 2) + "</b>（" + word +
+        "）—— " + (rho > 0 ? "「跑得快必然糙」并不成立，" : "两者反向，") + "质量差距主要来自<i>域与工程实践</i>，不是单纯赶速度"
+    });
+  })();
+  /* 8.5 象限分布 + 待提升区吞吐占比 */
+  (function () {
+    insights.push({
+      kind: "quad", dims: [], teams: TEAMS.map((t, i) => i).filter((i) => quadOf(i) === 3),
+      html: "四象限（分界：均速 <b>" + fmtDec(velAvg, 1) + "</b> 点 / 全量密度 <b>" + fmtDec(densAll, 1) +
+        "</b> 个/千点）：高产高质 <b>" + quadCnt[0] + "</b> 队、高产低质 <b>" + quadCnt[1] + "</b>、低产高质 <b>" +
+        quadCnt[2] + "</b>、待提升 <b>" + quadCnt[3] + "</b>；待提升区年吞吐 <i>" + fmtInt(quadPts[3]) + " 点</i>，占全量 " +
+        fmtDec(quadPts[3] / ptsSum * 100, 1) + "%"
+    });
+  })();
+  $("hf-ins").innerHTML = insights.map((x, k) => (
+    '<li><span class="hf-ins-no">' + (k + 1) + '</span><span class="hf-ins-tx">' + x.html + "</span></li>"
+  )).join("");
+
+  /* ===== 9. 底部口径滚动条（init 前填充） ===== */
+  (function () {
+    const items = [
+      ["形态", C.blue, "本页 = C 型「横向对比」：12 队同屏并置 PK，不做整页重绘式对象切换；交互为高亮 / 刷选（轴上拖拽），回答「谁强谁弱、强在哪、弱在哪、有没有此消彼长」"],
+      ["分工", C.violet, "同一批团队对象的三页分工：本页（12 队横向 PK · 队际比较粒度）｜单团队冲刺详情（单队 Sprint 360 度 · 燃尽/任务墙/成员负载）｜单团队看板详情（单队看板流动 · CFD/控制图/WIP 四列）"],
+      ["逆向维", C.amber, "四个逆向维（周期时间中位 / 缺陷密度 / 评审时长 / 障碍数）统一做「方向翻转」不做倒数：平行坐标轴 inverse 倒置（轴名琥珀色 + ↑优，八轴读法一致，越靠上越优）；排名矩阵按值越小名次越前；综合得分归一取 (max−v)÷(max−min)"],
+      ["得分", C.green, "综合得分 = Σ(归一值 × 权重)，归一为逐维 min-max 拉伸到 0~100（方向翻转后统一越大越优），权重 " +
+        DIMS.map((d) => d.short + " " + fmtDec(d.w, 2)).join(" + ") + " = " + fmtDec(WSUM, 2) + "（页内权重条可见）；满分 100 = 每一维都是 12 队最优值"],
+      ["排位", C.blue, "排名矩阵每列恰为 1~12 的排列：正向维值大者靠前、逆向维值小者靠前，同值按契约团队序（速率降序）稳定排位，因此无并列、无缺号"],
+      ["勾稽", C.amber, "12 团队名 / 速率 / 站点 / 域引契约 §2.3 逐字，Σ速率 = " + fmtInt(velSum) + " 点/Sprint，年吞吐 = " +
+        fmtInt(velSum) + " × " + SPRINTS_PER_YEAR + " = " + fmtInt(ptsSum) + " 点（契约 §2.2）"],
+      ["勾稽", C.amber, "承诺达成率 = 近 12 Sprint 完成 ÷ 承诺；完成 = 速率 × 12（Σ = " + fmtInt(doneSum) + "），承诺 Σ = " +
+        fmtInt(commitSum) + "，全量 = " + fmtDec(rateAll, 2) + "%，与父页「承诺 vs 完成」双轴同源"],
+      ["勾稽", C.amber, "缺陷密度 = 本队年缺陷 ÷ 本队年吞吐 × 1000；12 队缺陷 Σ = " + fmtInt(defSum) +
+        "（契约年发现），按域四分逐字 软件 " + fmtInt(defByDom["软件"]) + " / 硬件 " + fmtInt(defByDom["硬件"]) +
+        " / 云端 " + fmtInt(defByDom["云端"]) + " / AI " + fmtInt(defByDom["AI"]) +
+        "；测试域团队无独立缺陷域，其缺陷计入软件域；全量密度 " + fmtDec(densAll, 1) + " 个/千点"],
+      ["勾稽", C.amber, "障碍数 = 12 队 × 5 类阻塞矩阵行和，列和 = " + BLOCK_CATS.map((c, j) => c + " " + blkColSum[j]).join(" / ") +
+        "，Σ = " + blkSum + " 张（契约 §2.3），与「单团队看板详情」「阻塞在制品台账」同源"],
+      ["自编", C.textDim, "周期时间中位（天，完成卡计时口径）/ 流动效率（Σ活动 ÷ Σ周期）/ 评审时长（h·每次代码评审）/ 自动化率（用例自动化占比）为二级自编的队际可比口径，不与兄弟页的时间序列明细重复"],
+      ["交互", C.blue, "平行坐标任意轴上拖拽出区间即刷选，命中队在排行榜 / 排名矩阵 / 雷达 / 象限四处同步高亮；点排行行高亮单队；kiosk 每 3 秒逐队轮巡，hash 直达或人工干预后暂停 20 秒；Esc 返回上级专题页"]
+    ];
+    const html = items.map((a) => '<span class="hf-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("hf-foot-track").innerHTML = html + html;                 /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* ===== 10. 资源守卫（排行榜 / 洞察 / KPI 已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("hf-error").classList.add("is-visible");
+
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const parChart = hasEcharts ? echarts.init($("hf-chart-par")) : null;
+  const heatChart = hasEcharts ? echarts.init($("hf-chart-heat")) : null;
+  const radarChart = hasEcharts ? echarts.init($("hf-chart-radar")) : null;
+  const quadChart = hasEcharts ? echarts.init($("hf-chart-quad")) : null;
+
+  /* ===== 11. option 构造 =====
+     ★ 平行坐标 series.data 只放数值数组（8 个标量），团队用 seriesIndex 关联；
+       其余图表的 data 项为**现场构造的字面量**（value 数组 + 样式），不含任何业务对象引用，
+       杜绝 setOption 深拷贝遇循环引用（契约 §7.1-7）。 */
+
+  const PAX_ID = "hf-pax-vel";                                 /* 速率轴 id：程序化刷选锚点 */
+  const PAR_ROWS = TEAMS.map((t, i) => DIMS.map((d) => d.vals[i]));   /* 12 × 8 纯数值矩阵 */
+
+  function parOption() {
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({ trigger: "item", confine: true, formatter: (p) => {
+        const i = p.seriesIndex;
+        return "<b style=\"color:" + DOM_COLOR[TEAMS[i].dom] + "\">" + TEAMS[i].name + "</b>　" + TEAMS[i].site + " · " + TEAMS[i].dom + "域<br/>" +
+          DIMS.map((d, j) => d.name + "：<b>" + fmtDec(d.vals[i], d.dec) + d.unit + "</b>　第 " + d.rank[i] + " 名").join("<br/>") +
+          "<br/>综合得分 <b style=\"color:" + C.amber + "\">" + fmtDec(scores[i], 1) + "</b> 分 · 第 " + scoreRank[i] + " 名";
+      } }, TIP),
+      parallel: {
+        left: 40, right: 26, top: 44, bottom: 22,
+        parallelAxisDefault: {
+          type: "value", nameLocation: "end", nameGap: 15,
+          nameTextStyle: { fontSize: 11, color: C.blue },
+          axisLine: { lineStyle: { color: "rgba(96,140,255,.45)" } },
+          axisTick: { lineStyle: { color: "rgba(96,140,255,.45)" } },
+          axisLabel: { color: C.textDim, fontSize: 9.5, margin: 4 },
+          splitLine: { show: false },
+          realtime: true,
+          areaSelectStyle: { width: 18, borderWidth: 1, borderColor: C.amber, color: C.amber, opacity: 0.2 }
+        }
+      },
+      parallelAxis: DIMS.map((d, j) => {
+        const p = d.span * 0.14 || 1;
+        return {
+          dim: j, id: j === 0 ? PAX_ID : ("hf-pax-" + j),
+          name: d.short + " ↑优",
+          nameTextStyle: { fontSize: 11, color: d.dir === -1 ? C.amber : C.blue },
+          inverse: d.dir === -1,                               /* ★ 逆向维倒置：最优值落在轴顶 */
+          min: Math.round((d.min - p) * 100) / 100,
+          max: Math.round((d.max + p) * 100) / 100,
+          axisLabel: { color: C.textDim, fontSize: 9.5, formatter: (v) => fmtDec(v, d.dec === 0 ? 0 : 1) }
+        };
+      }),
+      series: TEAMS.map((t, i) => ({
+        name: t.name, type: "parallel",
+        lineStyle: { width: 1.9, opacity: 0.8, color: DOM_COLOR[t.dom] },
+        emphasis: { lineStyle: { width: 3.4, opacity: 1 } },
+        inactiveOpacity: 0.05, activeOpacity: 1,
+        smooth: 0.05,
+        data: [PAR_ROWS[i].slice()]                            /* ★ 纯数值数组，无对象回指 */
+      }))
+    };
+  }
+
+  function heatOption() {
+    const data = [];
+    DIMS.forEach((d, j) => TEAMS.forEach((t, i) => {
+      const on = sel.length === 0 || sel.indexOf(i) >= 0;
+      data.push({
+        value: [i, ND - 1 - j, d.rank[i]],                     /* 字面量：value 数组 + 样式，无业务对象 */
+        itemStyle: { opacity: on ? 1 : 0.2, borderColor: sel.indexOf(i) >= 0 ? C.amber : "rgba(5,10,28,.85)", borderWidth: sel.indexOf(i) >= 0 ? 1.6 : 1 }
+      });
+    }));
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({ position: "top", confine: true, formatter: (p) => {
+        const i = p.value[0], j = ND - 1 - p.value[1];
+        return "<b>" + TEAMS[i].name + "</b> · " + DIMS[j].name + "<br/>名次 <b style=\"color:" + C.amber + "\">第 " + p.value[2] +
+          " / " + NT + "</b>　实测 <b>" + fmtDim(j, i) + "</b><br/>方向：" + (DIMS[j].dir === 1 ? "正向（越大越优）" : "逆向（越小越优）");
+      } }, TIP),
+      grid: { left: 62, right: 14, top: 12, bottom: 44 },
+      xAxis: {
+        type: "category", data: TEAMS.map((t) => t.name),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { fontSize: 11, interval: 0, formatter: (v, k) => (sel.indexOf(k) >= 0 ? "{on|" + v + "}" : "{off|" + v + "}"),
+          rich: { on: { color: C.amber, fontWeight: 700, fontSize: 11.5 }, off: { color: C.textDim, fontSize: 11 } } },
+        splitArea: { show: false }
+      },
+      yAxis: {
+        type: "category", data: DIMS.map((d) => d.short + (d.dir === -1 ? " ↓" : " ↑")).slice().reverse(),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10.5, interval: 0 }
+      },
+      visualMap: {
+        type: "piecewise", min: 1, max: NT, orient: "horizontal", left: "center", bottom: 2,
+        itemWidth: 13, itemHeight: 9, itemGap: 6, textStyle: { color: C.textDim, fontSize: 10 },
+        text: ["1 名最亮", "12 名最暗"],
+        showLabel: true,                                       /* ★ piecewise 一旦设 text，showLabel 默认变 false，须显式补回 */
+        pieces: [
+          { min: 1, max: 3, label: "1~3 名", color: C.amber },
+          { min: 4, max: 6, label: "4~6 名", color: hexMix(C.amber, 0.42, 0x50) },
+          { min: 7, max: 9, label: "7~9 名", color: C.blueDeep },
+          { min: 10, max: 12, label: "10~12 名", color: darken(C.blueDeep, 0.5) }
+        ]
+      },
+      series: [{
+        type: "heatmap", data: data,
+        label: { show: true, fontSize: 10.5, fontWeight: 700, color: "#06101f", formatter: (p) => p.value[2] },
+        progressive: 0
+      }]
+    };
+  }
+
+  const RADAR_DIMS = DIMS.map((d, j) => j).filter((j) => DIMS[j].core);   /* 核心 6 维 */
+  const RADAR_COLORS = [C.amber, C.cyan, C.violet];
+  function radarPick() {
+    if (sel.length >= 2) return sel.slice(0, 3);
+    if (sel.length === 1) return sel[0] === bestIdx ? [bestIdx, worstIdx] : [sel[0], bestIdx];
+    return [bestIdx, worstIdx];                                /* 默认：Σ 排名首末两队 */
+  }
+  function radarOption() {
+    const pick = radarPick();
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({ trigger: "item", confine: true }, TIP),
+      legend: {
+        top: 2, left: "center", itemWidth: 16, itemHeight: 9, itemGap: 14,
+        textStyle: { color: C.textDim, fontSize: 11 },
+        data: pick.map((i) => TEAMS[i].name)
+      },
+      radar: {
+        center: ["50%", "56%"], radius: "62%",
+        indicator: RADAR_DIMS.map((j) => ({ name: DIMS[j].short + (DIMS[j].dir === -1 ? "↓" : "↑"), max: 100, min: 0 })),
+        axisName: { color: C.textDim, fontSize: 10.5 },
+        splitNumber: 4,
+        axisLine: { lineStyle: { color: C.grid } },
+        splitLine: { lineStyle: { color: C.grid } },
+        splitArea: { areaStyle: { color: ["rgba(20,38,92,.24)", "rgba(14,26,66,.24)"] } }
+      },
+      series: [{
+        type: "radar", symbolSize: 4,
+        data: pick.map((i, k) => ({                            /* 字面量：name + 数值数组 */
+          name: TEAMS[i].name,
+          value: RADAR_DIMS.map((j) => Math.round(DIMS[j].norm[i] * 10) / 10),
+          lineStyle: { width: 2.2, color: RADAR_COLORS[k % 3] },
+          itemStyle: { color: RADAR_COLORS[k % 3] },
+          areaStyle: { color: RADAR_COLORS[k % 3], opacity: 0.14 }
+        }))
+      }]
+    };
+  }
+  function radarTag() {
+    const pick = radarPick();
+    $("hf-tag-radar").innerHTML = "核心 6 维<b>归一值</b>（0~100，逆向已翻转）· 当前 " +
+      pick.map((i) => TEAMS[i].name).join(" vs ") + (sel.length === 0 ? "（默认 Σ 排名首末）" : "");
+  }
+
+  function quadOption() {
+    const R = [10, 34];
+    const pMin = Math.min.apply(null, TEAMS.map((t) => t.pts));
+    const pMax = Math.max.apply(null, TEAMS.map((t) => t.pts));
+    const data = TEAMS.map((t, i) => {
+      const on = sel.length === 0 || sel.indexOf(i) >= 0;
+      const c = DOM_COLOR[t.dom];
+      return {                                                 /* 字面量：value 数组（含索引标量）+ 样式 */
+        value: [t.vel, Math.round(t.dens * 10) / 10, t.pts, i],
+        symbolSize: R[0] + (R[1] - R[0]) * (t.pts - pMin) / (pMax - pMin),
+        itemStyle: { color: c, opacity: on ? 0.82 : 0.18, borderColor: sel.indexOf(i) >= 0 ? C.amber : "rgba(5,10,28,.6)", borderWidth: sel.indexOf(i) >= 0 ? 2.2 : 1 },
+        label: { show: true, position: "top", distance: 3, fontSize: on ? 11 : 10, fontWeight: on ? 700 : 400,
+          color: sel.indexOf(i) >= 0 ? C.amber : (on ? "#c8d6f2" : "rgba(127,146,196,.35)"), formatter: t.name }
+      };
+    });
+    const xMin = 40, xMax = 88, yMin = 200, yMax = 800;
+    const area = (x0, x1, y0, y1, color) => [{ xAxis: x0, yAxis: y0, itemStyle: { color: color } }, { xAxis: x1, yAxis: y1 }];
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({ trigger: "item", confine: true, formatter: (p) => {
+        const i = p.value[3], t = TEAMS[i];
+        return "<b style=\"color:" + DOM_COLOR[t.dom] + "\">" + t.name + "</b>　" + t.site + " · " + t.dom + "域<br/>" +
+          "速率 <b>" + t.vel + "</b> 点/Sprint（第 " + DIMS[0].rank[i] + " 名）<br/>" +
+          "缺陷密度 <b>" + fmtDec(t.dens, 1) + "</b> 个/千点（第 " + DIMS[4].rank[i] + " 名）<br/>" +
+          "年吞吐 <b>" + fmtInt(t.pts) + "</b> 点 = " + t.vel + " × " + SPRINTS_PER_YEAR + "（气泡面积）<br/>" +
+          "象限：<b style=\"color:" + C.amber + "\">" + QUADS[quadOf(i)] + "</b>";
+      } }, TIP),
+      grid: { left: 54, right: 18, top: 22, bottom: 34 },
+      xAxis: {
+        type: "value", name: "速率 点/Sprint →", nameLocation: "end", nameGap: 8,
+        nameTextStyle: { color: C.textDim, fontSize: 10 }, min: xMin, max: xMax,
+        axisLine: { lineStyle: { color: C.line } }, axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      yAxis: {
+        type: "value", inverse: true,                          /* ★ 逆向维：密度越低越好 → 越靠上 */
+        name: "↑ 缺陷密度 个/千点（低者优）", nameLocation: "end", nameGap: 10,
+        nameTextStyle: { color: C.amber, fontSize: 10, align: "left" }, min: yMin, max: yMax,
+        axisLine: { lineStyle: { color: C.line } }, axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      series: [{
+        type: "scatter", data: data,
+        markArea: {
+          silent: true, label: { show: true, position: "insideTopLeft", color: "rgba(160,186,232,.5)", fontSize: 10.5, distance: 4 },
+          data: [
+            [{ xAxis: velAvg, yAxis: yMin, itemStyle: { color: "rgba(111,224,154,.055)" }, label: { formatter: QUADS[0] + " " + quadCnt[0] + " 队", position: "insideTopRight" } }, { xAxis: xMax, yAxis: densAll }],
+            [{ xAxis: velAvg, yAxis: densAll, itemStyle: { color: "rgba(255,157,92,.055)" }, label: { formatter: QUADS[1] + " " + quadCnt[1] + " 队", position: "insideBottomRight" } }, { xAxis: xMax, yAxis: yMax }],
+            [{ xAxis: xMin, yAxis: yMin, itemStyle: { color: "rgba(92,157,255,.05)" }, label: { formatter: QUADS[2] + " " + quadCnt[2] + " 队", position: "insideTopLeft" } }, { xAxis: velAvg, yAxis: densAll }],
+            [{ xAxis: xMin, yAxis: densAll, itemStyle: { color: "rgba(255,95,107,.06)" }, label: { formatter: QUADS[3] + " " + quadCnt[3] + " 队", position: "insideBottomLeft" } }, { xAxis: velAvg, yAxis: yMax }]
+          ]
+        },
+        markLine: {
+          silent: true, symbol: "none",
+          lineStyle: { color: "rgba(255,194,77,.6)", type: "dashed", width: 1.2 },
+          label: { color: C.amber, fontSize: 10, formatter: (p) => p.name },
+          data: [
+            { name: "均速 " + fmtDec(velAvg, 1), xAxis: velAvg },
+            { name: "全量密度 " + fmtDec(densAll, 1), yAxis: densAll }
+          ]
+        }
+      }]
+    };
+  }
+  function quadTag() {
+    $("hf-tag-quad").innerHTML = "气泡 = 年吞吐（Σ <b>" + fmtInt(ptsSum) + "</b> 点）· 分界 = 均速 / 全量密度（均现算）";
+  }
+
+  /* ===== 12. 选中态：C 型的核心交互——高亮 / 刷选，而非切换重绘 ===== */
+  let sel = [];                                                /* 选中队索引（升序）；空 = 全量 */
+  let brushing = false;                                        /* 防程序化刷选与 axisareaselected 互激 */
+
+  function renderRows() {
+    rowEls.forEach((li) => {
+      const i = Number(li.dataset.i);
+      const on = sel.indexOf(i) >= 0;
+      li.classList.toggle("is-sel", on);
+      li.classList.toggle("is-dim", sel.length > 0 && !on);
+    });
+  }
+  function renderHead() {
+    if (sel.length === 0) {
+      $("hf-focus-cap").textContent = "当前高亮";
+      $("hf-focus-val").textContent = "全量 12 队";
+      $("hf-crumb-obj").textContent = "12 团队 · 横向对比（同屏并置，非单体详情）";
+    } else if (sel.length === 1) {
+      const t = TEAMS[sel[0]];
+      $("hf-focus-cap").textContent = "当前高亮 · 综合第 " + scoreRank[sel[0]] + " 名";
+      $("hf-focus-val").textContent = t.name + "　" + fmtDec(scores[sel[0]], 1) + " 分";
+      $("hf-crumb-obj").textContent = t.name + " · " + t.site + " · " + t.dom + "域 · 速率第 " + DIMS[0].rank[sel[0]] + " 名";
+    } else {
+      $("hf-focus-cap").textContent = "刷选命中 " + sel.length + " 队";
+      $("hf-focus-val").textContent = sel.map((i) => TEAMS[i].name).join("、").slice(0, 14);
+      $("hf-crumb-obj").textContent = "刷选对比 · " + sel.map((i) => TEAMS[i].name).join("、");
+    }
+  }
+  function syncBrush() {
+    if (!parChart) return;
+    brushing = true;
+    let ivs = [];
+    if (sel.length > 0 && sel.length < NT) ivs = sel.map((i) => [TEAMS[i].vel - 0.5, TEAMS[i].vel + 0.5]);
+    parChart.dispatchAction({ type: "axisAreaSelect", parallelAxisId: PAX_ID, intervals: ivs });
+    brushing = false;
+  }
+  function applySel(list, src) {
+    const next = (list || []).slice().sort((a, b) => a - b);
+    if (next.join(",") !== sel.join(",")) {
+      sel = next;
+      renderRows();
+      renderHead();
+      radarTag();
+      if (hasEcharts) {
+        heatChart.setOption(heatOption(), true);
+        radarChart.setOption(radarOption(), true);
+        quadChart.setOption(quadOption(), true);
+      }
+      if (sel.length === 1) {
+        history.replaceState(null, "", "#" + encodeURIComponent(TEAMS[sel[0]].name));
+        const li = rowEls.filter((e) => Number(e.dataset.i) === sel[0])[0];
+        if (li && li.scrollIntoView) li.scrollIntoView({ block: "nearest" });
+      }
+    }
+    if (src !== "brush") syncBrush();
+  }
+
+  /* hash 契约：decodeURIComponent → trim + 全角空白剔除归一 → 别名表 → 匹配 12 团队名 */
+  const HASH_ALIAS = {};
+  TEAMS.forEach((t) => { HASH_ALIAS[t.name + "队"] = t.name; HASH_ALIAS[t.name + "团队"] = t.name; });
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    if (HASH_ALIAS[s]) s = HASH_ALIAS[s];
+    return TEAMS.findIndex((x) => x.name === s);
+  }
+
+  /* ===== 13. 首绘（DOM 已全部填充完毕，此处才 init 图表）=====
+     ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  radarTag();
+  quadTag();
+  renderHead();
+  if (hasEcharts) {
+    parChart.setOption(parOption(), true);
+    heatChart.setOption(heatOption(), true);
+    radarChart.setOption(radarOption(), true);
+    quadChart.setOption(quadOption(), true);
+
+    /* 轴刷选 → 命中队联动高亮（echarts 官方 parallel 刷选取法；不可用时静默降级为纯视觉刷选） */
+    parChart.on("axisareaselected", function () {
+      if (brushing) return;
+      let hits = null;
+      try {
+        const series = parChart.getModel().getSeries();
+        hits = [];
+        series.forEach((s, k) => {
+          if (typeof s.getRawIndicesByActiveState !== "function") { hits = null; return; }
+          if (hits && s.getRawIndicesByActiveState("active").length > 0) hits.push(k);
+        });
+      } catch (e) { hits = null; }
+      if (!hits) return;
+      pauseRotate(20000);
+      applySel(hits.length === NT ? [] : hits, "brush");
+    });
+    parChart.on("click", (p) => { if (p.seriesIndex != null) { pauseRotate(20000); applySel([p.seriesIndex]); } });
+    heatChart.on("click", (p) => { if (p.value && p.value.length) { pauseRotate(20000); applySel([p.value[0]]); } });
+    quadChart.on("click", (p) => { if (p.value && p.value.length > 3) { pauseRotate(20000); applySel([p.value[3]]); } });
+  }
+
+  /* ===== 14. 交互：排行行 / 键盘 / hash 契约 / kiosk 轮巡 =====
+     ★ 本节只做「调用」，门闩状态量 pauseUntil / pauseRotate() 已在第 1.1 节声明
+       （声明行号严格小于此处首次调用行号，TDZ 防护）。 */
+  const PARENT = "大屏样板间-研发敏捷交付总览1920.html";
+
+  rowEls.forEach((li) => li.addEventListener("click", () => {
+    const i = Number(li.dataset.i);
+    pauseRotate(20000);
+    applySel(sel.length === 1 && sel[0] === i ? [] : [i]);
+  }));
+  rowsEl.addEventListener("mouseenter", () => { hoverHold = true; });
+  rowsEl.addEventListener("mouseleave", () => { hoverHold = false; pauseRotate(3000); });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { location.href = PARENT; return; }
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      const cur = sel.length === 1 ? scoreRank[sel[0]] - 1 : -1;
+      const step = e.key === "ArrowRight" ? 1 : -1;
+      const p = ((cur + step) % NT + NT) % NT;
+      pauseRotate(20000);
+      applySel([scoreOrder[p]]);
+    }
+  });
+
+  /* 冷启动 hash：命中则高亮该队并滚动到其排名行（★ C 型不整页重绘） */
+  const bootHit = resolveHash(location.hash);
+  if (bootHit >= 0) { applySel([bootHit]); pauseRotate(20000); }
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && !(sel.length === 1 && sel[0] === k)) { applySel([k]); pauseRotate(20000); }
+  });
+
+  /* kiosk 常驻：每 3 秒逐队轮巡高亮；门闩期内空转（不 teardown） */
+  setInterval(() => {
+    if (hoverHold || Date.now() < pauseUntil) return;
+    kioskIdx = (kioskIdx + 1) % NT;
+    applySel([scoreOrder[kioskIdx]]);
+  }, 3000);
+
+  /* ===== 15. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const permOK = (arr) => { const s = arr.slice().sort((a, b) => a - b); return s.length === NT && s.every((v, i) => v === i + 1); };
+  const checks = [
+    ["12 团队名 / 速率 / 站点 / 域与契约 §2.3 逐字（构造性断言）",
+      TEAMS.map((t) => [t.name, t.vel, t.site, t.dom].join("|")).join(";") === TEAM_AUTH],
+    ["Σ速率 = 746 点/Sprint，且速率严格降序（父页速率排序柱同序）",
+      velSum === VEL_ALL && velSum === 746 && TEAMS.every((t, i) => i === 0 || t.vel < TEAMS[i - 1].vel)],
+    ["年吞吐 = Σ速率 × 26 = 19,396 点，且逐队 pts = vel × 26",
+      ptsSum === THROUGHPUT_ALL && ptsSum === 19396 && ptsSum === velSum * SPRINTS_PER_YEAR &&
+      TEAMS.every((t) => t.pts === t.vel * SPRINTS_PER_YEAR)],
+    ["8 维每维 12 个值齐全、有限且方向标记合法（+1 / −1）",
+      DIMS.length === 8 && DIMS.every((d) => d.vals.length === NT && d.vals.every((v) => typeof v === "number" && isFinite(v)) &&
+        (d.dir === 1 || d.dir === -1))],
+    ["逆向维恰 4 个（周期时间中位 / 缺陷密度 / 评审时长 / 障碍数），口径 = 方向翻转（非倒数）：归一取 (max−v)÷(max−min)",
+      DIMS.filter((d) => d.dir === -1).map((d) => d.name).join("|") === "周期时间中位|缺陷密度|评审时长|障碍数" &&
+      DIMS.every((d) => d.vals.every((v, i) => {
+        const want = d.span === 0 ? 100 : (d.dir === 1 ? (v - d.min) : (d.max - v)) / d.span * 100;
+        return Math.abs(d.norm[i] - want) < 1e-9;
+      }))],
+    ["每维归一值落在 [0,100]，且最优队 = 100、最差队 = 0",
+      DIMS.every((d) => d.norm.every((v) => v >= -1e-9 && v <= 100 + 1e-9) &&
+        Math.abs(Math.max.apply(null, d.norm) - 100) < 1e-9 && Math.abs(Math.min.apply(null, d.norm)) < 1e-9)],
+    ["排名矩阵每维恰是 1~12 的排列（无重复无缺失），且 1 名 = 该维最优值",
+      DIMS.every((d) => permOK(d.rank) &&
+        d.vals[d.rank.indexOf(1)] === (d.dir === 1 ? d.max : d.min))],
+    ["排名与原始值方向一致：正向维值大者名次靠前、逆向维值小者名次靠前",
+      DIMS.every((d) => TEAMS.every((t, a) => TEAMS.every((t2, b) => {
+        if (d.vals[a] === d.vals[b]) return true;
+        const aBetter = d.dir === 1 ? d.vals[a] > d.vals[b] : d.vals[a] < d.vals[b];
+        return aBetter ? d.rank[a] < d.rank[b] : d.rank[a] > d.rank[b];
+      })))],
+    ["权重和 = 1（现算，页内权重条可见）且每维权重 > 0",
+      Math.abs(WSUM - 1) < 1e-9 && DIMS.every((d) => d.w > 0)],
+    ["综合得分 = Σ(归一值 × 权重) 逐队现算（|Δ| < 1e-9），且落在 [0,100]",
+      TEAMS.every((t, i) => Math.abs(scores[i] - DIMS.reduce((a, d) => a + d.norm[i] * d.w, 0)) < 1e-9 &&
+        scores[i] >= -1e-9 && scores[i] <= 100 + 1e-9)],
+    ["综合排名恰是 1~12 的排列，且得分严格降序（首位 = " + TEAMS[bestIdx].name + "，末位 = " + TEAMS[worstIdx].name + "）",
+      permOK(scoreRank) && scoreOrder.every((ti, p) => p === 0 || scores[ti] <= scores[scoreOrder[p - 1]]) &&
+      scoreRank[bestIdx] === 1 && scoreRank[worstIdx] === NT],
+    ["承诺达成率现算：完成 = 速率 × 12（Σ = 8,952 = 父页 Σ完成），承诺 Σ = 9,659 = 父页 Σ承诺，全量 = 92.68%",
+      TEAMS.every((t) => t.done === t.vel * SPRINTS_CLOSED && Math.abs(t.rate - t.done / t.commit * 100) < 1e-9 && t.commit > t.done) &&
+      doneSum === 8952 && commitSum === COMMIT_ALL && commitSum === 9659 && Math.abs(rateAll - 92.68) < 0.005],
+    ["12 队缺陷 Σ = 8,640（契约 §2.2 年发现），按域四分逐字回契约 软件 4,820 / 硬件 1,560 / 云端 1,340 / AI 920",
+      defSum === DEF_ALL && defSum === 8640 &&
+      Object.keys(DEF_DOM_AUTH).every((k) => defByDom[k] === DEF_DOM_AUTH[k]) &&
+      sum(Object.keys(DEF_DOM_AUTH).map((k) => DEF_DOM_AUTH[k])) === DEF_ALL],
+    ["缺陷密度 = 本队缺陷 ÷ 本队年吞吐 × 1000 现算；全量密度 = 8,640 ÷ 19,396 × 1000",
+      TEAMS.every((t) => Math.abs(t.dens - t.def / t.pts * 1000) < 1e-9) &&
+      Math.abs(densAll - DEF_ALL / THROUGHPUT_ALL * 1000) < 1e-9],
+    ["障碍数 = 阻塞矩阵行和，列和 = 契约五类 38/27/21/14/9，Σ = 109 张",
+      TEAMS.every((t, i) => t.blk === sum(BLOCK_MTX[i])) &&
+      blkColSum.every((v, j) => v === BLOCK_CAT_AUTH[j]) && blkSum === BLOCK_ALL && blkSum === 109 &&
+      sum(BLOCK_CAT_AUTH) === BLOCK_ALL],
+    ["平行坐标 data 为 12 × 8 纯数值矩阵（只放标量，无对象回指）",
+      PAR_ROWS.length === NT && PAR_ROWS.every((r, i) => Array.isArray(r) && r.length === ND &&
+        r.every((v, j) => typeof v === "number" && isFinite(v) && v === DIMS[j].vals[i]))],
+    ["象限散点 12 点齐全，四象限计数 Σ = 12、年吞吐 Σ = 19,396 点，分界 = 均速 / 全量密度现算",
+      sum(quadCnt) === NT && sum(quadPts) === ptsSum && Math.abs(velAvg - velSum / NT) < 1e-9 &&
+      TEAMS.every((t, i) => quadOf(i) >= 0 && quadOf(i) <= 3)],
+    ["雷达核心 6 维取自 8 维子集，指标值 = 归一值（0~100，逆向已翻转）",
+      RADAR_DIMS.length === 6 && RADAR_DIMS.every((j) => j >= 0 && j < ND && DIMS[j].core) &&
+      RADAR_DIMS.every((j) => DIMS[j].norm.every((v) => v >= -1e-9 && v <= 100 + 1e-9))],
+    ["洞察结论 3~5 条，且其中引用的名次与排名矩阵逐条一致（现算校验）",
+      insights.length >= 3 && insights.length <= 5 &&
+      insights.every((x) => x.dims.every((j) => j >= 0 && j < ND) && x.teams.every((i) => i >= 0 && i < NT)) &&
+      (function () {
+        const g = insights.filter((x) => x.kind === "seesaw")[0];
+        if (!g) return false;
+        const i = g.teams[0], a = g.dims[0], b = g.dims[1];
+        /* 独立复算「全场最大名次落差」，须与洞察选中的队/维一致 */
+        let mx = -1;
+        TEAMS.forEach((t, k) => { for (let p = 0; p < ND; p++) for (let q = p + 1; q < ND; q++) mx = Math.max(mx, Math.abs(DIMS[p].rank[k] - DIMS[q].rank[k])); });
+        return Math.abs(DIMS[a].rank[i] - DIMS[b].rank[i]) === mx && DIMS[a].rank[i] < DIMS[b].rank[i];
+      })()],
+    ["排行榜 12 行按综合得分降序渲染，行 data-i 与团队索引一一对应（hash 定位目标）",
+      rowEls.length === NT && rowEls.every((li, p) => Number(li.dataset.i) === scoreOrder[p])],
+    ["hash 12 队名均可解析，别名表覆盖「XX队」「XX团队」（构造性断言）",
+      TEAMS.every((t, i) => resolveHash("#" + encodeURIComponent(t.name)) === i &&
+        resolveHash("#" + encodeURIComponent(t.name + "队")) === i &&
+        resolveHash("#" + encodeURIComponent(t.name + "团队")) === i) &&
+      resolveHash("#" + encodeURIComponent("不存在的队")) === -1],
+    /* ★ TDZ 防护的构造性断言：pauseUntil / pauseRotate() 声明在第 1.1 节（行号远小于第 14 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 pauseCalls ≥ 1」即证明声明早于首次调用。 */
+    ["pauseUntil 声明早于首次 pauseRotate() 调用（B 型门闩 + TDZ 防护，构造性断言）",
+      typeof pauseUntil === "number" && typeof pauseRotate === "function" &&
+      (bootHit < 0 ? pauseCalls === 0 : (pauseCalls >= 1 && pauseUntil > Date.now()))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[12团队效能对比] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

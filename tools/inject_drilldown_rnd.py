@@ -74,21 +74,87 @@ DIMS6 = ["交付", "质量", "效率", "投入产出", "协同", "人才"]
 
 # ---- 父页接线配置（锚点均实测于页面源码；rows 是 CSS 选择器，names 是 §6 对象名） ----
 # 分波追加：W2 先接一期三对「表格行级」下钻，图表画布级与面板级入口视各波页面实况扩充。
+# ---- 二期扩充 W7：每个专题页的第 2 个子页 ----
+# 锚点一律避开已被首个子页占用的行锚（同一批 li 挂两条 target 会互相覆盖 dataset.drillSub）
+CHARTER3 = ["创意提案", "Charter 评审", "正式立项"]
+CHARTER3_MATCH = [n.replace(" ", "") for n in CHARTER3]   # ★ 匹配前会剔空白，含空格名须另给 match
+TRPTS6 = ["TR1", "TR2", "TR3", "TR4", "TR5", "TR6"]
+IFPAIRS6 = ["软件↔硬件", "软件↔云端", "软件↔AI", "硬件↔云端", "硬件↔AI", "云端↔AI"]
+
+SUB_CH = "大屏样板间-研发Charter立项台账1920.html"
+SUB_YV = "大屏样板间-研发TR评审台账1920.html"
+SUB_HG = "大屏样板间-研发预算执行台账1920.html"
+SUB_DM = "大屏样板间-研发障碍与回顾台账1920.html"
+SUB_PT = "大屏样板间-研发流水线运行台账1920.html"
+SUB_RY = "大屏样板间-研发跨域接口台账1920.html"
+
+
+# ---- 二期扩充 W8：A 型切换器 ×4 + B 型台账 ×2（锚点同样避开首个子页的行锚）----
+MODULES13 = ["应用框架", "智家APP", "固件中间件", "系统集成", "主板电源", "射频天线", "结构散热",
+             "设备接入", "数据管道", "开放API", "视觉质检", "语音交互", "推荐策略"]
+FUNCS6 = ["软件", "硬件", "云平台", "AI算法", "测试", "PM与管理"]
+CBBDOMS5 = ["软件基础库", "硬件模块", "云服务组件", "AI模型组件", "工具链"]
+MATS10 = ["主控 SoC", "电源管理 IC", "温度传感器", "毫米波雷达", "无线通信模组",
+          "快充协议芯片", "镁铝中框", "触控显示屏", "存储器", "声学器件"]
+# ★ 同 NODES12：匹配前会剔空白，含空格名须另给 match
+MATS10_MATCH = [n.replace(" ", "") for n in MATS10]
+
+SUB_ZJ = "大屏样板间-研发单团队看板详情1920.html"
+SUB_JL = "大屏样板间-研发单模块质量详情1920.html"
+SUB_XN = "大屏样板间-研发单职能人才详情1920.html"
+SUB_TP = "大屏样板间-研发单CBB域详情1920.html"
+SUB_ZL = "大屏样板间-研发物料认证台账1920.html"
+SUB_GP = "大屏样板间-研发数据集与训练台账1920.html"
+
+
+# ---- 二期扩充 W9：C 型横向对比 ×4 + E 型关系图谱 ×3（第 3 个子页，锚点再避开前两个）----
+STAGES6 = ["概念", "计划", "开发", "验证", "发布", "周期"]
+SUB_ZC = "大屏样板间-研发四线组合对比1920.html"
+SUB_HP = "大屏样板间-研发阶段停留对比1920.html"
+SUB_HF = "大屏样板间-研发12团队效能对比1920.html"
+SUB_KJ = "大屏样板间-研发五群能力对比1920.html"
+SUB_MZ = "大屏样板间-研发四域依赖图谱1920.html"
+SUB_NV = "大屏样板间-研发跨站协作图谱1920.html"
+SUB_PV = "大屏样板间-研发技能图谱1920.html"
+
+
+# ---- 二期扩充 W10（收官）：D 型时序复盘 ×3 + B 型台账 ×3 ----
+# D 型按「时间窗」而非对象组织（事件流时间轴 + 前后对比），是第五种子页形态。
+CLUSTERS4 = ["软件", "硬件", "云平台", "AI算法"]   # dv 热力 y 轴类目（实测于父页源码，非「云端/AI」）
+SUB_ZX = "大屏样板间-研发单需求全链路复盘1920.html"
+SUB_XQ = "大屏样板间-研发单发布批次复盘1920.html"
+SUB_FJ = "大屏样板间-研发季度指数复盘1920.html"
+SUB_FB = "大屏样板间-研发链路瓶颈台账1920.html"
+SUB_LN = "大屏样板间-研发改进行动台账1920.html"
+SUB_QW = "大屏样板间-研发专利资产台账1920.html"
+
+
 PAGES = [
     {
         "file": "大屏样板间-研发产品组合与路标1920.html",
+        "charts": [
+            {"chartId": "lb-chart-quad", "names": LINES4, "sub": SUB_ZC},
+            {"chartId": "lb-chart-funnel", "names": CHARTER3, "match": CHARTER3_MATCH, "sub": SUB_CH},
+        ],
         "targets": [
             {"rows": "#lb-tbody li", "names": LINES4, "sub": SUB_DL},
         ],
     },
     {
         "file": "大屏样板间-研发IPD管道与评审1920.html",
+        "charts": [
+            {"chartId": "ip-chart-box", "names": STAGES6, "sub": SUB_HP},
+            {"chartId": "ip-chart-tr", "names": TRPTS6, "sub": SUB_YV},
+        ],
         "targets": [
             {"rows": "#ip-tbody li", "names": PROJECTS8, "sub": SUB_DJ},
         ],
     },
     {
         "file": "大屏样板间-研发需求全生命周期1920.html",
+        "panels": [
+            {"panelTitle": "需求状态累积流图", "label": "需求复盘", "sub": SUB_ZX},
+        ],
         "targets": [
             {"rows": "#rq-tbody li", "names": SOURCES4, "sub": SUB_TZ},
         ],
@@ -96,18 +162,30 @@ PAGES = [
     # ---- 二期 · 敏捷执行（W3）----
     {
         "file": "大屏样板间-研发敏捷交付总览1920.html",
+        "charts": [
+            {"chartId": "ag-chart-vel", "names": TEAMS12, "sub": SUB_HF},
+        ],
+        "panels": [
+            {"panelTitle": "障碍清单", "label": "障碍台账", "sub": SUB_DM},
+        ],
         "targets": [
             {"rows": "#ag-tbody li", "names": TEAMS12, "sub": SUB_CQ},
         ],
     },
     {
         "file": "大屏样板间-研发看板流动效率1920.html",
+        "charts": [
+            {"chartId": "ks-chart-wip", "names": TEAMS12, "sub": SUB_ZJ},
+        ],
         "targets": [
             {"rows": "#ks-tbody li", "names": BLOCKS5, "sub": SUB_BS},
         ],
     },
     {
         "file": "大屏样板间-研发质量与缺陷1920.html",
+        "charts": [
+            {"chartId": "qa-chart-sun", "names": MODULES13, "sub": SUB_JL},
+        ],
         "targets": [
             {"rows": "#qa-tbody li", "names": DOMAINS4, "sub": SUB_QX},
         ],
@@ -115,18 +193,28 @@ PAGES = [
     # ---- 三期 · 多域协同（W4）----
     {
         "file": "大屏样板间-研发软硬云AI集成协同1920.html",
+        "charts": [
+            {"chartId": "ct-chart-dep", "names": DOMAINS4, "sub": SUB_MZ},
+            {"chartId": "ct-chart-if", "names": IFPAIRS6, "sub": SUB_RY},
+        ],
         "targets": [
             {"rows": "#ct-tbody li", "names": BASELINES4, "sub": SUB_JX},
         ],
     },
     {
         "file": "大屏样板间-研发硬件与样机1920.html",
+        "panels": [
+            {"panelTitle": "关键物料认证进度", "label": "物料台账", "sub": SUB_ZL},
+        ],
         "targets": [
             {"rows": "#hj-tbody li", "names": BATCHES5, "sub": SUB_PC},
         ],
     },
     {
         "file": "大屏样板间-研发AI模型迭代1920.html",
+        "panels": [
+            {"panelTitle": "训练排期 × 算力利用率", "label": "数据集台账", "sub": SUB_GP},
+        ],
         "targets": [
             {"rows": "#ai-tbody li", "names": MODELS5, "sub": SUB_ML},
         ],
@@ -134,6 +222,9 @@ PAGES = [
     # ---- 四期 · 组织与资产（W5）----
     {
         "file": "大屏样板间-研发多中心布局1920.html",
+        "charts": [
+            {"chartId": "gq-chart-graph", "names": SITES6, "sub": SUB_NV},
+        ],
         "targets": [
             {"rows": "#gq-tbody li", "names": SITES6, "sub": SUB_BY},
         ],
@@ -146,6 +237,9 @@ PAGES = [
     # ---- 二期补齐（S12–S18）：7 个原本没有子页的专题页 ----
     {
         "file": "大屏样板间-研发投入与预算1920.html",
+        "charts": [
+            {"chartId": "ty-chart-bullet", "names": COSTS5, "sub": SUB_HG},
+        ],
         "targets": [
             {"rows": "#ty-tbody li", "names": COSTS5, "sub": SUB_YZ},
         ],
@@ -154,15 +248,20 @@ PAGES = [
         # 该页无表格：走图表画布 click（覆盖率箱线，类目名即五域仓库群）+ 面板级入口兜底
         "file": "大屏样板间-研发工程效能1920.html",
         "charts": [
+            {"chartId": "dx-chart-xp", "names": REPOS5, "sub": SUB_KJ},
             {"chartId": "dx-chart-coverage", "names": REPOS5, "sub": SUB_GC},
         ],
         "panels": [
             {"panelTitle": "单测覆盖率箱线", "label": "仓库群详情", "sub": SUB_GC},
+            {"panelTitle": "流水线成功率日历热力", "label": "流水线台账", "sub": SUB_PT},
         ],
     },
     {
         # 事件行文本含 P1/P2/P3/P4 等级标记，按等级下钻到台账并定位该等级
         "file": "大屏样板间-研发云端服务与发布1920.html",
+        "panels": [
+            {"panelTitle": "发布列车节奏日历热力", "label": "发布复盘", "sub": SUB_XQ},
+        ],
         "targets": [
             {"rows": "#cy-list li", "names": INCLV4, "sub": SUB_RZ},
         ],
@@ -173,6 +272,9 @@ PAGES = [
     {
         # 等距 SVG 的 16 个节点组带 data-node，textContent 含节点名原文（已浏览器实测）
         "file": "大屏样板间-研发交付流水线数字孪生1920.html",
+        "charts": [
+            {"chartId": "dv-chart-heat", "names": CLUSTERS4, "sub": SUB_FB},
+        ],
         "targets": [
             {"rows": "[data-node]", "names": NODES12, "match": NODES12_MATCH, "sub": SUB_LJ},
         ],
@@ -184,7 +286,9 @@ PAGES = [
         # 岗位只存在于图表里（rc-tbody 是六职能，不是岗位），故走画布 click + 面板入口
         "file": "大屏样板间-研发人才与能力1920.html",
         "charts": [
+            {"chartId": "rc-chart-cloud", "names": FUNCS6, "sub": SUB_PV},
             {"chartId": "rc-chart-post", "names": POSTS10, "sub": SUB_RL},
+            {"chartId": "rc-chart-pyramid", "names": FUNCS6, "sub": SUB_XN},
         ],
         "panels": [
             {"panelTitle": "关键岗位饱和度", "label": "岗位台账", "sub": SUB_RL},
@@ -192,12 +296,20 @@ PAGES = [
     },
     {
         "file": "大屏样板间-研发技术资产与复用1920.html",
+        "charts": [
+            {"chartId": "ta-chart-patent", "names": LINES4, "sub": SUB_QW},
+            {"chartId": "ta-chart-shelf", "names": CBBDOMS5, "sub": SUB_TP},
+        ],
         "targets": [
             {"rows": "#ta-tbody li", "names": OSS10, "sub": SUB_SM},
         ],
     },
     {
         "file": "大屏样板间-研发效能指数1920.html",
+        "panels": [
+            {"panelTitle": "改进行动追踪", "label": "行动台账", "sub": SUB_LN},
+            {"panelTitle": "指数 24 月走势", "label": "季度复盘", "sub": SUB_FJ},
+        ],
         "targets": [
             {"rows": "#pi-tbody li", "names": DIMS6, "sub": SUB_ZB},
         ],

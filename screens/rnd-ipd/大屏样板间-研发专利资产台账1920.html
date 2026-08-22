@@ -1,0 +1,1352 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发专利资产台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --qw-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：专利号 / 名称 / 类型 / 产品线 / 发明人 / 申请日 / 法律状态 / 剩余年限 */
+    --qw-tcols: 98px 1fr 48px 72px 84px 74px 56px 78px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .qw-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(169, 140, 245, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    /* 三栏：台账 914 / 单件详情 480 / 图表列 462（1884 内宽 − 2×14 间隙） */
+    grid-template-columns: 1fr 480px 462px;
+    grid-template-rows: 84px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .qw-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .qw-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .qw-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .qw-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(169, 140, 245, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(169, 140, 245, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .qw-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .qw-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .qw-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .qw-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .qw-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到技术资产与复用，琥珀描边与本页星蓝主色区分 */
+  .qw-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .qw-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .qw-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .qw-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .qw-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .qw-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .qw-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .qw-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .qw-chips { display: flex; align-items: center; gap: 9px; }
+  .qw-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 122px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .qw-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .qw-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .qw-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .qw-chip.is-key b { color: var(--rnd-blue); }
+  .qw-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .qw-clock-time { font: 700 26px/1 var(--qw-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .qw-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 两级筛选条：一级产品线（hash 契约目标）+ 二级法律状态 ===== */
+  .qw-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .qw-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .qw-lchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 6px 12px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .qw-lchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .qw-lchip b { font: 700 14px/1 var(--qw-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .qw-lchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .qw-lchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .qw-lchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .qw-lchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .qw-lchip.is-hit { animation: qw-hit 0.9s ease-in-out 2; }
+  @keyframes qw-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--qw-cc, rgba(92, 157, 255, 0.8)); } }
+  .qw-fdiv { flex: none; width: 1px; height: 24px; margin: 0 3px; background: rgba(96, 140, 255, 0.28); }
+  .qw-schip {
+    display: flex; align-items: baseline; gap: 5px; cursor: pointer;
+    padding: 4px 10px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.04em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .qw-schip b { font: 700 12px/1 var(--qw-mono); font-variant-numeric: tabular-nums; }
+  .qw-schip i { font-style: normal; font-size: 10.5px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .qw-schip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .qw-schip.is-on { color: #071026; font-weight: 700; }
+  .qw-schip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  /* 右侧状态文字：flex:1 + min-width:0 + 省略号——无论文案多长都只会在条内截断，
+     绝不会把左侧 chip 顶出画面（两级筛选共 11 枚 chip，横向余量本就紧张）。 */
+  .qw-filters-state {
+    margin-left: auto; flex: 1 1 auto; min-width: 0; padding-left: 14px; text-align: right;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 11.5px; color: var(--rnd-text-dim); letter-spacing: 0.04em; font-variant-numeric: tabular-nums;
+  }
+  .qw-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .qw-filters-state em { font-style: normal; color: #d3e2ff; }
+  .qw-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 7px; }
+  .qw-filters-state u { text-decoration: none; color: var(--rnd-amber); }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .qw-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .qw-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .qw-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--qw-kc, var(--rnd-blue)); }
+  .qw-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .qw-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .qw-kpi-v b { font: 700 24px/1 var(--qw-mono); color: var(--qw-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .qw-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .qw-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .qw-col { display: flex; flex-direction: column; gap: 14px; height: 742px; min-height: 0; min-width: 0; }
+  .qw-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .qw-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .qw-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .qw-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .qw-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .qw-panel-tag { font-size: 11px; letter-spacing: 0.05em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .qw-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .qw-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：24 行 × 27px + 表头，overflow hidden 防撑破 */
+  .qw-panel.is-ledger { flex: none; height: 742px; min-height: 0; overflow: hidden; }
+  /* ★ 详情区同样写死高度：内部 5 个块全部由 JS 在 echarts.init 之前填充，
+     写死高度后即便填充再多内容也不会反过来压矮任何图表容器。 */
+  .qw-panel.is-detail { flex: none; height: 742px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .qw-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .qw-thead, .qw-tbody li { display: grid; grid-template-columns: var(--qw-tcols); align-items: center; gap: 8px; }
+  .qw-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .qw-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .qw-tbody li {
+    padding: 0 8px; height: 27px; border-radius: 5px; cursor: pointer;
+    font-size: 12.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: qw-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes qw-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .qw-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .qw-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .qw-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .qw-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qw-tbody li .qw-no { font: 700 11px/1 var(--qw-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.02em; }
+  .qw-tbody li .qw-nm { color: #dfe9ff; }
+  .qw-tbody li .qw-line { font-size: 11.5px; color: #bfd2f6; }
+  .qw-tbody li .qw-inv { font-size: 11.5px; color: #a9bce4; }
+  .qw-tbody li .qw-date { font-size: 11.5px; color: #a9bce4; }
+  /* 空态行：必须显式覆盖 .qw-tbody li 的 grid/27px 行高，否则文案会被裁掉 */
+  .qw-empty { display: block; height: auto; padding: 26px 8px; cursor: default; background: none !important; font-size: 12.5px; color: rgba(127, 146, 196, 0.8); }
+  .qw-badge {
+    padding: 2px 6px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap;
+  }
+  /* 专利类型三档 */
+  .qw-badge.is-t0 { color: #041b3a; background: var(--rnd-blue); }
+  .qw-badge.is-t1 { color: #063a25; background: var(--rnd-green); }
+  .qw-badge.is-t2 { color: #2a1140; background: var(--rnd-violet); }
+  /* 法律状态五档 */
+  .qw-badge.is-s0 { color: #063a25; background: var(--rnd-green); }
+  .qw-badge.is-s1 { color: #041b3a; background: var(--rnd-blue); }
+  .qw-badge.is-s2 { color: #3a2a05; background: var(--rnd-amber); }
+  .qw-badge.is-s3 { color: #3d060c; background: var(--rnd-red); }
+  .qw-badge.is-s4 { border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+  /* 剩余年限：微条 + 数值 */
+  .qw-rem { display: flex; align-items: center; gap: 7px; }
+  .qw-rem-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .qw-rem-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .qw-rem em { flex: none; width: 40px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+  .qw-rem-na { font-size: 11px; color: rgba(127, 146, 196, 0.55); }
+
+  /* ===== 中栏：单件专利详情（审查流转时间轴 + 指标 + 关联） ===== */
+  .qw-dt-head { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 7px 10px 8px; border-radius: 8px; background: rgba(14, 26, 66, 0.55); border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 8px; min-height: 92px; }
+  .qw-dt-no { display: flex; align-items: center; gap: 8px; }
+  .qw-dt-no b { font: 700 13px/1 var(--qw-mono); color: var(--rnd-blue); letter-spacing: 0.04em; }
+  .qw-dt-title { font-size: 13px; font-weight: 700; color: #eaf1ff; line-height: 1.35; max-height: 36px; overflow: hidden; }
+  .qw-dt-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qw-dt-sub b { font-weight: 700; color: #c9d8f8; }
+  .qw-dt-bar { flex: none; display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; background: rgba(14, 26, 66, 0.5); }
+  .qw-dt-seg { position: relative; min-width: 14px; }
+  .qw-dt-seg + .qw-dt-seg { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .qw-dt-seg.is-cur {
+    background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px) !important;
+    animation: qw-breath 1.6s ease-in-out infinite;
+  }
+  @keyframes qw-breath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+  .qw-dt-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .qw-dt-row { flex: 1; display: grid; grid-template-columns: 62px 1fr 74px; align-items: center; gap: 8px; padding: 0 5px; border-radius: 5px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .qw-dt-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .qw-dt-row b { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.03em; }
+  .qw-dt-row b::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--qw-pc, var(--rnd-blue)); }
+  .qw-dt-row.is-todo b { color: rgba(127, 146, 196, 0.6); }
+  .qw-dt-row.is-todo b::before { opacity: 0.3; }
+  .qw-dt-row span { color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qw-dt-row em { font-style: normal; text-align: right; font: 700 13px/1 var(--qw-mono); color: var(--rnd-cyan); }
+  .qw-dt-row.is-cur em { color: var(--rnd-amber); }
+  .qw-dt-row.is-todo em { color: rgba(127, 146, 196, 0.5); }
+  .qw-dt-metrics { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0; }
+  .qw-dt-m {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px 7px;
+    border-radius: 8px; border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.5);
+  }
+  .qw-dt-m span { font-size: 10.5px; letter-spacing: 0.1em; color: #6079b0; }
+  .qw-dt-m b { font: 700 19px/1 var(--qw-mono); color: var(--qw-mc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .qw-dt-m i { font-style: normal; font-size: 10px; color: rgba(127, 146, 196, 0.75); }
+  .qw-dt-rel { flex: none; min-height: 132px; padding: 7px 10px 8px; border-radius: 8px; border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.5); }
+  .qw-dt-rel h3 { margin: 0 0 6px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.1em; color: #8aa8e8; }
+  .qw-dt-rl { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 11.5px; color: var(--rnd-text-dim); }
+  .qw-dt-rl u { flex: none; text-decoration: none; width: 62px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.75); }
+  .qw-dt-tag {
+    display: inline-flex; align-items: center; padding: 2px 9px 3px; border-radius: 6px;
+    font-size: 11.5px; letter-spacing: 0.04em; white-space: nowrap;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.55); color: #cfe0ff;
+  }
+  .qw-dt-tag.is-cbb { border-color: rgba(70, 214, 200, 0.45); color: #b6f0e8; }
+  .qw-dt-tag.is-inv { border-color: rgba(169, 140, 245, 0.45); color: #ded0ff; }
+  .qw-dt-note { font-size: 10.5px; line-height: 1.5; color: rgba(127, 146, 196, 0.7); }
+
+  /* ===== 底部滚动条 ===== */
+  .qw-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .qw-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-violet); }
+  .qw-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-violet);
+    box-shadow: 0 0 10px var(--rnd-violet); animation: qw-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes qw-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .qw-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .qw-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .qw-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .qw-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .qw-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .qw-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="qw-stage" id="qw-stage">
+    <!-- mockflag:begin --><div class="qw-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="qw-error" id="qw-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="qw-header">
+      <div class="qw-head-left">
+        <div class="qw-crumb">
+          <a class="qw-crumb-up" href="大屏样板间-研发技术资产与复用1920.html" title="返回上级专题页（Esc）">‹ 返回 技术资产与复用</a>
+          <b>云麓智联科技</b><i>›</i><span>技术资产与复用</span><i>›</i><em>专利资产台账</em>
+        </div>
+        <div class="qw-head-title-row">
+          <div class="qw-head-title">专利资产台账</div>
+          <div class="qw-head-meta">
+            <span>在册专利 <b id="qw-meta-app">--</b> 件 · 本表抽样 <b id="qw-meta-n">--</b> 件（<b id="qw-meta-ratio">--</b>）</span><i>|</i>
+            <span><b>4</b> 条产品线 · <b>5</b> 档法律状态 · <b>9</b> 个技术领域</span><i>|</i>
+            <span>数据基准日 <b>2026-08-19</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="qw-head-right">
+        <div class="qw-chips">
+          <div class="qw-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="qw-chip is-key"><span id="qw-chip-key">授权率 · 全部</span><b id="qw-chip-val">--</b></div>
+        </div>
+        <div class="qw-clock" aria-label="实时时钟">
+          <span class="qw-clock-time" id="qw-clock-time">--:--:--</span>
+          <span class="qw-clock-date" id="qw-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 两级筛选：一级产品线（hash 契约目标）+ 二级法律状态（计数随一级重算） -->
+    <div class="qw-filters">
+      <span class="qw-filters-tag">产品线</span>
+      <div id="qw-lchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="qw-fdiv"></span>
+      <span class="qw-filters-tag">法律状态</span>
+      <div id="qw-schips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="qw-filters-state" id="qw-filters-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="qw-kpis" id="qw-kpis"></div>
+
+    <!-- 左：专利明细台账（写死高度 742px = 24 行 × 27px + 表头） -->
+    <section class="qw-panel is-ledger">
+      <div class="qw-panel-head">
+        <h2>专利明细台账（产品线 × 法律状态）</h2>
+        <span class="qw-panel-tag" id="qw-table-tag">--</span>
+      </div>
+      <div class="qw-table">
+        <div class="qw-thead">
+          <span>专利号</span><span>专利名称</span><span>类型</span><span>产品线</span>
+          <span>第一发明人</span><span>申请日</span><span>状态</span><span>剩余年限</span>
+        </div>
+        <ul class="qw-tbody" id="qw-tbody"></ul>
+      </div>
+    </section>
+
+    <!-- 中：单件专利详情（审查流转时间轴 + 三指标 + 关联产品与 CBB） -->
+    <section class="qw-panel is-detail">
+      <div class="qw-panel-head">
+        <h2>单件专利 · 审查流转</h2>
+        <span class="qw-panel-tag" id="qw-dt-tag">--</span>
+      </div>
+      <div class="qw-dt-head" id="qw-dt-headbox"></div>
+      <div class="qw-dt-bar" id="qw-dt-bar"></div>
+      <div class="qw-dt-list" id="qw-dt-list"></div>
+      <div class="qw-dt-metrics" id="qw-dt-metrics"></div>
+      <div class="qw-dt-rel" id="qw-dt-rel"></div>
+    </section>
+
+    <!-- 右：24 月走势 + 技术领域分布 + 授权率与审查周期 -->
+    <div class="qw-col">
+      <section class="qw-panel" style="flex: 1.12;">
+        <div class="qw-panel-head">
+          <h2>申请 / 授权 24 月走势</h2>
+          <span class="qw-panel-tag">累计末值 <b id="qw-trend-tag">--</b>（与父页同源）</span>
+        </div>
+        <div class="qw-chart" id="qw-chart-trend"></div>
+      </section>
+      <section class="qw-panel" style="flex: 1;">
+        <div class="qw-panel-head">
+          <h2>技术领域分布</h2>
+          <span class="qw-panel-tag" id="qw-field-tag">--</span>
+        </div>
+        <div class="qw-chart" id="qw-chart-field"></div>
+      </section>
+      <section class="qw-panel" style="flex: 1;">
+        <div class="qw-panel-head">
+          <h2>授权率与平均审查周期</h2>
+          <span class="qw-panel-tag" id="qw-rate-tag">--</span>
+        </div>
+        <div class="qw-chart" id="qw-chart-rate"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="qw-foot">
+      <div class="qw-foot-tag">知识产权研判</div>
+      <div class="qw-foot-view"><div class="qw-foot-track" id="qw-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("qw-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("qw-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 知识产权视角）
+         ★ 与父页 P16「技术资产与复用」严格同源（docs/RndIpdThemed.md §2.2）：
+           专利累计申请 1,264 件 / 累计授权 782 件；24 月月度序列 PAT_APP / PAT_GRA 与期初
+           PAT_OPEN {742, 431} 与父页 `ta-chart-patent` 逐字一致，累计末值恒为 1,264 / 782。
+         ★ 三页分工（同一父页下三个子页，视角互不重叠，页内口径条已注明）：
+           · 本页 qw「专利资产台账」＝ 自有知识产权的**全量台账**（申请→授权的法律资产视角）；
+           · 兄弟页 sm「开源合规与技术债台账」＝ **外购与欠账**（第三方组件许可证风险 + 技术债存量）；
+           · 兄弟页 tp「单CBB域详情」＝ **自研沉淀的复用**（CBB 组件被复用的工程视角）。
+         ★ 二级拆分（产品线 × 法律状态矩阵、技术领域 × 产品线矩阵、24 件抽样明细、
+           五节点审查流转段耗时）为本页自编，一律 Σ == 上级数，全部进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，行与产品线/状态/领域之间一律用索引
+           （ln / st / ty）关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 契约锚点（勿改，与父页逐字） */
+  const PAT_APP_REF = 1264;                 /* 累计申请（件） */
+  const PAT_GRA_REF = 782;                  /* 累计授权（件） */
+  const PAT_OPEN = { app: 742, gra: 431 };  /* 24 月窗口期初累计（2024-08 末） */
+  const PAT_APP = [16, 17, 15, 22, 14, 11, 19, 21, 20, 24, 22, 20, 23, 24, 22, 28, 22, 18, 27, 29, 28, 31, 29, 20];
+  const PAT_GRA = [9, 10, 8, 13, 8, 6, 11, 13, 12, 15, 14, 13, 15, 16, 15, 19, 17, 14, 20, 22, 21, 23, 22, 15];
+  const AS_OF = "2026-08-19";               /* 数据基准日 */
+
+  /* 4.2 四条产品线（契约 §2.2 逐字，作 hash 键）
+         app = 在册申请件数、gra = 已授权件数、cyc = 平均审查周期（申请→授权日历天，
+         口径为全部已授权件加权，含实用新型/外观快速通道，故低于纯发明专利均值）。
+         Σ app == 1,264、Σ gra == 782（契约），授权率与整体周期一律现算。 */
+  const LINES = [
+    { name: "智家终端",   app: 428, gra: 268, cyc: 528, color: C.blue },
+    { name: "云平台服务", app: 336, gra: 208, cyc: 612, color: C.cyan },
+    { name: "AIoT模组",   app: 292, gra: 182, cyc: 566, color: C.amber },
+    { name: "行业方案",   app: 208, gra: 124, cyc: 648, color: C.violet }
+  ];
+
+  /* 4.3 法律状态五档（列顺序 = 状态索引；ST_MAT 行 = 产品线、列 = 状态）
+         列和 == 各状态件数，行和 == 各产品线申请数，全表 Σ == 1,264；
+         「已授权」列和必须 == 782（与契约授权数同一个数，不另写一份）。 */
+  const STATES = [
+    { name: "已授权", color: C.green,  badge: "is-s0", note: "已下证，进入年费维持期" },
+    { name: "实审中", color: C.blue,   badge: "is-s1", note: "已进入实质审查，等待审查意见" },
+    { name: "公开",   color: C.amber,  badge: "is-s2", note: "已公开未实审，可提实审请求" },
+    { name: "驳回",   color: C.red,    badge: "is-s3", note: "驳回决定生效（未复审或复审维持）" },
+    { name: "撤回",   color: C.blueDeep, badge: "is-s4", note: "主动撤回或视为撤回" }
+  ];
+  const ST_MAT = [
+    [268, 72, 44, 26, 18],      /* 智家终端   Σ 428 */
+    [208, 58, 36, 20, 14],      /* 云平台服务 Σ 336 */
+    [182, 50, 32, 18, 10],      /* AIoT模组   Σ 292 */
+    [124, 34, 20, 14, 16]       /* 行业方案   Σ 208 */
+  ];
+
+  /* 4.4 技术领域 × 产品线矩阵（9 领域；行 = 产品线、列 = 领域）
+         行和 == 产品线申请数、列和 == 领域件数、全表 Σ == 1,264，两个方向都进自检。 */
+  const FIELDS = ["边缘计算", "语音交互", "电源管理", "射频与天线", "云原生架构",
+                  "AI推理加速", "传感与检测", "数据安全", "人机交互"];
+  const FIELD_COLORS = [C.blue, C.cyan, C.amber, C.orange, C.green, C.violet, C.blueDeep, C.red, "#8fb4ff"];
+  const FIELD_MAT = [
+    [46, 92, 62, 34, 18, 48, 42, 24, 62],   /* 智家终端   Σ 428 */
+    [52, 26,  8,  6, 96, 46, 10, 68, 24],   /* 云平台服务 Σ 336 */
+    [58, 22, 52, 70, 10, 24, 42,  8,  6],   /* AIoT模组   Σ 292 */
+    [30, 24, 26, 26, 28, 24, 24, 16, 10]    /* 行业方案   Σ 208 */
+  ];
+
+  /* 4.5 专利类型三档（Σ == 1,264；法定保护期 TERM 用于剩余年限现算） */
+  const TYPES = [
+    { name: "发明",     short: "发明", n: 812, term: 20, badge: "is-t0", color: C.blue },
+    { name: "实用新型", short: "实用", n: 318, term: 10, badge: "is-t1", color: C.green },
+    { name: "外观设计", short: "外观", n: 134, term: 15, badge: "is-t2", color: C.violet }
+  ];
+
+  /* 4.6 发明人名册（六职能，契约 §2.1：软件 / 硬件 / 云平台 / AI算法 / 测试 / PM与管理）
+         台账行只存名册索引（标量），不做对象回指。 */
+  const INVENTORS = [
+    { n: "陈立诚", f: "软件" },   { n: "周砚舟", f: "软件" },     { n: "苏亦泽", f: "软件" },
+    { n: "王砺锋", f: "硬件" },   { n: "郝云翔", f: "硬件" },
+    { n: "李栖桐", f: "云平台" }, { n: "谢云归", f: "云平台" },
+    { n: "徐见微", f: "AI算法" }, { n: "汪知远", f: "AI算法" },
+    { n: "高砚青", f: "测试" },   { n: "罗嘉衡", f: "PM与管理" }
+  ];
+
+  /* 4.7 五节点审查流转（申请 → 受理 → 公开 → 实审 → 结案）
+         seg[k] = 第 k 段停留天数；Σ seg == 该件审查周期（现算，不复制数字）。
+         结案节点名随法律状态变：已授权→授权 / 驳回→驳回 / 撤回→撤回 / 在审→未到（is-todo）。
+         实用新型与外观走初步审查，节点名沿用统一五段，段耗时显著短于发明。 */
+  const NODES = ["申请", "受理", "公开", "实审", "结案"];
+  const NODE_HINT = ["递交申请文件 → 受理通知书", "受理 → 公布/公告", "公开 → 进入审查程序",
+                     "审查意见答复 → 作出决定"];
+  const NODE_COLORS = [C.blue, C.cyan, C.amber, C.green, C.violet];
+  const END_NAME = ["授权", "驳回", "撤回"];
+
+  /* 4.8 台账抽样 24 件（1,264 件不可能逐条陈列；按申请日倒序展示）
+         ty = 类型索引 ln = 产品线索引 st = 法律状态索引 inv = 发明人名册索引数组
+         seg = 各段停留天数（已授权/驳回/撤回 4 段，实审中 3 段，公开 2 段）
+         cl/ct/fm = 权利要求数 / 被引用次数 / 同族数；prod/cbb = 关联产品与 CBB 组件（父页货架同名）。 */
+  const ROWS = [
+    { no: "CN2026176509", ty: 1, ln: 0, st: 1, ad: "2025-11-24", inv: [4, 3], seg: [5, 62, 28],
+      nm: "一种可拆卸模块化传感器安装座", cl: 8, ct: 1, fm: 1, prod: "星澜Pro2", cbb: "板对板连接器" },
+    { no: "CN2026334077", ty: 2, ln: 3, st: 2, ad: "2025-09-18", inv: [10, 3], seg: [5, 48],
+      nm: "车载路侧感知终端（车联1.0）", cl: 1, ct: 1, fm: 1, prod: "车联1.0", cbb: "板对板连接器" },
+    { no: "CN2026131902", ty: 2, ln: 0, st: 0, ad: "2025-06-03", inv: [10, 2], seg: [4, 42, 26, 78],
+      nm: "智能中控屏（星澜S3）", cl: 1, ct: 5, fm: 1, prod: "星澜S3", cbb: "lm-ui 控件集" },
+    { no: "CN2026256208", ty: 1, ln: 2, st: 0, ad: "2025-03-11", inv: [4, 3], seg: [4, 54, 30, 116],
+      nm: "一种小型化多频段天线馈电结构", cl: 7, ct: 8, fm: 2, prod: "澜芯M60", cbb: "2.4G/5G 射频板" },
+    { no: "CN2026118307", ty: 1, ln: 0, st: 0, ad: "2025-02-18", inv: [3, 4], seg: [5, 58, 32, 124],
+      nm: "一种带均热板的智能面板散热结构", cl: 9, ct: 11, fm: 2, prod: "星澜Pro2", cbb: "均热板结构件" },
+    { no: "CN2026226147", ty: 0, ln: 1, st: 2, ad: "2025-01-27", inv: [5, 8], seg: [6, 544],
+      nm: "一种零信任网关的设备指纹动态评分方法", cl: 11, ct: 4, fm: 1, prod: "云盾2.1", cbb: "统一鉴权网关" },
+    { no: "CN2026288730", ty: 0, ln: 2, st: 2, ad: "2024-12-25", inv: [1, 4], seg: [7, 538],
+      nm: "一种模组固件差分升级的断点续传方法", cl: 10, ct: 3, fm: 1, prod: "澜芯M80", cbb: "IoT 接入 SDK" },
+    { no: "CN2026153470", ty: 0, ln: 0, st: 2, ad: "2024-12-08", inv: [0, 8], seg: [6, 542],
+      nm: "一种基于用户习惯的场景自适应调光方法", cl: 12, ct: 3, fm: 1, prod: "星澜Pro2", cbb: "lm-ui 控件集" },
+    { no: "CN2026275462", ty: 0, ln: 2, st: 1, ad: "2024-11-19", inv: [3, 0], seg: [6, 540, 66],
+      nm: "一种低功耗休眠唤醒时钟域切换方法", cl: 14, ct: 5, fm: 2, prod: "澜芯M80", cbb: "PMIC 参考设计" },
+    { no: "CN2026205883", ty: 0, ln: 1, st: 1, ad: "2024-10-21", inv: [5, 0], seg: [8, 538, 74],
+      nm: "一种基于调用链染色的灰度流量隔离方法", cl: 17, ct: 7, fm: 2, prod: "云枢3.0", cbb: "指标与链路追踪" },
+    { no: "CN2026328901", ty: 0, ln: 3, st: 1, ad: "2024-09-30", inv: [2, 6], seg: [9, 542, 82],
+      nm: "一种行业方案配置模板的差异化下发方法", cl: 12, ct: 4, fm: 1, prod: "智楼5.0", cbb: "四域通用流水线" },
+    { no: "CN2026125644", ty: 0, ln: 0, st: 1, ad: "2024-09-12", inv: [7, 0], seg: [7, 536, 88],
+      nm: "一种低功耗语音唤醒词二级校验方法", cl: 15, ct: 9, fm: 3, prod: "星澜S3", cbb: "lm-utils 基础库" },
+    { no: "CN2026238025", ty: 0, ln: 1, st: 4, ad: "2023-12-14", inv: [6, 7], seg: [7, 552, 84, 196],
+      nm: "一种基于时序预测的弹性扩容触发方法", cl: 12, ct: 6, fm: 1, prod: "云枢3.0", cbb: "指标与链路追踪" },
+    { no: "CN2026104821", ty: 0, ln: 0, st: 0, ad: "2023-11-06", inv: [0, 7, 3], seg: [6, 540, 74, 152],
+      nm: "一种基于边缘计算的多设备协同唤醒方法", cl: 18, ct: 26, fm: 4, prod: "星澜S3", cbb: "lm-net 传输栈" },
+    { no: "CN2026317245", ty: 0, ln: 3, st: 0, ad: "2023-09-05", inv: [8, 5], seg: [6, 548, 112, 226],
+      nm: "一种车路协同场景下的边缘任务卸载决策方法", cl: 19, ct: 21, fm: 4, prod: "车联1.0", cbb: "端云统一推理层" },
+    { no: "CN2026214590", ty: 0, ln: 1, st: 0, ad: "2023-08-09", inv: [6, 9], seg: [5, 546, 102, 178],
+      nm: "一种设备侧证书批量轮换与回滚方法", cl: 13, ct: 18, fm: 4, prod: "云盾2.1", cbb: "统一鉴权网关" },
+    { no: "CN2026294156", ty: 0, ln: 2, st: 3, ad: "2023-06-30", inv: [4, 9], seg: [8, 552, 108, 286],
+      nm: "一种基于电流指纹的外设类型识别方法", cl: 11, ct: 2, fm: 1, prod: "澜芯M60", cbb: "多合一环境传感" },
+    { no: "CN2026182774", ty: 0, ln: 1, st: 0, ad: "2023-05-16", inv: [5, 1], seg: [7, 544, 96, 204],
+      nm: "一种面向海量设备长连接的分片重连调度方法", cl: 19, ct: 41, fm: 6, prod: "云枢3.0", cbb: "设备消息总线" },
+    { no: "CN2026164235", ty: 0, ln: 0, st: 3, ad: "2023-03-28", inv: [7, 1], seg: [9, 556, 102, 268],
+      nm: "一种家居设备语音指令歧义消解方法", cl: 14, ct: 2, fm: 1, prod: "星澜S3", cbb: "lm-utils 基础库" },
+    { no: "CN2026247331", ty: 0, ln: 2, st: 0, ad: "2023-02-07", inv: [3, 4], seg: [9, 548, 116, 242],
+      nm: "一种模组射频前端的自适应阻抗匹配方法", cl: 20, ct: 29, fm: 5, prod: "澜芯M60", cbb: "2.4G/5G 射频板" },
+    { no: "CN2026303618", ty: 0, ln: 3, st: 0, ad: "2022-12-13", inv: [2, 10], seg: [7, 554, 124, 258],
+      nm: "一种楼宇多子系统告警关联收敛方法", cl: 17, ct: 15, fm: 3, prod: "智楼5.0", cbb: "指标与链路追踪" },
+    { no: "CN2026193016", ty: 0, ln: 1, st: 0, ad: "2022-11-02", inv: [6, 5], seg: [6, 550, 88, 232],
+      nm: "一种多租户配额动态再分配方法", cl: 16, ct: 22, fm: 3, prod: "云枢3.0", cbb: "配额与限流中台" },
+    { no: "CN2026267914", ty: 0, ln: 2, st: 0, ad: "2022-09-26", inv: [8, 7], seg: [8, 556, 94, 268],
+      nm: "一种端侧模型 INT8 量化误差补偿方法", cl: 22, ct: 37, fm: 6, prod: "澜芯M60", cbb: "INT8 量化工具" },
+    { no: "CN2026142118", ty: 0, ln: 0, st: 0, ad: "2022-07-21", inv: [3, 7, 9], seg: [8, 552, 110, 186],
+      nm: "一种多模态传感融合的室内人员存在检测方法", cl: 21, ct: 34, fm: 5, prod: "星澜Pro2", cbb: "多合一环境传感" }
+  ];
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 5.1 产品线维度：授权率现算，Σ 与契约锚点比对 */
+  LINES.forEach((l, li) => {
+    l.rate = 100 * l.gra / l.app;
+    l.stat = ST_MAT[li].slice();
+    l.statSum = sum(l.stat);
+    l.field = FIELD_MAT[li].slice();
+    l.fieldSum = sum(l.field);
+  });
+  D.app = sum(LINES.map((l) => l.app));
+  D.gra = sum(LINES.map((l) => l.gra));
+  D.rate = 100 * D.gra / D.app;
+  D.cycAvg = sum(LINES.map((l) => l.cyc * l.gra)) / D.gra;      /* 授权件加权平均审查周期 */
+
+  /* 5.2 法律状态维度：列和现算 */
+  STATES.forEach((s, si) => {
+    s.n = sum(ST_MAT.map((r) => r[si]));
+    s.share = 100 * s.n / D.app;
+  });
+  D.stateSum = sum(STATES.map((s) => s.n));
+  D.granted = STATES[0].n;                                       /* 已授权列和，应 == D.gra */
+  D.pending = STATES[1].n + STATES[2].n;                         /* 在审 = 实审中 + 公开 */
+  D.pendShare = 100 * D.pending / D.app;
+
+  /* 5.3 技术领域维度：列和现算 */
+  D.fieldTotal = FIELDS.map((_, fi) => sum(FIELD_MAT.map((r) => r[fi])));
+  D.fieldSum = sum(D.fieldTotal);
+  D.fieldTopI = D.fieldTotal.indexOf(Math.max.apply(null, D.fieldTotal));
+
+  /* 5.4 类型维度 */
+  D.typeSum = sum(TYPES.map((t) => t.n));
+
+  /* 5.5 24 月走势：期初 + 逐月累加 = 累计末值（与父页同一算法） */
+  const MONTHS = [];
+  for (let i = 0; i < 24; i++) {
+    const off = 8 + i;                                           /* 0 → 2024-09 */
+    MONTHS.push(String(2024 + Math.floor(off / 12)).slice(2) + "-" + pad(off % 12 + 1));
+  }
+  D.appNew = sum(PAT_APP);
+  D.graNew = sum(PAT_GRA);
+  D.appCum = [];
+  D.graCum = [];
+  (() => {
+    let a = PAT_OPEN.app, g = PAT_OPEN.gra;
+    for (let i = 0; i < PAT_APP.length; i++) {
+      a += PAT_APP[i]; g += PAT_GRA[i];
+      D.appCum.push(a); D.graCum.push(g);
+    }
+  })();
+  D.appEnd = D.appCum[D.appCum.length - 1];
+  D.graEnd = D.graCum[D.graCum.length - 1];
+  D.rate24 = 100 * D.graNew / D.appNew;
+  D.monthOk = PAT_APP.every((v, i) => PAT_GRA[i] <= v);
+  D.cumOk = D.appCum.every((v, i) => D.graCum[i] <= v);
+  /* 本年新增 = 2026-01 ~ 2026-08（窗口末 8 个月），与月度序列同源现算 */
+  D.ytdFrom = MONTHS.indexOf("26-01");
+  D.ytdApp = sum(PAT_APP.slice(D.ytdFrom));
+  D.ytdGra = sum(PAT_GRA.slice(D.ytdFrom));
+  D.peak = Math.max.apply(null, PAT_APP);
+  D.peakM = MONTHS[PAT_APP.indexOf(D.peak)];
+
+  /* 5.6 抽样行派生：审查周期 = Σ seg（现算）；剩余年限 = 法定年限 − 已过年限 */
+  const asOfDate = new Date(Number(AS_OF.slice(0, 4)), Number(AS_OF.slice(5, 7)) - 1, Number(AS_OF.slice(8, 10)));
+  function parseDay(ds) {
+    return new Date(Number(ds.slice(0, 4)), Number(ds.slice(5, 7)) - 1, Number(ds.slice(8, 10)));
+  }
+  const dayFmt = (dt) => dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate());
+  const DAY_MS = 86400000;
+  ROWS.sort((a, b) => (a.ad < b.ad ? 1 : a.ad > b.ad ? -1 : 0));   /* 按申请日倒序 */
+  ROWS.forEach((r) => {
+    r.cyc = sum(r.seg);                                             /* 审查周期（天） */
+    r.t0 = parseDay(r.ad);
+    r.endDate = new Date(r.t0.getTime() + r.cyc * DAY_MS);          /* 最后一个已到节点日期 */
+    r.elapsed = (asOfDate - r.t0) / DAY_MS / 365.25;                /* 已过年限 */
+    r.term = TYPES[r.ty].term;                                      /* 法定保护期 */
+    r.remain = r.term - r.elapsed;                                  /* 剩余年限（现算） */
+    r.done = r.st === 0 || r.st === 3 || r.st === 4;                /* 是否已结案 */
+  });
+  D.n = ROWS.length;
+  D.sampleRatio = 100 * D.n / D.app;
+  D.rowsByLine = LINES.map((l, li) => ROWS.filter((r) => r.ln === li).length);
+  D.rowsByState = STATES.map((s, si) => ROWS.filter((r) => r.st === si).length);
+  D.rowsByType = TYPES.map((t, ti) => ROWS.filter((r) => r.ty === ti).length);
+  D.grantedRows = ROWS.filter((r) => r.st === 0);
+  D.grantedCycAvg = sum(D.grantedRows.map((r) => r.cyc)) / D.grantedRows.length;
+  D.mostCited = ROWS.slice().sort((a, b) => b.ct - a.ct)[0];
+  D.longestCyc = ROWS.slice().sort((a, b) => b.cyc - a.cyc)[0];
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("qw-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("qw-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("qw-meta-app").textContent = fmtInt(D.app);
+  $("qw-meta-n").textContent = fmtInt(D.n);
+  $("qw-meta-ratio").textContent = fmtDec(D.sampleRatio, 1) + "%";
+  $("qw-trend-tag").innerHTML = "<b>" + fmtInt(D.appEnd) + " / " + fmtInt(D.graEnd) + "</b> 件";
+
+  /* ===== 7. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "累计申请", v: D.app, dec: 0, unit: "件", color: C.blue,
+      s: "期初 " + fmtInt(PAT_OPEN.app) + " + 近 24 月 " + fmtInt(D.appNew) + " · 四产品线 Σ 同值" },
+    { k: "累计授权", v: D.gra, dec: 0, unit: "件", color: C.green,
+      s: "期初 " + fmtInt(PAT_OPEN.gra) + " + 近 24 月 " + fmtInt(D.graNew) + " · 法律状态「已授权」列和" },
+    { k: "累计授权率", v: D.rate, dec: 1, unit: "%", color: C.amber,
+      s: fmtInt(D.gra) + " ÷ " + fmtInt(D.app) + " 现算 · 近 24 月 " + fmtDec(D.rate24, 1) + "%" },
+    { k: "在审件数", v: D.pending, dec: 0, unit: "件", color: C.cyan,
+      s: "实审中 " + STATES[1].n + " + 公开 " + STATES[2].n + " · 占在册 " + fmtDec(D.pendShare, 1) + "%" },
+    { k: "本年新增申请", v: D.ytdApp, dec: 0, unit: "件", color: C.violet,
+      s: "2026-01 ~ 2026-08 · 同期授权 " + fmtInt(D.ytdGra) + " 件 · 峰值月 20" + D.peakM },
+    { k: "平均审查周期", v: D.cycAvg, dec: 0, unit: "天", color: C.orange,
+      s: "四产品线按授权件加权 ≈ " + fmtDec(D.cycAvg / 30.44, 1) + " 个月" }
+  ];
+  $("qw-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="qw-kpi" style="--qw-kc:' + p.color + '">' +
+      '<div class="qw-kpi-k">' + p.k + "</div>" +
+      '<div class="qw-kpi-v"><b id="qw-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="qw-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("qw-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 一级筛选：产品线 chip（全部 + 四产品线；hash 契约键逐字） ===== */
+  const LFILTERS = [{ name: "全部", color: C.blue, app: D.app, gra: D.gra, rate: D.rate, cnt: D.n }]
+    .concat(LINES.map((l, li) => ({ name: l.name, color: l.color, app: l.app, gra: l.gra, rate: l.rate, cnt: D.rowsByLine[li] })));
+  const lbox = $("qw-lchips");
+  /* chip 上只留「名称 + 申请件数 + 授权率」，授权件数与样例数下沉到 title（页头右侧余量有限） */
+  lbox.innerHTML = LFILTERS.map((f, i) => (
+    '<button class="qw-lchip" type="button" data-i="' + i + '" style="--qw-cc:' + f.color +
+      '" title="' + f.name + "：申请 " + fmtInt(f.app) + " 件 · 授权 " + fmtInt(f.gra) +
+      " 件 · 授权率 " + fmtDec(f.rate, 1) + "% · 本表样例 " + f.cnt + ' 件">' +
+      "<u>" + f.name + "</u><b>" + fmtInt(f.app) + "</b>" +
+      "<i>" + fmtDec(f.rate, 1) + "%</i>" +
+    "</button>"
+  )).join("");
+  const lchips = Array.from(lbox.children);
+
+  /* ===== 9. 二级筛选：法律状态 chip（全部 + 五档；件数与样例数随一级重算） ===== */
+  const sbox = $("qw-schips");
+  function stateScopeN(li, si) {
+    if (si === 0) return li === 0 ? D.app : LINES[li - 1].app;
+    return li === 0 ? STATES[si - 1].n : ST_MAT[li - 1][si - 1];
+  }
+  function stateScopeCnt(li, si) {
+    return ROWS.filter((r) => (li === 0 || r.ln === li - 1) && (si === 0 || r.st === si - 1)).length;
+  }
+  function renderSChips(li, si) {
+    const items = [{ name: "全部", color: C.blue }]
+      .concat(STATES.map((s) => ({ name: s.name, color: s.color })));
+    sbox.innerHTML = items.map((f, i) => (
+      '<button class="qw-schip' + (i === si ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        ' title="' + LFILTERS[li].name + " · " + f.name + "：" + fmtInt(stateScopeN(li, i)) +
+        " 件 · 本表样例 " + stateScopeCnt(li, i) + ' 件"' +
+        (i === si ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<b>" + fmtInt(stateScopeN(li, i)) + "</b><i>/" + stateScopeCnt(li, i) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(sbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(lIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 10. hash 契约：父页 P16 的「专利资产 24 月走势」类目是**月份**，不适合直接作 hash 键，
+         故本页 hash 键取四产品线名逐字（智家终端 / 云平台服务 / AIoT模组 / 行业方案）；
+         HASH_ALIAS 另收父页可能传来的月份串（24-09 / 2024-09 / 2024年09月 / 2024/09 …），
+         一律归一到「全部」口径，并在筛选条上提示来源。 ===== */
+  const HASH_ALIAS = {};
+  const MONTH_KEYS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("all", 0); alias("全量", 0); alias("全部产品线", 0);
+  LINES.forEach((l, li) => {
+    const base = l.name;
+    [base, base.toLowerCase(), base.toUpperCase()].forEach((k) => {
+      alias(k, li + 1);
+      alias(k + "产品线", li + 1);
+      alias(k + "线", li + 1);
+      alias(k + "专利", li + 1);
+    });
+  });
+  /* 月份别名：父页 24 个月类目的四种常见写法，全部归一到「全部」并标记来源 */
+  MONTHS.forEach((m) => {
+    const yy = m.slice(0, 2), mm = m.slice(3);
+    [m, "20" + m, "20" + yy + "/" + mm, "20" + yy + "年" + mm + "月", "20" + yy + "年" + Number(mm) + "月"]
+      .forEach((k) => { alias(k, 0); MONTH_KEYS[k] = m; });
+  });
+  const MONTH_RE = /^(19|20)?\d{2}[-/.年]\d{1,2}月?$/;
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                     /* trim + 全角空白剔除归一化 */
+    if (!raw) return { i: -1, via: "none", raw: "" };
+    const hit = HASH_ALIAS[raw];
+    if (hit === undefined) {
+      /* 未登记但形如月份的串（父页走势图类目），同样归一到「全部」 */
+      if (MONTH_RE.test(raw)) return { i: 0, via: "month", raw: raw };
+      return { i: -1, via: "miss", raw: raw };
+    }
+    if (MONTH_KEYS[raw]) return { i: 0, via: "month", raw: raw };
+    return { i: hit, via: "line", raw: raw };
+  }
+  let hashSuppress = false;
+  let hashNote = "", hashNoteFull = "";
+  function syncHash(li) {
+    const want = "#" + encodeURIComponent(LFILTERS[li].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 台账主表渲染（行高 27px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("qw-tbody");
+  let view = ROWS, lIdx = 0, sIdx = 0, selPos = 0;
+
+  function invLabel(r) {
+    const first = INVENTORS[r.inv[0]].n;
+    return r.inv.length > 1 ? first + " 等 " + r.inv.length + " 人" : first;
+  }
+  function rowHtml(r, k) {
+    let remCell;
+    if (r.st === 0) {
+      const w = clamp(100 * r.remain / r.term, 6, 100);
+      const col = r.remain > 12 ? C.green : r.remain > 6 ? C.amber : C.orange;
+      remCell = '<span class="qw-rem"><span class="qw-rem-t"><u style="width:' + fmtDec(w, 1) + "%;background:" + col +
+        '"></u></span><em style="color:' + col + '">' + fmtDec(r.remain, 1) + " 年</em></span>";
+    } else {
+      remCell = '<span class="qw-rem-na">' + (r.done ? "已结案 —" : "未授权 —") + "</span>";
+    }
+    return "<li data-no=\"" + r.no + "\" style=\"animation-delay:" + (k * 12) + "ms\">" +
+      '<span class="qw-no">' + r.no + "</span>" +
+      '<span class="qw-nm" title="' + r.nm + '">' + r.nm + "</span>" +
+      '<span class="qw-badge ' + TYPES[r.ty].badge + '">' + TYPES[r.ty].short + "</span>" +
+      '<span class="qw-line" style="color:' + LINES[r.ln].color + '">' + LINES[r.ln].name + "</span>" +
+      '<span class="qw-inv">' + invLabel(r) + "</span>" +
+      '<span class="qw-date">' + r.ad + "</span>" +
+      '<span class="qw-badge ' + STATES[r.st].badge + '">' + STATES[r.st].name + "</span>" +
+      remCell +
+    "</li>";
+  }
+  function renderTable() {
+    if (!view.length) {
+      tbody.innerHTML = '<li class="qw-empty">当前筛选无样例行（该口径在册专利仍计入全盘统计，仅 ' +
+        D.n + " 件抽样表未覆盖）。</li>";
+    } else {
+      tbody.innerHTML = view.map(rowHtml).join("");
+      Array.from(tbody.children).forEach((li, k) => {
+        /* 手动点行 → 选中并暂停轮巡 20 秒（与 hash 定位同一门闩） */
+        li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+      });
+    }
+    const scopeApp = lIdx === 0 ? D.app : LINES[lIdx - 1].app;
+    const scopeGra = lIdx === 0 ? D.gra : LINES[lIdx - 1].gra;
+    /* 筛选结果落在台账面板头（横向余量大），筛选条右侧只留下钻来源提示或操作提示 */
+    $("qw-table-tag").innerHTML =
+      "样例 <b>" + view.length + "</b> / " + D.n + " 件 · 抽样率 " + fmtDec(D.sampleRatio, 1) +
+      "% · 全盘该口径 <b>" + fmtInt(scopeApp) + "</b> 件（已授权 " + fmtInt(scopeGra) + " 件）";
+    const stEl = $("qw-filters-state");
+    stEl.innerHTML = hashNote
+      ? "<u>" + hashNote + "</u>"
+      : "在册 " + fmtInt(D.app) + " 件不逐条陈列<i>|</i>行点击或轮巡联动审查流转";
+    stEl.title = hashNote ? hashNoteFull : "";
+  }
+
+  /* ===== 12. 单件专利详情：五节点审查流转时间轴（纯 HTML/CSS）
+         各节点日期由申请日 + 累计天数现算；未到节点 is-todo；结案节点名随法律状态变。 ===== */
+  function renderSel() {
+    const rows = Array.from(tbody.children);
+    if (!view.length) {
+      $("qw-dt-tag").textContent = "当前筛选无样例行";
+      $("qw-dt-headbox").innerHTML = '<div class="qw-dt-sub">调整产品线或法律状态筛选后，此处展示选中专利的审查流转。</div>';
+      $("qw-dt-bar").innerHTML = "";
+      $("qw-dt-list").innerHTML = "";
+      $("qw-dt-metrics").innerHTML = "";
+      $("qw-dt-rel").innerHTML = '<h3>关联产品与 CBB 组件</h3><div class="qw-dt-note">无选中专利。</div>';
+      return;
+    }
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    rows.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+    const endLabel = r.done ? END_NAME[r.st === 0 ? 0 : r.st === 3 ? 1 : 2] : "结案";
+    $("qw-dt-tag").textContent = "申请→受理→公开→实审→" + endLabel + " · Σ 各段停留 = 审查周期";
+    $("qw-dt-headbox").innerHTML =
+      '<div class="qw-dt-no"><b>' + r.no + "</b>" +
+        '<span class="qw-badge ' + TYPES[r.ty].badge + '">' + TYPES[r.ty].name + "</span>" +
+        '<span class="qw-badge ' + STATES[r.st].badge + '">' + STATES[r.st].name + "</span>" +
+        '<span class="qw-dt-sub" style="color:' + LINES[r.ln].color + '">' + LINES[r.ln].name + "</span></div>" +
+      '<div class="qw-dt-title">' + r.nm + "</div>" +
+      '<div class="qw-dt-sub">申请日 <b>' + r.ad + "</b> · 已过 <b>" + fmtDec(r.elapsed, 1) +
+        "</b> 年 / 法定 <b>" + r.term + "</b> 年" +
+        (r.st === 0 ? " · 剩余 <b>" + fmtDec(r.remain, 1) + "</b> 年" : " · " + STATES[r.st].note) + "</div>" +
+      '<div class="qw-dt-sub">审查周期 <b>' + fmtInt(r.cyc) + "</b> 天（Σ " + r.seg.length + " 段）· " +
+        (r.done ? endLabel + "日 <b>" + dayFmt(r.endDate) + "</b>" :
+                  "当前停留 <b>" + NODES[r.seg.length] + "</b> 节点（自 " + dayFmt(r.endDate) + "）") + "</div>";
+    $("qw-dt-bar").innerHTML = r.seg.map((v, k) => (
+      '<span class="qw-dt-seg' + (!r.done && k === r.seg.length - 1 ? " is-cur" : "") +
+        '" style="flex:' + v + ";background:" + NODE_COLORS[k] +
+        '" title="' + NODES[k] + " → " + NODES[k + 1] + " " + v + ' 天"></span>'
+    )).join("");
+    let acc = 0;
+    const nodeDates = [dayFmt(r.t0)];
+    r.seg.forEach((v) => { acc += v; nodeDates.push(dayFmt(new Date(r.t0.getTime() + acc * DAY_MS))); });
+    $("qw-dt-list").innerHTML = NODES.map((name, k) => {
+      const reached = k < nodeDates.length;
+      const isEnd = k === NODES.length - 1;
+      const label = isEnd ? endLabel : name;
+      let body, val;
+      if (reached) {
+        body = nodeDates[k] + (k > 0 ? " · " + NODE_HINT[k - 1] : " · 递交并取得申请号");
+        val = k === 0 ? "起点" : r.seg[k - 1] + " 天";
+      } else {
+        body = r.st === 1 ? "实质审查中 · 尚未作出授权/驳回决定" :
+               r.st === 2 ? "已公开未实审 · 待提出实质审查请求" : "尚未到达";
+        val = "--";
+      }
+      const cur = !r.done && k === nodeDates.length - 1;
+      return '<div class="qw-dt-row ' + (reached ? (cur ? "is-cur" : "") : "is-todo") +
+        '" style="--qw-pc:' + NODE_COLORS[k] + '">' +
+        "<b>" + label + "</b><span>" + body + "</span><em>" + val + "</em></div>";
+    }).join("");
+    const METRICS = [
+      { k: "权利要求", v: r.cl, u: "项", c: C.blue },
+      { k: "被引用", v: r.ct, u: "次", c: C.amber },
+      { k: "同族", v: r.fm, u: "件", c: C.cyan }
+    ];
+    $("qw-dt-metrics").innerHTML = METRICS.map((m) => (
+      '<div class="qw-dt-m" style="--qw-mc:' + m.c + '"><span>' + m.k + "</span><b>" +
+        fmtInt(m.v) + "</b><i>" + m.u + "</i></div>"
+    )).join("");
+    $("qw-dt-rel").innerHTML =
+      "<h3>关联产品与 CBB 组件</h3>" +
+      '<div class="qw-dt-rl"><u>关联产品</u><span class="qw-dt-tag">' + r.prod + "</span>" +
+        '<span class="qw-dt-tag" style="border-color:' + LINES[r.ln].color + '">' + LINES[r.ln].name + "</span></div>" +
+      '<div class="qw-dt-rl"><u>CBB 组件</u><span class="qw-dt-tag is-cbb">' + r.cbb + "</span></div>" +
+      '<div class="qw-dt-rl"><u>发明人</u>' +
+        r.inv.map((k) => '<span class="qw-dt-tag is-inv">' + INVENTORS[k].n + " · " + INVENTORS[k].f + "</span>").join("") +
+      "</div>" +
+      '<div class="qw-dt-note">CBB 组件命名与父页「CBB 货架」同源；组件复用口径见兄弟页「单CBB域详情」，' +
+        "第三方组件许可证风险见兄弟页「开源合规与技术债台账」。</div>";
+  }
+
+  /* ===== 13. 申请 / 授权 24 月走势（与父页 ta-chart-patent 同源：月度双线 + 累计面积）
+         累计末值恒为 1,264 / 782，全盘口径不随筛选变化。 ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const AXIS_LABEL = { color: C.textDim, fontSize: 10 };
+  function trendOption() {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 4, top: 34, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "line", lineStyle: { color: "rgba(92,157,255,.45)" } },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>20" + MONTHS[i] + "</b><br/>当月申请 <b style=\"color:" + C.blue + "\">" + PAT_APP[i] +
+            "</b> 件 · 授权 <b style=\"color:" + C.amber + "\">" + PAT_GRA[i] + "</b> 件<br/>累计申请 <b>" +
+            fmtInt(D.appCum[i]) + "</b> · 累计授权 <b>" + fmtInt(D.graCum[i]) + "</b><br/><span style=\"color:" +
+            C.textDim + "\">累计授权率 " + fmtDec(100 * D.graCum[i] / D.appCum[i], 1) + "%</span>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, left: 0, itemWidth: 12, itemHeight: 7, itemGap: 8,
+        textStyle: { color: C.textDim, fontSize: 10 },
+        data: ["月度申请", "月度授权", "累计申请", "累计授权"]
+      },
+      xAxis: {
+        type: "category", data: MONTHS.slice(), boundaryGap: false,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5, interval: 3 }
+      },
+      yAxis: [
+        { type: "value", name: "月度", nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: AXIS_LABEL, axisLine: { show: false },
+          splitLine: { lineStyle: { color: C.grid, type: "dashed" } } },
+        { type: "value", name: "累计", min: 400, nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: AXIS_LABEL, axisLine: { show: false }, splitLine: { show: false } }
+      ],
+      series: [
+        { name: "累计申请", type: "line", yAxisIndex: 1, smooth: true, symbol: "none", z: 2,
+          data: D.appCum.slice(), lineStyle: { width: 1.6, color: "rgba(92,157,255,.7)" },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "rgba(92,157,255,.34)" }, { offset: 1, color: "rgba(92,157,255,.03)" }]) },
+          /* 末值标注用 markPoint 挂在最后一个月上（endLabel 会被右轴刻度压住） */
+          markPoint: { symbol: "circle", symbolSize: 6, silent: true,
+            itemStyle: { color: C.blue, borderColor: "#eaf1ff", borderWidth: 1 },
+            label: { position: "top", offset: [-12, -2], color: "#9cc2ff", fontSize: 10.5, fontWeight: 700,
+              formatter: () => fmtInt(D.appEnd) },
+            data: [{ coord: [MONTHS[MONTHS.length - 1], D.appEnd] }] } },
+        { name: "累计授权", type: "line", yAxisIndex: 1, smooth: true, symbol: "none", z: 3,
+          data: D.graCum.slice(), lineStyle: { width: 1.6, color: "rgba(255,194,77,.75)" },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "rgba(255,194,77,.30)" }, { offset: 1, color: "rgba(255,194,77,.03)" }]) },
+          markPoint: { symbol: "circle", symbolSize: 6, silent: true,
+            itemStyle: { color: C.amber, borderColor: "#eaf1ff", borderWidth: 1 },
+            label: { position: "top", offset: [-12, -2], color: "#ffd58a", fontSize: 10.5, fontWeight: 700,
+              formatter: () => fmtInt(D.graEnd) },
+            data: [{ coord: [MONTHS[MONTHS.length - 1], D.graEnd] }] } },
+        { name: "月度申请", type: "line", yAxisIndex: 0, smooth: true, symbol: "circle", symbolSize: 4, z: 6,
+          data: PAT_APP.slice(), lineStyle: { width: 2.2, color: C.blue }, itemStyle: { color: C.blue } },
+        { name: "月度授权", type: "line", yAxisIndex: 0, smooth: true, symbol: "circle", symbolSize: 4, z: 6,
+          data: PAT_GRA.slice(), lineStyle: { width: 2, color: C.amber }, itemStyle: { color: C.amber } }
+      ]
+    };
+  }
+
+  /* ===== 14. 技术领域分布（9 领域横向条；随一级筛选切换口径，Σ 恒等于该口径申请数） ===== */
+  function fieldData(li) {
+    const vals = FIELDS.map((_, fi) => (li === 0 ? D.fieldTotal[fi] : FIELD_MAT[li - 1][fi]));
+    const idx = FIELDS.map((_, i) => i).sort((a, b) => (vals[b] - vals[a]) || (a - b));
+    return { names: idx.map((i) => FIELDS[i]), vals: idx.map((i) => vals[i]),
+             cols: idx.map((i) => FIELD_COLORS[i]), total: sum(vals) };
+  }
+  function fieldOption(li) {
+    const fd = fieldData(li);
+    /* ★ 只把标量与数组下发给 option（名称、数值、颜色三个并行数组），不塞任何业务对象 */
+    const names = fd.names.slice().reverse();
+    const vals = fd.vals.slice().reverse();
+    const cols = fd.cols.slice().reverse();
+    const total = fd.total;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 44, top: 6, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + names[i] + "</b><br/>专利 <b>" + fmtInt(vals[i]) + "</b> 件 · 占该口径 <b style=\"color:" +
+            C.amber + "\">" + fmtDec(total ? 100 * vals[i] / total : 0, 1) + "%</b>";
+        }
+      }, TIP),
+      xAxis: { type: "value", axisLabel: { show: false }, axisLine: { show: false },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } } },
+      yAxis: { type: "category", data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10 } },
+      series: [{
+        name: "专利件数", type: "bar", barWidth: "62%",
+        label: { show: true, position: "right", color: "#cfdcff", fontSize: 10, fontWeight: 700,
+          formatter: (p) => fmtInt(p.value) },
+        data: vals.map((v, i) => ({ value: v, itemStyle: { color: cols[i], borderRadius: [0, 3, 3, 0] } }))
+      }]
+    };
+  }
+
+  /* ===== 15. 授权率与平均审查周期（四产品线：柱 = 授权率 %、线 = 平均审查周期 天）
+         整体授权率 markLine = 782 ÷ 1,264 现算；选中产品线高亮，其余降透明度。 ===== */
+  function rateOption(li) {
+    const names = LINES.map((l) => l.name);
+    const rates = LINES.map((l) => Number(fmtDec(l.rate, 1)));
+    const cycs = LINES.map((l) => l.cyc);
+    const gras = LINES.map((l) => l.gra);
+    const apps = LINES.map((l) => l.app);
+    const cols = LINES.map((l, i) => (li === 0 || li - 1 === i ? l.color : "rgba(92,157,255,.28)"));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 4, top: 28, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + names[i] + "</b><br/>申请 <b>" + fmtInt(apps[i]) + "</b> 件 · 授权 <b>" +
+            fmtInt(gras[i]) + "</b> 件<br/>授权率 <b style=\"color:" + C.green + "\">" + fmtDec(rates[i], 1) +
+            "%</b> · 平均审查周期 <b style=\"color:" + C.orange + "\">" + fmtInt(cycs[i]) + "</b> 天<br/>" +
+            "<span style=\"color:" + C.textDim + "\">周期口径：已授权件申请→授权日历天加权（含实用新型/外观快速通道）</span>";
+        }
+      }, TIP),
+      legend: { top: 0, right: 2, itemWidth: 12, itemHeight: 7, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10 }, data: ["授权率", "平均审查周期"] },
+      xAxis: { type: "category", data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10, interval: 0 } },
+      yAxis: [
+        { type: "value", name: "%", min: 0, max: 100, nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: AXIS_LABEL, axisLine: { show: false },
+          splitLine: { lineStyle: { color: C.grid, type: "dashed" } } },
+        { type: "value", name: "天", min: 0, nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: AXIS_LABEL, axisLine: { show: false }, splitLine: { show: false } }
+      ],
+      series: [
+        { name: "授权率", type: "bar", barWidth: "42%",
+          label: { show: true, position: "top", color: "#cfdcff", fontSize: 10, fontWeight: 700,
+            formatter: (p) => fmtDec(p.value, 1) + "%" },
+          data: rates.map((v, i) => ({ value: v, itemStyle: { color: cols[i], borderRadius: [3, 3, 0, 0] } })),
+          markLine: {
+            symbol: "none", silent: true,
+            lineStyle: { color: C.green, type: "dashed", width: 1.5 },
+            label: { color: C.green, fontSize: 10, fontWeight: 700, position: "insideEndTop",
+              formatter: () => "整体 " + fmtDec(D.rate, 1) + "%" },
+            data: [{ yAxis: Number(fmtDec(D.rate, 2)) }]
+          } },
+        { name: "平均审查周期", type: "line", yAxisIndex: 1, smooth: false,
+          symbol: "circle", symbolSize: 6, z: 5, data: cycs.slice(),
+          lineStyle: { width: 2.2, color: C.orange }, itemStyle: { color: C.orange },
+          markLine: {
+            symbol: "none", silent: true,
+            lineStyle: { color: "rgba(255,157,92,.6)", type: "dashed", width: 1.2 },
+            label: { color: C.orange, fontSize: 10, position: "insideEndBottom",
+              formatter: () => "加权 " + fmtInt(D.cycAvg) + " 天" },
+            data: [{ yAxis: Number(fmtDec(D.cycAvg, 1)) }]
+          } }
+      ]
+    };
+  }
+
+  /* ===== 16. 筛选主流程：一次调用刷新 chip / 表 / 详情 / 两张联动图 / 页头 chip（单一入口） ===== */
+  function applyFilter(li, si, pushHash) {
+    lIdx = clamp(li, 0, LFILTERS.length - 1);
+    sIdx = clamp(si, 0, STATES.length);
+    view = ROWS.filter((r) => (lIdx === 0 || r.ln === lIdx - 1) && (sIdx === 0 || r.st === sIdx - 1));
+    selPos = 0;
+    lchips.forEach((el, i) => {
+      const on = i === lIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? LFILTERS[i].color : "";
+      el.style.borderColor = on ? LFILTERS[i].color : "";
+    });
+    renderSChips(lIdx, sIdx);
+    $("qw-chip-key").textContent = "授权率 · " + LFILTERS[lIdx].name;
+    $("qw-chip-val").textContent = fmtDec(LFILTERS[lIdx].rate, 1) + "%";
+    const fd = fieldData(lIdx);
+    $("qw-field-tag").innerHTML = "九领域 Σ <b>" + fmtInt(fd.total) + "</b> 件 · 首位「" + fd.names[0] +
+      "」" + fmtDec(fd.total ? 100 * fd.vals[0] / fd.total : 0, 1) + "% · 口径 " + LFILTERS[lIdx].name;
+    $("qw-rate-tag").innerHTML = "整体 <b>" + fmtDec(D.rate, 1) + "%</b> = " + fmtInt(D.gra) + " ÷ " +
+      fmtInt(D.app) + " · 加权周期 <b>" + fmtInt(D.cycAvg) + "</b> 天";
+    renderTable();
+    renderSel();
+    if (fieldChart) fieldChart.setOption(fieldOption(lIdx), true);
+    if (rateChart) rateChart.setOption(rateOption(lIdx), true);
+    if (pushHash) syncHash(lIdx);
+  }
+
+  lchips.forEach((el) => el.addEventListener("click", () => {
+    hashNote = "";
+    applyFilter(Number(el.dataset.i), 0, true);
+  }));
+
+  /* hash 定位：命中产品线则激活筛选 chip 并闪烁；月份串归一到「全部」并在筛选条提示来源 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit.via === "month") {
+      const mLabel = MONTH_KEYS[hit.raw] ? "20" + MONTH_KEYS[hit.raw] : hit.raw;
+      hashNote = "来源：父页走势图 " + mLabel + " → 已归一「全部」";
+      hashNoteFull = "本页由父页「专利资产 24 月走势」下钻进入，传入的 hash 是月份 " + mLabel +
+        "；该图类目为月份、不适合作本页的筛选键，本页按四条产品线组织，故已归一到「全部」口径展示全量台账。";
+    } else {
+      hashNote = "";
+      hashNoteFull = "";
+    }
+    if (hit.i < 0) { applyFilter(0, 0, false); return; }
+    applyFilter(hit.i, 0, false);
+    if (hit.i > 0) {
+      const chip = lchips[hit.i];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                   /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发技术资产与复用1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 17. kiosk 轮巡：台账行 3 秒逐行高亮并联动审查流转；hash 定位或手动点行后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 18. 初始渲染：先填充全部 DOM（KPI + 台账 + 详情），再 init 图表 ===== */
+  let trendChart = null, fieldChart = null, rateChart = null;
+  applyFilter(0, 0, false);                                    /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  trendChart = echarts.init($("qw-chart-trend"));
+  trendChart.setOption(trendOption());
+  fieldChart = echarts.init($("qw-chart-field"));
+  fieldChart.setOption(fieldOption(0));
+  rateChart = echarts.init($("qw-chart-rate"));
+  rateChart.setOption(rateOption(0));
+  locateByHash();                                              /* 初始解析 hash（无 hash 落全部） */
+
+  /* 走势图月份扫描提示 */
+  let tipIdx = 0;
+  setInterval(() => {
+    trendChart.dispatchAction({ type: "showTip", seriesIndex: 2, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % MONTHS.length;
+  }, 4200);
+
+  /* ===== 19. 底部知识产权研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.violet, t: "三页分工：本页＝自有专利全量台账（知识产权视角）；「开源合规与技术债台账」＝外购与欠账；" +
+        "「单CBB域详情」＝自研沉淀的复用——同一父页三个子页口径互不重叠" },
+    { lv: "高", c: C.amber, t: "累计申请 " + fmtInt(D.app) + " 件 / 授权 " + fmtInt(D.gra) + " 件，授权率 " +
+        fmtDec(D.rate, 1) + "%（" + fmtInt(D.gra) + " ÷ " + fmtInt(D.app) + " 现算），与父页 24 月走势累计末值逐字同源" },
+    { lv: "中", c: C.orange, t: "在审 " + fmtInt(D.pending) + " 件（实审中 " + STATES[1].n + " + 公开 " +
+        STATES[2].n + "），占在册 " + fmtDec(D.pendShare, 1) + "%；驳回 " + STATES[3].n + " + 撤回 " +
+        STATES[4].n + " 件合计仅 " + fmtDec(100 * (STATES[3].n + STATES[4].n) / D.app, 1) + "%" },
+    { lv: "中", c: C.orange, t: "平均审查周期 " + fmtInt(D.cycAvg) + " 天（≈ " + fmtDec(D.cycAvg / 30.44, 1) +
+        " 个月，按授权件加权）；最慢「" + LINES[3].name + "」" + LINES[3].cyc + " 天、最快「" +
+        LINES[0].name + "」" + LINES[0].cyc + " 天，差 " + (LINES[3].cyc - LINES[0].cyc) + " 天" },
+    { lv: "低", c: C.blue, t: "技术领域首位「" + FIELDS[D.fieldTopI] + "」" + D.fieldTotal[D.fieldTopI] +
+        " 件（占 " + fmtDec(100 * D.fieldTotal[D.fieldTopI] / D.app, 1) + "%），九领域 Σ = " +
+        fmtInt(D.fieldSum) + " 件与在册总数收敛" },
+    { lv: "低", c: C.cyan, t: "本年（2026-01 ~ 2026-08）新增申请 " + fmtInt(D.ytdApp) + " 件、授权 " +
+        fmtInt(D.ytdGra) + " 件，近 24 月授权率 " + fmtDec(D.rate24, 1) + "%，高于累计口径 " +
+        fmtDec(D.rate24 - D.rate, 1) + " 个百分点" },
+    { lv: "低", c: C.green, t: "抽样 " + D.n + " 件（抽样率 " + fmtDec(D.sampleRatio, 1) + "%）：被引用最多「" +
+        D.mostCited.no + "」" + D.mostCited.ct + " 次、审查最久「" + D.longestCyc.no + "」" +
+        D.longestCyc.cyc + " 天；已授权样例平均审查周期 " + fmtInt(D.grantedCycAvg) + " 天（以发明为主故高于全盘加权值）" },
+    { lv: "低", c: C.green, t: "勾稽：四产品线 Σ = " + fmtInt(D.app) + " 件 · 法律状态五档 Σ = " +
+        fmtInt(D.stateSum) + " 件 · 技术领域九项 Σ = " + fmtInt(D.fieldSum) + " 件 · 类型三档 Σ = " +
+        fmtInt(D.typeSum) + " 件，四个口径同为在册总数" }
+  ];
+  const track = $("qw-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="qw-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                     /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 20. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try {
+    JSON.stringify(trendOption());
+    JSON.stringify(fieldOption(0)); JSON.stringify(fieldOption(2));
+    JSON.stringify(rateOption(0)); JSON.stringify(rateOption(3));
+  } catch (e) { optAcyclic = false; console.error("[专利资产台账] option 存在循环引用：", e.message); }
+
+  const SEG_LEN = { 0: 4, 1: 3, 2: 2, 3: 4, 4: 4 };              /* 法律状态 → 已到达的段数 */
+  const checks = [
+    ["24 月走势累计申请末值 = 1,264（与父页逐字）",
+      D.appEnd === PAT_APP_REF && D.appEnd === PAT_OPEN.app + D.appNew],
+    ["24 月走势累计授权末值 = 782（与父页逐字）",
+      D.graEnd === PAT_GRA_REF && D.graEnd === PAT_OPEN.gra + D.graNew],
+    ["月度序列长度 = 24 且逐月授权 ≤ 申请、累计授权 ≤ 累计申请",
+      PAT_APP.length === 24 && PAT_GRA.length === 24 && MONTHS.length === 24 && D.monthOk && D.cumOk],
+    ["累计授权率 = 782 ÷ 1,264 现算（≈ 61.9%）",
+      Math.abs(D.rate - 100 * PAT_GRA_REF / PAT_APP_REF) < 1e-9 && Math.abs(D.rate - 61.867) < 0.01],
+    ["四产品线申请数 Σ = 总申请数 1,264", D.app === PAT_APP_REF && LINES.length === 4],
+    ["四产品线授权数 Σ = 累计授权 782（且逐线授权 ≤ 申请）",
+      D.gra === PAT_GRA_REF && LINES.every((l) => l.gra <= l.app)],
+    ["法律状态五档 Σ = 总申请数 1,264", D.stateSum === PAT_APP_REF && STATES.length === 5],
+    ["「已授权」档件数 = 累计授权 782（与产品线口径同一个数）", D.granted === D.gra],
+    ["产品线 × 法律状态矩阵：行和 = 各线申请数",
+      LINES.every((l) => l.statSum === l.app)],
+    ["产品线 × 法律状态矩阵：列和 = 各状态件数",
+      STATES.every((s, si) => sum(ST_MAT.map((r) => r[si])) === s.n)],
+    ["技术领域九项 Σ = 总申请数 1,264", D.fieldSum === PAT_APP_REF && FIELDS.length === 9],
+    ["技术领域 × 产品线矩阵：行和 = 各线申请数",
+      LINES.every((l) => l.fieldSum === l.app)],
+    ["各产品线口径下领域分布 Σ == 该线申请数（联动图口径收敛）",
+      LINES.every((l, li) => fieldData(li + 1).total === l.app) && fieldData(0).total === D.app],
+    ["专利类型三档 Σ = 总申请数 1,264", D.typeSum === PAT_APP_REF && TYPES.length === 3],
+    ["在审件数 = 实审中 + 公开 = 346", D.pending === STATES[1].n + STATES[2].n && D.pending === 346],
+    ["本年新增 = 2026-01 ~ 2026-08 月度申请之和（8 个月）",
+      D.ytdFrom === 16 && PAT_APP.slice(D.ytdFrom).length === 8 && D.ytdApp === sum(PAT_APP.slice(16))],
+    ["平均审查周期 = 四产品线按授权件加权现算",
+      Math.abs(D.cycAvg - sum(LINES.map((l) => l.cyc * l.gra)) / D.gra) < 1e-9 && D.cycAvg > 0],
+    ["单件 Σ 各段停留天数 = 该件审查周期（逐行现算）",
+      ROWS.every((r) => r.cyc === sum(r.seg) && r.seg.every((v) => v > 0))],
+    ["段数与法律状态自洽（结案 4 段 / 实审中 3 段 / 公开 2 段）",
+      ROWS.every((r) => r.seg.length === SEG_LEN[r.st])],
+    ["各节点日期均不晚于数据基准日 2026-08-19",
+      ROWS.every((r) => r.endDate <= asOfDate && r.t0 <= asOfDate)],
+    ["已授权件剩余年限 = 法定年限 − 已过年限（发明 20 / 实用新型 10 / 外观 15）现算",
+      D.grantedRows.every((r) => Math.abs(r.remain - (TYPES[r.ty].term - r.elapsed)) < 1e-9 && r.remain > 0) &&
+      TYPES[0].term === 20],
+    ["抽样各线条数 = 一级 chip 计数（全部档 = 样例总数）",
+      LFILTERS.every((f, i) => f.cnt === (i === 0 ? ROWS.length : ROWS.filter((r) => r.ln === i - 1).length))],
+    ["抽样状态分布 Σ = 样例总数 24 且五档全覆盖",
+      sum(D.rowsByState) === D.n && D.n === 24 && D.rowsByState.every((v) => v > 0)],
+    ["抽样产品线分布 Σ = 样例总数、类型三档全覆盖",
+      sum(D.rowsByLine) === D.n && D.rowsByType.every((v) => v > 0) && sum(D.rowsByType) === D.n],
+    ["二级 chip 计数随一级重算：某线各状态样例数 Σ = 该线样例数",
+      LFILTERS.every((f, i) => sum(STATES.map((s, si) => stateScopeCnt(i, si + 1))) === stateScopeCnt(i, 0))],
+    ["二级 chip 全盘件数随一级重算：某线各状态件数 Σ = 该线申请数",
+      LINES.every((l, li) => sum(STATES.map((s, si) => stateScopeN(li + 1, si + 1))) === l.app)],
+    ["专利号唯一且格式为 CN2026 + 6 位数字",
+      (new Set(ROWS.map((r) => r.no))).size === D.n && ROWS.every((r) => /^CN2026\d{6}$/.test(r.no))],
+    ["台账按申请日严格倒序（同日不并列）",
+      ROWS.every((r, i) => i === 0 || r.ad < ROWS[i - 1].ad)],
+    ["发明人索引合法且六职能全部出现在名册",
+      ROWS.every((r) => r.inv.length > 0 && r.inv.every((k) => k >= 0 && k < INVENTORS.length)) &&
+      (new Set(INVENTORS.map((p) => p.f))).size === 6],
+    ["hash 四产品线名均可解析（契约逐字）",
+      LINES.every((l, li) => HASH_ALIAS[l.name] === li + 1) &&
+      HASH_ALIAS["智家终端"] === 1 && HASH_ALIAS["云平台服务"] === 2 &&
+      HASH_ALIAS["AIoT模组"] === 3 && HASH_ALIAS["行业方案"] === 4 && HASH_ALIAS["全部"] === 0],
+    ["HASH_ALIAS 兜底父页月份串（24 月四种写法）→ 归一到「全部」",
+      MONTHS.every((m) => HASH_ALIAS[m] === 0 && HASH_ALIAS["20" + m] === 0 && MONTH_KEYS[m] === m) &&
+      MONTH_RE.test("26-03") && MONTH_RE.test("2026-03")],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[专利资产台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

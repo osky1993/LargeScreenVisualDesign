@@ -1,0 +1,1466 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发改进行动台账</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --ln-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 台账列宽：行动编号 / 行动项 / 目标维度 / 发起方 / 责任人 / 计划完成 / 进度 / 预期提升 / 状态 */
+    --ln-tcols: 100px 1fr 66px 88px 84px 82px 96px 66px 58px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .ln-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 90% 6%, rgba(111, 224, 154, 0.06), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    /* 940 + 452 + 1fr(464) = 1856 内容宽 + 2×14 间隙 = 1884 = 1920 − 左右 18px 内边距 */
+    grid-template-columns: 940px 452px 1fr;
+    grid-template-rows: 92px 52px 62px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .ln-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .ln-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） ===== */
+  .ln-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .ln-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(111, 224, 154, 0.45) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(111, 224, 154, 0.45) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .ln-head-left { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .ln-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .ln-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .ln-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .ln-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到效能指数，琥珀描边与本页星蓝主色区分 */
+  .ln-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .ln-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .ln-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .ln-head-title {
+    font-size: 29px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .ln-head-meta { display: flex; align-items: center; gap: 14px; font-size: 12.5px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .ln-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .ln-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+  /* 口径分工条：与两个兄弟子页（单维度追溯详情 zb / 障碍与回顾行动台账 dm）划清颗粒度边界 */
+  .ln-scope { font-size: 11.5px; letter-spacing: 0.03em; color: rgba(127, 146, 196, 0.9); white-space: nowrap; }
+  .ln-scope b { font-weight: 700; color: var(--rnd-amber); }
+  .ln-scope em { font-style: normal; color: #9cc2ff; }
+
+  .ln-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .ln-chips { display: flex; align-items: center; gap: 9px; }
+  .ln-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 126px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .ln-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: #6079b0; }
+  .ln-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .ln-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .ln-chip.is-key b { color: var(--rnd-blue); }
+  .ln-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .ln-clock-time { font: 700 26px/1 var(--ln-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .ln-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 两级筛选条：一级 = 目标维度（hash 契约 六维名）+ 二级 = 行动状态 ===== */
+  .ln-filters {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .ln-filters-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .ln-dchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 6px 12px 7px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .ln-dchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .ln-dchip b { font: 700 13.5px/1 var(--ln-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .ln-dchip i { font-style: normal; font-size: 10.5px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .ln-dchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .ln-dchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .ln-dchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .ln-dchip.is-hit { animation: ln-hit 0.9s ease-in-out 2; }
+  @keyframes ln-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--ln-cc, rgba(92, 157, 255, 0.8)); } }
+  .ln-fdiv { flex: none; width: 1px; height: 24px; margin: 0 3px; background: rgba(96, 140, 255, 0.28); }
+  .ln-schip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+    padding: 4px 11px 5px; border-radius: 7px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.18); background: rgba(14, 26, 66, 0.45);
+    color: #a9bce4; font-size: 12px; letter-spacing: 0.05em;
+    transition: border-color .18s, background .18s, color .18s;
+  }
+  .ln-schip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .ln-schip:hover { border-color: rgba(92, 157, 255, 0.5); color: #eaf1ff; }
+  .ln-schip.is-on { color: #071026; font-weight: 700; }
+  .ln-schip.is-on i { color: rgba(7, 16, 38, 0.66); }
+  .ln-filters-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .ln-filters-state b { font-weight: 700; color: var(--rnd-blue); }
+  .ln-filters-state em { font-style: normal; color: #d3e2ff; }
+  .ln-filters-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .ln-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .ln-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .ln-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ln-kc, var(--rnd-blue)); }
+  .ln-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .ln-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .ln-kpi-v b { font: 700 24px/1 var(--ln-mono); color: var(--ln-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .ln-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .ln-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .ln-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .ln-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .ln-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .ln-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; height: 22px; margin-bottom: 6px; }
+  .ln-panel-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .ln-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .ln-panel-tag { font-size: 11px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .ln-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .ln-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 台账区写死高度（任务卡硬性）：28 行 × 23px + 表头，tbody overflow hidden 防撑破 */
+  .ln-panel.is-ledger { flex: none; height: 734px; min-height: 0; overflow: hidden; }
+  /* ★ 详情区写死高度：里程碑 / 收益拆解 / 阻碍因素三块均由 JS 在 init 之前填充，
+     且与图表不同列，仍按规矩写死高度 + min-height:0 + overflow:hidden。 */
+  .ln-panel.is-detail { flex: none; height: 734px; min-height: 0; overflow: hidden; }
+  .ln-panel.is-gap { flex: none; height: 246px; min-height: 0; }
+  .ln-panel.is-state { flex: none; height: 200px; min-height: 0; }
+
+  /* ===== CSS grid 模拟台账表（非 <table>） ===== */
+  .ln-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .ln-thead, .ln-tbody li { display: grid; grid-template-columns: var(--ln-tcols); align-items: center; gap: 7px; }
+  .ln-thead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.06em; color: #8aa8e8;
+  }
+  .ln-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .ln-tbody li {
+    padding: 0 8px; height: 23px; border-radius: 5px; cursor: pointer;
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: ln-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes ln-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .ln-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .ln-tbody li:hover { background: rgba(92, 157, 255, 0.10); }
+  .ln-tbody li.is-sel { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue), inset 0 0 16px rgba(92, 157, 255, 0.10); }
+  .ln-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ln-tbody li .ln-no { font: 700 11px/1 var(--ln-mono); color: rgba(127, 146, 196, 0.9); letter-spacing: 0.02em; }
+  .ln-tbody li .ln-name { color: #dfe9ff; }
+  .ln-tbody li .ln-from { font-size: 11px; color: #a9bce4; }
+  .ln-tbody li .ln-owner { font-size: 11px; color: #bfd2f6; }
+  .ln-tbody li .ln-due { font-size: 11px; color: #a9bce4; }
+  .ln-tbody li .ln-gain { text-align: right; font: 700 12px/1 var(--ln-mono); }
+  /* 补充项角标：父页「改进行动追踪」只陈列 7 条在办行动，其余为本页补充 */
+  .ln-sup {
+    display: inline-block; margin-left: 4px; padding: 0 3px; border-radius: 3px; vertical-align: 2px;
+    font-size: 8.5px; font-weight: 700; line-height: 1.5; letter-spacing: 0;
+    color: #3a2a05; background: var(--rnd-amber);
+  }
+  .ln-dimtag {
+    padding: 1px 5px; border-radius: 4px; justify-self: start; white-space: nowrap;
+    font-size: 10.5px; font-weight: 700; border: 1px solid;
+    background: rgba(14, 26, 66, 0.5);
+  }
+  .ln-badge {
+    padding: 2px 6px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap;
+  }
+  .ln-badge.is-s0 { color: #063a25; background: var(--rnd-green); }
+  .ln-badge.is-s1 { color: #041b3a; background: var(--rnd-blue); }
+  .ln-badge.is-s2 { border: 1px solid rgba(96, 140, 255, 0.45); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+  .ln-badge.is-s3 { color: #3d060c; background: var(--rnd-red); }
+  /* 进度：微条 + 数值 */
+  .ln-prog { display: flex; align-items: center; gap: 7px; }
+  .ln-prog-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .ln-prog-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .ln-prog em { flex: none; width: 32px; text-align: right; font-style: normal; font-variant-numeric: tabular-nums; }
+
+  /* ===== 右栏详情：里程碑四节点 + 预期收益拆解 + 阻碍因素 ===== */
+  .ln-dt-head {
+    flex: none; height: 96px; display: flex; flex-direction: column; gap: 5px; overflow: hidden;
+    padding: 7px 10px 8px; border-radius: 8px; background: rgba(14, 26, 66, 0.55);
+    border: 1px solid rgba(96, 140, 255, 0.2); margin-bottom: 8px;
+  }
+  .ln-dt-no { display: flex; align-items: center; gap: 8px; }
+  .ln-dt-no b { font: 700 12.5px/1 var(--ln-mono); color: var(--rnd-blue); letter-spacing: 0.03em; }
+  .ln-dt-title { font-size: 14px; font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ln-dt-sub { font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ln-dt-sub b { font-weight: 700; color: #c9d8f8; }
+  .ln-sec { flex: none; display: flex; flex-direction: column; min-height: 0; overflow: hidden; margin-bottom: 8px; }
+  .ln-sec.is-ms { height: 236px; }
+  .ln-sec.is-bf { height: 192px; }
+  .ln-sec.is-rk { height: 136px; margin-bottom: 0; }
+  .ln-sec-h { flex: none; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; height: 18px; margin-bottom: 5px; }
+  .ln-sec-h u { text-decoration: none; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: #9cc2ff; }
+  .ln-sec-h i { font-style: normal; font-size: 10.5px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 里程碑四段进度条 */
+  .ln-ms-bar { flex: none; display: flex; height: 20px; border-radius: 5px; overflow: hidden; margin-bottom: 8px; background: rgba(14, 26, 66, 0.5); }
+  .ln-ms-seg { position: relative; min-width: 12px; background: rgba(96, 140, 255, 0.12); }
+  .ln-ms-seg + .ln-ms-seg { border-left: 2px solid rgba(8, 18, 49, 0.9); }
+  .ln-ms-seg u { position: absolute; left: 0; top: 0; bottom: 0; text-decoration: none; }
+  .ln-ms-seg.is-cur u { background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.18) 0 5px, transparent 5px 10px); animation: ln-breath 1.6s ease-in-out infinite; }
+  @keyframes ln-breath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.4); } }
+  .ln-ms-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ln-ms-row { flex: 1; display: grid; grid-template-columns: 52px 1fr 86px 52px; align-items: center; gap: 8px; padding: 0 5px; border-radius: 5px; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .ln-ms-row:nth-child(odd) { background: rgba(28, 48, 112, 0.22); }
+  .ln-ms-row b { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #dfe9ff; letter-spacing: 0.04em; }
+  .ln-ms-row b::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--ln-nc, var(--rnd-blue)); }
+  .ln-ms-row span { color: var(--rnd-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ln-ms-row em { font-style: normal; text-align: left; font: 700 11px/1 var(--ln-mono); color: var(--ln-nc, var(--rnd-blue)); }
+  .ln-ms-row s { text-decoration: none; text-align: right; font: 700 11.5px/1 var(--ln-mono); color: #c9d8f8; }
+  .ln-ms-row.is-todo b { color: rgba(127, 146, 196, 0.6); }
+  .ln-ms-row.is-todo b::before { opacity: 0.32; }
+  .ln-ms-row.is-todo s { color: rgba(127, 146, 196, 0.5); }
+  /* 预期收益拆解 */
+  .ln-bf-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+  .ln-bf-row { flex: 1; display: grid; grid-template-columns: 108px 1fr 54px; align-items: center; gap: 8px; padding: 0 6px; border-radius: 5px; background: rgba(28, 48, 112, 0.24); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .ln-bf-row b { font-size: 11.5px; font-weight: 700; color: #dfe9ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ln-bf-row span { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--rnd-text-dim); }
+  .ln-bf-row span u { flex: none; text-decoration: none; color: #bfd2f6; white-space: nowrap; }
+  .ln-bf-row span var { flex: 1; min-width: 0; height: 5px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .ln-bf-row span var i { display: block; height: 100%; border-radius: 3px; background: var(--rnd-cyan); }
+  .ln-bf-row em { font-style: normal; text-align: right; font: 700 12px/1 var(--ln-mono); color: var(--rnd-cyan); }
+  .ln-bf-sum { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 5px; padding: 4px 6px; border-radius: 5px; border: 1px dashed rgba(70, 214, 200, 0.4); font-size: 11px; color: var(--rnd-text-dim); font-variant-numeric: tabular-nums; }
+  .ln-bf-sum b { font-weight: 700; color: var(--rnd-cyan); }
+  /* 阻碍因素 */
+  .ln-rk-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+  .ln-rk-row { flex: 1; display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 8px; padding: 0 6px; border-radius: 5px; background: rgba(28, 48, 112, 0.22); font-size: 11px; }
+  .ln-rk-row b { padding: 1px 0; border-radius: 3px; text-align: center; font-size: 10px; font-weight: 700; color: #071026; }
+  .ln-rk-row span { color: #bfd2f6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* 环形 + 完成率条并排 */
+  .ln-pair { flex: 1; min-height: 0; display: flex; gap: 8px; }
+  .ln-pair .ln-chart.is-donut { flex: 0 0 176px; }
+
+  /* ===== 底部滚动条 ===== */
+  .ln-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .ln-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-green); }
+  .ln-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-green);
+    box-shadow: 0 0 10px var(--rnd-green); animation: ln-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes ln-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .ln-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .ln-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .ln-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .ln-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .ln-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .ln-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="ln-stage" id="ln-stage">
+    <!-- mockflag:begin --><div class="ln-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="ln-error" id="ln-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="ln-header">
+      <div class="ln-head-left">
+        <div class="ln-crumb">
+          <a class="ln-crumb-up" href="大屏样板间-研发效能指数1920.html" title="返回上级专题页（Esc）">‹ 返回 效能指数</a>
+          <b>云麓智联科技</b><i>›</i><span>研发效能指数</span><i>›</i><em>改进行动台账</em>
+        </div>
+        <div class="ln-head-title-row">
+          <div class="ln-head-title">改进行动台账</div>
+          <div class="ln-head-meta">
+            <span>全量 <b id="ln-meta-n">--</b> 条组织级改进行动 · 覆盖 <b>6</b> 个目标维度</span><i>|</i>
+            <span>其中父页在办 <b id="ln-meta-p">--</b> 条 · 本页补充 <b id="ln-meta-x">--</b> 条</span><i>|</i>
+            <span>数据日期 <b>2026-08-20</b> · 健康指数 <b id="ln-meta-idx">--</b> 分</span>
+          </div>
+        </div>
+        <div class="ln-scope">
+          口径分工：本页 = <b>组织级效能改进行动全量台账</b>（六维 × 立项→推广全生命周期，单位「条行动」）；
+          <em>单维度二级指标加权追溯</em>见姊妹子页「单维度追溯详情」，<em>Sprint 级障碍与回顾行动</em>见「障碍与回顾行动台账」——三页颗粒度递减，不可相加。
+        </div>
+      </div>
+      <div class="ln-head-right">
+        <div class="ln-chips">
+          <div class="ln-chip"><span>DATA AS OF</span><b>2026-08-20</b></div>
+          <div class="ln-chip is-key"><span id="ln-chip-key">在办提升 · 全部</span><b id="ln-chip-val">--</b></div>
+        </div>
+        <div class="ln-clock" aria-label="实时时钟">
+          <span class="ln-clock-time" id="ln-clock-time">--:--:--</span>
+          <span class="ln-clock-date" id="ln-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 两级筛选：一级 目标维度（hash 契约六维名）+ 二级 行动状态 -->
+    <div class="ln-filters">
+      <span class="ln-filters-tag">目标维度</span>
+      <div id="ln-dchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="ln-fdiv"></span>
+      <span class="ln-filters-tag">行动状态</span>
+      <div id="ln-schips" style="display:flex;align-items:center;gap:8px;"></div>
+      <div class="ln-filters-state" id="ln-filters-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="ln-kpis" id="ln-kpis"></div>
+
+    <!-- 左：改进行动台账（写死高度 734px = 28 行 × 23px + 表头） -->
+    <div class="ln-col">
+      <section class="ln-panel is-ledger">
+        <div class="ln-panel-head">
+          <h2>改进行动台账（目标维度 × 状态）</h2>
+          <span class="ln-panel-tag" id="ln-table-tag">--</span>
+        </div>
+        <div class="ln-table">
+          <div class="ln-thead">
+            <span>行动编号</span><span>行动项</span><span>目标维度</span><span>发起方</span>
+            <span>责任人</span><span>计划完成</span><span>进度</span><span>预期提升</span><span>状态</span>
+          </div>
+          <ul class="ln-tbody" id="ln-tbody"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中：单条行动详情（里程碑四节点 + 预期收益拆解 + 阻碍因素），写死高度 -->
+    <div class="ln-col">
+      <section class="ln-panel is-detail">
+        <div class="ln-panel-head">
+          <h2>单条行动详情</h2>
+          <span class="ln-panel-tag" id="ln-dt-tag">--</span>
+        </div>
+        <div class="ln-dt-head" id="ln-dt-headbox"></div>
+        <div class="ln-sec is-ms">
+          <div class="ln-sec-h"><u>里程碑 · 立项 → 方案 → 试点 → 推广</u><i id="ln-ms-tag">--</i></div>
+          <div class="ln-ms-bar" id="ln-ms-bar"></div>
+          <div class="ln-ms-list" id="ln-ms-list"></div>
+        </div>
+        <div class="ln-sec is-bf">
+          <div class="ln-sec-h"><u>预期收益拆解 · 目标维二级指标</u><i id="ln-bf-tag">--</i></div>
+          <div class="ln-bf-list" id="ln-bf-list"></div>
+          <div class="ln-bf-sum" id="ln-bf-sum"></div>
+        </div>
+        <div class="ln-sec is-rk">
+          <div class="ln-sec-h"><u>阻碍因素</u><i id="ln-rk-tag">--</i></div>
+          <div class="ln-rk-list" id="ln-rk-list"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右：维度改进潜力 + 状态分布与完成率 + 进度甘特 -->
+    <div class="ln-col">
+      <section class="ln-panel is-gap">
+        <div class="ln-panel-head">
+          <h2>维度改进潜力</h2>
+          <span class="ln-panel-tag" id="ln-gap-tag">--</span>
+        </div>
+        <div class="ln-chart" id="ln-chart-gap"></div>
+      </section>
+      <section class="ln-panel is-state">
+        <div class="ln-panel-head">
+          <h2>状态分布与完成率</h2>
+          <span class="ln-panel-tag" id="ln-state-tag">--</span>
+        </div>
+        <div class="ln-pair">
+          <div class="ln-chart is-donut" id="ln-chart-state"></div>
+          <div class="ln-chart" id="ln-chart-rate"></div>
+        </div>
+      </section>
+      <section class="ln-panel" style="flex:1;">
+        <div class="ln-panel-head">
+          <h2>进度甘特 · 在办 Top 10</h2>
+          <span class="ln-panel-tag" id="ln-gantt-tag">--</span>
+        </div>
+        <div class="ln-chart" id="ln-chart-gantt"></div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="ln-foot">
+      <div class="ln-foot-tag">改进研判</div>
+      <div class="ln-foot-view"><div class="ln-foot-track" id="ln-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("ln-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("ln-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const r2 = (v) => Math.round(v * 100) / 100;              /* 浮点收口：分值一律两位 */
+  const DAY = 86400000;
+  const ts = (s) => new Date(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10))).getTime();
+  const fmtDate = (t) => { const d = new Date(t); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  function hexA(hex, a) {
+    const h = hex.replace("#", "");
+    return "rgba(" + parseInt(h.slice(0, 2), 16) + "," + parseInt(h.slice(2, 4), 16) + "," +
+      parseInt(h.slice(4, 6), 16) + "," + a + ")";
+  }
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 研发效能改进办视角）
+         ★ 与父页 P17「研发效能指数」严格同源（docs/RndIpdThemed.md §2.2 / §9.1 P17→ln）：
+           研发健康指数 84.1 = 交付 86×0.20 + 质量 88×0.20 + 效率 81×0.15
+                             + 投入产出 78×0.15 + 协同 83×0.15 + 人才 87×0.15（权重和 = 1）；
+           父页「改进行动追踪」面板的 7 条在办行动，其**行动项文本 / 目标维度 / 预期提升 /
+           责任人 / 进度**在本页逐字复刻，由 PARENT_AUTH 做构造性断言守住。
+         ★ 本页口径（三页分工，页头已注明）：
+           - 本页 = **组织级效能改进行动**全量台账，颗粒度 = 一条跨部门改进举措（周期数月、
+             有立项/方案/试点/推广四节点），单位「条行动」；
+           - 姊妹子页 zb「单维度追溯详情」做的是**单维度二级指标加权追溯**（把一维得分
+             再往下拆成 4 项二级指标），单位是「分」，不是行动；
+           - 姊妹子页 dm「障碍与回顾行动台账」做的是**Sprint 级障碍 + 回顾行动**（团队 ×
+             迭代视角，周期一个 Sprint），颗粒度比本页小一级。三者不可相加。
+         ★ 收益口径：**当前六维得分已包含「已完成」行动兑现的收益**；「在办」= 进行中 + 未启动，
+           其 Σ预期提升是尚未兑现的规划增量，与「距目标 90 的差距」对比；已取消行动不计入。
+         ★ 二级拆分（28 条行动、四节点里程碑、预期收益拆解、阻碍因素）为本页自编，
+           Σ 一律收敛到上级数，全部进页尾勾稽自检。
+         ★ 循环引用红线：进 option 的数据只放标量与数组，行与维度/状态之间一律用索引
+           （di / st）关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 六维一级表（dim / score / w 与契约 §2.2、父页 pi 的 DIMS、门户 hq 的 HEALTH_DIMS 逐字） */
+  const DIMS = [
+    { dim: "交付",     score: 86, w: 0.20, color: C.series[0], from: "P2 IPD管道 · P5 敏捷交付" },
+    { dim: "质量",     score: 88, w: 0.20, color: C.series[1], from: "P8 质量与缺陷" },
+    { dim: "效率",     score: 81, w: 0.15, color: C.series[2], from: "P6 看板 · P7 工程效能" },
+    { dim: "投入产出", score: 78, w: 0.15, color: C.series[3], from: "P4 投入与预算" },
+    { dim: "协同",     score: 83, w: 0.15, color: C.series[4], from: "P9 集成协同 · P14 多中心" },
+    { dim: "人才",     score: 87, w: 0.15, color: C.series[5], from: "P15 人才与能力" }
+  ];
+  /* ★ 构造性断言用的权威副本：逐字转写自 docs/RndIpdThemed.md §2.2 与父页 DIMS。 */
+  const DIM_AUTH = "交付|86|0.2;质量|88|0.2;效率|81|0.15;投入产出|78|0.15;协同|83|0.15;人才|87|0.15";
+  const AUTH_INDEX = 84.15;               /* = Σ(得分×权重)，展示口径一位小数 = 84.1 */
+  const TARGET = 90;                      /* 管理层目标线（与父页同口径） */
+  const TODAY = ts("2026-08-20");         /* 数据日期 = 甘特今日线 */
+
+  /* 4.2 各维二级指标名（逐字引姊妹子页 zb「单维度追溯详情」的 SUBS，
+         用作本页「预期收益拆解」的合法条目集——一条行动只能影响其目标维的二级指标。 */
+  const SUB_OF = {
+    "交付":     ["按期交付率", "AR 计划达成率", "里程碑 DCP 准时率", "需求前置达标率"],
+    "质量":     ["缺陷逃逸率", "缺陷关闭率", "单测覆盖率", "变更失败率"],
+    "效率":     ["DORA 部署频率", "变更前置时间", "流动效率", "在制卡阻塞占比"],
+    "投入产出": ["研发费率", "单点故事点成本", "CBB 复用率", "需求价值兑现率"],
+    "协同":     ["联调接口达成率", "跨域依赖阻塞占比", "集成测试通过率", "跨站协作响应达标"],
+    "人才":     ["关键岗位饱和度", "核心人才保留率", "高职级 P7+ 占比", "人均年产出"]
+  };
+
+  /* 4.3 行动状态四档（顺序 = 任务卡二级筛选口径：已完成 / 进行中 / 未启动 / 已取消） */
+  const ST_NAMES  = ["已完成", "进行中", "未启动", "已取消"];
+  const ST_COLORS = [C.green, C.blue, C.blueDeep, C.red];
+  const ST_NOTE   = ["收益已兑现，计入当前得分", "在办：里程碑推进中", "在办：已排期未启动", "已终止，不计入潜力"];
+  const OPEN_ST   = [1, 2];               /* 「在办」口径 = 进行中 + 未启动 */
+
+  /* 4.4 里程碑四节点：gate = 该节点完成对应的累计进度百分位；frac = 节点日期在周期上的位置 */
+  const MS_NAMES = ["立项", "方案", "试点", "推广"];
+  const MS_HINT  = ["立项评审 → 资源与预算落位", "方案设计 → 评审通过", "试点范围内验证 → 数据达标", "全域推广 → 机制固化"];
+  const MS_GATE  = [10, 35, 70, 100];
+  const MS_FRAC  = [0, 0.25, 0.60, 0.90];
+  const MS_ST_NAMES  = ["未开始", "进行中", "已完成", "已终止"];
+  const MS_ST_COLORS = [C.textDim, C.amber, C.green, C.red];
+
+  /* 4.5 ★ 父页「改进行动追踪」7 条在办行动的权威副本（逐字转写自父页 ACTIONS）
+         本页若与之有任何一字/一分之差，页尾自检立刻报出 —— 两页同源靠这条断言守住。 */
+  const PARENT_AUTH = [
+    ["需求价值分级与砍单机制", "投入产出", "组合办 周珩",   2.0, 62],
+    ["云资源与算力配额闭环",   "投入产出", "云平台部 王衡", 1.5, 48],
+    ["外协结构优化与单价复议", "投入产出", "外协组 陆铮",   1.0, 35],
+    ["CBB 复用率 63% → 70%",   "投入产出", "架构委 韩牧",   1.5, 41],
+    ["构建时长压降与缓存分层", "效率",     "工效组 陈拓",   1.8, 76],
+    ["跨域依赖前置拉通例会",   "效率",     "PMO 沈砚",      1.2, 55],
+    ["看板 WIP 限额与阻塞清理", "效率",    "教练组 贺兰",   1.0, 44]
+  ];
+
+  /* 4.6 改进行动台账 28 条（按编号升序陈列，编号按目标维度分段）
+         src: 0 = 父页「改进行动追踪」逐字行（7 条，不带角标）
+              1 = 本页补充（历史已完成 / 已取消 / 未启动规划，行动项后带「补」角标）
+         st : 0 已完成 · 1 进行中 · 2 未启动 · 3 已取消（进度 100% ⇔ 已完成）
+         gain: 该行动闭环后对**目标维得分**的预期提升（分）
+         bf : 预期收益拆解 [二级指标名, 指标预期变化, 该项贡献分] —— Σ 贡献分 == gain（逐行自检）
+         rk : 阻碍因素 [文案, 等级 0 高 / 1 中 / 2 低] */
+  const ROWS = [
+    /* ---- 交付（86 → 目标 90，差距 4.0） ---- */
+    { no: "ACT-2026-001", name: "里程碑 DCP 决策提速", dim: "交付", org: "IPMT", owner: "PMO 沈砚",
+      s: "2026-01-12", d: "2026-05-29", pct: 100, gain: 1.2, st: 0, src: 1,
+      bf: [["里程碑 DCP 准时率", "84.0% → 89.0%", 0.8], ["按期交付率", "87.2% → 88.4%", 0.4]],
+      rk: [["已闭环：预审前置已写入 IPD 手册，无未决阻碍", 2]] },
+    { no: "ACT-2026-002", name: "交付节奏与版本火车对齐", dim: "交付", org: "IPMT", owner: "组合办 周珩",
+      s: "2026-03-02", d: "2026-10-30", pct: 58, gain: 1.2, st: 1, src: 1,
+      bf: [["按期交付率", "87.2% → 89.6%", 0.7], ["AR 计划达成率", "90.2% → 91.8%", 0.5]],
+      rk: [["R26.6 集成窗口与两条产品线路标冲突，需 IPMT 裁决", 0],
+           ["四产品线节奏基线未统一，切换成本集中在 Q4", 1]] },
+    { no: "ACT-2026-003", name: "需求前置时间压降专项", dim: "交付", org: "PMO", owner: "需求组 苏牧",
+      s: "2026-05-11", d: "2026-11-27", pct: 34, gain: 1.0, st: 1, src: 1,
+      bf: [["需求前置达标率", "64.4% → 72.0%", 0.7], ["AR 计划达成率", "90.2% → 91.0%", 0.3]],
+      rk: [["IR 澄清环节仍靠人工排期，工具化未立项", 1],
+           ["客户直采类需求前置不可控，占 OR 来源 36%", 1]] },
+    { no: "ACT-2026-004", name: "AR 承诺与容量对齐机制", dim: "交付", org: "PMO", owner: "教练组 贺兰",
+      s: "2026-09-01", d: "2026-12-31", pct: 0, gain: 0.8, st: 2, src: 1,
+      bf: [["AR 计划达成率", "90.2% → 92.5%", 0.6], ["按期交付率", "87.2% → 87.8%", 0.2]],
+      rk: [["12 团队速率基线口径待统一，教练组人力 Q4 才释放", 1]] },
+    { no: "ACT-2026-005", name: "TR 评审材料模板统一", dim: "交付", org: "质量委员会", owner: "TR 秘书 岑铎",
+      s: "2026-03-16", d: "2026-07-31", pct: 100, gain: 0.6, st: 0, src: 1,
+      bf: [["里程碑 DCP 准时率", "81.0% → 84.0%", 0.4], ["按期交付率", "86.0% → 87.2%", 0.2]],
+      rk: [["已闭环：TR1–TR6 模板已随评审系统发布", 2]] },
+    /* ---- 质量（88 → 目标 90，差距 2.0） ---- */
+    { no: "ACT-2026-006", name: "现网缺陷根因闭环强化", dim: "质量", org: "质量委员会", owner: "质量部 桑晚亭",
+      s: "2026-04-13", d: "2026-11-13", pct: 46, gain: 0.9, st: 1, src: 1,
+      bf: [["缺陷逃逸率", "2.0% → 1.5%", 0.6], ["缺陷关闭率", "95.0% → 96.2%", 0.3]],
+      rk: [["现网 173 条缺陷的根因回溯依赖各域自查，口径不齐", 1],
+           ["硬件域缺陷复现需样机档期，闭环周期长", 1]] },
+    { no: "ACT-2026-007", name: "单测覆盖率 74% → 82%", dim: "质量", org: "工程效能委员会", owner: "工效组 陈拓",
+      s: "2026-06-01", d: "2026-12-18", pct: 31, gain: 0.8, st: 1, src: 1,
+      bf: [["单测覆盖率", "74.0% → 82.0%", 0.5], ["缺陷逃逸率", "2.0% → 1.8%", 0.3]],
+      rk: [["嵌入式仓库群缺少可用桩框架，覆盖率提升成本最高", 0],
+           ["存量代码补测与迭代承诺争抢团队容量", 1]] },
+    { no: "ACT-2026-008", name: "变更失败率压降与灰度门禁", dim: "质量", org: "质量委员会", owner: "SRE 组 温野",
+      s: "2026-09-14", d: "2027-01-29", pct: 0, gain: 0.6, st: 2, src: 1,
+      bf: [["变更失败率", "8.4% → 6.5%", 0.6]],
+      rk: [["灰度门禁需接入发布列车，排期落在 R26.8 之后", 1]] },
+    { no: "ACT-2026-009", name: "缺陷分级与响应 SLA 重定", dim: "质量", org: "质量委员会", owner: "质量部 桑晚亭",
+      s: "2026-02-09", d: "2026-06-26", pct: 100, gain: 0.7, st: 0, src: 1,
+      bf: [["缺陷关闭率", "92.6% → 95.0%", 0.5], ["缺陷逃逸率", "2.4% → 2.0%", 0.2]],
+      rk: [["已闭环：四级 SLA 已在缺陷系统强制生效", 2]] },
+    /* ---- 效率（81 → 目标 90，差距 9.0；含父页 3 条逐字） ---- */
+    { no: "ACT-2026-010", name: "构建时长压降与缓存分层", dim: "效率", org: "工程效能委员会", owner: "工效组 陈拓",
+      s: "2026-02-23", d: "2026-10-09", pct: 76, gain: 1.8, st: 1, src: 0,
+      bf: [["变更前置时间", "26.0 h → 20.5 h", 1.1], ["DORA 部署频率", "14.2 → 16.4 次/日", 0.7]],
+      rk: [["远端缓存命中率在硬件仿真任务上仍不足 40%", 1],
+           ["构建机房算力配额与 AI 训练任务争抢", 1]] },
+    { no: "ACT-2026-011", name: "跨域依赖前置拉通例会", dim: "效率", org: "PMO", owner: "PMO 沈砚",
+      s: "2026-04-06", d: "2026-11-20", pct: 55, gain: 1.2, st: 1, src: 0,
+      bf: [["在制卡阻塞占比", "25.0% → 20.4%", 0.7], ["流动效率", "45.0% → 47.0%", 0.5]],
+      rk: [["跨域依赖 38 张阻塞卡里，外部供应类 14 张不可控", 0],
+           ["六站点时差导致例会参与率仅 72%", 1]] },
+    { no: "ACT-2026-012", name: "看板 WIP 限额与阻塞清理", dim: "效率", org: "PMO", owner: "教练组 贺兰",
+      s: "2026-05-04", d: "2026-12-04", pct: 44, gain: 1.0, st: 1, src: 0,
+      bf: [["流动效率", "45.0% → 49.0%", 0.7], ["在制卡阻塞占比", "25.0% → 23.0%", 0.3]],
+      rk: [["12 团队 WIP 限额尚未统一，4 队仍超限运行", 1],
+           ["限额收紧初期速率会短期回落，团队抵触", 1]] },
+    { no: "ACT-2026-013", name: "流水线自愈与失败重试治理", dim: "效率", org: "工程效能委员会", owner: "工效组 陈拓",
+      s: "2026-09-07", d: "2026-12-11", pct: 0, gain: 1.5, st: 2, src: 1,
+      bf: [["DORA 部署频率", "14.2 → 17.0 次/日", 0.9], ["变更前置时间", "26.0 h → 23.0 h", 0.6]],
+      rk: [["自愈策略需与质量门禁对齐，避免掩盖真实失败", 1]] },
+    { no: "ACT-2026-014", name: "环境按需供给与预置镜像", dim: "效率", org: "CTO 办公室", owner: "云平台部 王衡",
+      s: "2025-11-17", d: "2026-04-24", pct: 100, gain: 1.4, st: 0, src: 1,
+      bf: [["变更前置时间", "31.5 h → 26.0 h", 0.9], ["流动效率", "41.0% → 45.0%", 0.5]],
+      rk: [["已闭环：五类标准镜像上线，环境等待类阻塞下降明显", 2]] },
+    { no: "ACT-2026-015", name: "代码评审时长压降", dim: "效率", org: "工程效能委员会", owner: "架构委 韩牧",
+      s: "2026-06-15", d: "2026-09-25", pct: 12, gain: 1.0, st: 3, src: 1,
+      bf: [["变更前置时间", "26.0 h → 24.2 h", 0.6], ["流动效率", "45.0% → 46.5%", 0.4]],
+      rk: [["已取消：与「构建时长压降与缓存分层」收益重叠，合并执行", 2],
+           ["评审时长口径与 DORA 前置时间重复计量，易双算", 1]] },
+    /* ---- 投入产出（78 → 目标 90，差距 12.0；含父页 4 条逐字） ---- */
+    { no: "ACT-2026-016", name: "需求价值分级与砍单机制", dim: "投入产出", org: "IPMT", owner: "组合办 周珩",
+      s: "2026-01-19", d: "2026-10-16", pct: 62, gain: 2.0, st: 1, src: 0,
+      bf: [["需求价值兑现率", "80.0% → 88.0%", 1.1], ["单点故事点成本", "11.0 → 10.2 万元/点", 0.9]],
+      rk: [["砍单触碰业务方既得预期，需 IPMT 逐单背书", 0],
+           ["价值分级模型缺少上线后回采数据支撑", 1]] },
+    { no: "ACT-2026-017", name: "云资源与算力配额闭环", dim: "投入产出", org: "CTO 办公室", owner: "云平台部 王衡",
+      s: "2026-03-09", d: "2026-11-06", pct: 48, gain: 1.5, st: 1, src: 0,
+      bf: [["单点故事点成本", "11.0 → 10.4 万元/点", 0.9], ["研发费率", "11.5% → 11.1%", 0.6]],
+      rk: [["AI 训练任务峰值不可预测，配额一刀切会伤模型迭代", 0],
+           ["按项目分摊的计费口径尚未与财经部对齐", 1]] },
+    { no: "ACT-2026-018", name: "外协结构优化与单价复议", dim: "投入产出", org: "财经部", owner: "外协组 陆铮",
+      s: "2026-04-20", d: "2026-12-18", pct: 35, gain: 1.0, st: 1, src: 0,
+      bf: [["研发费率", "11.5% → 11.2%", 0.6], ["单点故事点成本", "11.0 → 10.7 万元/点", 0.4]],
+      rk: [["三家主力外协合同到期日集中在 2027 Q1，复议窗口窄", 1],
+           ["外协转自研需补编制，与人才维行动争抢 HC", 1]] },
+    { no: "ACT-2026-019", name: "CBB 复用率 63% → 70%", dim: "投入产出", org: "架构委员会", owner: "架构委 韩牧",
+      s: "2026-03-23", d: "2026-12-25", pct: 41, gain: 1.5, st: 1, src: 0,
+      bf: [["CBB 复用率", "63.0% → 70.0%", 1.0], ["单点故事点成本", "11.0 → 10.6 万元/点", 0.5]],
+      rk: [["216 个 CBB 里 80 个长期零复用，需先做货架清理", 1],
+           ["复用激励未进团队考核，推动靠架构委刷脸", 1]] },
+    { no: "ACT-2026-020", name: "样机物料集采与共线复用", dim: "投入产出", org: "财经部", owner: "硬件部 邵岐",
+      s: "2026-09-21", d: "2027-01-22", pct: 0, gain: 1.2, st: 2, src: 1,
+      bf: [["研发费率", "11.5% → 11.2%", 0.7], ["单点故事点成本", "11.0 → 10.8 万元/点", 0.5]],
+      rk: [["共线复用需两条产品线让出样机档期，尚未达成一致", 1]] },
+    { no: "ACT-2026-021", name: "研发费用资本化口径重梳", dim: "投入产出", org: "财经部", owner: "财经 BP 计然",
+      s: "2025-10-20", d: "2026-03-27", pct: 100, gain: 1.1, st: 0, src: 1,
+      bf: [["研发费率", "12.1% → 11.5%", 0.7], ["需求价值兑现率", "77.0% → 80.0%", 0.4]],
+      rk: [["已闭环：费用化/资本化判定规则已随年度预算发布", 2]] },
+    { no: "ACT-2026-022", name: "长尾工具许可证退订", dim: "投入产出", org: "财经部", owner: "IT 支持 卓青",
+      s: "2026-01-05", d: "2026-05-15", pct: 28, gain: 0.6, st: 3, src: 1,
+      bf: [["研发费率", "11.5% → 11.4%", 0.4], ["单点故事点成本", "11.0 → 10.9 万元/点", 0.2]],
+      rk: [["已取消：退订清单里 6 款工具被合规审计列为必留", 2],
+           ["工具与其他类年投入仅 1.2 亿，收益不足以覆盖切换成本", 1]] },
+    /* ---- 协同（83 → 目标 90，差距 7.0） ---- */
+    { no: "ACT-2026-023", name: "跨域接口契约先行与冻结", dim: "协同", org: "架构委员会", owner: "集成组 简牧",
+      s: "2026-03-30", d: "2026-10-23", pct: 52, gain: 1.5, st: 1, src: 1,
+      bf: [["联调接口达成率", "91.4% → 95.0%", 0.9], ["跨域依赖阻塞占比", "34.9% → 29.0%", 0.6]],
+      rk: [["软硬云AI 四域接口版本节奏不同，冻结点难对齐", 0],
+           ["契约变更走 CCB 后评审等待时长上升", 1]] },
+    { no: "ACT-2026-024", name: "跨站协作 24h 响应机制", dim: "协同", org: "PMO", owner: "多中心办 白凛",
+      s: "2026-06-08", d: "2026-12-04", pct: 18, gain: 1.2, st: 1, src: 1,
+      bf: [["跨站协作响应达标", "78.0% → 86.0%", 0.8], ["跨域依赖阻塞占比", "34.9% → 32.0%", 0.4]],
+      rk: [["六站点值班表尚未打通，夜间请求仍靠个人响应", 1],
+           ["西安/成都两地关键角色单点，响应能力受限", 1]] },
+    { no: "ACT-2026-025", name: "联调环境共享与排期看板", dim: "协同", org: "CTO 办公室", owner: "云平台部 王衡",
+      s: "2026-09-28", d: "2027-01-15", pct: 0, gain: 0.9, st: 2, src: 1,
+      bf: [["集成测试通过率", "90.0% → 93.0%", 0.5], ["联调接口达成率", "91.4% → 92.8%", 0.4]],
+      rk: [["硬件在环环境无法共享，只能覆盖软件与云端两域", 1]] },
+    /* ---- 人才（87 → 目标 90，差距 3.0） ---- */
+    { no: "ACT-2026-026", name: "关键岗位继任梯队建设", dim: "人才", org: "人力资源部", owner: "HRBP 云璃",
+      s: "2026-04-27", d: "2026-11-06", pct: 40, gain: 1.0, st: 1, src: 1,
+      bf: [["关键岗位饱和度", "92.4% → 96.0%", 0.6], ["核心人才保留率", "96.0% → 97.2%", 0.4]],
+      rk: [["射频与天线、算法专家两类岗位外部供给稀缺", 0],
+           ["继任者培养周期 12 个月以上，本年度难兑现", 1]] },
+    { no: "ACT-2026-027", name: "高潜任职资格通道加速", dim: "人才", org: "人力资源部", owner: "HRBP 云璃",
+      s: "2026-10-12", d: "2027-02-26", pct: 0, gain: 0.8, st: 2, src: 1,
+      bf: [["高职级 P7+ 占比", "26.0% → 29.0%", 0.5], ["核心人才保留率", "96.0% → 96.8%", 0.3]],
+      rk: [["职级通道加速需与年度调薪包联动，预算未落位", 1]] },
+    { no: "ACT-2026-028", name: "内部技术导师制试点", dim: "人才", org: "CTO 办公室", owner: "架构委 韩牧",
+      s: "2025-09-29", d: "2026-02-27", pct: 100, gain: 0.7, st: 0, src: 1,
+      bf: [["人均年产出", "4.8 → 5.0 点/人年", 0.4], ["高职级 P7+ 占比", "24.5% → 26.0%", 0.3]],
+      rk: [["已闭环：导师制已在软件、云平台两职能全面铺开", 2]] }
+  ];
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+  const DIM_IDX = {};
+  DIMS.forEach((d, i) => { DIM_IDX[d.dim] = i; });
+
+  /* 5.1 六维加权：逐行现算，合成指数 = Σ(得分×权重) */
+  DIMS.forEach((d) => { d.ws = d.score * d.w; d.gap = TARGET - d.score; });
+  D.wsum  = r2(sum(DIMS.map((d) => d.w)));
+  D.index = sum(DIMS.map((d) => d.ws));
+  D.worst = DIMS.slice().sort((a, b) => a.score - b.score)[0];
+  D.gapSum = sum(DIMS.map((d) => d.gap));
+
+  /* 5.2 行派生：目标维索引、日期时间戳、周期天数、里程碑节点 */
+  ROWS.forEach((r, i) => {
+    r.i    = i;
+    r.di   = DIM_IDX[r.dim];
+    r.sTs  = ts(r.s);
+    r.dTs  = ts(r.d);
+    r.span = Math.round((r.dTs - r.sTs) / DAY);
+    r.seq  = Number(r.no.slice(-3));
+    r.open = OPEN_ST.indexOf(r.st) >= 0;
+    r.bfSum = r2(sum(r.bf.map((b) => b[2])));
+    /* 四节点日期：起点 + 周期 × 位置系数（严格单调，且均早于计划完成日） */
+    r.ms = MS_FRAC.map((f, k) => ({
+      k: k,
+      ts: r.sTs + Math.round(r.span * f) * DAY,
+      /* 节点态：完成 / 进行中 / 未开始 / 已终止（已取消行动的未完成节点一律终止） */
+      st: r.pct >= MS_GATE[k] ? 2
+        : (k === 0 || r.pct >= MS_GATE[k - 1]) ? (r.st === 3 ? 3 : (r.st === 2 ? 0 : 1))
+        : (r.st === 3 ? 3 : 0),
+      /* 节点内进度：把整体进度映射到该节点的 gate 区间 */
+      p: clamp((r.pct - (k === 0 ? 0 : MS_GATE[k - 1])) / (MS_GATE[k] - (k === 0 ? 0 : MS_GATE[k - 1])) * 100, 0, 100)
+    }));
+  });
+
+  /* 5.3 汇总维度 */
+  D.n = ROWS.length;
+  D.parentN = ROWS.filter((r) => r.src === 0).length;
+  D.extraN  = D.n - D.parentN;
+  D.byState = ST_NAMES.map((_, si) => ROWS.filter((r) => r.st === si).length);
+  D.stateSum = sum(D.byState);
+  D.doneN = D.byState[0];
+  D.doneRate = 100 * D.doneN / D.n;
+  D.openRows = ROWS.filter((r) => r.open);
+  D.openN = D.openRows.length;
+  D.gainOpen = r2(sum(D.openRows.map((r) => r.gain)));
+  D.gainDone = r2(sum(ROWS.filter((r) => r.st === 0).map((r) => r.gain)));
+  D.gainCancel = r2(sum(ROWS.filter((r) => r.st === 3).map((r) => r.gain)));
+  D.gainAll = r2(sum(ROWS.map((r) => r.gain)));
+  D.avgSpan = sum(ROWS.map((r) => r.span)) / D.n;
+
+  /* 5.4 逐维聚合：条数 / 已完成数 / 完成率 / 在办 Σ预期提升 / 是否超额规划 */
+  DIMS.forEach((d, di) => {
+    const rs = ROWS.filter((r) => r.di === di);
+    d.rows    = rs.length;
+    d.done    = rs.filter((r) => r.st === 0).length;
+    d.rate    = 100 * d.done / d.rows;
+    d.openN   = rs.filter((r) => r.open).length;
+    d.openGain = r2(sum(rs.filter((r) => r.open).map((r) => r.gain)));
+    d.over    = d.openGain > d.gap + 1e-9;              /* 超额规划：在办 Σ提升 > 距 90 差距 */
+    /* ★ 折合指数提升不做四舍五入：一旦 r2 到两位，5.5×0.15 = 0.825 会被抬成 0.83，
+       与「逐行 Σ(gain×权重)」的独立重算对不上（页尾自检硬校验这条）。 */
+    d.lift    = d.openGain * d.w;                       /* 折合合成指数的提升 */
+  });
+  D.dimRowsSum = sum(DIMS.map((d) => d.rows));
+  D.dimDoneSum = sum(DIMS.map((d) => d.done));
+  D.liftOpen = sum(DIMS.map((d) => d.lift));            /* 在办行动全部兑现后的指数增量 */
+  D.after = D.index + D.liftOpen;
+  D.overDims = DIMS.filter((d) => d.over);
+  D.worstOpen = D.worst.openN;
+
+  /* 5.5 父页 7 条的折合指数提升（应恒等于父页 pi 的 D.potential = 1.5 分） */
+  D.parentLift = r2(sum(ROWS.filter((r) => r.src === 0).map((r) => r.gain * DIMS[r.di].w)));
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const dt = new Date();
+    $("ln-clock-time").textContent = pad(dt.getHours()) + ":" + pad(dt.getMinutes()) + ":" + pad(dt.getSeconds());
+    $("ln-clock-date").textContent = dt.getFullYear() + "年" + pad(dt.getMonth() + 1) + "月" + pad(dt.getDate()) + "日 " + WEEKS[dt.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("ln-meta-n").textContent = fmtInt(D.n);
+  $("ln-meta-p").textContent = fmtInt(D.parentN);
+  $("ln-meta-x").textContent = fmtInt(D.extraN);
+  $("ln-meta-idx").textContent = fmtDec(D.index, 1);
+
+  /* ===== 7. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "行动总数", v: D.n, dec: 0, unit: "条", color: C.blue,
+      s: "六维全覆盖 · 父页在办 " + D.parentN + " 条 + 本页补充 " + D.extraN + " 条" },
+    { k: "已完成", v: D.doneN, dec: 0, unit: "条", color: C.green,
+      s: "Σ 已兑现 " + fmtDec(D.gainDone, 1) + " 分 · 收益已计入当前 " + fmtDec(D.index, 1) + " 分" },
+    { k: "完成率", v: D.doneRate, dec: 1, unit: "%", color: C.cyan,
+      s: D.doneN + " ÷ " + D.n + " 现算 · 已取消 " + D.byState[3] + " 条不计入分子" },
+    { k: "Σ 预期提升", v: D.gainOpen, dec: 1, unit: "分", color: C.amber,
+      s: "在办口径（进行中+未启动 " + D.openN + " 条）· 折合指数 +" + fmtDec(D.liftOpen, 2) + " 分" },
+    { k: "最弱维在办", v: D.worstOpen, dec: 0, unit: "条", color: C.orange,
+      s: D.worst.dim + " " + D.worst.score + " 分（距 90 差 " + fmtDec(D.worst.gap, 1) + "）· 在办 Σ " + fmtDec(D.worst.openGain, 1) + " 分" },
+    { k: "平均周期", v: D.avgSpan, dec: 0, unit: "天", color: C.violet,
+      s: "立项 → 计划完成 · " + D.n + " 条平均 ≈ " + fmtDec(D.avgSpan / 30.4, 1) + " 个月" }
+  ];
+  $("ln-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="ln-kpi" style="--ln-kc:' + p.color + '">' +
+      '<div class="ln-kpi-k">' + p.k + "</div>" +
+      '<div class="ln-kpi-v"><b id="ln-kpi-' + i + '">0</b><s>' + p.unit + "</s></div>" +
+      '<div class="ln-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛 */
+  KPIS.forEach((p, i) => {
+    const el = $("ln-kpi-" + i), dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const q = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - q, 3);
+      el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      if (q < 1) requestAnimationFrame(step);
+      else el.textContent = p.dec ? fmtDec(p.v, p.dec) : fmtInt(p.v);
+    })(t0);
+  });
+
+  /* ===== 8. 一级筛选：目标维度 chip（全部 + 六维；hash 契约键逐字用六维名） ===== */
+  const DFILTERS = [{ name: "全部", color: C.blue, cnt: D.n, gain: D.gainOpen, gap: D.gapSum }]
+    .concat(DIMS.map((d) => ({ name: d.dim, color: d.color, cnt: d.rows, gain: d.openGain, gap: d.gap })));
+  const dbox = $("ln-dchips");
+  dbox.innerHTML = DFILTERS.map((f, i) => (
+    '<button class="ln-dchip" type="button" data-i="' + i + '" style="--ln-cc:' + f.color + '"' +
+      ' title="' + f.name + "：行动 " + f.cnt + " 条 · 在办 Σ预期提升 " + fmtDec(f.gain, 1) +
+      " 分 · 距目标 90 差距 " + fmtDec(f.gap, 1) + ' 分">' +
+      "<u>" + f.name + "</u><b>" + f.cnt + "</b><i>条 · 在办 " + fmtDec(f.gain, 1) + " 分</i>" +
+    "</button>"
+  )).join("");
+  const dchips = Array.from(dbox.children);
+
+  /* ===== 9. 二级筛选：行动状态 chip（全部 + 四态；计数随一级维度重算） ===== */
+  const sbox = $("ln-schips");
+  function stScopeCnt(di, si) {
+    return ROWS.filter((r) => (di === 0 || r.di === di - 1) && (si === 0 || r.st === si - 1)).length;
+  }
+  function renderSChips(di, si) {
+    const items = [{ name: "全部", color: C.blue }]
+      .concat(ST_NAMES.map((n, k) => ({ name: n, color: ST_COLORS[k] })));
+    sbox.innerHTML = items.map((f, i) => (
+      '<button class="ln-schip' + (i === si ? " is-on" : "") + '" type="button" data-i="' + i + '"' +
+        (i === si ? ' style="background:' + f.color + ";border-color:" + f.color + '"' : "") + ">" +
+        f.name + "<i>" + stScopeCnt(di, i) + "</i>" +
+      "</button>"
+    )).join("");
+    Array.from(sbox.children).forEach((el) => {
+      el.addEventListener("click", () => applyFilter(dIdx, Number(el.dataset.i), false));
+    });
+  }
+
+  /* ===== 10. hash 契约：父页 P17「改进行动追踪」面板级入口 → 子页#encodeURIComponent(六维名)
+         归一化（trim + 全角空白剔除）后查表；HASH_ALIAS 收「投入」「产出」「ROI」等简写。 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  alias("全部", 0); alias("ALL", 0); alias("all", 0); alias("全量", 0); alias("改进行动", 0);
+  DIMS.forEach((d, di) => {
+    const i = di + 1;
+    alias(d.dim, i);
+    alias(d.dim + "维", i);
+    alias(d.dim + "维度", i);
+    alias(d.dim + "改进", i);
+    alias(d.dim + "行动", i);
+  });
+  /* 「投入产出」的常见简写与英文写法 */
+  ["投入", "产出", "ROI", "roi", "Roi", "投产", "投入-产出", "投入产出比", "投入与产出"]
+    .forEach((k) => alias(k, DIM_IDX["投入产出"] + 1));
+  ["交付力", "按期交付"].forEach((k) => alias(k, DIM_IDX["交付"] + 1));
+  ["质量力", "缺陷"].forEach((k) => alias(k, DIM_IDX["质量"] + 1));
+  ["效率力", "工程效率"].forEach((k) => alias(k, DIM_IDX["效率"] + 1));
+  ["协作", "跨域协同"].forEach((k) => alias(k, DIM_IDX["协同"] + 1));
+  ["人才力", "人才与能力"].forEach((k) => alias(k, DIM_IDX["人才"] + 1));
+
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                       /* trim + 全角空白剔除归一化 */
+    if (!raw) return -1;                                      /* 无 hash：默认全部，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -1 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(di) {
+    const want = "#" + encodeURIComponent(DFILTERS[di].name);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 写回，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 11. 台账主表渲染（行高 23px 写死、overflow hidden，台账区不撑破） ===== */
+  const tbody = $("ln-tbody");
+  let view = ROWS, dIdx = 0, sIdx = 0, selPos = 0;
+  const SUP = '<sup class="ln-sup" title="本页补充：父页「改进行动追踪」只陈列 7 条在办行动，历史已完成/已取消与未启动规划为本页补充">补</sup>';
+
+  function rowHtml(r, k) {
+    const dim = DIMS[r.di];
+    const pc = r.st === 0 ? C.green : r.st === 3 ? C.red : r.pct >= 60 ? C.cyan : r.pct >= 30 ? C.amber : C.orange;
+    return '<li data-no="' + r.no + '" style="animation-delay:' + (k * 10) + 'ms">' +
+      '<span class="ln-no">' + r.no + "</span>" +
+      '<span class="ln-name">' + r.name + (r.src ? SUP : "") + "</span>" +
+      '<span class="ln-dimtag" style="color:' + dim.color + ";border-color:" + dim.color + '55">' + dim.dim + "</span>" +
+      '<span class="ln-from">' + r.org + "</span>" +
+      '<span class="ln-owner">' + r.owner + "</span>" +
+      '<span class="ln-due">' + r.d.slice(2) + "</span>" +
+      '<span class="ln-prog"><span class="ln-prog-t"><u style="width:' + r.pct + "%;background:" + pc +
+        '"></u></span><em style="color:' + pc + '">' + r.pct + "%</em></span>" +
+      '<span class="ln-gain" style="color:' + (r.st === 3 ? C.textDim : C.amber) + '">+' + fmtDec(r.gain, 1) + "</span>" +
+      '<span class="ln-badge is-s' + r.st + '">' + ST_NAMES[r.st] + "</span>" +
+    "</li>";
+  }
+  function renderTable() {
+    tbody.innerHTML = view.map(rowHtml).join("");
+    Array.from(tbody.children).forEach((li, k) => {
+      /* 手动点行 → 选中并暂停轮巡 20 秒（与 hash 定位同一门闩） */
+      li.addEventListener("click", () => { selPos = k; renderSel(); pauseRotate(20000); });
+    });
+    const f = DFILTERS[dIdx];
+    $("ln-table-tag").textContent =
+      "全量陈列 " + D.n + " 条（非抽样）· 父页逐字 " + D.parentN + " 条 · 补充「补」" + D.extraN + " 条";
+    $("ln-filters-state").innerHTML =
+      "筛选结果 <b>" + view.length + "</b> 条 / 共 " + D.n + " 条<i>|</i>该口径在办 Σ预期提升 <em>" +
+      fmtDec(f.gain, 1) + "</em> 分 · 距目标 90 差距 <em>" + fmtDec(f.gap, 1) +
+      "</em> 分<i>|</i>行点击或 3 秒轮巡联动右侧详情";
+  }
+
+  /* ===== 12. 单条行动详情：里程碑四节点 + 预期收益拆解 + 阻碍因素（纯 HTML/CSS） ===== */
+  const RK_LV = ["高", "中", "低"];
+  const RK_COLORS = [C.red, C.orange, C.green];
+  function renderSel() {
+    const lis = Array.from(tbody.children);
+    if (!view.length) {
+      $("ln-dt-tag").textContent = "当前筛选无行动";
+      $("ln-dt-headbox").innerHTML = '<div class="ln-dt-sub">调整目标维度或行动状态筛选后，此处展示选中行动的里程碑、预期收益拆解与阻碍因素。</div>';
+      $("ln-ms-bar").innerHTML = ""; $("ln-ms-list").innerHTML = "";
+      $("ln-bf-list").innerHTML = ""; $("ln-bf-sum").innerHTML = "";
+      $("ln-rk-list").innerHTML = "";
+      $("ln-ms-tag").textContent = "--"; $("ln-bf-tag").textContent = "--"; $("ln-rk-tag").textContent = "--";
+      return;
+    }
+    selPos = selPos % view.length;
+    const r = view[selPos];
+    const dim = DIMS[r.di];
+    lis.forEach((li, k) => li.classList.toggle("is-sel", k === selPos));
+
+    $("ln-dt-tag").textContent = "第 " + (selPos + 1) + " / " + view.length + " 条 · " + ST_NOTE[r.st];
+    $("ln-dt-headbox").innerHTML =
+      '<div class="ln-dt-no"><b>' + r.no + "</b>" +
+        '<span class="ln-dimtag" style="color:' + dim.color + ";border-color:" + dim.color + '55">' + dim.dim + "</span>" +
+        '<span class="ln-badge is-s' + r.st + '">' + ST_NAMES[r.st] + "</span>" +
+        '<span class="ln-dt-sub">' + (r.src ? "本页补充" : "父页「改进行动追踪」逐字") + "</span></div>" +
+      '<div class="ln-dt-title">' + r.name + "</div>" +
+      '<div class="ln-dt-sub">发起方 <b>' + r.org + "</b> · 责任人 <b>" + r.owner + "</b> · 进度 <b>" +
+        r.pct + "%</b> · 预期提升 <b>+" + fmtDec(r.gain, 1) + "</b> 分</div>" +
+      '<div class="ln-dt-sub">立项 <b>' + r.s + "</b> → 计划完成 <b>" + r.d + "</b> · 周期 <b>" + r.span +
+        "</b> 天 · 折合指数 <b>+" + fmtDec(r.gain * dim.w, 2) + "</b> 分（" + dim.dim + " 权重 " + fmtDec(dim.w, 2) + "）</div>";
+
+    /* 12.1 里程碑四段条：段宽 ∝ gate 区间，填充 ∝ 节点内进度 */
+    $("ln-ms-tag").textContent = "四节点 · 当前 " + MS_NAMES[Math.max(0, r.ms.filter((m) => m.st === 2).length - (r.pct >= 100 ? 1 : 0))] +
+      " · 累计进度 " + r.pct + "%";
+    $("ln-ms-bar").innerHTML = r.ms.map((m, k) => {
+      const wSeg = MS_GATE[k] - (k === 0 ? 0 : MS_GATE[k - 1]);
+      const col = MS_ST_COLORS[m.st];
+      return '<span class="ln-ms-seg' + (m.st === 1 ? " is-cur" : "") + '" style="flex:' + wSeg +
+        '" title="' + MS_NAMES[k] + " " + MS_ST_NAMES[m.st] + " " + fmtDec(m.p, 0) + '%">' +
+        '<u style="width:' + fmtDec(m.p, 0) + "%;background:" + hexA(col, m.st === 2 ? 0.85 : 0.6) + '"></u></span>';
+    }).join("");
+    $("ln-ms-list").innerHTML = r.ms.map((m, k) => (
+      '<div class="ln-ms-row ' + (m.st === 2 || m.st === 1 ? "" : "is-todo") + '" style="--ln-nc:' + MS_ST_COLORS[m.st] + '">' +
+        "<b>" + MS_NAMES[k] + "</b>" +
+        "<span>" + MS_HINT[k] + "</span>" +
+        "<em>" + fmtDate(m.ts) + (m.st === 2 ? " 达成" : " 计划") + "</em>" +
+        "<s>" + MS_ST_NAMES[m.st] + "</s>" +
+      "</div>"
+    )).join("");
+
+    /* 12.2 预期收益拆解：该行动对目标维二级指标的影响，Σ 贡献分 == 预期提升 */
+    $("ln-bf-tag").textContent = dim.dim + " 维 " + r.bf.length + " 项二级指标（口径同「单维度追溯详情」）";
+    $("ln-bf-list").innerHTML = r.bf.map((b) => {
+      const w = clamp(100 * b[2] / r.gain, 8, 100);
+      return '<div class="ln-bf-row"><b>' + b[0] + "</b>" +
+        "<span><u>" + b[1] + '</u><var><i style="width:' + fmtDec(w, 0) + '%"></i></var></span>' +
+        "<em>+" + fmtDec(b[2], 1) + "</em></div>";
+    }).join("");
+    $("ln-bf-sum").innerHTML =
+      "<span>Σ 二级贡献 = 该行动预期提升（逐条自检）</span>" +
+      "<span><b>+" + fmtDec(r.bfSum, 1) + "</b> 分 ＝ +" + fmtDec(r.gain, 1) + " 分</span>";
+
+    /* 12.3 阻碍因素 */
+    $("ln-rk-tag").textContent = r.rk.length + " 项 · 最高等级 " + RK_LV[Math.min.apply(null, r.rk.map((x) => x[1]))];
+    $("ln-rk-list").innerHTML = r.rk.map((x) => (
+      '<div class="ln-rk-row"><b style="background:' + RK_COLORS[x[1]] + '">' + RK_LV[x[1]] +
+        "</b><span>" + x[0] + "</span></div>"
+    )).join("");
+  }
+
+  /* ===== 13. option 构造（★ 只放标量与数组，ROWS / DIMS 对象一律不进 option） ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+
+  /* 13.1 维度改进潜力：六维「距目标 90 差距」底条 + 「在办 Σ预期提升」叠加条 */
+  function gapOption(di) {
+    const names = DIMS.map((d) => d.dim);
+    const gaps  = DIMS.map((d) => r2(d.gap));
+    const opens = DIMS.map((d) => d.openGain);
+    const overs = DIMS.map((d) => (d.over ? 1 : 0));
+    const scores = DIMS.map((d) => d.score);
+    const cols  = DIMS.map((d) => d.color);
+    const cnts  = DIMS.map((d) => d.openN);
+    const maxV = Math.max.apply(null, gaps.concat(opens)) * 1.22;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 46, top: 24, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + names[i] + "</b> 当前 <b>" + scores[i] + "</b> 分<br/>距目标 90 差距 <b style=\"color:" +
+            C.blueDeep + "\">" + fmtDec(gaps[i], 1) + "</b> 分<br/>在办行动 " + cnts[i] +
+            " 条 · Σ预期提升 <b style=\"color:" + (overs[i] ? C.red : C.amber) + "\">" + fmtDec(opens[i], 1) + "</b> 分" +
+            (overs[i] ? "<br/><span style=\"color:" + C.red + "\">超额规划：规划量已超过差距，超出部分计入储备</span>"
+                      : "<br/><span style=\"color:" + C.textDim + "\">覆盖差距 " + fmtDec(100 * opens[i] / gaps[i], 0) + "%</span>");
+        }
+      }, TIP),
+      legend: { top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 10,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["距目标 90 差距", "在办 Σ预期提升"] },
+      xAxis: { type: "value", max: maxV, axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+      yAxis: { type: "category", data: names, inverse: true,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: {
+          fontSize: 11.5, fontWeight: 700,
+          color: (v) => (di > 0 && v === names[di - 1] ? "#ffffff" : "#bcd2f8")
+        },
+        splitLine: { show: false } },
+      series: [
+        { name: "距目标 90 差距", type: "bar", barWidth: 15, z: 2,
+          data: gaps.map((v, i) => ({ value: v, itemStyle: { color: hexA(cols[i], 0.24), borderColor: hexA(cols[i], 0.6), borderWidth: 1, borderRadius: [0, 4, 4, 0] } })),
+          label: { show: true, position: "right", color: C.textDim, fontSize: 10,
+            formatter: (p) => "差 " + fmtDec(p.value, 1) } },
+        { name: "在办 Σ预期提升", type: "bar", barWidth: 8, barGap: "-100%", z: 4,
+          data: opens.map((v, i) => ({ value: v, itemStyle: { color: overs[i] ? C.red : cols[i], borderRadius: [0, 3, 3, 0] } })),
+          label: { show: true, position: "insideRight", color: "#071026", fontSize: 9.5, fontWeight: 700,
+            formatter: (p) => (p.value >= 1 ? fmtDec(p.value, 1) : "") } }
+      ]
+    };
+  }
+
+  /* 13.2 状态四态环形（随一级维度口径重算，中心显示完成率） */
+  function stateOption(di) {
+    const rs = di === 0 ? ROWS : ROWS.filter((r) => r.di === di - 1);
+    const cnt = ST_NAMES.map((_, si) => rs.filter((r) => r.st === si).length);
+    const tot = sum(cnt);
+    const rate = tot ? 100 * cnt[0] / tot : 0;
+    const data = ST_NAMES.map((n, i) => ({ name: n, value: cnt[i], itemStyle: { color: ST_COLORS[i] } }))
+      .filter((x) => x.value > 0);
+    return {
+      backgroundColor: "transparent",
+      title: {
+        left: "center", top: "38%",
+        text: fmtDec(rate, 1) + "%", subtext: "完成率 " + cnt[0] + "/" + tot,
+        textStyle: { color: C.green, fontSize: 19, fontWeight: 700, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" },
+        subtextStyle: { color: C.textDim, fontSize: 10 }
+      },
+      tooltip: Object.assign({ trigger: "item",
+        formatter: (p) => "<b>" + p.name + "</b><br/>" + p.value + " 条 · 占 <b>" + fmtDec(p.percent, 1) + "%</b>" }, TIP),
+      series: [{
+        type: "pie", radius: ["58%", "82%"], center: ["50%", "50%"], avoidLabelOverlap: true,
+        itemStyle: { borderColor: "#081231", borderWidth: 2 },
+        label: { show: true, fontSize: 9.5, color: C.textDim, formatter: "{b}\n{c}" },
+        labelLine: { length: 4, length2: 4, lineStyle: { color: C.line } },
+        data: data
+      }]
+    };
+  }
+
+  /* 13.3 按维度完成率对比条 */
+  function rateOption(di) {
+    const names = DIMS.map((d) => d.dim);
+    const rates = DIMS.map((d) => Number(fmtDec(d.rate, 1)));
+    const dones = DIMS.map((d) => d.done);
+    const rows  = DIMS.map((d) => d.rows);
+    const cols  = DIMS.map((d) => d.color);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 40, top: 20, bottom: 2, containLabel: true },
+      tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>" + names[i] + "</b><br/>完成 " + dones[i] + " / " + rows[i] + " 条 = <b style=\"color:" +
+            C.green + "\">" + fmtDec(rates[i], 1) + "%</b>";
+        } }, TIP),
+      title: { text: "按维度完成率", left: 2, top: 0, textStyle: { color: C.textDim, fontSize: 10.5, fontWeight: 400 } },
+      xAxis: { type: "value", max: 100, axisLabel: { show: false }, splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false } },
+      yAxis: { type: "category", data: names, inverse: true,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { fontSize: 10.5, color: (v) => (di > 0 && v === names[di - 1] ? "#ffffff" : "#a9bce4") },
+        splitLine: { show: false } },
+      series: [{
+        type: "bar", barWidth: 10,
+        data: rates.map((v, i) => ({ value: v, itemStyle: { color: hexA(cols[i], 0.85), borderRadius: [0, 3, 3, 0] } })),
+        label: { show: true, position: "right", color: C.textDim, fontSize: 9.5,
+          formatter: (p) => dones[p.dataIndex] + "/" + rows[p.dataIndex] + " · " + fmtDec(p.value, 0) + "%" }
+      }]
+    };
+  }
+
+  /* 13.4 进度甘特：当前维度口径下「在办」行动按预期提升降序取 Top 10
+         ★ series.data 只放标量数组 [lane, 起 ts, 止 ts, 进度, ROWS 下标]，详情经下标闭包取 */
+  function ganttPick(di) {
+    return ROWS.filter((r) => r.open && (di === 0 || r.di === di - 1))
+      .sort((a, b) => (b.gain - a.gain) || (a.seq - b.seq))
+      .slice(0, 10);
+  }
+  function ganttOption(di) {
+    const pick = ganttPick(di);
+    const lanes = pick.map((r) => r.no.slice(4));            /* y 轴标签：2026-0XX */
+    const data  = pick.map((r, k) => [k, r.sTs, r.dTs, r.pct, r.i]);
+    const minTs = pick.length ? Math.min.apply(null, pick.map((r) => r.sTs)) : TODAY - 90 * DAY;
+    const maxTs = pick.length ? Math.max.apply(null, pick.map((r) => r.dTs)) : TODAY + 90 * DAY;
+    const padTs = Math.max(10 * DAY, (maxTs - minTs) * 0.04);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 2, right: 12, top: 22, bottom: 2, containLabel: true },
+      tooltip: Object.assign({ trigger: "item",
+        formatter: (p) => {
+          if (!p.value || p.value.length < 5) return "";
+          const r = ROWS[p.value[4]];
+          return "<b>" + r.no + "</b> " + r.name + "<br/>" + r.dim + " · " + ST_NAMES[r.st] +
+            " · 预期提升 <b style=\"color:" + C.amber + "\">+" + fmtDec(r.gain, 1) + "</b> 分<br/>" +
+            r.s + " → " + r.d + "（" + r.span + " 天）· 进度 <b>" + r.pct + "%</b><br/>" +
+            "<span style=\"color:" + C.textDim + "\">距今日线 " + Math.round((r.dTs - TODAY) / DAY) + " 天</span>";
+        } }, TIP),
+      xAxis: {
+        type: "time", min: minTs - padTs, max: maxTs + padTs,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9.5,
+          formatter: (v) => { const dt = new Date(v); return String(dt.getFullYear()).slice(2) + "-" + pad(dt.getMonth() + 1); } },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }
+      },
+      yAxis: {
+        type: "category", data: lanes, inverse: true,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: "#a9bce4", fontSize: 9, fontFamily: "Bahnschrift, DIN Alternate, sans-serif" },
+        splitLine: { show: false }
+      },
+      series: [{
+        type: "custom", data: data, z: 4, encode: { x: [1, 2], y: 0 },
+        renderItem: (params, api) => {
+          const lane = api.value(0);
+          const a = api.coord([api.value(1), lane]);
+          const b = api.coord([api.value(2), lane]);
+          const pct = api.value(3);
+          const r = ROWS[api.value(4)];
+          const col = DIMS[r.di].color;
+          const h = Math.min(13, api.size([0, 1])[1] * 0.5);
+          const rect = { x: a[0], y: a[1] - h / 2, width: Math.max(2, b[0] - a[0]), height: h };
+          const box = { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height };
+          const outer = echarts.graphic.clipRectByRect(rect, box);
+          if (!outer) return null;
+          const fill = echarts.graphic.clipRectByRect(
+            { x: rect.x, y: rect.y, width: Math.max(1, rect.width * pct / 100), height: h }, box);
+          const kids = [
+            { type: "rect", shape: Object.assign({ r: 3 }, outer),
+              style: { fill: hexA(col, 0.16), stroke: hexA(col, r.st === 2 ? 0.5 : 0.85), lineWidth: 1.1,
+                lineDash: r.st === 2 ? [4, 3] : null } }
+          ];
+          if (fill && pct > 0) {
+            kids.push({ type: "rect", shape: Object.assign({ r: 3 }, fill), style: { fill: hexA(col, 0.72) } });
+          }
+          if (outer.width > 46) {
+            kids.push({ type: "text",
+              style: { x: outer.x + outer.width - 5, y: outer.y + outer.height / 2,
+                text: "+" + fmtDec(r.gain, 1), align: "right", verticalAlign: "middle",
+                fill: "#eaf1ff", fontSize: 9, fontWeight: 700 } });
+          }
+          return { type: "group", children: kids };
+        },
+        markLine: {
+          silent: true, symbol: "none", z: 10,
+          lineStyle: { color: C.amber, width: 1.6 },
+          label: { show: true, position: "insideEndTop", color: C.amber, fontSize: 10, fontWeight: 700,
+            formatter: "今日 " + fmtDate(TODAY) },
+          data: [{ xAxis: TODAY }]
+        }
+      }]
+    };
+  }
+
+  /* ===== 14. 筛选主流程：一次调用刷新 chip / 表 / 详情 / 三块图表 / 页头 chip（单一入口） ===== */
+  function applyFilter(di, si, pushHash) {
+    dIdx = clamp(di, 0, DFILTERS.length - 1);
+    sIdx = clamp(si, 0, ST_NAMES.length);
+    view = ROWS.filter((r) =>
+      (dIdx === 0 || r.di === dIdx - 1) && (sIdx === 0 || r.st === sIdx - 1));
+    selPos = 0;
+    dchips.forEach((el, i) => {
+      const on = i === dIdx;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? DFILTERS[i].color : "";
+      el.style.borderColor = on ? DFILTERS[i].color : "";
+    });
+    renderSChips(dIdx, sIdx);
+    const f = DFILTERS[dIdx];
+    $("ln-chip-key").textContent = "在办提升 · " + f.name;
+    $("ln-chip-val").textContent = "+" + fmtDec(f.gain, 1) + " 分";
+    $("ln-gap-tag").innerHTML = "Σ差距 <b>" + fmtDec(D.gapSum, 1) + "</b> 分 · Σ在办提升 <b>" +
+      fmtDec(D.gainOpen, 1) + "</b> 分 · 超额维 <b>" + D.overDims.length + "</b> 个";
+    const rs = dIdx === 0 ? ROWS : ROWS.filter((r) => r.di === dIdx - 1);
+    const dn = rs.filter((r) => r.st === 0).length;
+    $("ln-state-tag").innerHTML = "口径 " + f.name + " · " + rs.length + " 条 · 已完成 <b>" + dn + "</b> 条";
+    const pick = ganttPick(dIdx);
+    $("ln-gantt-tag").innerHTML = "在办 " + (dIdx === 0 ? D.openN : DIMS[dIdx - 1].openN) + " 条取前 <b>" +
+      pick.length + "</b> · 今日线 2026-08-20";
+    renderTable();
+    renderSel();
+    if (stateChart) stateChart.setOption(stateOption(dIdx), true);
+    if (rateChart)  rateChart.setOption(rateOption(dIdx), true);
+    if (gapChart)   gapChart.setOption(gapOption(dIdx), true);
+    if (ganttChart) ganttChart.setOption(ganttOption(dIdx), true);
+    if (pushHash) syncHash(dIdx);
+  }
+
+  dchips.forEach((el) => el.addEventListener("click", () => applyFilter(Number(el.dataset.i), 0, true)));
+
+  /* hash 定位：命中六维则激活筛选 chip、闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyFilter(0, 0, false); return; }
+    applyFilter(hit, 0, false);
+    if (hit > 0) {
+      const chip = dchips[hit];
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                  /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发效能指数1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 15. kiosk 轮巡：台账行 3 秒逐行高亮并联动右栏详情；hash 定位或手动点行后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil || !view.length) return;
+    selPos = (selPos + 1) % view.length;
+    renderSel();
+  }, 3000);
+
+  /* ===== 16. 初始渲染：先填充全部 DOM（KPI + 台账 + 详情），再 init 图表 ===== */
+  let gapChart = null, stateChart = null, rateChart = null, ganttChart = null;
+  applyFilter(0, 0, false);                                   /* 先立骨架，保证兄弟块填充完 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  gapChart = echarts.init($("ln-chart-gap"));
+  gapChart.setOption(gapOption(0));
+  stateChart = echarts.init($("ln-chart-state"));
+  stateChart.setOption(stateOption(0));
+  rateChart = echarts.init($("ln-chart-rate"));
+  rateChart.setOption(rateOption(0));
+  ganttChart = echarts.init($("ln-chart-gantt"));
+  ganttChart.setOption(ganttOption(0));
+  locateByHash();                                             /* 初始解析 hash（无 hash 落全部） */
+
+  /* 环形图轮播提示 */
+  let tipIdx = 0;
+  setInterval(() => {
+    stateChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: tipIdx });
+    tipIdx = (tipIdx + 1) % Math.max(1, D.byState.filter((v) => v > 0).length);
+  }, 4200);
+
+  /* ===== 17. 底部改进研判滚动条（文案数字全部由派生量现算） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "最弱维「" + D.worst.dim + "」" + D.worst.score + " 分，距目标 90 差 " +
+        fmtDec(D.worst.gap, 1) + " 分；在办 " + D.worst.openN + " 条行动 Σ预期提升 " +
+        fmtDec(D.worst.openGain, 1) + " 分，仅覆盖差距的 " + fmtDec(100 * D.worst.openGain / D.worst.gap, 0) + "%" },
+    { lv: "高", c: C.red, t: "六维在办 Σ预期提升 " + fmtDec(D.gainOpen, 1) + " 分，折合合成指数 +" +
+        fmtDec(D.liftOpen, 2) + " 分；全部兑现后指数 " + fmtDec(D.index, 1) + " → " + fmtDec(D.after, 1) +
+        " 分，距 90 仍差 " + fmtDec(TARGET - D.after, 2) + " 分，须再立新行动" },
+    { lv: "中", c: C.orange, t: "超额规划 " + D.overDims.length + " 个维度：" +
+        (D.overDims.map((d) => d.dim + "（在办 " + fmtDec(d.openGain, 1) + " 分 > 差距 " + fmtDec(d.gap, 1) + " 分）").join("、") || "无") +
+        "；口径 = 目标 90 为管理层底线，该维按冲击 90+ 规划，超出部分计入储备" },
+    { lv: "中", c: C.orange, t: "完成率 " + D.doneN + " / " + D.n + " = " + fmtDec(D.doneRate, 1) +
+        "%，进行中 " + D.byState[1] + " 条、未启动 " + D.byState[2] + " 条、已取消 " + D.byState[3] +
+        " 条；已完成行动兑现 " + fmtDec(D.gainDone, 1) + " 分已计入当前 " + fmtDec(D.index, 1) + " 分" },
+    { lv: "低", c: C.amber, t: "父页「改进行动追踪」7 条在办行动本页逐字复刻，折合指数提升 Σ = " +
+        fmtDec(D.parentLift, 1) + " 分（与父页潜在提升同源）；本页另补充 " + D.extraN +
+        " 条历史与规划行动，带「补」角标区分" },
+    { lv: "低", c: C.green, t: "平均周期 " + fmtDec(D.avgSpan, 0) + " 天（≈ " + fmtDec(D.avgSpan / 30.4, 1) +
+        " 个月），四节点里程碑 立项→方案→试点→推广 的门限为 " + MS_GATE.join("% / ") +
+        "%；进度 100% 与状态「已完成」逐行互为充要" },
+    { lv: "低", c: C.green, t: "勾稽：四态 Σ = " + D.stateSum + " 条 = 行动总数；六维条数 Σ = " + D.dimRowsSum +
+        " 条；Σ 预期提升三口径 在办 " + fmtDec(D.gainOpen, 1) + " + 已完成 " + fmtDec(D.gainDone, 1) +
+        " + 已取消 " + fmtDec(D.gainCancel, 1) + " = " + fmtDec(D.gainAll, 1) + " 分" }
+  ];
+  const track = $("ln-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="ln-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                     /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 18. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try {
+    JSON.stringify(gapOption(0)); JSON.stringify(stateOption(0)); JSON.stringify(stateOption(4));
+    JSON.stringify(rateOption(0)); JSON.stringify(ganttOption(0)); JSON.stringify(ganttOption(3));
+  } catch (e) { optAcyclic = false; console.error("[改进行动台账] option 存在循环引用：", e.message); }
+
+  const dimSig = DIMS.map((d) => d.dim + "|" + d.score + "|" + d.w).join(";");
+  const parentRows = ROWS.filter((r) => r.src === 0);
+  const gTop = ganttPick(0);
+
+  const checks = [
+    ["六维名 / 得分 / 权重与契约 §2.2 逐字（交付86·质量88·效率81·投入产出78·协同83·人才87）",
+      dimSig === DIM_AUTH && DIMS.length === 6],
+    ["权重 Σ = 1，加权合成 = 84.15（展示 84.1，与父页 pi、门户 hq 同源）",
+      D.wsum === 1 && Math.abs(D.index - AUTH_INDEX) < 1e-9],
+    /* ★ 本页台账按行动编号（= 目标维度分段）排序，与父页 ACTIONS 的陈列次序不同，
+       故按「行动项名」查表比对，而非按位次比对。 */
+    ["父页 7 条行动的行动项 / 目标维度 / 预期提升逐字一致（按行动项名查表）",
+      parentRows.length === PARENT_AUTH.length &&
+      PARENT_AUTH.every((a) => {
+        const hit = parentRows.filter((x) => x.name === a[0]);
+        return hit.length === 1 && hit[0].dim === a[1] && Math.abs(hit[0].gain - a[3]) < 1e-9;
+      })],
+    ["父页 7 条的责任人与进度亦逐字（组合办 周珩 62% … 教练组 贺兰 44%）",
+      PARENT_AUTH.every((a) => {
+        const hit = parentRows.filter((x) => x.name === a[0])[0];
+        return !!hit && hit.owner === a[2] && hit.pct === a[4];
+      })],
+    ["父页 7 条折合指数提升 Σ(gain×权重) = 1.5 分（父页潜在提升同源）",
+      Math.abs(D.parentLift - 1.5) < 1e-9],
+    ["行动条数 22~28 且全部为父页逐字或本页补充两类",
+      D.n >= 22 && D.n <= 28 && ROWS.every((r) => r.src === 0 || r.src === 1) && D.parentN + D.extraN === D.n],
+    ["四态 Σ = 行动总数（已完成/进行中/未启动/已取消）",
+      D.stateSum === D.n && D.byState.length === 4 && D.byState.every((v) => v > 0)],
+    ["完成率 = 已完成 ÷ 总数 = 6 ÷ 28 = 21.4%（现算，不写死）",
+      D.doneN === 6 && D.n === 28 && D.doneN === ROWS.filter((r) => r.st === 0).length &&
+      Math.abs(D.doneRate - 100 * 6 / 28) < 1e-9],
+    ["六维条数 Σ = 总数、六维已完成 Σ = 已完成数（二级拆分收敛）",
+      D.dimRowsSum === D.n && D.dimDoneSum === D.doneN && DIMS.every((d) => d.rows >= 1)],
+    ["逐维完成率 = 该维已完成 ÷ 该维条数",
+      DIMS.every((d) => Math.abs(d.rate - 100 * d.done / d.rows) < 1e-9)],
+    ["各维在办 Σ预期提升 ≤ 距目标 90 的差距（五维成立），唯「质量」2.3 > 2.0 标注超额规划",
+      DIMS.filter((d) => !d.over).every((d) => d.openGain <= d.gap + 1e-9) &&
+      DIMS.filter((d) => !d.over).length === 5 && D.overDims.length === 1 &&
+      D.overDims[0].dim === "质量" && D.overDims[0].gap === 2 &&
+      Math.abs(D.overDims[0].openGain - 2.3) < 1e-9],
+    ["在办口径 = 进行中 + 未启动，Σ 条数与 Σ 预期提升自洽",
+      D.openN === D.byState[1] + D.byState[2] &&
+      Math.abs(D.gainOpen - sum(DIMS.map((d) => d.openGain))) < 1e-9],
+    ["Σ 预期提升三口径相加 = 全量（在办 + 已完成 + 已取消）",
+      Math.abs(D.gainOpen + D.gainDone + D.gainCancel - D.gainAll) < 1e-9],
+    ["折合指数提升：维度级聚合 == 逐行 Σ(gain × 该行目标维权重)（独立重算）",
+      Math.abs(D.liftOpen - sum(D.openRows.map((r) => r.gain * DIMS[r.di].w))) < 1e-9 &&
+      D.liftOpen > 0 && Math.abs(D.after - (D.index + D.liftOpen)) < 1e-9],
+    ["单条里程碑四节点日期严格单调递增，且均不晚于计划完成日",
+      ROWS.every((r) => r.ms.every((m, k) => (k === 0 || m.ts > r.ms[k - 1].ts) && m.ts <= r.dTs))],
+    ["里程碑门限 10/35/70/100 递增，节点态与整体进度自洽",
+      MS_GATE.every((g, k) => k === 0 || g > MS_GATE[k - 1]) && MS_GATE[3] === 100 &&
+      ROWS.every((r) => r.ms.every((m, k) => (r.pct >= MS_GATE[k]) === (m.st === 2)))],
+    ["进度 100% ⇔ 状态「已完成」（充要，逐行）",
+      ROWS.every((r) => (r.pct === 100) === (r.st === 0))],
+    ["未启动行进度恒为 0；已取消行进度 < 100",
+      ROWS.every((r) => (r.st !== 2 || r.pct === 0) && (r.st !== 3 || r.pct < 100))],
+    ["已完成行计划完成日 ≤ 数据日期 2026-08-20；未启动行立项日 > 数据日期",
+      ROWS.every((r) => (r.st !== 0 || r.dTs <= TODAY) && (r.st !== 2 || r.sTs > TODAY))],
+    ["进行中行的立项日 ≤ 今日 < 计划完成日（在办窗口自洽）",
+      ROWS.every((r) => r.st !== 1 || (r.sTs <= TODAY && r.dTs > TODAY))],
+    ["计划完成日晚于立项日，周期 ≥ 90 天，平均周期现算",
+      ROWS.every((r) => r.span >= 90) &&
+      Math.abs(D.avgSpan - sum(ROWS.map((r) => r.span)) / D.n) < 1e-9],
+    ["每条行动的预期收益拆解 Σ 贡献分 == 该条预期提升（逐行）",
+      ROWS.every((r) => Math.abs(r.bfSum - r.gain) < 1e-9 && r.bf.length >= 1 && r.bf.length <= 3)],
+    ["收益拆解的二级指标必属该行动目标维（口径同「单维度追溯详情」zb）",
+      ROWS.every((r) => r.bf.every((b) => SUB_OF[r.dim].indexOf(b[0]) >= 0)) &&
+      Object.keys(SUB_OF).length === 6 &&
+      DIMS.every((d) => SUB_OF[d.dim] && SUB_OF[d.dim].length === 4)],
+    ["每条行动至少 1 项阻碍因素，等级合法（高/中/低）",
+      ROWS.every((r) => r.rk.length >= 1 && r.rk.every((x) => x[1] >= 0 && x[1] <= 2))],
+    ["行动编号唯一、格式 ACT-2026-XXX 且严格升序",
+      (new Set(ROWS.map((r) => r.no))).size === D.n &&
+      ROWS.every((r) => /^ACT-2026-\d{3}$/.test(r.no)) &&
+      ROWS.every((r, i) => i === 0 || r.seq > ROWS[i - 1].seq)],
+    ["各维条数 = 一级 chip 计数（全部 chip = 总数）",
+      DFILTERS.every((f, i) => f.cnt === (i === 0 ? D.n : ROWS.filter((r) => r.di === i - 1).length))],
+    ["二级 chip 计数随一级重算：逐维「全部」== 该维四态之和",
+      DFILTERS.every((_, i) => stScopeCnt(i, 0) ===
+        sum(ST_NAMES.map((_n, k) => stScopeCnt(i, k + 1))))],
+    ["最弱维 = 投入产出（78 分为六维最低），在办条数现算",
+      D.worst.dim === "投入产出" && D.worst.score === 78 &&
+      D.worstOpen === ROWS.filter((r) => r.dim === "投入产出" && r.open).length],
+    ["甘特 Top10 ⊆ 在办集合、条数 ≤ 10 且按预期提升降序",
+      gTop.length === Math.min(10, D.openN) && gTop.every((r) => r.open) &&
+      gTop.every((r, i) => i === 0 || r.gain <= gTop[i - 1].gain)],
+    ["甘特今日线 2026-08-20 落在 Top10 时间窗内",
+      gTop.length > 0 && Math.min.apply(null, gTop.map((r) => r.sTs)) <= TODAY &&
+      Math.max.apply(null, gTop.map((r) => r.dTs)) >= TODAY],
+    ["hash 六维名均可解析（契约逐字），且收「投入」「产出」「ROI」等简写别名",
+      DIMS.every((d, i) => HASH_ALIAS[d.dim] === i + 1) &&
+      HASH_ALIAS["投入"] === 4 && HASH_ALIAS["产出"] === 4 && HASH_ALIAS["ROI"] === 4 &&
+      HASH_ALIAS["roi"] === 4 && HASH_ALIAS["投入产出比"] === 4 && HASH_ALIAS["交付维"] === 1 &&
+      HASH_ALIAS["全部"] === 0],
+    ["图表 option 无循环引用（JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[改进行动台账] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

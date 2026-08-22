@@ -1,0 +1,1455 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发季度指数复盘</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --fj-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 改进行动清单列宽：行动项 / 归属维 / 进度 / 状态 */
+    --fj-acols: 1fr 74px 92px 60px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .fj-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 4%, rgba(169, 140, 245, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 1fr 660px;
+    grid-template-rows: 84px 52px 62px 1fr 50px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .fj-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .fj-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入；chips 紧邻 clock） ===== */
+  .fj-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .fj-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(169, 140, 245, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(169, 140, 245, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .fj-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .fj-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .fj-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .fj-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .fj-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到效能指数 */
+  .fj-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .fj-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .fj-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .fj-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .fj-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .fj-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .fj-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .fj-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .fj-chips { display: flex; align-items: center; gap: 9px; }
+  .fj-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 122px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .fj-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .fj-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .fj-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .fj-chip.is-key b { color: var(--rnd-blue); }
+  .fj-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .fj-clock-time { font: 700 26px/1 var(--fj-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .fj-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== 季度切换条（hash 契约目标：2024Q4 ~ 2026Q3 共 8 季） ===== */
+  .fj-qbar {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .fj-qbar-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .fj-qchips { display: flex; align-items: center; gap: 8px; }
+  .fj-qchip {
+    display: flex; align-items: baseline; gap: 6px; cursor: pointer; font-family: inherit;
+    padding: 6px 11px 7px; border-radius: 8px;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 12.5px; letter-spacing: 0.04em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .fj-qchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .fj-qchip b { font: 700 13.5px/1 var(--fj-mono); color: inherit; font-variant-numeric: tabular-nums; }
+  .fj-qchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .fj-qchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .fj-qchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .fj-qchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .fj-qchip.is-hit { animation: fj-hit 0.9s ease-in-out 2; }
+  @keyframes fj-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--fj-cc, rgba(92, 157, 255, 0.8)); } }
+  .fj-qbar-state { margin-left: auto; flex: none; font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .fj-qbar-state b { font-weight: 700; color: var(--rnd-blue); }
+  .fj-qbar-state em { font-style: normal; color: #d3e2ff; }
+  .fj-qbar-state i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 8px; }
+
+  /* ===== KPI 条（六格；init 前填充完毕） ===== */
+  .fj-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0; }
+  .fj-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .fj-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--fj-kc, var(--rnd-blue)); }
+  .fj-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .fj-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .fj-kpi-v b { font: 700 24px/1 var(--fj-mono); color: var(--fj-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .fj-kpi-v b.is-word { font-size: 19px; letter-spacing: 0.04em; }
+  .fj-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .fj-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 面板 ===== */
+  .fj-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .fj-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .fj-panel::before { content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .fj-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .fj-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .fj-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .fj-panel-tag { font-size: 11.5px; letter-spacing: 0.05em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .fj-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .fj-panel-tag em { font-style: normal; font-weight: 700; color: var(--rnd-green); }
+  .fj-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ★ 时间轴区写死高度（任务卡硬性）：与瀑布同属一个 flex 容器，不给它压矮的机会 */
+  .fj-panel.is-flow { flex: none; height: 372px; min-height: 0; overflow: hidden; }
+  .fj-panel.is-wf { flex: 1; min-height: 0; }
+  /* ★ 右栏四块全部写死高度：清单由 JS 在 init 之前填充，写死高度避免回填后压矮兄弟图表 */
+  .fj-panel.is-trend { flex: none; height: 180px; min-height: 0; overflow: hidden; }
+  .fj-panel.is-radar { flex: none; height: 236px; min-height: 0; overflow: hidden; }
+  .fj-panel.is-act   { flex: none; height: 156px; min-height: 0; overflow: hidden; }
+  .fj-panel.is-next  { flex: none; height: 134px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟改进行动清单（非 <table>） ===== */
+  .fj-atable { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .fj-athead, .fj-abody li {
+    display: grid; grid-template-columns: var(--fj-acols); align-items: center; gap: 8px;
+  }
+  .fj-athead {
+    flex: none; padding: 3px 8px; border-radius: 5px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 10.5px; letter-spacing: 0.08em; color: #8aa8e8;
+  }
+  .fj-abody { flex: 1; min-height: 0; margin: 3px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .fj-abody li {
+    padding: 0 8px; height: 21px; border-radius: 4px;
+    font-size: 11.5px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: fj-rowin .34s ease both;
+  }
+  @keyframes fj-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .fj-abody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .fj-abody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fj-abody li .fj-adim { font-size: 10.5px; }
+  .fj-apg { display: flex; align-items: center; gap: 6px; }
+  .fj-apg-t { flex: 1; min-width: 0; height: 5px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .fj-apg-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .fj-apg em { flex: none; width: 30px; text-align: right; font-style: normal; font-size: 10.5px; }
+  .fj-badge {
+    padding: 1px 6px 2px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .fj-badge.is-s0 { color: #063a25; background: var(--rnd-green); }
+  .fj-badge.is-s1 { color: #3a2a05; background: var(--rnd-amber); }
+  .fj-badge.is-s2 { border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+
+  /* ===== 下季重点（由最弱维现算） ===== */
+  .fj-next-list { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .fj-next-list li {
+    display: grid; grid-template-columns: 18px 1fr; align-items: center; gap: 8px;
+    height: 21px; font-size: 11.5px; color: #cad9f8; font-variant-numeric: tabular-nums;
+  }
+  .fj-next-list li u {
+    text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; border-radius: 4px; font: 700 10px/1 var(--fj-mono); color: #071026;
+  }
+  .fj-next-list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fj-next-list li span b { font-weight: 700; color: #eaf1ff; }
+
+  /* ===== 底部口径滚动条 ===== */
+  .fj-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .fj-foot-tag { flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-violet); }
+  .fj-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-violet);
+    box-shadow: 0 0 10px var(--rnd-violet); animation: fj-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes fj-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .fj-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .fj-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .fj-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .fj-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .fj-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="fj-stage" id="fj-stage">
+    <!-- mockflag:begin --><div class="fj-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="fj-error" id="fj-error" role="alert">ECharts 资源加载失败，KPI、改进行动与下季重点不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="fj-header">
+      <div class="fj-head-left">
+        <div class="fj-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="fj-crumb-up" href="大屏样板间-研发效能指数1920.html" title="返回上级专题页（Esc）">‹ 返回 效能指数</a><i>›</i>
+          <em id="fj-crumb-obj">--</em>
+        </div>
+        <div class="fj-head-title-row">
+          <div class="fj-head-title" id="fj-title">-- · 季度指数复盘</div>
+          <div class="fj-head-meta">
+            <span>季末指数 <b id="fj-meta-idx">--</b> · 环比 <b id="fj-meta-diff">--</b></span><i>|</i>
+            <span>季内事件 <b id="fj-meta-ev">--</b> 起 · 覆盖 <b>6</b> 维</span><i>|</i>
+            <span>复盘窗口 <b id="fj-meta-win">--</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="fj-head-right">
+        <div class="fj-chips">
+          <div class="fj-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="fj-chip is-key"><span id="fj-chip-key">QUARTER INDEX</span><b id="fj-chip-idx">--</b></div>
+        </div>
+        <div class="fj-clock" aria-label="实时时钟">
+          <span class="fj-clock-time" id="fj-clock-time">--:--:--</span>
+          <span class="fj-clock-date" id="fj-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 季度切换条（hash 契约：2024Q4 ~ 2026Q3） -->
+    <div class="fj-qbar">
+      <span class="fj-qbar-tag">复盘季度</span>
+      <div class="fj-qchips" id="fj-qchips"></div>
+      <div class="fj-qbar-state" id="fj-qbar-state">--</div>
+    </div>
+
+    <!-- KPI 六格 -->
+    <div class="fj-kpis" id="fj-kpis"></div>
+
+    <!-- 左栏：季度事件流时间轴（主视觉） + 六维环比瀑布 -->
+    <div class="fj-col">
+      <section class="fj-panel is-flow">
+        <div class="fj-panel-head">
+          <h2>季度事件流时间轴 · 六维泳道</h2>
+          <span class="fj-panel-tag" id="fj-flow-tag">--</span>
+        </div>
+        <div class="fj-chart" id="fj-chart-flow"></div>
+      </section>
+      <section class="fj-panel is-wf">
+        <div class="fj-panel-head">
+          <h2>六维环比瀑布 · 上季指数 → 本季指数</h2>
+          <span class="fj-panel-tag" id="fj-wf-tag">--</span>
+        </div>
+        <div class="fj-chart" id="fj-chart-wf"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：指数走势与归因 / 六维雷达对比 / 改进行动 / 下季重点 -->
+    <div class="fj-col">
+      <section class="fj-panel is-trend">
+        <div class="fj-panel-head">
+          <h2>指数走势与归因 · 24 月</h2>
+          <span class="fj-panel-tag" id="fj-trend-tag">--</span>
+        </div>
+        <div class="fj-chart" id="fj-chart-trend"></div>
+      </section>
+      <section class="fj-panel is-radar">
+        <div class="fj-panel-head">
+          <h2>六维雷达对比 · 本季 vs 上季</h2>
+          <span class="fj-panel-tag" id="fj-radar-tag">--</span>
+        </div>
+        <div class="fj-chart" id="fj-chart-radar"></div>
+      </section>
+      <section class="fj-panel is-act">
+        <div class="fj-panel-head">
+          <h2>上季行动 · 本季落地</h2>
+          <span class="fj-panel-tag" id="fj-act-tag">--</span>
+        </div>
+        <div class="fj-atable">
+          <div class="fj-athead"><span>行动项</span><span>归属维</span><span>进度</span><span>状态</span></div>
+          <ul class="fj-abody" id="fj-abody"></ul>
+        </div>
+      </section>
+      <section class="fj-panel is-next">
+        <div class="fj-panel-head">
+          <h2>下季重点（最弱维现算）</h2>
+          <span class="fj-panel-tag" id="fj-next-tag">--</span>
+        </div>
+        <ul class="fj-next-list" id="fj-next"></ul>
+      </section>
+    </div>
+
+    <!-- 底部口径滚动条 -->
+    <footer class="fj-foot" aria-label="季度复盘口径说明">
+      <div class="fj-foot-tag">复盘口径</div>
+      <div class="fj-foot-view"><div class="fj-foot-track" id="fj-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("fj-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("fj-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 1.1 kiosk 门闩必须早于任何 pauseRotate() 调用声明（let 不提升；初始 hash 解析在页面
+     中部就会调用它，见 docs/RndIpdThemed.md §8 批次四「holdUntil 的 TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  let pauseCalls = 0;
+  function pauseRotate(ms) { pauseCalls += 1; pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const signed = (v, dec) => (v >= 0 ? "+" : "-") + fmtDec(Math.abs(v), dec);
+
+  /* ===== 4. 数据源（模拟 · 云麓智联科技 · 期次 2026 年 8 月 · D 型「时序复盘」子页）
+
+     ★ 本页形态：D 型「时序复盘」——按**时间窗**（一个季度）而非对象组织，主视觉是
+       事件流时间轴 + 前后对比瀑布，回答「这个季度指数怎么走的、被什么事件推动、复盘学到什么」。
+       与同专题另外三型的分工：
+         A 对象切换器（如 zb 单维度追溯详情）：看**一个对象**的 360 度；
+         B 台账筛选（如 rz 线上事件台账）：看**全量明细**并单条穿透；
+         C 横向对比：把**多个对象**摆在一起 PK；
+         D 本页：把**一段时间**里发生的事按时序摊开，做「前 → 后」的差分归因。
+
+     ★ 与兄弟页 zb「研发单维度追溯详情」的分工（同属 P17 效能指数的子页，切勿重复）：
+         zb = **单个维度**的二级指标加权追溯（每维 4 项二级指标，Σ 二级加权 ≡ 该维契约得分），
+              纵向下拆一层，回答「这一维的分是怎么算出来的」；
+         本页 = **一个季度的整体复盘**（六维一起看），横向拉一条时间线，
+              回答「这一季指数为什么这样走、哪些事件推的、下一季该抓什么」。
+
+     ★ 与父页 P17「研发效能指数」同源：
+         六维权重与末季得分逐字引 docs/RndIpdThemed.md §2.2（健康指数 84.1 =
+         交付 86×0.20 + 质量 88×0.20 + 效率 81×0.15 + 投入产出 78×0.15 + 协同 83×0.15 + 人才 87×0.15）；
+         24 月走势逐字引父页 TREND_HIST（末值不写死，由本页六维加权现算）。
+
+     ★ 季度指数口径：**季末月读数**（该季最后一个月的指数），故末季 2026Q3 的季末读数
+       ＝ 24 月走势末值 ＝ 84.1（展示口径一位小数，精确值 84.15）。父页「上季 82.45」用的是
+       **季内三月均值**口径，两条口径并存不矛盾：本页对 2026Q2 同时给出季末读数 83.05 与
+       三月均值 82.45，后者与父页 PREV_SCORE 加权值逐字相等（进页尾勾稽自检）。
+
+     ★ 二级拆分（逐季六维得分、季内事件影响分、改进行动落地）为本页自编，
+       但一律满足 Σ==上级：每季 Σ(维度值×权重)= 该季指数；每维季度变化 = Σ 该维事件影响。
+
+     ★ 循环引用红线：进 option 的数据只放标量与数组，事件与维度之间一律用索引 dim 关联，
+       绝不用对象引用回指（setOption 深拷贝遇环 → 整页图表全空）。 ===== */
+
+  /* 4.1 六维与权重（契约 §2.2 逐字，权重和 = 1） */
+  const DIMS = ["交付", "质量", "效率", "投入产出", "协同", "人才"];
+  const WTS  = [0.20, 0.20, 0.15, 0.15, 0.15, 0.15];
+  const DCOL = [C.series[0], C.series[1], C.series[2], C.series[3], C.series[4], C.series[5]];
+  /* 构造性断言用：末季六维得分（= 契约健康指数拆分，逐字） */
+  const AUTH_LAST = [86, 88, 81, 78, 83, 87];
+  const AUTH_INDEX = 84.15;            /* = Σ(得分×权重)，展示口径一位小数 = 84.1 */
+  const TARGET = 90;                   /* 管理层目标线（与父页同口径） */
+
+  /* 4.2 指数 24 月走势（2024-09 → 2026-08）
+         前 23 个月逐字引父页 P17 的 TREND_HIST，末值不写死，由本页末季六维加权现算。 */
+  const TREND_HIST = [
+    76.8, 77.2, 77.9, 78.5, 78.1, 78.6, 79.4, 80.1, 80.6, 81.0, 80.7, 81.3,
+    81.9, 82.2, 84.6, 84.9, 85.1, 84.6, 83.8, 81.9, 82.4, 83.05, 83.6
+  ];
+  const TREND_START = { y: 2024, m: 9 };
+  /* 父页 TREND_WHY 逐字（只有这两个月挂了归因，页面按现算出来的极值月取用） */
+  const TREND_WHY = {
+    "2025-11": "全量流水线切换 + 自动化回归上线",
+    "2026-04": "R26.4 合入延期 + 跨域依赖阻塞 38 张"
+  };
+  /* 父页 PREV_SCORE 逐字（上季 = 2026 Q2 的**季内三月均值**口径六维得分），用于口径互校 */
+  const AUTH_PREV = { "交付": 84, "质量": 86, "效率": 79, "投入产出": 79, "协同": 80, "人才": 85 };
+
+  /* 4.3 逐季六维得分（季末月读数口径）
+         ★ 反解设计：以末季契约六维为锚，按每季 Δ 满足 Σ(Δ×权重) ≡ 该季指数变化
+           逐季倒推，故每一季的 Σ(维度值×权重) 都**精确等于**该季末月的走势读数（无残差）。
+         2024Q3 为**期初基准季**（= 走势首点 2024-09 = 76.8），只作首季环比基线，不进切换器。 */
+  const SCORES = {
+    "2024Q3": [80.0, 82.6, 71.4, 71.6, 74.2, 78.0],
+    "2024Q4": [81.3, 83.8, 73.4, 73.4, 76.4, 80.0],
+    "2025Q1": [82.1, 84.5, 74.4, 74.2, 77.6, 81.0],
+    "2025Q2": [83.5, 85.7, 76.2, 75.8, 79.6, 82.8],
+    "2025Q3": [84.3, 86.4, 77.4, 76.4, 80.8, 83.8],
+    "2025Q4": [86.8, 88.7, 81.4, 79.4, 84.4, 86.8],
+    "2026Q1": [85.8, 87.8, 80.2, 78.0, 82.8, 86.2],
+    "2026Q2": [85.0, 87.1, 79.6, 77.0, 81.6, 86.0],
+    "2026Q3": [86.0, 88.0, 81.0, 78.0, 83.0, 87.0]
+  };
+  const BASE_Q = "2024Q3";
+  /* 8 个复盘季度（覆盖父页 24 月走势的全部时间范围；末季 2026Q3 数据截至 2026-08） */
+  const QS = [
+    { q: "2024Q4", y: 2024, m0: 10, live: false, sub: "平台夯基" },
+    { q: "2025Q1", y: 2025, m0: 1,  live: false, sub: "春节爬坡" },
+    { q: "2025Q2", y: 2025, m0: 4,  live: false, sub: "流水线提速" },
+    { q: "2025Q3", y: 2025, m0: 7,  live: false, sub: "夏季平台期" },
+    { q: "2025Q4", y: 2025, m0: 10, live: false, sub: "全量切换跃升" },
+    { q: "2026Q1", y: 2026, m0: 1,  live: false, sub: "变更冲击回落" },
+    { q: "2026Q2", y: 2026, m0: 4,  live: false, sub: "R26.4 延期与修复" },
+    { q: "2026Q3", y: 2026, m0: 7,  live: true,  sub: "复位回升（进行中）" }
+  ];
+  const AS_OF = "2026-08-19";
+
+  /* 4.4 季内事件流（本页核心）：[日期 MM-DD, 事件名, 维度索引, 影响分]
+         ★ 硬勾稽：某维的季度变化 ≡ 该维全部事件影响之和（1e-9 容差，逐维逐季进自检）；
+           六维变化按权重加权后 ≡ 该季指数变化 ≡ 季末读数 − 上季末读数。
+         ★ 事件影响分为该事件对**所属维度得分**的贡献（分），折算到指数需再乘该维权重。 */
+  const EVENTS = {
+    "2024Q4": [
+      ["10-18", "R24.6 版本火车按期发车",      0,  0.9],
+      ["12-06", "星澜S2 DCP 有条件通过",        0,  0.4],
+      ["11-08", "自动化回归用例扩到 6,200 条",  1,  0.8],
+      ["12-13", "现网缺陷双周清零机制上线",     1,  0.4],
+      ["10-25", "CI 构建集群扩容 40%",          2,  1.2],
+      ["11-22", "看板 WIP 限额两团队试点",      2,  0.8],
+      ["10-11", "外协单价年度复议落地",         3,  1.0],
+      ["12-20", "样机物料集中采购",             3,  0.8],
+      ["11-01", "四域联合站会机制上线",         4,  1.3],
+      ["12-11", "南京中心接入统一研发平台",     4,  0.9],
+      ["10-09", "秋招 180 人到岗",              5,  1.2],
+      ["11-29", "技术等级评审改版",             5,  0.8]
+    ],
+    "2025Q1": [
+      ["02-07", "春节窗口交付降速",             0, -0.3],
+      ["03-21", "R25.2 提前一周冻结",           0,  1.1],
+      ["01-16", "单测门禁提到 70% 覆盖",        1,  0.9],
+      ["02-25", "硬件 EMC 复测返工",            1, -0.2],
+      ["01-24", "构建缓存分层上线",             2,  0.7],
+      ["03-14", "评审排队时长压降",             2,  0.3],
+      ["01-10", "云资源闲置回收专项",           3,  0.6],
+      ["02-13", "算力采购溢价",                 3, -0.4],
+      ["03-27", "CBB 复用率 +3pt",              3,  0.6],
+      ["01-31", "跨站点接力值班表启用",         4,  0.7],
+      ["03-06", "接口契约仓统一",               4,  0.5],
+      ["01-20", "关键岗位缺口补齐 12 人",       5,  0.7],
+      ["02-18", "核心工程师流失 4 人",          5, -0.4],
+      ["03-25", "内部讲师团开课",               5,  0.7]
+    ],
+    "2025Q2": [
+      ["05-15", "R25.4 按期发布",               0,  1.0],
+      ["04-22", "云盾2.0 Plan 阶段超期",        0, -0.3],
+      ["06-18", "TR4 一次通过率回升",           0,  0.7],
+      ["04-11", "静态扫描全量接入",             1,  0.8],
+      ["05-28", "灰度发布比例提到 30%",         1,  0.6],
+      ["06-24", "OTA 回滚事故",                 1, -0.2],
+      ["04-17", "流水线并行度翻倍",             2,  1.1],
+      ["06-05", "环境申请自助化",               2,  0.7],
+      ["05-08", "需求价值分级试点",             3,  0.9],
+      ["06-27", "外协结构优化",                 3,  0.7],
+      ["04-08", "四域集成基线例会立制",         4,  1.2],
+      ["05-21", "跨域依赖看板上线",             4,  0.8],
+      ["04-29", "算法专家引进 6 人",            5,  1.0],
+      ["06-12", "轮岗计划首期启动",             5,  0.8]
+    ],
+    "2025Q3": [
+      ["08-14", "R25.6 集成延期两周",           0, -0.5],
+      ["09-19", "Verify 阶段并行提速",          0,  1.3],
+      ["07-23", "缺陷逃逸率降到 2.6%",          1,  0.9],
+      ["08-06", "夏季高温致样机批次返修",       1, -0.2],
+      ["07-11", "MTTR 压到 55 min",             2,  0.6],
+      ["09-05", "部署频率破 10 次/日",          2,  0.6],
+      ["08-27", "云成本优化专项",               3,  0.8],
+      ["09-12", "样机批次追加投料",             3, -0.2],
+      ["07-30", "深圳-西安硬件协同专班",        4,  0.7],
+      ["09-26", "联调接口达成率 +4pt",          4,  0.5],
+      ["07-04", "校招 96 人入职",               5,  0.6],
+      ["08-21", "认证工程师占比提升",           5,  0.4]
+    ],
+    "2025Q4": [
+      ["11-07", "全量流水线切换",               0,  1.5],
+      ["12-12", "R25.8 按期且零回滚",           0,  0.8],
+      ["10-16", "智楼4.0 Launch 提前",          0,  0.2],
+      ["11-14", "自动化回归全量上线",           1,  1.6],
+      ["12-19", "系统级测试台扩建",             1,  0.7],
+      ["11-21", "构建时长压降 42%",             2,  1.8],
+      ["10-24", "看板 WIP 限额全面推行",        2,  1.2],
+      ["12-05", "评审前置改革",                 2,  1.0],
+      ["10-10", "需求砍单机制落地",             3,  1.4],
+      ["11-28", "算力配额闭环",                 3,  1.0],
+      ["12-23", "工具 license 集中续签",        3,  0.6],
+      ["11-04", "四域同轴基线冻结制",           4,  1.6],
+      ["10-30", "跨站协作平台二期",             4,  1.2],
+      ["12-16", "外部供应商联调门禁",           4,  0.8],
+      ["10-08", "研发学院成立",                 5,  1.2],
+      ["11-18", "关键岗位饱和度达 92%",         5,  1.0],
+      ["12-26", "年度晋升通道扩容",             5,  0.8]
+    ],
+    "2026Q1": [
+      ["01-15", "R26.2 需求变更插入 37 条",     0, -0.9],
+      ["02-12", "春节两周产能窗口",             0, -0.4],
+      ["03-24", "Develop 阶段并行度提升",       0,  0.3],
+      ["01-04", "现网 P1：鉴权证书批量过期",    1, -0.7],
+      ["02-27", "硬件 DVT 失效率抬升",          1, -0.5],
+      ["03-18", "灰度门禁加严",                 1,  0.3],
+      ["01-22", "环境与资源阻塞 27 张",         2, -0.8],
+      ["02-06", "构建队列拥塞",                 2, -0.6],
+      ["03-11", "缓存命中率优化",               2,  0.2],
+      ["01-29", "算力成本超预算 8%",            3, -0.8],
+      ["02-20", "外协追加 2 个包",              3, -0.7],
+      ["03-27", "CBB 复用率微升",               3,  0.1],
+      ["02-03", "跨域依赖阻塞升到 34 张",       4, -1.0],
+      ["03-06", "云-AI 接口版本错位",           4, -0.6],
+      ["02-24", "春节后离职 11 人",             5, -0.9],
+      ["03-20", "内部转岗补位",                 5,  0.3]
+    ],
+    "2026Q2": [
+      ["04-16", "R26.4 合入延期",               0, -1.4],
+      ["05-22", "5 月补发车追回",               0,  0.6],
+      ["04-28", "延期致集成测试窗口压缩",       1, -0.9],
+      ["06-17", "回归用例补齐",                 1,  0.2],
+      ["04-09", "跨域依赖阻塞 38 张",           2, -1.1],
+      ["06-05", "阻塞清理专项",                 2,  0.5],
+      ["05-08", "延期返工工时",                 3, -0.9],
+      ["04-23", "样机物料涨价",                 3, -0.4],
+      ["06-26", "云资源回收二期",               3,  0.3],
+      ["04-14", "四域基线冻结失效",             4, -1.3],
+      ["05-19", "拉通例会复位",                 4,  0.4],
+      ["06-10", "接口契约破坏 9 处",            4, -0.3],
+      ["05-06", "关键岗位空缺 3 个",            5, -0.5],
+      ["06-23", "AI 专家到岗 4 人",             5,  0.3]
+    ],
+    "2026Q3": [
+      ["07-15", "R26.6 集成按节奏推进",         0,  0.7],
+      ["08-12", "按期交付率回到 87.2%",         0,  0.3],
+      ["07-22", "缺陷逃逸率降到 2.0%",          1,  0.6],
+      ["08-06", "测试自动化率提到 78%",         1,  0.3],
+      ["07-09", "部署频率达 14.2 次/日",        2,  0.8],
+      ["08-15", "MTTR 压到 42 min",             2,  0.6],
+      ["07-28", "需求价值分级全面推行",         3,  0.6],
+      ["08-04", "外协单价复议二轮",             3,  0.4],
+      ["07-17", "R26.6 四域基线冻结恢复",       4,  0.8],
+      ["08-18", "联调接口达成 91.4%",           4,  0.6],
+      ["07-31", "人均产出回到 5.02 点/人年",    5,  0.5],
+      ["08-08", "研发学院二期开班",             5,  0.5]
+    ]
+  };
+
+  /* 4.5 上季定的改进行动在本季的落地情况：[行动项, 维度索引, 状态(0完成/1进行中/2未启动), 进度%]
+         完成率 = 完成数 ÷ 总数（现算）。
+         ★ 末季 2026Q3 的前三项逐字引父页 P17 的 ACTIONS（名称 + 进度），进构造性断言。 */
+  const ACTIONS = {
+    "2024Q4": [
+      ["统一研发平台六站点接入", 4, 0, 100], ["CI 构建集群扩容", 2, 0, 100],
+      ["外协单价年度复议", 3, 0, 100], ["自动化回归用例扩容", 1, 1, 72],
+      ["技术等级评审改版", 5, 0, 100]
+    ],
+    "2025Q1": [
+      ["单测门禁 70% 覆盖", 1, 0, 100], ["构建缓存分层", 2, 0, 100],
+      ["云资源闲置回收", 3, 0, 100], ["跨站点接力值班表", 4, 1, 64],
+      ["关键岗位缺口补齐", 5, 1, 58]
+    ],
+    "2025Q2": [
+      ["流水线并行度翻倍", 2, 0, 100], ["需求价值分级试点", 3, 1, 45],
+      ["四域集成基线例会立制", 4, 0, 100], ["静态扫描全量接入", 1, 0, 100],
+      ["算法专家引进", 5, 0, 100]
+    ],
+    "2025Q3": [
+      ["灰度发布比例提到 30%", 1, 0, 100], ["环境申请自助化", 2, 0, 100],
+      ["外协结构优化", 3, 1, 52], ["跨域依赖看板上线", 4, 0, 100],
+      ["轮岗计划首期", 5, 1, 66]
+    ],
+    "2025Q4": [
+      ["全量流水线切换", 2, 0, 100], ["自动化回归全量上线", 1, 0, 100],
+      ["看板 WIP 限额全面推行", 2, 0, 100], ["需求砍单机制落地", 3, 0, 100],
+      ["研发学院筹建", 5, 0, 100]
+    ],
+    "2026Q1": [
+      ["四域同轴基线冻结制固化", 4, 1, 58], ["算力配额闭环", 3, 1, 44],
+      ["评审前置改革推广", 2, 0, 100], ["系统级测试台扩建二期", 1, 2, 0],
+      ["关键岗位饱和度 95%", 5, 2, 0]
+    ],
+    "2026Q2": [
+      ["跨域依赖前置拉通例会", 2, 1, 38], ["R26.4 风险前置评审", 0, 2, 0],
+      ["云资源回收二期", 3, 0, 100], ["接口契约门禁", 4, 1, 41],
+      ["AI 专家引进计划", 5, 1, 55]
+    ],
+    "2026Q3": [
+      ["构建时长压降与缓存分层", 2, 1, 76], ["跨域依赖前置拉通例会", 2, 1, 55],
+      ["需求价值分级与砍单机制", 3, 1, 62], ["阻塞清理与 WIP 复位", 2, 0, 100],
+      ["四域基线冻结恢复", 4, 0, 100]
+    ]
+  };
+  /* 父页 ACTIONS 逐字副本（名称 + 进度），构造性断言用 */
+  const AUTH_ACTIONS = [
+    ["构建时长压降与缓存分层", 76], ["跨域依赖前置拉通例会", 55], ["需求价值分级与砍单机制", 62]
+  ];
+  const ST_NAMES = ["完成", "进行中", "未启动"];
+  const ST_BADGE = ["is-s0", "is-s1", "is-s2"];
+  const ST_COLORS = [C.green, C.amber, C.blueDeep];
+
+  /* ===== 5. 派生量（全部现算，页面上不出现硬编码合计） ===== */
+  const D = {};
+
+  /* 5.1 月度走势：末值由末季六维加权现算写入（不写死） */
+  D.lastIndex = sum(AUTH_LAST.map((s, i) => s * WTS[i]));
+  D.trend = TREND_HIST.concat([D.lastIndex]);
+  D.months = D.trend.map((_, i) => {
+    const t = (TREND_START.y * 12 + (TREND_START.m - 1)) + i;
+    return Math.floor(t / 12) + "-" + pad(t % 12 + 1);
+  });
+  D.monIdx = {};
+  D.months.forEach((m, i) => { D.monIdx[m] = i; });
+  D.mom = D.trend.map((v, i) => (i === 0 ? 0 : v - D.trend[i - 1]));
+
+  /* 5.2 季度派生：指数（Σ 维度×权重）、季末月、环比、六维贡献、事件聚合、行动完成率 */
+  const wsumOf = (arr) => sum(arr.map((s, i) => s * WTS[i]));
+  const monKey = (y, m) => y + "-" + pad(m);
+  const Q = {};                                          /* 季度键 → 派生对象（不进 option） */
+  const QORDER = QS.map((it) => it.q);
+
+  /* 期初基准季（不进切换器，只作首季基线） */
+  Q[BASE_Q] = {
+    q: BASE_Q, index: wsumOf(SCORES[BASE_Q]), endMon: "2024-09",
+    scores: SCORES[BASE_Q].slice(), base: true
+  };
+
+  QS.forEach((it, qi) => {
+    const prevKey = qi === 0 ? BASE_Q : QORDER[qi - 1];
+    const sc = SCORES[it.q].slice();
+    const psc = SCORES[prevKey].slice();
+    const o = {
+      q: it.q, y: it.y, m0: it.m0, live: it.live, sub: it.sub,
+      prevKey: prevKey, scores: sc, prevScores: psc,
+      mons: [monKey(it.y, it.m0), monKey(it.y, it.m0 + 1), monKey(it.y, it.m0 + 2)]
+    };
+    /* 季末读数月 = 该季**最后一个有读数的月**；进行中的 2026Q3 落在 2026-08（数据截止月） */
+    o.endMon = o.mons.filter((m) => D.monIdx[m] !== undefined).slice(-1)[0];
+    o.index = wsumOf(sc);
+    o.prevIndex = wsumOf(psc);
+    o.diff = o.index - o.prevIndex;
+    o.dDim = sc.map((v, i) => v - psc[i]);                 /* 逐维季度变化 */
+    o.contrib = o.dDim.map((v, i) => v * WTS[i]);          /* 六维贡献 = 变化 × 权重 */
+    o.contribSum = sum(o.contrib);
+    /* 季内逐月读数（末季 2026Q3 仅 7/8 月有读数，9 月未到） */
+    o.monVals = o.mons.map((m) => (D.monIdx[m] === undefined ? null : D.trend[D.monIdx[m]]));
+    o.monLive = o.monVals.filter((v) => v !== null).length;
+    o.monAvg = sum(o.monVals.filter((v) => v !== null)) / o.monLive;
+    /* 事件：按日期升序；逐维影响求和用于硬校验 */
+    o.events = EVENTS[it.q].slice().sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    o.evByDim = DIMS.map((_, j) => sum(o.events.filter((e) => e[2] === j).map((e) => e[3])));
+    o.evCntByDim = DIMS.map((_, j) => o.events.filter((e) => e[2] === j).length);
+    o.evPos = o.events.filter((e) => e[3] > 0);
+    o.evNeg = o.events.filter((e) => e[3] < 0);
+    o.evAbsMax = o.events.slice().sort((a, b) => Math.abs(b[3]) - Math.abs(a[3]))[0];
+    o.evWorst = o.events.slice().sort((a, b) => a[3] - b[3])[0];
+    o.evBest = o.events.slice().sort((a, b) => b[3] - a[3])[0];
+    /* 最大贡献维 / 最大拖累维（按贡献分，即已含权重） */
+    const ci = o.contrib.map((v, j) => j);
+    o.topDim = ci.slice().sort((a, b) => o.contrib[b] - o.contrib[a])[0];
+    o.botDim = ci.slice().sort((a, b) => o.contrib[a] - o.contrib[b])[0];
+    /* 最弱维（按得分）——下季重点由此现算 */
+    o.weak = ci.slice().sort((a, b) => sc[a] - sc[b]);
+    /* 改进行动 */
+    o.acts = ACTIONS[it.q];
+    o.actDone = o.acts.filter((a) => a[2] === 0).length;
+    o.actRate = 100 * o.actDone / o.acts.length;
+    o.actAvg = sum(o.acts.map((a) => a[3])) / o.acts.length;
+    /* 季内最大单月环比（用于走势归因标注） */
+    let bi = 0, bv = -1;
+    o.mons.forEach((m, k) => {
+      const i = D.monIdx[m];
+      if (i === undefined) return;
+      if (Math.abs(D.mom[i]) > bv) { bv = Math.abs(D.mom[i]); bi = i; }
+    });
+    o.swingIdx = bi;
+    o.swingMon = D.months[bi];
+    o.swingVal = D.mom[bi];
+    /* 该月最大影响事件（现算归因，父页 TREND_WHY 命中时优先用契约原文） */
+    const mm = o.swingMon.slice(5);
+    const inMon = o.events.filter((e) => e[0].slice(0, 2) === mm);
+    const topInMon = inMon.slice().sort((a, b) => Math.abs(b[3]) - Math.abs(a[3]))[0];
+    o.swingWhy = TREND_WHY[o.swingMon] || (topInMon ? topInMon[1] : "");
+    o.swingFromContract = !!TREND_WHY[o.swingMon];
+    Q[it.q] = o;
+  });
+
+  /* 5.3 全局派生 */
+  D.evTotal = sum(QORDER.map((k) => Q[k].events.length));
+  D.qBest = QORDER.slice().sort((a, b) => Q[b].diff - Q[a].diff)[0];
+  D.qWorst = QORDER.slice().sort((a, b) => Q[a].diff - Q[b].diff)[0];
+  D.spanFrom = Q[BASE_Q].index;
+  D.spanTo = Q[QORDER[QORDER.length - 1]].index;
+  D.spanDiff = D.spanTo - D.spanFrom;
+  /* 2026Q2 三月均值口径 vs 父页 PREV_SCORE（口径互校） */
+  D.q2Avg = Q["2026Q2"].monAvg;
+  D.authPrevIndex = sum(DIMS.map((d, i) => AUTH_PREV[d] * WTS[i]));
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("fj-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("fj-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+
+  /* ===== 7. 季度切换 chip（8 季；chip 上带季末指数与环比） ===== */
+  const qbox = $("fj-qchips");
+  qbox.innerHTML = QORDER.map((k, i) => {
+    const o = Q[k];
+    const col = o.diff >= 0 ? C.green : C.orange;
+    return '<button class="fj-qchip" type="button" data-i="' + i + '" style="--fj-cc:' + col + '" ' +
+      'title="' + o.q + " · " + o.sub + '">' +
+      "<u>" + o.q + "</u><b>" + fmtDec(o.index, 1) + "</b><i>" + signed(o.diff, 2) + "</i></button>";
+  }).join("");
+  const qchips = Array.from(qbox.children);
+
+  /* ===== 8. hash 契约：父页 P17「指数 24 月走势」面板级入口 → 子页#encodeURIComponent(季度标识)
+         归一化（decodeURIComponent + trim + 全角空白剔除 + 大小写归一）后查 HASH_ALIAS。
+         收「2026Q2」「26Q2」「2026-Q2」「2026年第二季度」「Q2」「二季度」等写法；
+         裸写法（Q2 / 二季度）落到**最近**的同序号季度。 ===== */
+  const HASH_ALIAS = {};
+  const CN_NUM = ["零", "一", "二", "三", "四"];
+  const alias = (k, v) => { if (HASH_ALIAS[k] === undefined) HASH_ALIAS[k] = v; };
+  /* 先按倒序登记裸写法，使「Q2」落到最近的一个 Q2 */
+  QORDER.slice().reverse().forEach((k) => {
+    const i = QORDER.indexOf(k);
+    const n = k.slice(-1), cn = CN_NUM[Number(n)];
+    alias("Q" + n, i); alias("q" + n, i);
+    alias(cn + "季度", i); alias("第" + cn + "季度", i);
+  });
+  QORDER.forEach((k, i) => {
+    const y = String(Q[k].y), y2 = y.slice(2), n = k.slice(-1), cn = CN_NUM[Number(n)];
+    [y, y2].forEach((yy) => {
+      alias(yy + "Q" + n, i); alias(yy + "q" + n, i);
+      alias(yy + "-Q" + n, i); alias(yy + "-q" + n, i);
+      alias(yy + "年Q" + n, i); alias(yy + "年q" + n, i);
+      alias(yy + "Q" + n + "季度", i);
+      alias(yy + "年" + cn + "季度", i);
+      alias(yy + "年第" + cn + "季度", i);
+      alias(yy + cn + "季度", i);
+    });
+  });
+  /* 归一化 + 查表（与 location 解耦，便于页尾自检直接调用，不去动 URL 状态） */
+  function lookupKey(text) {
+    let raw = String(text == null ? "" : text);
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                     /* trim + 全角空白剔除归一化 */
+    if (!raw) return -1;
+    let hit = HASH_ALIAS[raw];
+    if (hit === undefined) hit = HASH_ALIAS[raw.toUpperCase()];
+    if (hit === undefined) hit = HASH_ALIAS[raw.toLowerCase()];
+    return hit === undefined ? -1 : hit;
+  }
+  function resolveHash() { return lookupKey((location.hash || "").replace(/^#/, "")); }
+  let hashSuppress = false;
+  function syncHash(i) {
+    const want = "#" + encodeURIComponent(QORDER[i]);
+    if (location.hash !== want) {
+      hashSuppress = true;
+      /* 页内切换用 replaceState 回写，不往历史里堆栈，返回上级仍是一次后退 */
+      if (history && history.replaceState) history.replaceState(null, "", want);
+      else location.hash = want;
+    }
+  }
+
+  /* ===== 9. KPI 六格（init 之前填充完毕；数值全部现算 + 翻牌缓动） ===== */
+  let kpiSeq = 0;
+  function renderKpis(o) {
+    const botIsDrag = o.contrib[o.botDim] < 0;
+    const items = [
+      { k: "本季指数（季末读数）", v: o.index, dec: 1, unit: "分", color: C.blue,
+        s: "Σ(六维得分 × 权重) 现算 · 季末月 " + o.endMon + (o.live ? " · 数据截至 " + AS_OF : "") },
+      { k: "环比变化", v: o.diff, dec: 2, sign: true, unit: "分", color: o.diff >= 0 ? C.green : C.orange,
+        s: "上季 " + o.prevKey + " " + fmtDec(o.prevIndex, 2) + " → 本季 " + fmtDec(o.index, 2) },
+      { k: "最大贡献维", word: DIMS[o.topDim], color: DCOL[o.topDim],
+        s: signed(o.contrib[o.topDim], 2) + " 分 = " + signed(o.dDim[o.topDim], 1) + " × " + fmtDec(WTS[o.topDim], 2) },
+      { k: botIsDrag ? "最大拖累维" : "最小贡献维", word: DIMS[o.botDim], color: botIsDrag ? C.orange : DCOL[o.botDim],
+        s: signed(o.contrib[o.botDim], 2) + " 分 = " + signed(o.dDim[o.botDim], 1) + " × " + fmtDec(WTS[o.botDim], 2) },
+      { k: "季内事件", v: o.events.length, dec: 0, unit: "起", color: C.violet,
+        s: "正向 " + o.evPos.length + " 起 / 负向 " + o.evNeg.length + " 起 · 逐维 Σ 影响 ≡ 逐维变化" },
+      { k: "上季行动完成率", v: o.actRate, dec: 1, unit: "%", color: o.actRate >= 60 ? C.green : C.amber,
+        s: o.actDone + " / " + o.acts.length + " 项完成 · 平均进度 " + fmtDec(o.actAvg, 0) + "%" }
+    ];
+    const seq = ++kpiSeq;
+    $("fj-kpis").innerHTML = items.map((p, i) => (
+      '<div class="fj-kpi" style="--fj-kc:' + p.color + '">' +
+        '<div class="fj-kpi-k">' + p.k + "</div>" +
+        '<div class="fj-kpi-v">' +
+          (p.word
+            ? '<b class="is-word">' + p.word + "</b>"
+            : '<b id="fj-kpi-' + seq + "-" + i + '">0</b><s>' + p.unit + "</s>") +
+        "</div>" +
+        '<div class="fj-kpi-s">' + p.s + "</div>" +
+      "</div>"
+    )).join("");
+    /* 翻牌缓动：easeOutCubic，1.0 秒收敛（★ 验收截图时可能读到中途值，等收敛后再判勾稽） */
+    items.forEach((p, i) => {
+      if (p.word) return;
+      const el = $("fj-kpi-" + seq + "-" + i);
+      if (!el) return;
+      const dur = 1000, t0 = performance.now();
+      const show = (val) => (p.sign ? signed(val, p.dec) : (p.dec ? fmtDec(val, p.dec) : fmtInt(val)));
+      (function step(now) {
+        if (kpiSeq !== seq) return;                       /* 已切季：丢弃过期动画帧 */
+        const q = Math.min(1, (now - t0) / dur);
+        const e = 1 - Math.pow(1 - q, 3);
+        el.textContent = show(p.v * e);
+        if (q < 1) requestAnimationFrame(step);
+        else el.textContent = show(p.v);
+      })(t0);
+    });
+  }
+
+  /* ===== 10. 改进行动清单（CSS grid 模拟表，非 <table>；写死高度不撑破） ===== */
+  function renderActs(o) {
+    $("fj-abody").innerHTML = o.acts.map((a, k) => {
+      const col = ST_COLORS[a[2]];
+      return "<li style=\"animation-delay:" + (k * 24) + "ms\">" +
+        "<span>" + a[0] + "</span>" +
+        '<span class="fj-adim" style="color:' + DCOL[a[1]] + '">' + DIMS[a[1]] + "</span>" +
+        '<span class="fj-apg"><span class="fj-apg-t"><u style="width:' + a[3] + "%;background:" + col +
+          '"></u></span><em style="color:' + col + '">' + a[3] + "%</em></span>" +
+        '<span class="fj-badge ' + ST_BADGE[a[2]] + '">' + ST_NAMES[a[2]] + "</span></li>";
+    }).join("");
+    $("fj-act-tag").innerHTML = "上季 " + o.prevKey + " 定项 <b>" + o.acts.length +
+      "</b> 项 · 本季完成 <em>" + o.actDone + "</em> 项 · 完成率 <b>" + fmtDec(o.actRate, 1) + "%</b>";
+  }
+
+  /* ===== 11. 下季重点（★ 由最弱维 / 最大拖累 / 最负事件现算生成，不写死文案） ===== */
+  function renderNext(o) {
+    const w0 = o.weak[0], w1 = o.weak[1];
+    const gap = TARGET - o.index;
+    const lift = WTS[w0] + WTS[w1];
+    const botIsDrag = o.contrib[o.botDim] < 0;
+    const worst = o.evWorst;
+    const items = [
+      { c: DCOL[w0], t: "补强最弱维「<b>" + DIMS[w0] + "</b>」：当前 <b>" + fmtDec(o.scores[w0], 1) +
+          "</b> 分（六维最低），权重 " + fmtDec(WTS[w0], 2) + "，每 +1 分带动指数 " + signed(WTS[w0], 2) + " 分" },
+      { c: DCOL[w1], t: "次弱维「<b>" + DIMS[w1] + "</b>」<b>" + fmtDec(o.scores[w1], 1) +
+          "</b> 分同步跟进；两维各 +1 分可补 <b>" + fmtDec(lift, 2) + "</b> 分，覆盖当前目标缺口的 " +
+          fmtDec(100 * lift / gap, 0) + "%" },
+      { c: botIsDrag ? C.orange : DCOL[o.botDim],
+        t: (o.botDim === w0
+              ? (botIsDrag ? "最大拖累维恰为最弱维「<b>" : "最小贡献维恰为最弱维「<b>")
+              : (botIsDrag ? "遏制本季最大拖累「<b>" : "巩固本季最小贡献「<b>")) + DIMS[o.botDim] +
+          "</b>」（贡献 <b>" + signed(o.contrib[o.botDim], 2) + "</b> 分" +
+          (o.botDim === w0 ? "，双重优先" : "") + "）；" +
+          (worst && worst[3] < 0
+            ? "最负事件「" + worst[1] + "」" + signed(worst[3], 1) + " 分需专项复盘"
+            : "季内无负向事件，转为守成巩固") },
+      { c: C.amber, t: "距管理层目标 <b>" + TARGET + "</b> 分尚差 <b>" + fmtDec(gap, 2) +
+          "</b> 分：按本季环比 " + signed(o.diff, 2) + " 分/季的斜率测算，需 <b>" +
+          (o.diff > 0 ? fmtDec(gap / o.diff, 1) + "</b> 个季度" : "—</b>（本季为负增长，先止跌）") }
+    ];
+    $("fj-next").innerHTML = items.map((it, k) => (
+      "<li><u style=\"background:" + it.c + "\">" + (k + 1) + "</u><span>" + it.t + "</span></li>"
+    )).join("");
+    $("fj-next-tag").textContent = "最弱 " + DIMS[w0] + " " + fmtDec(o.scores[w0], 1) +
+      " · 次弱 " + DIMS[w1] + " " + fmtDec(o.scores[w1], 1) + " · 缺口 " + fmtDec(gap, 2) + " 分";
+  }
+
+  /* ===== 12. 图表：全部 option 只下发标量与数组（严禁把 Q[...] 对象塞进 series.data） ===== */
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const dayMs = 86400000;
+  const dstr = (y, m, d) => y + "-" + pad(m) + "-" + pad(d);
+  const tval = (s) => new Date(s.slice(0, 4) + "/" + s.slice(5, 7) + "/" + s.slice(8, 10)).getTime();
+
+  /* 12.1 季度事件流时间轴（主视觉）：六维泳道 × 时间轴，气泡大小 ∝ |影响分|，正绿负橙 */
+  function flowOption(o) {
+    const x0 = tval(dstr(o.y, o.m0, 1));
+    const endY = o.m0 + 2 > 12 ? o.y + 1 : o.y;
+    const endM = o.m0 + 2 > 12 ? o.m0 - 10 : o.m0 + 2;
+    const x1 = new Date(endY, endM, 0).getTime();          /* 该季最后一个月的最后一天 */
+    const lanes = DIMS.slice();
+    const mk = (e) => [tval(dstr(o.y, Number(e[0].slice(0, 2)), Number(e[0].slice(3, 5)))),
+                       DIMS[e[2]], e[3], e[1], e[0], e[2]];
+    const posData = o.evPos.map(mk);
+    const negData = o.evNeg.map(mk);
+    /* 月分隔线 + 月底纹（markArea 用于三个月交替淡色带） */
+    const mLine = [], mArea = [];
+    for (let k = 0; k < 3; k++) {
+      const yy = o.m0 + k > 12 ? o.y + 1 : o.y;
+      const mm = o.m0 + k > 12 ? o.m0 + k - 12 : o.m0 + k;
+      const a = tval(dstr(yy, mm, 1));
+      const b = new Date(yy, mm, 0).getTime();
+      if (k > 0) mLine.push({ xAxis: a });
+      if (k % 2 === 1) mArea.push([{ xAxis: a }, { xAxis: b }]);
+    }
+    if (o.live) mLine.push({ xAxis: tval(AS_OF), lineStyle: { color: C.amber, width: 1.6, type: "dashed" },
+      label: { show: true, color: C.amber, fontSize: 10, formatter: "数据截至 " + AS_OF.slice(5), position: "end" } });
+    const evFmt = (p) => {
+      const v = p.value;
+      return "<b>" + v[4] + "</b>　" + v[3] + "<br/>影响维 <b style=\"color:" + DCOL[v[5]] + "\">" +
+        v[1] + "</b>（权重 " + fmtDec(WTS[v[5]], 2) + "）<br/>影响幅度 <b style=\"color:" +
+        (v[2] >= 0 ? C.green : C.orange) + "\">" + signed(v[2], 1) + "</b> 分" +
+        "　折算指数 <b>" + signed(v[2] * WTS[v[5]], 3) + "</b> 分";
+    };
+    const mkSeries = (name, data, color, posLabel) => ({
+      name: name, type: "scatter", data: data, z: 6,
+      symbolSize: (val) => Math.min(34, 10 + Math.abs(val[2]) * 13),
+      itemStyle: { color: color, borderColor: "rgba(5,10,28,.7)", borderWidth: 1,
+        shadowBlur: 8, shadowColor: color, opacity: 0.92 },
+      label: {
+        show: true, position: posLabel, distance: 6, color: "#cfdcff", fontSize: 9.5,
+        formatter: (p) => p.value[3] + "  " + signed(p.value[2], 1)
+      },
+      labelLayout: { hideOverlap: true },
+      emphasis: { scale: 1.25, itemStyle: { opacity: 1 } }
+    });
+    const posSeries = mkSeries("正向事件", posData, C.green, "top");
+    posSeries.markLine = { symbol: "none", silent: true, data: mLine,
+      lineStyle: { color: "rgba(96,140,255,.35)", type: "dashed", width: 1 } };
+    posSeries.markArea = { silent: true, itemStyle: { color: "rgba(92,157,255,.045)" }, data: mArea };
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 62, right: 26, top: 26, bottom: 24 },
+      tooltip: Object.assign({ trigger: "item", formatter: evFmt }, TIP),
+      legend: { top: 0, right: 4, itemWidth: 12, itemHeight: 8, itemGap: 12,
+        textStyle: { color: C.textDim, fontSize: 10.5 }, data: ["正向事件", "负向事件"] },
+      xAxis: {
+        type: "time", min: x0, max: x1,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        splitLine: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10, formatter: (v) => {
+          const d = new Date(v); return pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+        } }
+      },
+      yAxis: {
+        type: "category", data: lanes, inverse: true, boundaryGap: true,
+        axisLine: { show: false }, axisTick: { show: false },
+        splitLine: { show: true, lineStyle: { color: C.grid, type: "dashed" } },
+        axisLabel: { fontSize: 11.5, fontWeight: 700, color: (v) => DCOL[DIMS.indexOf(v)] || C.text }
+      },
+      series: [posSeries, mkSeries("负向事件", negData, C.orange, "bottom")]
+    };
+  }
+
+  /* 12.2 六维环比瀑布：首值（上季指数）+ Σ 六维贡献 = 末值（本季指数），硬勾稽 */
+  function wfOption(o) {
+    const names = [o.prevKey + " 上季", DIMS[0], DIMS[1], DIMS[2], DIMS[3], DIMS[4], DIMS[5], o.q + " 本季"];
+    const holder = [0], vals = [o.prevIndex], cols = [C.blueDeep], labs = [fmtDec(o.prevIndex, 2)];
+    let run = o.prevIndex;
+    o.contrib.forEach((c, j) => {
+      holder.push(c >= 0 ? run : run + c);
+      vals.push(Math.abs(c));
+      cols.push(c >= 0 ? C.green : C.orange);
+      labs.push(signed(c, 2));
+      run += c;
+    });
+    holder.push(0); vals.push(o.index); cols.push(C.blue); labs.push(fmtDec(o.index, 2));
+    const lo = Math.min(o.prevIndex, o.index, run, ...holder.slice(1, 7).map((h, i) => h));
+    const yMin = Math.floor(Math.min(lo, o.prevIndex, o.index) - 1.4);
+    const yMax = Math.ceil(Math.max(o.prevIndex, o.index) + 1.2);
+    const dDim = o.dDim.slice(), wts = WTS.slice();
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 14, top: 30, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          if (i === 0) return "<b>" + names[0] + "</b><br/>上季指数 <b>" + fmtDec(o.prevIndex, 2) + "</b> 分";
+          if (i === 7) return "<b>" + names[7] + "</b><br/>本季指数 <b>" + fmtDec(o.index, 2) +
+            "</b> 分<br/>环比 <b style=\"color:" + (o.diff >= 0 ? C.green : C.orange) + "\">" + signed(o.diff, 2) + "</b> 分";
+          const j = i - 1;
+          return "<b style=\"color:" + DCOL[j] + "\">" + DIMS[j] + "</b><br/>得分 " +
+            fmtDec(o.prevScores[j], 1) + " → <b>" + fmtDec(o.scores[j], 1) + "</b>（" + signed(dDim[j], 1) + "）" +
+            "<br/>指数贡献 <b>" + signed(dDim[j] * wts[j], 2) + "</b> 分 = " + signed(dDim[j], 1) +
+            " × " + fmtDec(wts[j], 2) + "<br/>季内事件 " + o.evCntByDim[j] + " 起，Σ 影响 " + signed(o.evByDim[j], 1) + " 分";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: names,
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10.5, interval: 0 }
+      },
+      yAxis: {
+        type: "value", min: yMin, max: yMax, name: "指数（分）",
+        nameTextStyle: { color: C.textDim, fontSize: 10 },
+        axisLabel: { color: C.textDim, fontSize: 10 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false }
+      },
+      series: [
+        { name: "占位", type: "bar", stack: "wf", silent: true, data: holder.slice(),
+          itemStyle: { color: "transparent" }, emphasis: { itemStyle: { color: "transparent" } } },
+        { name: "贡献", type: "bar", stack: "wf", barWidth: "52%",
+          /* 逐点带上自己的 label 颜色（label.color 不接受回调，只有 itemStyle 接受） */
+          data: vals.map((v, i) => ({
+            value: v, itemStyle: { color: cols[i], borderRadius: 3 }, label: { color: cols[i] } })),
+          label: { show: true, position: "top", fontSize: 10.5, fontWeight: 700,
+            formatter: (p) => labs[p.dataIndex] },
+          markLine: { symbol: "none", silent: true,
+            lineStyle: { color: "rgba(255,194,77,.55)", type: "dashed", width: 1.2 },
+            label: { color: C.amber, fontSize: 10, position: "insideEndTop",
+              formatter: "上季 " + fmtDec(o.prevIndex, 2) },
+            data: [{ yAxis: o.prevIndex }] } }
+      ]
+    };
+  }
+
+  /* 12.3 指数走势与归因：24 月折线 + 本季 markArea + 季末点 + 归因 markPoint */
+  function trendOption(o) {
+    const idxs = o.mons.map((m) => D.monIdx[m]).filter((i) => i !== undefined);
+    const a0 = D.months[idxs[0]], a1 = D.months[idxs[idxs.length - 1]];
+    /* 本季逐月归因：父页 TREND_WHY 原文优先，否则现算取该月绝对影响最大的事件（只放字符串，不放对象） */
+    const whyMap = {};
+    o.mons.forEach((m) => {
+      if (TREND_WHY[m]) { whyMap[m] = TREND_WHY[m]; return; }
+      const mm = m.slice(5);
+      const top = o.events.filter((e) => e[0].slice(0, 2) === mm)
+        .sort((x, z) => Math.abs(z[3]) - Math.abs(x[3]))[0];
+      if (top) whyMap[m] = top[1] + "（" + DIMS[top[2]] + " " + signed(top[3], 1) + "）";
+    });
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 12, top: 24, bottom: 2, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis",
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          const why = whyMap[D.months[i]] || TREND_WHY[D.months[i]];
+          return "<b>" + D.months[i] + "</b>　指数 <b>" + fmtDec(D.trend[i], 2) + "</b><br/>环比 <b style=\"color:" +
+            (D.mom[i] >= 0 ? C.green : C.orange) + "\">" + signed(D.mom[i], 2) + "</b> 分" +
+            (why ? "<br/><span style=\"color:" + C.amber + "\">归因：" + why + "</span>" : "");
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: D.months.slice(),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 9, interval: 2, rotate: 30,
+          formatter: (v) => v.slice(2) }
+      },
+      yAxis: {
+        type: "value", min: 74, max: 88, interval: 3.5,
+        axisLabel: { color: C.textDim, fontSize: 9.5 },
+        splitLine: { lineStyle: { color: C.grid, type: "dashed" } }, axisLine: { show: false }
+      },
+      series: [{
+        name: "健康指数", type: "line", smooth: true, symbol: "circle", symbolSize: 3.5,
+        data: D.trend.slice(),
+        lineStyle: { width: 2, color: C.blue },
+        itemStyle: { color: C.blue },
+        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: "rgba(92,157,255,.28)" }, { offset: 1, color: "rgba(92,157,255,0)" }]) },
+        markArea: { silent: true, itemStyle: { color: "rgba(255,194,77,.13)",
+          borderColor: "rgba(255,194,77,.42)", borderWidth: 1 },
+          data: [[{ xAxis: a0, label: { show: true, color: C.amber, fontSize: 10, position: "insideTop",
+            formatter: o.q } }, { xAxis: a1 }]] },
+        markPoint: {
+          symbol: "pin", symbolSize: 30, data: [
+            { name: "季末", coord: [D.months[idxs[idxs.length - 1]], D.trend[idxs[idxs.length - 1]]],
+              itemStyle: { color: C.blue },
+              label: { color: "#071026", fontSize: 9.5, fontWeight: 700,
+                formatter: fmtDec(o.index, 1) } },
+            { name: "归因", coord: [o.swingMon, D.trend[o.swingIdx]],
+              itemStyle: { color: o.swingVal >= 0 ? C.green : C.orange },
+              label: { color: "#071026", fontSize: 9, fontWeight: 700,
+                formatter: signed(o.swingVal, 1) } }
+          ]
+        },
+        markLine: { symbol: "none", silent: true,
+          lineStyle: { color: "rgba(111,224,154,.5)", type: "dashed", width: 1.2 },
+          label: { color: C.green, fontSize: 9.5, position: "insideStartTop",
+            formatter: "本季 " + fmtDec(o.index, 1) },
+          data: [{ yAxis: o.index }] }
+      }]
+    };
+  }
+
+  /* 12.4 六维雷达对比：本季 vs 上季两层叠加；改善维绿色轴名、恶化维橙色轴名 */
+  function radarOption(o) {
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const arr = p.value;
+          return "<b>" + p.name + "</b><br/>" + DIMS.map((d, i) => (
+            "<span style=\"color:" + DCOL[i] + "\">" + d + "</span> <b>" + fmtDec(arr[i], 1) + "</b>"
+          )).join("　");
+        }
+      }, TIP),
+      legend: { top: 0, right: 2, itemWidth: 12, itemHeight: 8, itemGap: 12,
+        textStyle: { color: C.textDim, fontSize: 10.5 },
+        data: ["上季 " + o.prevKey, "本季 " + o.q] },
+      radar: {
+        center: ["50%", "56%"], radius: "62%", startAngle: 90, splitNumber: 4,
+        shape: "polygon",
+        axisName: { fontSize: 10.5, fontWeight: 700 },
+        nameGap: 6,
+        indicator: DIMS.map((d, i) => ({
+          name: d + " " + fmtDec(o.scores[i], 1) + "\n" + signed(o.dDim[i], 1),
+          max: 92, min: 68,
+          color: o.dDim[i] > 0 ? C.green : (o.dDim[i] < 0 ? C.orange : C.textDim)
+        })),
+        splitLine: { lineStyle: { color: "rgba(96,140,255,.18)" } },
+        splitArea: { areaStyle: { color: ["rgba(24,44,104,.16)", "rgba(24,44,104,.06)"] } },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.22)" } }
+      },
+      series: [{
+        type: "radar", symbolSize: 4,
+        data: [
+          { name: "上季 " + o.prevKey, value: o.prevScores.slice(),
+            lineStyle: { color: C.violet, width: 1.6, type: "dashed" },
+            itemStyle: { color: C.violet },
+            areaStyle: { color: "rgba(169,140,245,.14)" } },
+          { name: "本季 " + o.q, value: o.scores.slice(),
+            lineStyle: { color: C.blue, width: 2.4 },
+            itemStyle: { color: C.blue },
+            areaStyle: { color: "rgba(92,157,255,.24)" } }
+        ]
+      }]
+    };
+  }
+
+  /* ===== 13. 切季主流程（单一入口：一次调用刷新页头 / KPI / 清单 / 四张图） ===== */
+  let qIdx = QORDER.length - 1;
+  let flowChart = null, wfChart = null, trendChart = null, radarChart = null;
+
+  function applyQ(i, pushHash) {
+    qIdx = ((i % QORDER.length) + QORDER.length) % QORDER.length;
+    const o = Q[QORDER[qIdx]];
+    /* 页头 */
+    $("fj-crumb-obj").textContent = o.q + " 复盘";
+    $("fj-title").textContent = o.q + " · 季度指数复盘";
+    $("fj-meta-idx").textContent = fmtDec(o.index, 1) + " 分";
+    $("fj-meta-diff").textContent = signed(o.diff, 2) + " 分";
+    $("fj-meta-ev").textContent = String(o.events.length);
+    $("fj-meta-win").textContent = o.mons[0] + " ~ " + (o.live ? AS_OF.slice(0, 7) + "（进行中）" : o.mons[2]);
+    $("fj-chip-key").textContent = o.q + " INDEX";
+    $("fj-chip-idx").textContent = fmtDec(o.index, 1) + " 分";
+    /* 切换 chip */
+    qchips.forEach((el, k) => {
+      const on = k === qIdx;
+      const oo = Q[QORDER[k]];
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? (oo.diff >= 0 ? C.green : C.orange) : "";
+      el.style.borderColor = on ? (oo.diff >= 0 ? C.green : C.orange) : "";
+    });
+    $("fj-qbar-state").innerHTML =
+      "期初基准 <em>" + BASE_Q + " " + fmtDec(Q[BASE_Q].index, 1) + "</em><i>|</i>" +
+      "八季累计 <b>" + signed(D.spanDiff, 2) + "</b> 分<i>|</i>" +
+      "最佳 <em>" + D.qBest + " " + signed(Q[D.qBest].diff, 2) + "</em> · 最差 <em>" + D.qWorst + " " +
+      signed(Q[D.qWorst].diff, 2) + "</em>";
+    /* 面板 tag */
+    $("fj-flow-tag").innerHTML = "共 <b>" + o.events.length + "</b> 起（正 " + o.evPos.length + " / 负 " +
+      o.evNeg.length + "）· 逐维 Σ 事件影响 ≡ 逐维季度变化 · 最大单起 " +
+      o.evAbsMax[1] + " <b>" + signed(o.evAbsMax[3], 1) + "</b>";
+    $("fj-wf-tag").innerHTML = "首值 <b>" + fmtDec(o.prevIndex, 2) + "</b> + Σ 六维贡献 <b>" +
+      signed(o.contribSum, 2) + "</b> = 末值 <b>" + fmtDec(o.index, 2) + "</b>";
+    const tTag = $("fj-trend-tag");
+    tTag.innerHTML = "季内 <b>" + o.monLive + "</b> 月 · 季内均值 <b>" + fmtDec(o.monAvg, 2) +
+      "</b> · 归因月 <b>" + o.swingMon + "</b> " + signed(o.swingVal, 2);
+    tTag.title = "本季最大单月环比 " + o.swingMon + " " + signed(o.swingVal, 2) + " 分｜归因：" +
+      o.swingWhy + (o.swingFromContract ? "（父页 TREND_WHY 原文）" : "（该月最大影响事件，现算）");
+    $("fj-radar-tag").innerHTML = "改善 <em>" + o.dDim.filter((v) => v > 0).length + "</em> 维 · 恶化 <b>" +
+      o.dDim.filter((v) => v < 0).length + "</b> 维 · 目标线 " + TARGET;
+    /* 清单（★ 图表 init 之前也走这条路径，保证 DOM 先填满） */
+    renderKpis(o);
+    renderActs(o);
+    renderNext(o);
+    /* 图表 */
+    if (flowChart) flowChart.setOption(flowOption(o), true);
+    if (wfChart) wfChart.setOption(wfOption(o), true);
+    if (trendChart) trendChart.setOption(trendOption(o), true);
+    if (radarChart) radarChart.setOption(radarOption(o), true);
+    if (pushHash) syncHash(qIdx);
+  }
+
+  qchips.forEach((el) => el.addEventListener("click", () => {
+    applyQ(Number(el.dataset.i), true);
+    pauseRotate(20000);                                   /* 手动切季：暂停轮巡 20 秒 */
+  }));
+
+  /* hash 定位：命中季度则切过去并闪烁对应 chip，同时暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit < 0) { applyQ(QORDER.length - 1, false); return; }
+    applyQ(hit, false);
+    const chip = qchips[hit];
+    chip.classList.remove("is-hit");
+    void chip.offsetWidth;                                /* 重排以重启动画 */
+    chip.classList.add("is-hit");
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效）；← → 切季 */
+  const UP_HREF = "大屏样板间-研发效能指数1920.html";
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { location.href = UP_HREF; return; }
+    if (e.key === "ArrowLeft") { applyQ(qIdx - 1, true); pauseRotate(20000); }
+    if (e.key === "ArrowRight") { applyQ(qIdx + 1, true); pauseRotate(20000); }
+  });
+
+  /* ===== 14. 底部口径滚动条（★ 图表 init 之前填充；与季度无关，只建一次） ===== */
+  (function buildFoot() {
+    const items = [
+      ["形态", C.violet, "本页是 D 型「时序复盘」子页：按**时间窗**（一个季度）而非对象组织，" +
+        "主视觉 = 事件流时间轴 + 前后对比瀑布。与 A 型（对象切换器，看一个对象的 360 度）、" +
+        "B 型（台账筛选，看全量明细并单条穿透）、C 型（横向对比，多个对象并排 PK）互不重复"],
+      ["分工", C.blue, "同属「研发效能指数」的兄弟子页「单维度追溯详情」做的是**单个维度**的" +
+        "二级指标加权追溯（每维 4 项二级指标，Σ 二级加权 ≡ 该维契约得分）；本页做的是" +
+        "**一个季度的整体复盘**（六维一起看），回答「这一季指数为什么这样走、被什么事件推动」"],
+      ["口径", C.amber, "季度指数 = **季末月读数**（该季最后一个月的指数）；末季 2026Q3 季末读数 " +
+        fmtDec(D.lastIndex, 1) + " 分 ≡ 父页 24 月走势末值 ≡ 契约 §2.2 健康指数 = " +
+        DIMS.map((d, i) => d + " " + AUTH_LAST[i] + "×" + fmtDec(WTS[i], 2)).join(" + ") + "（权重和 = 1）"],
+      ["互校", C.cyan, "父页「上季 " + fmtDec(D.authPrevIndex, 2) + "」用的是**季内三月均值**口径：" +
+        "本页 2026Q2 季末读数 " + fmtDec(Q["2026Q2"].index, 2) + " 分、三月均值 " + fmtDec(D.q2Avg, 2) +
+        " 分，后者与父页 PREV_SCORE 加权值逐字相等，两条口径并存不矛盾"],
+      ["加总", C.green, "本页最硬的一条勾稽：**每个事件带（维度，影响分值），某维的季度变化 ≡ 该维全部" +
+        "事件影响之和**（八季 × 六维共 " + (QORDER.length * DIMS.length) + " 条恒等式，1e-9 容差）；" +
+        "六维变化按权重加权后 ≡ 该季指数变化 ≡ 季末读数差，八季合计 " + D.evTotal + " 起事件"],
+      ["瀑布", C.orange, "环比瀑布首值 = 上季指数、末值 = 本季指数，中间六根柱 = 各维贡献 = 该维变化 × 权重；" +
+        "首值 + Σ 六维贡献 ≡ 末值（无残差项，不设「其他」凑数柱）"],
+      ["行动", C.green, "改进行动完成率 = 完成项 ÷ 上季定项数（现算）；下季重点 3~4 条由**最弱维、" +
+        "最大拖累维与季内最负事件现算生成**，不写死文案。末季行动前三项逐字引父页 ACTIONS"],
+      ["基准", C.blueDeep, "复盘覆盖 " + QORDER[0] + " ~ " + QORDER[QORDER.length - 1] + " 共 " +
+        QORDER.length + " 季（对应父页 24 月走势 " + D.months[0] + " ~ " + D.months[D.months.length - 1] +
+        "）；期初基准季 " + BASE_Q + " " + fmtDec(Q[BASE_Q].index, 1) + " 分 = 走势首点，只作首季环比基线"]
+    ];
+    const html = items.map((a) => (
+      '<div class="fj-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i><span>" + a[2] + "</span></div>"
+    )).join("");
+    $("fj-foot-track").innerHTML = html + html;            /* 两份首尾相接，滚动无缝 */
+  })();
+  const track = $("fj-foot-track");
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 15. 初始渲染：先把全部 DOM 填满（KPI / 行动清单 / 下季重点 / 口径条），再 init 图表 ===== */
+  applyQ(QORDER.length - 1, false);
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  flowChart = echarts.init($("fj-chart-flow"));
+  wfChart = echarts.init($("fj-chart-wf"));
+  trendChart = echarts.init($("fj-chart-trend"));
+  radarChart = echarts.init($("fj-chart-radar"));
+  applyQ(qIdx, false);                                     /* 图表就位后统一下发一次 option */
+  locateByHash();                                          /* 初始解析 hash（无 hash 落末季） */
+
+  /* ===== 16. kiosk 轮巡：13 秒切一季；hash 定位 / 手动切季 / 方向键后暂停 20 秒 ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil) return;
+    applyQ(qIdx + 1, true);
+  }, 13000);
+
+  /* ===== 17. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染） ===== */
+  let optAcyclic = true;
+  try {
+    QORDER.forEach((k) => {
+      const o = Q[k];
+      JSON.stringify(flowOption(o)); JSON.stringify(wfOption(o));
+      JSON.stringify(trendOption(o)); JSON.stringify(radarOption(o));
+    });
+  } catch (e) { optAcyclic = false; console.error("[季度指数复盘] option 存在循环引用：", e.message); }
+
+  const EPS = 1e-9;
+  const near = (a, b) => Math.abs(a - b) < EPS;
+  const lastQ = Q[QORDER[QORDER.length - 1]];
+
+  const checks = [
+    ["六维权重 Σ = 1（契约 §2.2 逐字）",
+      DIMS.length === 6 && WTS.length === 6 && near(sum(WTS), 1)],
+    ["末季六维得分 = 契约逐字（86/88/81/78/83/87）",
+      lastQ.scores.every((v, i) => v === AUTH_LAST[i])],
+    ["末季指数 = Σ(得分×权重) = 84.15，展示口径一位小数 = 84.1（与父页、门户同源）",
+      near(lastQ.index, AUTH_INDEX) && fmtDec(lastQ.index, 1) === "84.1"],
+    ["24 月走势末值 = 末季指数（现算收敛，非写死）",
+      D.trend.length === 24 && near(D.trend[23], lastQ.index) && D.months[23] === "2026-08"],
+    ["每季指数 = Σ(维度值 × 权重)（含期初基准季，逐季现算）",
+      QORDER.concat([BASE_Q]).every((k) => near(Q[k].index, wsumOf(SCORES[k])))],
+    ["每季指数 ≡ 该季末月的走势读数（季末读数口径，逐季无残差）",
+      QORDER.concat([BASE_Q]).every((k) => near(Q[k].index, D.trend[D.monIdx[Q[k].endMon]]))],
+    ["期初基准季 = 走势首点 2024-09 = 76.8",
+      Q[BASE_Q].endMon === D.months[0] && near(Q[BASE_Q].index, 76.8)],
+    ["★ 每维季度变化 = Σ 该维事件影响（八季 × 六维逐条恒等，1e-9 容差）",
+      QORDER.every((k) => Q[k].dDim.every((v, j) => near(v, Q[k].evByDim[j])))],
+    ["每维事件数 2~4 起（每季逐维），且事件总数 = 各季之和",
+      QORDER.every((k) => Q[k].evCntByDim.every((c) => c >= 2 && c <= 4)) &&
+      D.evTotal === sum(QORDER.map((k) => Q[k].events.length))],
+    ["季内事件日期全部落在该季三个月内，且末季不晚于数据截止日",
+      QORDER.every((k) => {
+        const o = Q[k];
+        return o.events.every((e) => {
+          const m = Number(e[0].slice(0, 2));
+          const inQ = [o.m0, o.m0 + 1, o.m0 + 2].map((x) => (x > 12 ? x - 12 : x)).indexOf(m) >= 0;
+          const notFuture = !o.live || (o.y + "-" + e[0]) <= AS_OF;
+          return inQ && notFuture;
+        });
+      })],
+    ["六维贡献 = 维度变化 × 权重（逐季逐维）",
+      QORDER.every((k) => Q[k].contrib.every((c, j) => near(c, Q[k].dDim[j] * WTS[j])))],
+    ["瀑布：首值 + Σ 六维贡献 = 末值（逐季）",
+      QORDER.every((k) => near(Q[k].prevIndex + Q[k].contribSum, Q[k].index))],
+    ["指数环比 = 本季指数 − 上季指数 = Σ 六维贡献（逐季三口径互等）",
+      QORDER.every((k) => near(Q[k].diff, Q[k].index - Q[k].prevIndex) && near(Q[k].diff, Q[k].contribSum))],
+    ["★ 事件影响可加总到指数：Σ(事件影响 × 该维权重) = 该季指数变化（逐季）",
+      QORDER.every((k) => near(sum(Q[k].events.map((e) => e[3] * WTS[e[2]])), Q[k].diff))],
+    ["八季链式闭合：期初基准 + Σ 八季环比 = 末季指数",
+      near(Q[BASE_Q].index + sum(QORDER.map((k) => Q[k].diff)), lastQ.index)],
+    ["季度链首尾相接：每季的上季 = 前一季（首季挂期初基准）",
+      QORDER.every((k, i) => Q[k].prevKey === (i === 0 ? BASE_Q : QORDER[i - 1]))],
+    ["2026Q2 三月均值 = 父页 PREV_SCORE 加权 = 82.45（两条口径互校）",
+      near(D.q2Avg, D.authPrevIndex) && near(D.authPrevIndex, 82.45)],
+    ["父页 TREND_HIST 逐字（23 项，首 76.8 / 末 83.6，2026-04 = 81.9）",
+      TREND_HIST.length === 23 && TREND_HIST[0] === 76.8 && TREND_HIST[22] === 83.6 &&
+      D.trend[D.monIdx["2026-04"]] === 81.9],
+    ["父页归因月 2025-11 / 2026-04 命中所在季且用契约原文",
+      Q["2025Q4"].swingMon === "2025-11" && Q["2025Q4"].swingFromContract &&
+      Q["2026Q2"].swingMon === "2026-04" && Q["2026Q2"].swingFromContract],
+    ["最大跃升季 = 2025Q4（+3.00）、最大回落季 = 2026Q1（−1.10）",
+      D.qBest === "2025Q4" && near(Q[D.qBest].diff, 3) &&
+      D.qWorst === "2026Q1" && near(Q[D.qWorst].diff, -1.1)],
+    ["行动完成率 = 已完成 ÷ 总数（逐季现算）",
+      QORDER.every((k) => {
+        const o = Q[k];
+        return o.acts.length === 5 && o.actDone === o.acts.filter((a) => a[2] === 0).length &&
+          near(o.actRate, 100 * o.actDone / o.acts.length);
+      })],
+    ["行动状态与进度自洽（完成 = 100% / 未启动 = 0% / 进行中 ∈ (0,100)）",
+      QORDER.every((k) => Q[k].acts.every((a) =>
+        (a[2] === 0 && a[3] === 100) || (a[2] === 2 && a[3] === 0) || (a[2] === 1 && a[3] > 0 && a[3] < 100)))],
+    ["末季行动前三项逐字引父页 ACTIONS（名称 + 进度）",
+      AUTH_ACTIONS.every((a, i) => lastQ.acts[i][0] === a[0] && lastQ.acts[i][3] === a[1])],
+    ["下季重点由最弱维现算：最弱维得分 ≤ 其余五维（逐季）",
+      QORDER.every((k) => {
+        const o = Q[k];
+        return o.scores.every((v) => v >= o.scores[o.weak[0]]) && o.scores[o.weak[1]] >= o.scores[o.weak[0]];
+      })],
+    ["最大贡献维 / 最大拖累维 = 贡献分的 argmax / argmin（逐季现算）",
+      QORDER.every((k) => {
+        const o = Q[k];
+        return o.contrib.every((c) => c <= o.contrib[o.topDim] + EPS) &&
+               o.contrib.every((c) => c >= o.contrib[o.botDim] - EPS);
+      })],
+    ["切换器 8 季，季度标识与 QORDER 逐字一致且升序",
+      qchips.length === 8 && QORDER.length === 8 &&
+      QORDER.every((k, i) => qchips[i].querySelector("u").textContent === k) &&
+      QORDER.every((k, i) => i === 0 || k > QORDER[i - 1])],
+    ["hash 各季度写法均可解析（2026Q2 / 26Q2 / 2026-Q2 / 2026年第二季度 / Q2 / 二季度）",
+      HASH_ALIAS["2026Q2"] === 6 && HASH_ALIAS["26Q2"] === 6 && HASH_ALIAS["2026-Q2"] === 6 &&
+      HASH_ALIAS["2026年第二季度"] === 6 && HASH_ALIAS["Q2"] === 6 && HASH_ALIAS["二季度"] === 6 &&
+      HASH_ALIAS["2026Q3"] === 7 && HASH_ALIAS["2024Q4"] === 0 && HASH_ALIAS["2025Q4"] === 4],
+    ["hash 归一化：百分号转义 / 全角空白 / 大小写均可命中（不改动 URL 状态）",
+      lookupKey(encodeURIComponent(" 2026　q2 ")) === 6 &&
+      lookupKey("2026Q2") === 6 && lookupKey(" 2 0 2 6 Q 2 ") === 6 &&
+      lookupKey(encodeURIComponent("2025年第四季度")) === 4 && lookupKey("不存在的季度") === -1],
+    /* ★ TDZ 防护的构造性断言：pauseUntil / pauseRotate 声明在第 1.1 节（行号远小于首次调用） */
+    ["pauseUntil 声明早于首次 pauseRotate() 调用（TDZ 防护，构造性断言）",
+      typeof pauseUntil === "number" && typeof pauseRotate === "function" &&
+      (resolveHash() < 0 ? pauseCalls >= 0 : (pauseCalls >= 1 && pauseUntil > Date.now()))],
+    ["图表 option 无循环引用（八季 × 四图 JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[季度指数复盘] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

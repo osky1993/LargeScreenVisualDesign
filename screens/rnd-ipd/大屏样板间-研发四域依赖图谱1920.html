@@ -1,0 +1,1331 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发四域依赖图谱</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --mz-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+    /* 依赖链路清单列宽：依赖方 / 箭头 / 被依赖方 / 接口数 / 阻塞数 / 阻塞率 / 风险 / 典型场景 */
+    --mz-tcols: 52px 18px 52px 62px 58px 74px 46px 1fr;
+    /* 环形耦合列宽：域对 / A→B / B→A / 合计 / 失衡 / 判定 */
+    --mz-ccols: 116px 54px 54px 1fr 50px 76px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .mz-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 4%, rgba(169, 140, 245, 0.08), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    /* 566 + 14 + 720(1fr) + 14 + 570 = 1884 = 1920 − 左右 padding 36 */
+    grid-template-columns: 566px 1fr 570px;
+    /* 84 + 62 + 34 + 760(1fr) + 56 + 4×14 gap = 1052 = 1080 − 上下 padding 28 */
+    grid-template-rows: 84px 62px 34px 1fr 56px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .mz-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .mz-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空，供「模拟数据」标识脚本注入） ===== */
+  .mz-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 10px;
+  }
+  .mz-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(169, 140, 245, 0.5) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(169, 140, 245, 0.5) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .mz-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .mz-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .mz-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .mz-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .mz-crumb em { font-style: normal; color: #d3e2ff; }
+  /* 返回上级：同目录相对路径回到软硬云AI集成协同，琥珀描边与本页星蓝主色区分 */
+  .mz-crumb-up {
+    display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+    padding: 3px 11px 4px; border-radius: 8px; text-decoration: none;
+    border: 1px solid rgba(255, 194, 77, 0.42);
+    background: linear-gradient(160deg, rgba(255, 194, 77, 0.14), rgba(18, 34, 78, 0.6));
+    color: #ffe3b0; font-size: 12px; letter-spacing: 0.06em;
+    transition: border-color .18s, box-shadow .18s, color .18s;
+  }
+  .mz-crumb-up:hover { color: #fff4de; border-color: rgba(255, 194, 77, 0.9); box-shadow: 0 0 14px rgba(255, 194, 77, 0.4); }
+  .mz-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .mz-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .mz-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .mz-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .mz-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .mz-head-right { display: flex; align-items: center; gap: 22px; flex: none; }
+  .mz-chips { display: flex; align-items: center; gap: 9px; }
+  .mz-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 128px; padding: 7px 16px; border-radius: 9px;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .mz-chip span { font-size: 10.5px; letter-spacing: 0.18em; color: #6079b0; }
+  .mz-chip b { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #cfdcff; font-variant-numeric: tabular-nums; }
+  .mz-chip.is-key { border-color: rgba(92, 157, 255, 0.5); background: rgba(24, 44, 104, 0.5); box-shadow: inset 0 0 14px rgba(92, 157, 255, 0.1); }
+  .mz-chip.is-key b { color: var(--rnd-blue); }
+  .mz-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 22px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .mz-clock-time { font: 700 26px/1 var(--mz-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .mz-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（六格，翻牌缓动；init 前填充完毕） ===== */
+  .mz-kpis {
+    grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; min-width: 0;
+  }
+  .mz-kpi {
+    position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 6px 14px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--rnd-line); background: var(--rnd-panel);
+  }
+  .mz-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--mz-kc, var(--rnd-blue));
+  }
+  .mz-kpi-k { font-size: 11px; letter-spacing: 0.14em; color: #7f92c4; }
+  .mz-kpi-v { display: flex; align-items: baseline; gap: 5px; }
+  .mz-kpi-v b { font: 700 24px/1 var(--mz-mono); color: var(--mz-kc, var(--rnd-blue)); font-variant-numeric: tabular-nums; }
+  .mz-kpi-v b.is-word { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 22px; letter-spacing: 0.06em; }
+  .mz-kpi-v s { text-decoration: none; font-size: 11.5px; color: rgba(127, 146, 196, 0.9); }
+  .mz-kpi-s { font-size: 10.5px; color: rgba(127, 146, 196, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ===== 视角条：四域 chip（hash 契约目标）+ 三页分工口径 ===== */
+  .mz-bar {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 14px;
+  }
+  .mz-bar-tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: #8aa8e8; }
+  .mz-dchip {
+    display: flex; align-items: baseline; gap: 7px; cursor: pointer;
+    padding: 4px 13px 5px; border-radius: 8px; font-family: inherit;
+    border: 1px solid rgba(96, 140, 255, 0.2); background: rgba(14, 26, 66, 0.55);
+    color: #bccdf2; font-size: 13px; letter-spacing: 0.06em;
+    transition: border-color .18s, background .18s, color .18s, box-shadow .18s;
+  }
+  .mz-dchip u { text-decoration: none; font-weight: 700; color: inherit; }
+  .mz-dchip i { font-style: normal; font-size: 11px; color: rgba(127, 146, 196, 0.85); font-variant-numeric: tabular-nums; }
+  .mz-dchip:hover { border-color: rgba(92, 157, 255, 0.55); color: #eaf1ff; }
+  .mz-dchip.is-on { color: #071026; font-weight: 700; box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); }
+  .mz-dchip.is-on i { color: rgba(7, 16, 38, 0.68); }
+  .mz-dchip.is-hit { animation: mz-hit 0.9s ease-in-out 2; }
+  @keyframes mz-hit { 0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, 0.28); } 50% { box-shadow: 0 0 26px var(--mz-cc, rgba(92, 157, 255, 0.8)); } }
+  .mz-bar-note { margin-left: auto; flex: none; font-size: 11.5px; color: var(--rnd-text-dim); letter-spacing: 0.03em; }
+  .mz-bar-note b { font-weight: 700; color: #9cc2ff; }
+  .mz-bar-note em { font-style: normal; color: #b9c9ee; }
+  .mz-bar-note i { font-style: normal; color: rgba(127, 146, 196, 0.4); margin: 0 7px; }
+
+  /* ===== 面板 ===== */
+  .mz-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+  .mz-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px;
+  }
+  .mz-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .mz-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .mz-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; }
+  .mz-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .mz-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mz-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .mz-chart { flex: 1; min-height: 0; width: 100%; }
+  /* ★ 弦图为主视觉，占中栏较大权重；桑基块由 JS 重绘但容器不改变高度 */
+  .mz-panel.is-chord { flex: 1.5; }
+  .mz-panel.is-flow { flex: 1; }
+  /* ★ 右栏两块均由 JS 在 echarts.init 之前填充完毕，且写死高度（448 + 14 + 298 = 760） */
+  .mz-panel.is-ledger { flex: none; height: 448px; min-height: 0; overflow: hidden; }
+  .mz-panel.is-cycle { flex: none; height: 298px; min-height: 0; overflow: hidden; }
+
+  /* ===== CSS grid 模拟依赖链路清单（非 <table>） ===== */
+  .mz-table { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .mz-thead, .mz-tbody li {
+    display: grid; grid-template-columns: var(--mz-tcols); align-items: center; gap: 6px;
+  }
+  .mz-thead {
+    flex: none; padding: 6px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11.5px; letter-spacing: 0.06em; color: #8aa8e8;
+  }
+  .mz-tbody { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .mz-tbody li {
+    padding: 0 8px; height: 28px; border-radius: 5px;
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+    animation: mz-rowin .34s ease both;
+    transition: background .22s, box-shadow .22s;
+  }
+  @keyframes mz-rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .mz-tbody li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .mz-tbody li.is-out { background: rgba(92, 157, 255, 0.17); box-shadow: inset 2px 0 0 var(--rnd-blue); }
+  .mz-tbody li.is-in { background: rgba(169, 140, 245, 0.16); box-shadow: inset 2px 0 0 var(--rnd-violet); }
+  .mz-tbody li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mz-tbody li .mz-dom { font-weight: 700; letter-spacing: 0.04em; }
+  .mz-tbody li .mz-arrow { text-align: center; color: rgba(127, 146, 196, 0.75); }
+  .mz-tbody li .mz-num { font: 700 12px/1 var(--mz-mono); text-align: right; }
+  .mz-tbody li .mz-scene { font-size: 11px; color: rgba(201, 216, 248, 0.82); }
+  .mz-rate { display: flex; align-items: center; gap: 6px; }
+  .mz-rate-t { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(96, 140, 255, 0.14); overflow: hidden; }
+  .mz-rate-t u { display: block; height: 100%; border-radius: 3px; text-decoration: none; }
+  .mz-rate em { flex: none; width: 34px; text-align: right; font-style: normal; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .mz-badge {
+    padding: 2px 6px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .mz-badge.is-r0 { color: #3d060c; background: var(--rnd-red); }
+  .mz-badge.is-r1 { color: #3a2a05; background: var(--rnd-amber); }
+  .mz-badge.is-r2 { border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+
+  /* ===== 环形依赖检测（双向耦合对） ===== */
+  .mz-cyc { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .mz-chead, .mz-clist li {
+    display: grid; grid-template-columns: var(--mz-ccols); align-items: center; gap: 7px;
+  }
+  .mz-chead {
+    flex: none; padding: 5px 8px; border-radius: 6px;
+    background: rgba(26, 46, 110, 0.6); border: 1px solid rgba(96, 140, 255, 0.2);
+    font-size: 11px; letter-spacing: 0.06em; color: #8aa8e8;
+  }
+  .mz-clist { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; overflow: hidden; }
+  .mz-clist li {
+    padding: 0 8px; height: 34px; border-radius: 5px;
+    font-size: 12px; color: #c9d8f8; font-variant-numeric: tabular-nums;
+  }
+  .mz-clist li:nth-child(odd) { background: rgba(28, 48, 112, 0.26); }
+  .mz-clist li.is-on { background: rgba(255, 194, 77, 0.13); box-shadow: inset 2px 0 0 var(--rnd-amber); }
+  .mz-pair { display: flex; align-items: center; gap: 5px; font-weight: 700; letter-spacing: 0.03em; }
+  .mz-pair s { text-decoration: none; color: rgba(127, 146, 196, 0.8); font-weight: 400; }
+  .mz-cnum { font: 700 12.5px/1 var(--mz-mono); text-align: right; }
+  .mz-cbar { display: flex; align-items: center; gap: 7px; }
+  .mz-cbar-t { flex: 1; min-width: 0; display: flex; height: 9px; border-radius: 4px; overflow: hidden; background: rgba(96, 140, 255, 0.12); }
+  .mz-cbar-t u { display: block; height: 100%; text-decoration: none; }
+  .mz-cbar em { flex: none; width: 22px; text-align: right; font-style: normal; font: 700 12px/1 var(--mz-mono); color: #dfe9ff; }
+  .mz-tag {
+    padding: 2px 7px; border-radius: 4px; text-align: center; justify-self: start;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; white-space: nowrap;
+  }
+  .mz-tag.is-s0 { color: #3d060c; background: var(--rnd-red); }
+  .mz-tag.is-s1 { color: #3a2a05; background: var(--rnd-amber); }
+  .mz-tag.is-s2 { border: 1px solid rgba(96, 140, 255, 0.4); color: #9cc2ff; background: rgba(24, 44, 104, 0.4); }
+
+  /* ===== 底部滚动条 ===== */
+  .mz-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 10px; background: var(--rnd-panel); padding: 0 16px;
+  }
+  .mz-foot-tag {
+    flex: none; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--rnd-orange);
+  }
+  .mz-foot-tag::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-orange);
+    box-shadow: 0 0 10px var(--rnd-orange); animation: mz-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes mz-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+  .mz-foot-view { flex: 1; min-width: 0; overflow: hidden; height: 100%; position: relative; }
+  .mz-foot-track { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 100%; gap: 44px; white-space: nowrap; will-change: transform; }
+  .mz-foot-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b4c8f0; font-variant-numeric: tabular-nums; }
+  .mz-foot-item i { font-style: normal; font-size: 11px; letter-spacing: 0.1em; color: rgba(127, 146, 196, 0.7); }
+  .mz-foot-item em { font-style: normal; color: #dfe9ff; }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .mz-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="mz-stage" id="mz-stage">
+    <!-- mockflag:begin --><div class="mz-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="mz-error" id="mz-error" role="alert">ECharts 资源加载失败，请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空，供「模拟数据」标识脚本注入） -->
+    <header class="mz-header">
+      <div class="mz-head-left">
+        <div class="mz-crumb">
+          <a class="mz-crumb-up" href="大屏样板间-研发软硬云AI集成协同1920.html" title="返回上级专题页（Esc）">‹ 返回 软硬云AI集成协同</a>
+          <b>云麓智联科技</b><i>›</i><span>软硬云AI集成协同</span><i>›</i><em>四域依赖图谱</em>
+        </div>
+        <div class="mz-head-title-row">
+          <div class="mz-head-title">四域依赖图谱</div>
+          <div class="mz-head-meta">
+            <span><b>4</b> 域 · <b>12</b> 条有向依赖边（4×3 全连通）</span><i>|</i>
+            <span>计划接口 <b id="mz-meta-plan">--</b> 条 · 已联调 <b id="mz-meta-done">--</b> 条（<b id="mz-meta-rate">--</b>）</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="mz-head-right">
+        <div class="mz-chips">
+          <div class="mz-chip"><span>DATA AS OF</span><b>2026-08-19</b></div>
+          <div class="mz-chip is-key"><span id="mz-chip-key">图谱视角 · 全景</span><b id="mz-chip-val">--</b></div>
+        </div>
+        <div class="mz-clock" aria-label="实时时钟">
+          <span class="mz-clock-time" id="mz-clock-time">--:--:--</span>
+          <span class="mz-clock-date" id="mz-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 六格 -->
+    <div class="mz-kpis" id="mz-kpis"></div>
+
+    <!-- 视角条：全景 + 四域 chip（hash 契约目标：软件 / 硬件 / 云端 / AI）+ 三页分工口径 -->
+    <div class="mz-bar">
+      <span class="mz-bar-tag">图谱视角</span>
+      <div id="mz-dchips" style="display:flex;align-items:center;gap:9px;"></div>
+      <span class="mz-bar-note">
+        口径分工<i>·</i><em>本页（图谱）＝ 域间依赖关系与延期传导</em><i>·</i>跨域接口台账 ＝ 接口级明细穿透<i>·</i>单集成基线详情 ＝ 单基线四域构成
+      </span>
+    </div>
+
+    <!-- 左栏：4×4 依赖矩阵热力 + 域中心度排行 -->
+    <div class="mz-col">
+      <section class="mz-panel" style="flex:1;">
+        <div class="mz-panel-head">
+          <h2>依赖矩阵热力 · 4×4（行＝依赖方，列＝被依赖方）</h2>
+          <span class="mz-panel-tag">阻塞接口 Σ <b id="mz-mx-sum">--</b> 个</span>
+        </div>
+        <div class="mz-chart" id="mz-chart-matrix"></div>
+      </section>
+      <section class="mz-panel" style="flex:1;">
+        <div class="mz-panel-head">
+          <h2>域中心度排行 · 出度 / 入度 / 总度数</h2>
+          <span class="mz-panel-tag" id="mz-deg-tag">--</span>
+        </div>
+        <div class="mz-chart" id="mz-chart-degree"></div>
+      </section>
+    </div>
+
+    <!-- 中栏：四域依赖弦图（主视觉）+ 延期传导影响面桑基 -->
+    <div class="mz-col">
+      <section class="mz-panel is-chord">
+        <div class="mz-panel-head">
+          <h2>四域依赖弦图 · 有向弦（弦宽 ∝ 阻塞接口数）</h2>
+          <span class="mz-panel-tag" id="mz-chord-tag">--</span>
+        </div>
+        <div class="mz-chart" id="mz-chart-chord"></div>
+      </section>
+      <section class="mz-panel is-flow">
+        <div class="mz-panel-head">
+          <h2>延期传导影响面 · 一跳 + 两跳</h2>
+          <span class="mz-panel-tag" id="mz-flow-tag">--</span>
+        </div>
+        <div class="mz-chart" id="mz-chart-flow"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：12 条依赖链路清单（写死 448px）+ 环形依赖检测（写死 298px） -->
+    <div class="mz-col">
+      <section class="mz-panel is-ledger">
+        <div class="mz-panel-head">
+          <h2>依赖链路清单 · 12 条有向边</h2>
+          <span class="mz-panel-tag" id="mz-ledger-tag">--</span>
+        </div>
+        <div class="mz-table">
+          <div class="mz-thead">
+            <span>依赖方</span><span></span><span>被依赖</span><span>接口数</span>
+            <span>阻塞数</span><span>阻塞率</span><span>风险</span><span>典型依赖场景</span>
+          </div>
+          <ul class="mz-tbody" id="mz-tbody"></ul>
+        </div>
+      </section>
+      <section class="mz-panel is-cycle">
+        <div class="mz-panel-head">
+          <h2>环形依赖检测 · 双向耦合对</h2>
+          <span class="mz-panel-tag" id="mz-cycle-tag">--</span>
+        </div>
+        <div class="mz-cyc">
+          <div class="mz-chead">
+            <span>域对（无序）</span><span>正向</span><span>反向</span><span>合计耦合度</span><span>失衡</span><span>判定</span>
+          </div>
+          <ul class="mz-clist" id="mz-clist"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部滚动条 -->
+    <div class="mz-foot">
+      <div class="mz-foot-tag">依赖研判</div>
+      <div class="mz-foot-view"><div class="mz-foot-track" id="mz-foot-track"></div></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放（1920x1080 设计稿 → 任意窗口，居中留黑边） ===== */
+  const stage = document.getElementById("mz-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  /* ===== 2. 资源守卫 ===== */
+  const errorNode = document.getElementById("mz-error");
+  if (!window.echarts) { errorNode.classList.add("is-visible"); return; }
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ★ 轮巡门闩必须早于任何 pauseRotate() 调用声明（let 不提升，
+     初始 hash 解析在页面中部就会调用它；见 docs/RndIpdThemed.md §8 批次四「TDZ 陷阱」）。 */
+  let pauseUntil = 0;
+  function pauseRotate(ms) { pauseUntil = Date.now() + ms; }
+
+  /* ===== 3. 系列公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 4. 数据源（模拟 · 期次 2026 年 8 月 · 云麓智联科技 · 四域架构师视角）
+
+     ★ E 型「关系图谱」子页：主角是**边**不是节点——谁依赖谁、耦合多紧、有没有环、延期怎么传导。
+       全仓成品屏首次落地弦图（chord），用 graph 的 circular 布局 + curveness 表达有向弦。
+
+     ★ 与父页 P9「软硬云AI集成协同」严格同源（docs/RndIpdThemed.md §2.2 / §6 P9）：
+       4×4 跨域依赖阻塞热力矩阵逐格一致（对角线 null，Σ = 31 个接口类阻塞），
+       六对联调组合的计划/已联调接口数逐字（Σ 计划 700、Σ 已联调 640、整体 91.4%），
+       上位口径为 §2.2 五类阻塞原因中的「跨域依赖 38 张」——矩阵只统计其中的接口类。
+
+     ★ 三页分工（写进页内口径条，避免与兄弟子页重复）：
+       · 本页 mz「四域依赖图谱」＝ 域与域之间的**关系**：弦图 / 依赖矩阵 / 中心度 / 环检测 / 传导链；
+       · ry「跨域接口台账」＝ 接口**条目级**明细与单条穿透；
+       · jx「单集成基线详情」＝ **单条基线**的四域构成与就绪度。
+
+     ★ 二级拆分（12 条有向边的接口数分配、典型场景、风险分档）为本页自编，
+       但按无序对合并后必须 == 父页六对组合的计划接口数，全部进页尾勾稽自检。
+
+     ★ 循环引用红线（弦图/力导向最易踩）：进 option 的 nodes / links 只放 name 与标量，
+       域与边之间一律用**索引 / 名称字符串**关联，绝不用对象引用回指。 ===== */
+
+  /* 4.1 四域（契约 §2.2 逐字：缺陷按域口径 软件 / 硬件 / 云端 / AI） */
+  const DOMAINS = ["软件", "硬件", "云端", "AI"];
+  const DOM_COLORS = [C.blue, C.amber, C.cyan, C.violet];
+  const DOM_DESC = [
+    "应用与嵌入式软件 · 12 团队中 4 个软件团队",
+    "整机结构 / 电子 / 样机试制 · EVT→PVT",
+    "云平台与发布列车 · SLO 99.95%",
+    "AI 算法与模型迭代 · 五模型五版本线"
+  ];
+
+  /* 4.2 ★ 父页 ct 的 DEP_MATRIX 逐字副本（只读参照，用于「与父页逐格相等」硬校验，勿改） */
+  const PARENT_DEP = [
+    [null, 4, 3, 2],
+    [3, null, 1, 1],
+    [4, 1, null, 3],
+    [2, 3, 4, null]
+  ];
+  /* 4.3 本页依赖矩阵：行 = 依赖方，列 = 被依赖方，格值 = 当前阻塞接口数；对角线置 null（非 0） */
+  const DEP_MATRIX = [
+    /* 依赖方 软件 */ [null, 4, 3, 2],
+    /* 依赖方 硬件 */ [3, null, 1, 1],
+    /* 依赖方 云端 */ [4, 1, null, 3],
+    /* 依赖方 AI  */ [2, 3, 4, null]
+  ];
+  const DEP_SUM_REF = 31;          /* 父页 D.depSum：接口类跨域阻塞合计 */
+  const DEP_CARDS_TOTAL = 38;      /* §2.2 五类阻塞原因中的「跨域依赖」卡数（上位口径） */
+
+  /* 4.4 父页 IF_PAIRS 六对组合逐字（计划 / 已联调），用于「方向拆分按对合并相等」硬校验 */
+  const IF_PAIRS_REF = [
+    { a: "软件", b: "硬件", plan: 150, done: 137 },
+    { a: "软件", b: "云端", plan: 180, done: 165 },
+    { a: "软件", b: "AI",   plan: 120, done: 109 },
+    { a: "硬件", b: "云端", plan: 90,  done: 82 },
+    { a: "硬件", b: "AI",   plan: 60,  done: 55 },
+    { a: "云端", b: "AI",   plan: 100, done: 92 }
+  ];
+
+  /* 4.5 12 条有向依赖边（4×3 全连通）
+         i = 依赖方索引，j = 被依赖方索引；ifn = 该方向的计划接口数（本页二级拆分，
+         按无序对合并 == IF_PAIRS_REF 的 plan）；阻塞数直接取矩阵格值，不另写一份。 */
+  const EDGES = [
+    { i: 0, j: 1, ifn: 90, scene: "驱动 / HAL 随样机改版重出，DVT2 引脚定义未冻结" },
+    { i: 0, j: 2, ifn: 96, scene: "设备接入与影子设备协议待 CLD-3.2.1 发布" },
+    { i: 0, j: 3, ifn: 68, scene: "端侧推理 SDK 依赖 MDL-3.4 算子清单" },
+    { i: 1, j: 0, ifn: 60, scene: "固件构建依赖软件侧 BSP 分支与打包脚本" },
+    { i: 1, j: 2, ifn: 38, scene: "整机遥测字段依赖云端埋点契约" },
+    { i: 1, j: 3, ifn: 26, scene: "NPU 调度策略依赖量化算子基准" },
+    { i: 2, j: 0, ifn: 84, scene: "OTA 分发依赖端侧升级代理版本对齐" },
+    { i: 2, j: 1, ifn: 52, scene: "固件签名链依赖安全芯片密钥烧录" },
+    { i: 2, j: 3, ifn: 56, scene: "模型分发与特征回流依赖模型注册中心接口" },
+    { i: 3, j: 0, ifn: 52, scene: "算子回归依赖端侧采样数据上报接口" },
+    { i: 3, j: 1, ifn: 34, scene: "视觉质检模型依赖新模组标定与镜头参数" },
+    { i: 3, j: 2, ifn: 44, scene: "训练特征回流依赖云端数据湖表结构变更" }
+  ];
+  /* 风险分档阈值（阻塞率 = 阻塞数 ÷ 接口数，现算，不硬编码等级） */
+  const RISK_HI = 5.0, RISK_MID = 3.0;
+  const RISK_NAMES = ["高", "中", "低"];
+  const RISK_BADGE = ["is-r0", "is-r1", "is-r2"];
+  const RISK_COLORS = [C.red, C.amber, C.blueDeep];
+  /* 强耦合阈值：双向合计 ≥ 6 判为「强耦合，需解耦」 */
+  const STRONG_TH = 6;
+
+  /* ===== 5. 派生量（单一数据源派生所有视图；合计一律现算，绝不复制数字） ===== */
+  const D = {};
+
+  /* 5.1 矩阵行和（出度 = 依赖别人）、列和（入度 = 被依赖）、总度数 */
+  D.diagNull = DEP_MATRIX.every((row, i) => row[i] === null);
+  D.rowSum = DEP_MATRIX.map((row, i) => sum(row.map((v, j) => (i === j ? 0 : (v || 0)))));
+  D.colSum = DOMAINS.map((_, j) => sum(DEP_MATRIX.map((row, i) => (i === j ? 0 : (row[j] || 0)))));
+  D.depSum = sum(D.rowSum);
+  D.depColSum = sum(D.colSum);
+  const DEG = DOMAINS.map((d, i) => ({
+    i: i, name: d, out: D.rowSum[i], inn: D.colSum[i], total: D.rowSum[i] + D.colSum[i]
+  }));
+  D.degTotalSum = sum(DEG.map((g) => g.total));
+  /* 被依赖最多域 = 入度最大者（关键路径瓶颈，现算） */
+  D.inMax = Math.max.apply(null, D.colSum);
+  D.hubIdx = D.colSum.indexOf(D.inMax);
+  D.hubUnique = D.colSum.filter((v) => v === D.inMax).length === 1;
+  D.hub = DOMAINS[D.hubIdx];
+  D.hubShare = D.inMax / D.depSum * 100;
+  /* 中心度排行（按总度数降序；纯标量，供条形图用） */
+  D.degRank = DEG.slice().sort((a, b) => b.total - a.total || b.inn - a.inn);
+
+  /* 5.2 12 条边派生：阻塞数取矩阵、阻塞率与风险档现算 */
+  EDGES.forEach((e) => {
+    e.from = DOMAINS[e.i];
+    e.to = DOMAINS[e.j];
+    e.blocked = DEP_MATRIX[e.i][e.j];
+    e.rate = e.blocked / e.ifn * 100;
+    e.risk = e.rate >= RISK_HI ? 0 : (e.rate >= RISK_MID ? 1 : 2);
+  });
+  D.edgeN = EDGES.length;
+  D.edgeIfn = sum(EDGES.map((e) => e.ifn));
+  D.edgeBlocked = sum(EDGES.map((e) => e.blocked));
+  D.riskCnt = RISK_NAMES.map((_, k) => EDGES.filter((e) => e.risk === k).length);
+  D.edgeRank = EDGES.slice().sort((a, b) => b.rate - a.rate);
+  D.worstEdge = D.edgeRank[0];
+  /* 有序对唯一且恰好覆盖全部非对角格（无重复无遗漏，构造性校验） */
+  D.edgeKeys = EDGES.map((e) => e.i + "-" + e.j);
+  D.edgeKeyUniq = (new Set(D.edgeKeys)).size === EDGES.length;
+  D.edgeCoverAll = DOMAINS.every((_, i) => DOMAINS.every((__, j) =>
+    i === j || D.edgeKeys.indexOf(i + "-" + j) >= 0));
+
+  /* 5.3 方向拆分按无序对合并 == 父页六对组合（硬校验用） */
+  const ifnOf = (i, j) => EDGES.filter((e) => e.i === i && e.j === j)[0].ifn;
+  D.pairCheck = IF_PAIRS_REF.map((p) => {
+    const i = DOMAINS.indexOf(p.a), j = DOMAINS.indexOf(p.b);
+    return { name: p.a + "↔" + p.b, plan: p.plan, mine: ifnOf(i, j) + ifnOf(j, i) };
+  });
+  D.ifPlan = sum(IF_PAIRS_REF.map((p) => p.plan));
+  D.ifDone = sum(IF_PAIRS_REF.map((p) => p.done));
+  D.ifRate = D.ifDone / D.ifPlan * 100;
+  D.ifGap = D.ifPlan - D.ifDone;
+
+  /* 5.4 环形依赖检测：枚举全部无序域对，双向都有正权即判定为环（A→B 且 B→A）
+         合计耦合度 = 两向之和（Σ 全部对 == Σ 矩阵 == 31）；失衡 = |两向之差|。 */
+  const CYCLES = [];
+  DOMAINS.forEach((_, i) => DOMAINS.forEach((__, j) => {
+    if (j <= i) return;
+    const ab = DEP_MATRIX[i][j] || 0, ba = DEP_MATRIX[j][i] || 0;
+    if (ab > 0 && ba > 0) {
+      CYCLES.push({
+        i: i, j: j, name: DOMAINS[i] + "↔" + DOMAINS[j],
+        ab: ab, ba: ba, tot: ab + ba, gap: Math.abs(ab - ba),
+        strong: (ab + ba) >= STRONG_TH
+      });
+    }
+  }));
+  CYCLES.sort((a, b) => b.tot - a.tot || a.gap - b.gap);
+  D.pairsAll = DOMAINS.length * (DOMAINS.length - 1) / 2;     /* 6 个无序对 */
+  D.cycleN = CYCLES.length;
+  D.cycleShare = D.cycleN / D.pairsAll * 100;
+  D.strongN = CYCLES.filter((c) => c.strong).length;
+  D.cycleTot = sum(CYCLES.map((c) => c.tot));
+  D.loosest = CYCLES[CYCLES.length - 1];
+
+  /* 5.5 延期传导：依赖边 A→B 表示「A 依赖 B」，故**传导方向与依赖边相反**——
+         B 延期 → 所有依赖 B 的 A 受影响。传导图 T = 依赖图的转置：T[x][a] = M[a][x]。
+         一跳受影响域 = 依赖 x 的域（传导图出边），一跳 Σ 接口 = x 的入度（列和）；
+         两跳 = 把每个一跳域 a 的入边再展开一层，其中回到 x 自身的量恒 == x 的出度（行和）。 */
+  const T = DOMAINS.map((_, x) => DOMAINS.map((__, a) => (x === a ? 0 : (DEP_MATRIX[a][x] || 0))));
+  const CASCADE = DOMAINS.map((_, x) => {
+    const one = [], two = [];
+    DOMAINS.forEach((__, a) => {
+      if (a === x || !T[x][a]) return;
+      one.push({ a: a, w: T[x][a] });
+      DOMAINS.forEach((___, b) => {
+        if (b === a || !T[a][b]) return;
+        two.push({ a: a, b: b, w: T[a][b] });
+      });
+    });
+    const oneSum = sum(one.map((o) => o.w));
+    const twoSum = sum(two.map((o) => o.w));
+    const back = sum(two.filter((o) => o.b === x).map((o) => o.w));
+    return { x: x, one: one, two: two, oneN: one.length, oneSum: oneSum, twoSum: twoSum, back: back };
+  });
+
+  /* 5.6 最长/最重传导链：4 域全排列暴力枚举哈密顿路径（3 跳跨全四域），取权重最大者 */
+  function permute(arr) {
+    if (arr.length <= 1) return [arr.slice()];
+    const out = [];
+    arr.forEach((v, k) => {
+      const rest = arr.slice(0, k).concat(arr.slice(k + 1));
+      permute(rest).forEach((p) => out.push([v].concat(p)));
+    });
+    return out;
+  }
+  D.chainBest = { w: -1, path: [] };
+  D.chainAll = 0;
+  permute([0, 1, 2, 3]).forEach((p) => {
+    let w = 0, ok = true;
+    for (let k = 0; k < p.length - 1; k++) {
+      const v = T[p[k]][p[k + 1]];
+      if (!v) { ok = false; break; }
+      w += v;
+    }
+    if (!ok) return;
+    D.chainAll++;
+    if (w > D.chainBest.w) D.chainBest = { w: w, path: p.slice() };
+  });
+  D.chainHops = D.chainBest.path.length - 1;
+  D.chainText = D.chainBest.path.map((k) => DOMAINS[k]).join(" → ");
+
+  /* ===== 6. 页头与时钟 ===== */
+  const WEEKS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  function tickClock() {
+    const d = new Date();
+    $("mz-clock-time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    $("mz-clock-date").textContent = d.getFullYear() + "年" + pad(d.getMonth() + 1) + "月" + pad(d.getDate()) + "日 " + WEEKS[d.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 500);
+  $("mz-meta-plan").textContent = fmtInt(D.ifPlan);
+  $("mz-meta-done").textContent = fmtInt(D.ifDone);
+  $("mz-meta-rate").textContent = fmtDec(D.ifRate, 1) + "%";
+  $("mz-mx-sum").textContent = fmtInt(D.depSum);
+
+  /* ===== 7. KPI 六格（init 之前填充完毕；数值全部由派生量现算 + 翻牌缓动） ===== */
+  const KPIS = [
+    { k: "依赖域", v: DOMAINS.length, dec: 0, unit: "域", color: C.blue,
+      s: DOMAINS.join(" / ") + " · 契约 §2.2 逐字" },
+    { k: "有向依赖边", v: D.edgeN, dec: 0, unit: "条", color: C.cyan,
+      s: "4×3 全连通 · 对角线 null（不自依赖）" },
+    { k: "Σ 接口阻塞", v: D.depSum, dec: 0, unit: "个", color: C.orange,
+      s: "与父页 4×4 矩阵逐格一致 · 跨域依赖卡 " + DEP_CARDS_TOTAL + " 张中的接口类" },
+    { k: "被依赖最多域", word: D.hub, color: C.red,
+      s: "入度 " + D.inMax + " 个 / Σ" + D.depSum + " = " + fmtDec(D.hubShare, 1) + "% · 关键路径瓶颈" },
+    { k: "双向耦合对", v: D.cycleN, dec: 0, unit: "对", color: C.amber,
+      s: D.cycleN + " / " + D.pairsAll + " = " + fmtDec(D.cycleShare, 0) + "% 成环 · 强耦合 " + D.strongN + " 对（合计≥" + STRONG_TH + "）" },
+    { k: "最长传导链", v: D.chainHops, dec: 0, unit: "跳", color: C.violet,
+      s: D.chainText + " · 权 " + D.chainBest.w + "（最重哈密顿链）" }
+  ];
+  $("mz-kpis").innerHTML = KPIS.map((p, i) => (
+    '<div class="mz-kpi" style="--mz-kc:' + p.color + '">' +
+      '<div class="mz-kpi-k">' + p.k + "</div>" +
+      '<div class="mz-kpi-v">' +
+        (p.word
+          ? '<b class="is-word">' + p.word + "</b>"
+          : '<b id="mz-kpi-' + i + '">0</b><s>' + p.unit + "</s>") +
+      "</div>" +
+      '<div class="mz-kpi-s">' + p.s + "</div>" +
+    "</div>"
+  )).join("");
+  /* 翻牌缓动：easeOutCubic，1.1 秒收敛（KPI 数字在动画中途会是小于目标的过渡值，非 bug） */
+  (function countUp() {
+    const t0 = performance.now(), DUR = 1100;
+    function step(t) {
+      const k = Math.min(1, (t - t0) / DUR);
+      const e = 1 - Math.pow(1 - k, 3);
+      KPIS.forEach((p, i) => {
+        if (p.word) return;
+        const el = $("mz-kpi-" + i);
+        if (el) el.textContent = p.dec ? fmtDec(p.v * e, p.dec) : fmtInt(p.v * e);
+      });
+      if (k < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  })();
+
+  /* ===== 8. 视角 chip（全景 + 四域；hash 契约目标为四域名） ===== */
+  const VIEWS = [{ name: "全景", idx: -1, color: C.blueDeep }].concat(
+    DOMAINS.map((d, i) => ({ name: d, idx: i, color: DOM_COLORS[i] }))
+  );
+  $("mz-dchips").innerHTML = VIEWS.map((v, k) => (
+    '<button class="mz-dchip" type="button" data-k="' + k + '" style="--mz-cc:' + v.color + '">' +
+      "<u>" + v.name + "</u>" +
+      "<i>" + (v.idx < 0 ? "Σ" + D.depSum : "出" + D.rowSum[v.idx] + "·入" + D.colSum[v.idx]) + "</i>" +
+    "</button>"
+  )).join("");
+  const dchips = Array.prototype.slice.call($("mz-dchips").querySelectorAll(".mz-dchip"));
+
+  /* ===== 9. 依赖链路清单（12 条，写死高度；★ 在 echarts.init 之前填充完毕） ===== */
+  const tbody = $("mz-tbody");
+  const rateMax = Math.max.apply(null, EDGES.map((e) => e.rate));
+  function ledgerHtml(focus) {
+    return D.edgeRank.map((e, k) => {
+      const cls = focus < 0 ? "" : (e.i === focus ? " is-out" : (e.j === focus ? " is-in" : ""));
+      const w = Math.max(6, e.rate / rateMax * 100);
+      return '<li class="' + cls.trim() + '" style="animation-delay:' + (k * 16) + 'ms">' +
+        '<span class="mz-dom" style="color:' + DOM_COLORS[e.i] + '">' + e.from + "</span>" +
+        '<span class="mz-arrow">→</span>' +
+        '<span class="mz-dom" style="color:' + DOM_COLORS[e.j] + '">' + e.to + "</span>" +
+        '<span class="mz-num" style="color:#c9d8f8">' + e.ifn + "</span>" +
+        '<span class="mz-num" style="color:' + C.orange + '">' + e.blocked + "</span>" +
+        '<span class="mz-rate"><span class="mz-rate-t"><u style="width:' + fmtDec(w, 1) + "%;background:" + RISK_COLORS[e.risk] + '"></u></span>' +
+          "<em>" + fmtDec(e.rate, 1) + "</em></span>" +
+        '<span class="mz-badge ' + RISK_BADGE[e.risk] + '">' + RISK_NAMES[e.risk] + "</span>" +
+        '<span class="mz-scene">' + e.scene + "</span>" +
+      "</li>";
+    }).join("");
+  }
+  tbody.innerHTML = ledgerHtml(-1);
+  $("mz-ledger-tag").innerHTML = "按阻塞率降序 · 高 <b>" + D.riskCnt[0] + "</b> / 中 <b>" + D.riskCnt[1] +
+    "</b> / 低 <b>" + D.riskCnt[2] + "</b> · Σ 接口 <b>" + fmtInt(D.edgeIfn) + "</b>";
+
+  /* ===== 10. 环形依赖检测清单（写死高度；★ 同样在 init 之前填充完毕） ===== */
+  const clist = $("mz-clist");
+  const cycMax = Math.max.apply(null, CYCLES.map((c) => c.tot));
+  function cycleHtml(focus) {
+    return CYCLES.map((c) => {
+      const on = focus >= 0 && (c.i === focus || c.j === focus);
+      const wa = c.ab / cycMax * 100, wb = c.ba / cycMax * 100;
+      const tag = c.strong ? 0 : (c.tot >= 4 ? 1 : 2);
+      const tagTxt = c.strong ? "强耦合" : (c.tot >= 4 ? "耦合" : "弱耦合");
+      return '<li class="' + (on ? "is-on" : "") + '">' +
+        '<span class="mz-pair"><span style="color:' + DOM_COLORS[c.i] + '">' + DOMAINS[c.i] + "</span>" +
+          "<s>⇄</s><span style=\"color:" + DOM_COLORS[c.j] + '">' + DOMAINS[c.j] + "</span></span>" +
+        '<span class="mz-cnum" style="color:' + DOM_COLORS[c.i] + '">' + c.ab + "</span>" +
+        '<span class="mz-cnum" style="color:' + DOM_COLORS[c.j] + '">' + c.ba + "</span>" +
+        '<span class="mz-cbar"><span class="mz-cbar-t">' +
+          '<u style="width:' + fmtDec(wa, 1) + "%;background:" + DOM_COLORS[c.i] + '"></u>' +
+          '<u style="width:' + fmtDec(wb, 1) + "%;background:" + DOM_COLORS[c.j] + '"></u>' +
+        "</span><em>" + c.tot + "</em></span>" +
+        '<span class="mz-cnum" style="color:' + (c.gap >= 2 ? C.orange : "rgba(127,146,196,.9)") + '">' + c.gap + "</span>" +
+        '<span class="mz-tag is-s' + tag + '">' + tagTxt + "</span>" +
+      "</li>";
+    }).join("");
+  }
+  clist.innerHTML = cycleHtml(-1);
+  $("mz-cycle-tag").innerHTML = "<b>" + D.cycleN + "</b>/" + D.pairsAll + " 对成环 · Σ 耦合度 <b>" +
+    D.cycleTot + "</b> · 最松 " + D.loosest.name + " <b>" + D.loosest.tot + "</b>";
+
+  /* ===== 11. 公共 option 片段 ===== */
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const TIP = {
+    backgroundColor: "rgba(8,18,49,.94)",
+    borderColor: "rgba(96,140,255,.42)",
+    borderWidth: 1,
+    textStyle: { color: C.text, fontSize: 12 },
+    extraCssText: "box-shadow:0 6px 22px rgba(0,0,0,.5);border-radius:8px;"
+  };
+  const makeChart = (id) => echarts.init($(id));
+
+  /* ===== 12. 主视觉：四域依赖弦图（graph + circular 布局 + curveness）
+         ★ 有向依赖：A→B 与 B→A 分开画两条弦，curveness 让它们向相反方向鼓出，互不遮挡；
+           弦宽 ∝ 阻塞接口数（矩阵格值），弦色取**依赖方**域色，箭头指向被依赖方；
+           节点尺寸 ∝ 总度数（出度 + 入度）。
+         ★ nodes / links 全部只放 name 与标量，绝无对象回指（setOption 深拷贝遇环会整页全空）。 ===== */
+  function chordOption(focus) {
+    const nodes = DOMAINS.map((d, i) => {
+      const on = focus < 0 || focus === i;
+      return {
+        name: d,
+        value: DEG[i].total,
+        symbolSize: 30 + DEG[i].total * 1.6,
+        itemStyle: {
+          color: DOM_COLORS[i],
+          opacity: on ? 1 : 0.28,
+          borderColor: focus === i ? "#ffffff" : "rgba(8,18,49,.85)",
+          borderWidth: focus === i ? 3 : 2,
+          shadowBlur: on ? 18 : 0,
+          shadowColor: DOM_COLORS[i]
+        },
+        label: {
+          show: true, position: "inside", color: "#071026",
+          fontSize: 13, fontWeight: 700, formatter: "{b}",
+          opacity: on ? 1 : 0.35
+        }
+      };
+    });
+    const links = EDGES.map((e) => {
+      const on = focus < 0 || e.i === focus || e.j === focus;
+      return {
+        source: e.from,
+        target: e.to,
+        value: e.blocked,
+        lineStyle: {
+          width: 2 + e.blocked * 2.6,
+          color: DOM_COLORS[e.i],
+          opacity: on ? (focus < 0 ? 0.7 : 0.86) : 0.07,
+          curveness: 0.3
+        }
+      };
+    });
+    return {
+      backgroundColor: "transparent",
+      animationDuration: 620,
+      tooltip: Object.assign({}, TIP, {
+        formatter: (p) => {
+          if (p.dataType === "edge") {
+            const e = EDGES.filter((q) => q.from === p.data.source && q.to === p.data.target)[0];
+            return "<b style=\"color:" + DOM_COLORS[e.i] + "\">" + e.from + "</b> 依赖 <b style=\"color:" +
+              DOM_COLORS[e.j] + "\">" + e.to + "</b><br/>阻塞接口 <b style=\"color:" + C.orange + "\">" +
+              e.blocked + "</b> 个 / 计划接口 <b>" + e.ifn + "</b> 条 · 阻塞率 <b>" + fmtDec(e.rate, 1) + "%</b><br/>" +
+              "<span style=\"color:" + C.textDim + "\">" + e.scene + "</span>";
+          }
+          const i = DOMAINS.indexOf(p.name);
+          return "<b style=\"color:" + DOM_COLORS[i] + "\">" + p.name + "</b> · 总度数 <b>" + DEG[i].total + "</b><br/>" +
+            "出度（依赖别人） <b>" + DEG[i].out + "</b> 个 · 入度（被依赖） <b>" + DEG[i].inn + "</b> 个<br/>" +
+            "<span style=\"color:" + C.textDim + "\">" + DOM_DESC[i] + "</span>";
+        }
+      }),
+      series: [{
+        type: "graph",
+        layout: "circular",
+        circular: { rotateLabel: false },
+        center: ["50%", "52%"],
+        radius: "62%",
+        roam: false,
+        draggable: false,
+        edgeSymbol: ["none", "arrow"],
+        edgeSymbolSize: 9,
+        emphasis: { focus: "adjacency", lineStyle: { opacity: 0.95 } },
+        data: nodes,
+        links: links,
+        edgeLabel: {
+          show: true, fontSize: 11, color: "#e6eeff", fontWeight: 700,
+          formatter: (p) => String(p.value)
+        }
+      }]
+    };
+  }
+
+  /* ===== 13. 依赖矩阵热力 4×4（对角线 null 不入 data；命中域的行列描琥珀边）
+         ★ visualMap 分段式设了两端 text，必须显式补 showLabel: true，否则每档 label 被整体吞掉。 ===== */
+  function matrixOption(focus) {
+    const data = [];
+    DEP_MATRIX.forEach((row, i) => row.forEach((v, j) => {
+      if (i === j || v === null) return;                       /* 对角线置 null，不画格子 */
+      const hit = focus >= 0 && (i === focus || j === focus);
+      data.push({
+        value: [j, i, v],                                       /* 纯标量三元组 */
+        itemStyle: hit
+          ? { borderColor: C.amber, borderWidth: 2.4, shadowBlur: 10, shadowColor: "rgba(255,194,77,.55)" }
+          : { borderColor: "rgba(8,18,49,.9)", borderWidth: 1 }
+      });
+    }));
+    return {
+      backgroundColor: "transparent",
+      animationDuration: 500,
+      tooltip: Object.assign({}, TIP, {
+        formatter: (p) => "<b style=\"color:" + DOM_COLORS[p.data.value[1]] + "\">" + DOMAINS[p.data.value[1]] +
+          "</b> 依赖 <b style=\"color:" + DOM_COLORS[p.data.value[0]] + "\">" + DOMAINS[p.data.value[0]] +
+          "</b><br/>阻塞接口 <b style=\"color:" + C.orange + "\">" + p.data.value[2] + "</b> 个 · 占 Σ" +
+          D.depSum + " 的 <b>" + fmtDec(p.data.value[2] / D.depSum * 100, 1) + "%</b>"
+      }),
+      grid: { left: 62, right: 16, top: 44, bottom: 54 },
+      xAxis: {
+        type: "category", data: DOMAINS, position: "top", name: "被依赖方", nameGap: 22,
+        nameTextStyle: { color: C.textDim, fontSize: 11 },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.3)" } },
+        axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 12, fontWeight: 700, color: "#c9d8f8" }),
+        splitArea: { show: true, areaStyle: { color: ["rgba(12,24,60,.28)", "transparent"] } }
+      },
+      yAxis: {
+        type: "category", data: DOMAINS, inverse: true, name: "依赖方", nameGap: 14,
+        nameTextStyle: { color: C.textDim, fontSize: 11, align: "right" },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.3)" } },
+        axisTick: { show: false },
+        axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 12, fontWeight: 700, color: "#c9d8f8" }),
+        splitArea: { show: true, areaStyle: { color: ["rgba(12,24,60,.28)", "transparent"] } }
+      },
+      visualMap: {
+        type: "piecewise", orient: "horizontal", left: "center", bottom: 4,
+        itemWidth: 15, itemHeight: 11, itemGap: 7,
+        textStyle: { color: C.textDim, fontSize: 10.5 },
+        text: ["重", "轻"],
+        showLabel: true,                                        /* ★ 设了 text 必须补，否则每档 label 被吞 */
+        pieces: [
+          { gte: 4, label: "4 个", color: C.red },
+          { value: 3, label: "3 个", color: C.orange },
+          { value: 2, label: "2 个", color: C.amber },
+          { value: 1, label: "1 个", color: C.blueDeep }
+        ]
+      },
+      series: [{
+        type: "heatmap",
+        data: data,
+        label: {
+          show: true, color: "#08122e", fontSize: 15, fontWeight: 700,
+          formatter: (p) => String(p.value[2])
+        },
+        emphasis: { itemStyle: { shadowBlur: 12, shadowColor: "rgba(0,0,0,.55)" } }
+      }]
+    };
+  }
+
+  /* ===== 14. 域中心度排行：出度 + 入度 堆叠 = 总度数（逐域现算） ===== */
+  function degreeOption(focus) {
+    const names = D.degRank.map((g) => g.name);
+    const dim = (g) => (focus < 0 || focus === g.i ? 1 : 0.3);
+    return {
+      backgroundColor: "transparent",
+      animationDuration: 520,
+      tooltip: Object.assign({}, TIP, {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const g = D.degRank[ps[0].dataIndex];
+          return "<b style=\"color:" + DOM_COLORS[g.i] + "\">" + g.name + "</b><br/>" +
+            "出度（依赖别人） <b style=\"color:" + C.blue + "\">" + g.out + "</b> 个<br/>" +
+            "入度（被依赖） <b style=\"color:" + C.violet + "\">" + g.inn + "</b> 个<br/>" +
+            "总度数 <b style=\"color:" + C.amber + "\">" + g.total + "</b> 个" +
+            (g.i === D.hubIdx ? "<br/><span style=\"color:" + C.red + "\">▲ 被依赖最多 · 关键路径瓶颈</span>" : "");
+        }
+      }),
+      legend: {
+        top: 2, right: 4, itemWidth: 12, itemHeight: 9, itemGap: 12,
+        textStyle: { color: C.textDim, fontSize: 11 },
+        data: ["出度（依赖别人）", "入度（被依赖）"]
+      },
+      grid: { left: 52, right: 58, top: 30, bottom: 10, containLabel: false },
+      xAxis: {
+        type: "value", max: Math.ceil(D.degRank[0].total * 1.12),   /* 现算上界，留出右侧 Σ 标签位 */
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: AXIS_LABEL,
+        splitLine: { lineStyle: { color: C.grid } }
+      },
+      yAxis: {
+        type: "category", inverse: true, data: names,
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.3)" } },
+        axisTick: { show: false },
+        axisLabel: {
+          fontSize: 12.5, fontWeight: 700,
+          color: (v) => DOM_COLORS[DOMAINS.indexOf(v)]
+        }
+      },
+      series: [
+        {
+          name: "出度（依赖别人）", type: "bar", stack: "deg", barWidth: 20,
+          itemStyle: { borderRadius: [3, 0, 0, 3] },
+          data: D.degRank.map((g) => ({
+            value: g.out,
+            itemStyle: { color: C.blue, opacity: dim(g) }
+          })),
+          label: { show: true, color: "#071026", fontSize: 11, fontWeight: 700, formatter: "{c}" }
+        },
+        {
+          name: "入度（被依赖）", type: "bar", stack: "deg", barWidth: 20,
+          itemStyle: { borderRadius: [0, 3, 3, 0] },
+          data: D.degRank.map((g) => ({
+            value: g.inn,
+            itemStyle: { color: C.violet, opacity: dim(g) }
+          })),
+          label: { show: true, color: "#0d0620", fontSize: 11, fontWeight: 700, formatter: "{c}" }
+        },
+        {
+          name: "总度数", type: "bar", stack: "deg", barWidth: 20, silent: true,
+          itemStyle: { color: "transparent" },
+          data: D.degRank.map((g) => ({ value: 0.01 })),
+          label: {
+            show: true, position: "right", offset: [6, 0],
+            color: C.amber, fontSize: 12, fontWeight: 700,
+            formatter: (p) => "Σ " + D.degRank[p.dataIndex].total +
+              (D.degRank[p.dataIndex].i === D.hubIdx ? " ▲" : "")
+          }
+        }
+      ]
+    };
+  }
+
+  /* ===== 15. 延期传导影响面（桑基三层：延期源 → 一跳 → 两跳）
+         ★ 层内节点名加后缀保证唯一，桑基本身无环（L0→L1→L2 单向）；
+           两跳里回到自身的那支即「环形依赖的实证」，其量恒 == 该域出度。 ===== */
+  function flowOption(x) {
+    const c = CASCADE[x];
+    const nodes = [], links = [], seen = {};
+    const srcName = DOMAINS[x] + " · 延期源";
+    nodes.push({ name: srcName, itemStyle: { color: DOM_COLORS[x], borderColor: "transparent" } });
+    c.one.forEach((o) => {
+      const n1 = DOMAINS[o.a] + " · 一跳";
+      if (!seen[n1]) { seen[n1] = 1; nodes.push({ name: n1, itemStyle: { color: DOM_COLORS[o.a], borderColor: "transparent" } }); }
+      links.push({ source: srcName, target: n1, value: o.w, lineStyle: { color: DOM_COLORS[x], opacity: 0.42 } });
+    });
+    c.two.forEach((o) => {
+      const n1 = DOMAINS[o.a] + " · 一跳";
+      const n2 = DOMAINS[o.b] + (o.b === x ? " · 两跳回流" : " · 两跳");
+      if (!seen[n2]) { seen[n2] = 1; nodes.push({ name: n2, itemStyle: { color: DOM_COLORS[o.b], borderColor: "transparent" } }); }
+      links.push({ source: n1, target: n2, value: o.w, lineStyle: { color: DOM_COLORS[o.a], opacity: 0.26 } });
+    });
+    return {
+      backgroundColor: "transparent",
+      animationDuration: 560,
+      tooltip: Object.assign({}, TIP, {
+        trigger: "item", triggerOn: "mousemove",
+        formatter: (p) => (p.dataType === "edge"
+          ? p.data.source + " → " + p.data.target + "<br/>受阻接口 <b style=\"color:" + C.orange + "\">" + p.data.value + "</b> 个"
+          : "<b>" + p.name + "</b>")
+      }),
+      series: [{
+        type: "sankey",
+        left: 8, right: 96, top: 12, bottom: 10,
+        nodeWidth: 12, nodeGap: 9,
+        nodeAlign: "left",
+        emphasis: { focus: "adjacency" },
+        lineStyle: { curveness: 0.5 },
+        label: { color: "#c9d8f8", fontSize: 11, fontWeight: 700 },
+        data: nodes,
+        links: links
+      }]
+    };
+  }
+
+  /* ===== 16. hash 契约：父页 P9 的跨域依赖热力（ct-chart-dep）下钻进来，
+         hash 键为**四域名**；图表 name 可能是域名或格子名，故 HASH_ALIAS 同时收
+         「软」「硬」「云」「AI算法」等简写与「软件→硬件」「软件依赖硬件」等格子名（取依赖方）。 ===== */
+  const HASH_ALIAS = {};
+  const alias = (k, v) => { HASH_ALIAS[String(k)] = v; };
+  ["全景", "全部", "ALL", "all", "全量", "四域", "总览"].forEach((k) => alias(k, -1));
+  const SHORT = [
+    ["软件", ["软", "软件域", "软件侧", "应用软件", "嵌入式", "SW", "sw"]],
+    ["硬件", ["硬", "硬件域", "硬件侧", "整机", "HW", "hw"]],
+    ["云端", ["云", "云端域", "云平台", "云服务", "云侧", "CLOUD", "cloud", "Cloud"]],
+    ["AI",   ["AI算法", "ai", "Ai", "AI域", "AI侧", "算法", "AI平台", "模型"]]
+  ];
+  SHORT.forEach((pair, i) => {
+    alias(pair[0], i);
+    alias(pair[0] + "域", i);
+    pair[1].forEach((s) => alias(s, i));
+  });
+  /* 格子名 → 依赖方（父页热力格 tooltip 口径「A 依赖 B」） */
+  DOMAINS.forEach((a, i) => DOMAINS.forEach((b, j) => {
+    if (i === j) return;
+    ["→", "-", "→依赖", "依赖", "↔", "·"].forEach((sep) => alias(a + sep + b, i));
+    alias(a + "依赖" + b, i);
+  }));
+
+  function resolveHash() {
+    let raw = (location.hash || "").replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 非法转义：按原文匹配，不抛错 */ }
+    raw = raw.replace(/[\s　]+/g, "");                        /* trim + 全角空白剔除归一化 */
+    if (!raw) return -2;                                       /* 无 hash：保持全景，不触发定位高亮 */
+    const hit = HASH_ALIAS[raw];
+    return hit === undefined ? -2 : hit;
+  }
+  let hashSuppress = false;
+  function syncHash(f) {
+    const want = f < 0 ? "" : "#" + encodeURIComponent(DOMAINS[f]);
+    const cur = location.hash || "";
+    if (cur === want) return;
+    hashSuppress = true;
+    if (history && history.replaceState) {
+      history.replaceState(null, "", want || (location.pathname + location.search));
+    } else if (want) {
+      location.hash = want;
+    }
+  }
+
+  /* ===== 17. 视角切换：一处改，弦图 / 矩阵 / 中心度 / 桑基 / 两张清单同步重绘 ===== */
+  let focus = -1;
+  let chordChart = null, matrixChart = null, degreeChart = null, flowChart = null;
+
+  function applyFocus(f, pushHash) {
+    focus = f;
+    dchips.forEach((el) => {
+      const k = Number(el.dataset.k);
+      const on = VIEWS[k].idx === f;
+      el.classList.toggle("is-on", on);
+      el.style.background = on ? VIEWS[k].color : "";
+      el.style.borderColor = on ? VIEWS[k].color : "";
+    });
+
+    const cx = f < 0 ? D.hubIdx : f;                            /* 全景时桑基默认取瓶颈域 */
+    const cas = CASCADE[cx];
+
+    $("mz-chip-key").textContent = "图谱视角 · " + (f < 0 ? "全景" : DOMAINS[f]);
+    $("mz-chip-val").textContent = f < 0
+      ? "Σ " + D.depSum + " 个"
+      : "出 " + D.rowSum[f] + " · 入 " + D.colSum[f];
+    $("mz-chord-tag").innerHTML = f < 0
+      ? "12 条有向弦 · Σ 阻塞 <b>" + D.depSum + "</b> 个 · 最重一弦 " + D.worstEdge.from + "→" + D.worstEdge.to +
+        " <b>" + fmtDec(D.worstEdge.rate, 1) + "%</b>"
+      : "高亮 <b>" + DOMAINS[f] + "</b> · 出弦 3 条 <b>" + D.rowSum[f] + "</b> 个 · 入弦 3 条 <b>" + D.colSum[f] + "</b> 个";
+    $("mz-deg-tag").innerHTML = "被依赖最多 <b>" + D.hub + "</b>（入度 " + D.inMax + "）· Σ 总度数 <b>" +
+      D.degTotalSum + "</b> = 2 × " + D.depSum;
+    $("mz-flow-tag").innerHTML = "<b>" + DOMAINS[cx] + "</b> 延期 · 一跳 <b>" + cas.oneN + "</b> 域 / <b>" +
+      cas.oneSum + "</b> 个接口 · 两跳 <b>" + cas.twoSum + "</b> 个（回流 <b>" + cas.back + "</b>）";
+
+    tbody.innerHTML = ledgerHtml(f);
+    clist.innerHTML = cycleHtml(f);
+
+    if (chordChart) chordChart.setOption(chordOption(f), true);
+    if (matrixChart) matrixChart.setOption(matrixOption(f), true);
+    if (degreeChart) degreeChart.setOption(degreeOption(f), true);
+    if (flowChart) flowChart.setOption(flowOption(cx), true);
+    if (pushHash) syncHash(f);
+  }
+
+  dchips.forEach((el) => el.addEventListener("click", () => {
+    applyFocus(VIEWS[Number(el.dataset.k)].idx, true);
+    pauseRotate(20000);
+  }));
+
+  /* hash 定位：命中四域名则高亮该域的全部出入边，闪烁对应 chip，并暂停轮巡 20 秒 */
+  function locateByHash() {
+    const hit = resolveHash();
+    if (hit === -2) { applyFocus(-1, false); return; }
+    applyFocus(hit, false);
+    if (hit >= 0) {
+      const chip = dchips[hit + 1];                             /* 0 号是「全景」 */
+      chip.classList.remove("is-hit");
+      void chip.offsetWidth;                                    /* 重排以重启动画 */
+      chip.classList.add("is-hit");
+    }
+    pauseRotate(20000);
+  }
+  window.addEventListener("hashchange", () => {
+    if (hashSuppress) { hashSuppress = false; return; }
+    locateByHash();
+  });
+
+  /* Esc 返回上级专题页（与 crumb 同效） */
+  const UP_HREF = "大屏样板间-研发软硬云AI集成协同1920.html";
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") location.href = UP_HREF; });
+
+  /* ===== 18. 初始渲染：先把全部 DOM（KPI + chip + 两张清单）填充完，再 init 图表 ===== */
+  applyFocus(-1, false);                                       /* 先立骨架，保证兄弟块填充完毕 */
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  chordChart = makeChart("mz-chart-chord");
+  chordChart.setOption(chordOption(-1));
+  matrixChart = makeChart("mz-chart-matrix");
+  matrixChart.setOption(matrixOption(-1));
+  degreeChart = makeChart("mz-chart-degree");
+  degreeChart.setOption(degreeOption(-1));
+  flowChart = makeChart("mz-chart-flow");
+  flowChart.setOption(flowOption(D.hubIdx));
+
+  /* 图上点击域节点 / 矩阵格 / 中心度条 → 切到该域视角 */
+  chordChart.on("click", (p) => {
+    const i = p.dataType === "node" ? DOMAINS.indexOf(p.name)
+      : (p.dataType === "edge" ? DOMAINS.indexOf(p.data.source) : -1);
+    if (i >= 0) { applyFocus(i, true); pauseRotate(20000); }
+  });
+  matrixChart.on("click", (p) => {
+    const i = p.data && p.data.value ? p.data.value[1] : -1;
+    if (i >= 0) { applyFocus(i, true); pauseRotate(20000); }
+  });
+  degreeChart.on("click", (p) => {
+    const g = D.degRank[p.dataIndex];
+    if (g) { applyFocus(g.i, true); pauseRotate(20000); }
+  });
+
+  /* 初始 hash 解析（父页下钻冷启动路径） */
+  locateByHash();
+
+  /* ===== 19. kiosk 轮巡：全景 → 软件 → 硬件 → 云端 → AI → 全景，3.5 秒一档；
+         hash 定位或手动点选后暂停 20 秒（pauseUntil 门闩，声明早于首次调用） ===== */
+  setInterval(() => {
+    if (Date.now() < pauseUntil) return;
+    applyFocus(focus >= DOMAINS.length - 1 ? -1 : focus + 1, true);
+  }, 3500);
+
+  /* ===== 20. 底部研判滚动条（全部由派生量现算拼串） ===== */
+  const ALERTS = [
+    { lv: "高", c: C.red, t: "被依赖压力集中在 " + D.hub + " 域（入度 " + D.inMax + " / Σ" + D.depSum +
+        " = " + fmtDec(D.hubShare, 1) + "%），该域任一延期将同时波及其余三域 " + CASCADE[D.hubIdx].oneSum + " 个接口" },
+    { lv: "高", c: C.red, t: "阻塞率最高一弦 " + D.worstEdge.from + "→" + D.worstEdge.to + " 达 " +
+        fmtDec(D.worstEdge.rate, 1) + "%（" + D.worstEdge.blocked + "/" + D.worstEdge.ifn + "），共 " +
+        D.riskCnt[0] + " 条边落入高风险档" },
+    { lv: "高", c: C.orange, t: "环形依赖检测：" + D.cycleN + "/" + D.pairsAll + " 个域对全部双向成环，其中 " +
+        D.strongN + " 对合计耦合度 ≥ " + STRONG_TH + " 判为强耦合，建议按对建立接口冻结窗口" },
+    { lv: "中", c: C.amber, t: "最重传导链 " + D.chainText + "（权 " + D.chainBest.w + "，" + D.chainHops +
+        " 跳跨全四域），关键路径排期须按此顺序前压" },
+    { lv: "中", c: C.amber, t: DOMAINS[D.hubIdx] + " 延期两跳影响 " + CASCADE[D.hubIdx].twoSum +
+        " 个接口，其中回流自身 " + CASCADE[D.hubIdx].back + " 个 —— 回流量恒等于该域出度，即环形耦合的实证" },
+    { lv: "低", c: C.blue, t: "耦合最松域对 " + D.loosest.name + " 合计仅 " + D.loosest.tot +
+        " 个阻塞，可作为并行解耦的样板" },
+    { lv: "提示", c: C.cyan, t: "联调接口整体达成 " + fmtDec(D.ifRate, 1) + "%（" + fmtInt(D.ifDone) + " ÷ " +
+        fmtInt(D.ifPlan) + "），待联调 " + D.ifGap + " 条 · 条目级明细见「跨域接口台账」子页" }
+  ];
+  const track = $("mz-foot-track");
+  const alertHtml = ALERTS.map((a) => (
+    '<div class="mz-foot-item"><i style="color:' + a.c + '">[' + a.lv + ']</i><em>' + a.t + "</em></div>"
+  )).join("");
+  track.innerHTML = alertHtml + alertHtml;                      /* 两份首尾相接，滚动无缝 */
+  let footX = 0;
+  const halfW = () => track.scrollWidth / 2;
+  setInterval(() => {
+    footX -= 0.6;
+    if (Math.abs(footX) >= halfW()) footX = 0;
+    track.style.transform = "translateX(" + footX + "px)";
+  }, 16);
+
+  /* ===== 21. 开发期自检：勾稽关系与 option 环检测（不影响页面渲染）
+         ★ 弦图 / 力导向最容易踩循环引用，这里对每个 option 都跑一次 JSON.stringify。 ===== */
+  let optAcyclic = true;
+  try {
+    JSON.stringify(chordOption(-1)); JSON.stringify(chordOption(0));
+    JSON.stringify(matrixOption(-1)); JSON.stringify(matrixOption(2));
+    JSON.stringify(degreeOption(-1)); JSON.stringify(degreeOption(1));
+    DOMAINS.forEach((_, i) => JSON.stringify(flowOption(i)));
+  } catch (e) {
+    optAcyclic = false;
+    console.error("[四域依赖图谱] option 存在循环引用：", e.message);
+  }
+
+  const checks = [
+    ["四域名与契约逐字（软件 / 硬件 / 云端 / AI）",
+      DOMAINS.length === 4 && DOMAINS.join("/") === "软件/硬件/云端/AI"],
+    ["4×4 依赖矩阵与父页逐格相等（16 格逐一比对）",
+      DEP_MATRIX.length === 4 && DEP_MATRIX.every((row, i) =>
+        row.length === 4 && row.every((v, j) => v === PARENT_DEP[i][j]))],
+    ["矩阵对角线全为 null（非 0，不自依赖）",
+      D.diagNull && PARENT_DEP.every((row, i) => row[i] === null)],
+    ["Σ 接口阻塞 = 31：行和 Σ == 列和 Σ == 父页 depSum",
+      D.depSum === DEP_SUM_REF && D.depColSum === DEP_SUM_REF],
+    ["弦图边权与矩阵逐条一致（12 条边 blocked === DEP_MATRIX[i][j]）",
+      EDGES.every((e) => e.blocked === DEP_MATRIX[e.i][e.j] && e.blocked > 0) &&
+      D.edgeBlocked === DEP_SUM_REF],
+    ["12 条依赖链路 = 4×3，有向对唯一、无重复无遗漏",
+      D.edgeN === 12 && D.edgeKeyUniq && D.edgeCoverAll],
+    ["出度 + 入度 = 总度数（逐域）",
+      DEG.every((g) => g.out + g.inn === g.total) &&
+      DEG.every((g, i) => g.out === D.rowSum[i] && g.inn === D.colSum[i])],
+    ["Σ 总度数 = 2 × 31 = 62（每条边被出/入各计一次）",
+      D.degTotalSum === 2 * DEP_SUM_REF],
+    ["被依赖最多域 = 软件（入度 9，唯一最大 → 关键路径瓶颈）",
+      D.hub === "软件" && D.inMax === 9 && D.hubUnique],
+    ["中心度排行按总度数降序（软件 18 / 云端 16 / AI 15 / 硬件 13）",
+      D.degRank.map((g) => g.name).join("/") === "软件/云端/AI/硬件" &&
+      D.degRank.every((g, i) => i === 0 || g.total <= D.degRank[i - 1].total)],
+    ["环检测构造性校验：6 个无序对逐对枚举，双向都 > 0 者判环，共 6 对",
+      D.pairsAll === 6 && D.cycleN === 6 &&
+      CYCLES.every((c) => DEP_MATRIX[c.i][c.j] === c.ab && DEP_MATRIX[c.j][c.i] === c.ba &&
+        c.ab > 0 && c.ba > 0 && c.tot === c.ab + c.ba && c.gap === Math.abs(c.ab - c.ba))],
+    ["Σ 各对合计耦合度 == Σ 矩阵 = 31（无序对合并不丢不重）",
+      D.cycleTot === DEP_SUM_REF],
+    ["强耦合（合计 ≥ 6）恰 3 对：软件↔硬件 / 软件↔云端 / 云端↔AI",
+      D.strongN === 3 &&
+      CYCLES.filter((c) => c.strong).map((c) => c.name).sort().join(",") ===
+        ["软件↔硬件", "软件↔云端", "云端↔AI"].sort().join(",")],
+    ["传导图 T = 依赖图转置（T[x][a] === M[a][x]，逐格）",
+      DOMAINS.every((_, x) => DOMAINS.every((__, a) =>
+        x === a ? T[x][a] === 0 : T[x][a] === (DEP_MATRIX[a][x] || 0)))],
+    ["传导一跳受影响域数 == 该域在传导图中的出边数（逐域 = 3，全连通）",
+      CASCADE.every((c, x) => c.oneN === T[x].filter((v) => v > 0).length && c.oneN === 3)],
+    ["传导一跳 Σ 接口 == 该域入度（被依赖强度，逐域）",
+      CASCADE.every((c, x) => c.oneSum === D.colSum[x])],
+    ["传导两跳回流量 == 该域出度（环形耦合的量化实证，逐域）",
+      CASCADE.every((c, x) => c.back === D.rowSum[x])],
+    ["传导两跳 Σ == Σ 一跳域的入度（逐域）",
+      CASCADE.every((c) => c.twoSum === sum(c.one.map((o) => D.colSum[o.a])))],
+    ["最重传导链 = 硬件→软件→云端→AI，权 12，3 跳覆盖全四域（24 条哈密顿路径暴力枚举）",
+      D.chainAll === 24 && D.chainBest.w === 12 && D.chainHops === 3 &&
+      D.chainText === "硬件 → 软件 → 云端 → AI"],
+    ["12 条方向接口数按无序对合并 == 父页六对组合计划数（逐对）",
+      D.pairCheck.every((p) => p.mine === p.plan)],
+    ["Σ 计划接口 = 700、Σ 已联调 = 640、整体达成 ≈ 91.4%（父页逐字）",
+      D.edgeIfn === 700 && D.ifPlan === 700 && D.ifDone === 640 &&
+      Math.abs(D.ifRate - 91.4) < 0.05],
+    ["风险档由阻塞率现算，高/中/低 = 4/5/3 且 Σ = 12",
+      D.riskCnt.join("/") === "4/5/3" && sum(D.riskCnt) === D.edgeN &&
+      EDGES.every((e) => e.risk === (e.rate >= RISK_HI ? 0 : (e.rate >= RISK_MID ? 1 : 2)))],
+    ["清单按阻塞率降序且 12 行不重不漏",
+      D.edgeRank.length === 12 &&
+      D.edgeRank.every((e, i) => i === 0 || e.rate <= D.edgeRank[i - 1].rate) &&
+      (new Set(D.edgeRank.map((e) => e.i + "-" + e.j))).size === 12],
+    ["桑基节点名唯一、层间单向（无环）、链路值全部 > 0",
+      DOMAINS.every((_, x) => {
+        const o = flowOption(x).series[0];
+        const names = o.data.map((n) => n.name);
+        return (new Set(names)).size === names.length &&
+          o.links.every((l) => l.value > 0 && names.indexOf(l.source) >= 0 && names.indexOf(l.target) >= 0) &&
+          o.links.every((l) => !/延期源$/.test(l.target)) &&
+          o.links.every((l) => !/两跳/.test(l.source));
+      })],
+    ["hash 四域名均可解析（含「软」「硬」「云」「AI算法」简写与格子名）",
+      HASH_ALIAS["软件"] === 0 && HASH_ALIAS["硬件"] === 1 && HASH_ALIAS["云端"] === 2 && HASH_ALIAS["AI"] === 3 &&
+      HASH_ALIAS["软"] === 0 && HASH_ALIAS["硬"] === 1 && HASH_ALIAS["云"] === 2 &&
+      HASH_ALIAS["AI算法"] === 3 && HASH_ALIAS["ai"] === 3 &&
+      HASH_ALIAS["软件→硬件"] === 0 && HASH_ALIAS["云端依赖AI"] === 2 && HASH_ALIAS["全景"] === -1],
+    ["图表 option 无循环引用（弦图 / 矩阵 / 中心度 / 四张桑基逐一 JSON.stringify 环检测）", optAcyclic]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[四域依赖图谱] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

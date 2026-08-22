@@ -1,0 +1,1302 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发单CBB域详情</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --tp-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .tp-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 104px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .tp-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .tp-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .tp-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 8px 8px;
+  }
+  .tp-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .tp-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .tp-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .tp-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .tp-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .tp-crumb em { font-style: normal; color: #d3e2ff; }
+  .tp-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .tp-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .tp-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .tp-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .tp-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .tp-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .tp-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .tp-head-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+  /* 资产域切换器：五大域 tab（← → 方向键 / 14s 自动轮换 / hash 直达） */
+  .tp-switcher { display: grid; grid-template-columns: repeat(3, auto); gap: 5px 6px; }
+  .tp-sw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 92px; padding: 3px 10px 4px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .tp-sw-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; }
+  .tp-sw-tab span { font-size: 9.5px; letter-spacing: 0.04em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .tp-sw-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .tp-sw-tab.is-active {
+    color: #04101f; border-color: transparent;
+    background: linear-gradient(160deg, var(--rnd-blue), var(--rnd-blue-deep));
+    box-shadow: 0 0 16px rgba(92, 157, 255, 0.45);
+  }
+  .tp-sw-tab.is-active span { color: rgba(4, 16, 31, 0.72); }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .tp-chips { display: flex; align-items: center; gap: 9px; }
+  .tp-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 156px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(169, 140, 245, 0.42); background: linear-gradient(160deg, rgba(169, 140, 245, 0.16), rgba(18, 34, 78, 0.6));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .tp-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: #8f7fc4; white-space: nowrap; }
+  .tp-chip b { font-size: 13.5px; font-weight: 700; letter-spacing: 0.05em; color: #cbbcf7; white-space: nowrap; }
+  .tp-chip:hover { border-color: rgba(169, 140, 245, 0.92); box-shadow: 0 0 16px -2px rgba(169, 140, 245, 0.7); }
+  .tp-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 20px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .tp-clock-time { font: 700 26px/1 var(--tp-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .tp-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（整行 6 枚，高度写死） ===== */
+  .tp-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .tp-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 8px 15px;
+  }
+  .tp-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .tp-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .tp-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .tp-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .tp-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .tp-kpi.is-good::after { background: radial-gradient(circle, rgba(111, 224, 154, 0.13), transparent 68%); }
+  .tp-kpi.is-violet::before { background: linear-gradient(90deg, var(--rnd-violet), transparent); }
+  .tp-kpi.is-violet::after { background: radial-gradient(circle, rgba(169, 140, 245, 0.14), transparent 68%); }
+  .tp-kpi-label { font-size: 12.5px; letter-spacing: 0.08em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .tp-kpi-num { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+  .tp-kpi-val { font: 700 29px/1 var(--tp-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .tp-kpi.is-amber .tp-kpi-val { color: #ffd489; }
+  .tp-kpi.is-good .tp-kpi-val { color: #b8f2cf; }
+  .tp-kpi.is-violet .tp-kpi-val { color: #cbbcf7; }
+  .tp-kpi-unit { font-size: 12.5px; color: var(--rnd-text-dim); }
+  .tp-kpi-sub { font-size: 11px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tp-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体 ===== */
+  .tp-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .tp-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .tp-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .tp-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .tp-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .tp-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .tp-panel-tag { font-size: 11.5px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tp-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .tp-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* 复用率色阶图例（静态图例，非数据） */
+  .tp-ramp { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; vertical-align: middle; }
+  .tp-ramp i { font-style: normal; font-size: 10px; color: rgba(127, 146, 196, 0.85); }
+  .tp-ramp u {
+    display: inline-block; width: 76px; height: 7px; border-radius: 4px; text-decoration: none;
+    background: linear-gradient(90deg, #ff5f6b, #ff9d5c, #ffc24d, #6fe09a, #46d6c8);
+  }
+
+  /* ===== 左栏下：待改进组件族（★ 高度写死，DOM 在 init 之前填充） ===== */
+  .tp-weakwrap { flex: none; height: 380px; }
+  .tp-weak { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 8px; overflow: hidden; }
+  .tp-weak li {
+    min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px;
+    padding: 6px 13px; border-radius: 10px;
+    border: 1px solid rgba(96, 140, 255, 0.16); background: linear-gradient(120deg, rgba(20, 38, 92, 0.62), rgba(14, 26, 66, 0.5));
+  }
+  .tp-weak-top { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .tp-weak-name { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: #eaf1ff; white-space: nowrap; }
+  .tp-weak-meta { flex: 1; min-width: 0; font-size: 11px; color: rgba(127, 146, 196, 0.95); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tp-badge {
+    flex: none; padding: 1px 9px 2px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
+    text-decoration: none; border: 1px solid transparent; white-space: nowrap;
+  }
+  .tp-badge.is-doc { color: #ffd489; border-color: rgba(255, 194, 77, 0.5); background: rgba(255, 194, 77, 0.12); }
+  .tp-badge.is-api { color: #ffb59a; border-color: rgba(255, 157, 92, 0.5); background: rgba(255, 157, 92, 0.12); }
+  .tp-badge.is-perf { color: #ff9aa4; border-color: rgba(255, 95, 107, 0.5); background: rgba(255, 95, 107, 0.12); }
+  .tp-badge.is-own { color: #cbbcf7; border-color: rgba(169, 140, 245, 0.5); background: rgba(169, 140, 245, 0.12); }
+  .tp-weak-bar { position: relative; height: 8px; border-radius: 4px; background: rgba(96, 140, 255, 0.16); overflow: hidden; }
+  .tp-weak-bar u { display: block; height: 100%; border-radius: 4px; text-decoration: none; }
+  .tp-weak-bar s { position: absolute; top: -2px; width: 2px; height: 12px; background: rgba(255, 194, 77, 0.9); text-decoration: none; }
+  .tp-weak-foot { display: flex; align-items: baseline; gap: 8px; font-size: 11px; color: #c8d6f2; font-variant-numeric: tabular-nums; min-width: 0; }
+  .tp-weak-foot b { font-weight: 700; color: #ffd489; }
+  .tp-weak-foot em { flex: 1; min-width: 0; font-style: normal; color: rgba(127, 146, 196, 0.95); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 右栏上：Top 复用组件表（CSS grid 模拟表格，★ 高度写死） ===== */
+  .tp-topwrap { flex: none; height: 372px; }
+  .tp-thead, .tp-top li {
+    display: grid; grid-template-columns: 1.5fr 0.72fr 0.62fr 0.62fr 1.02fr; align-items: center; gap: 7px;
+    padding: 0 9px; font-variant-numeric: tabular-nums;
+  }
+  .tp-thead {
+    flex: none; height: 24px; font-size: 11px; letter-spacing: 0.06em; color: rgba(127, 146, 196, 0.95);
+    border-bottom: 1px solid rgba(96, 140, 255, 0.22);
+  }
+  .tp-thead span:nth-child(3), .tp-thead span:nth-child(4) { text-align: right; }
+  .tp-top { flex: 1; min-height: 0; margin: 4px 0 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 3px; overflow: hidden; }
+  .tp-top li { border-radius: 6px; font-size: 12px; color: #c8d6f2; }
+  .tp-top li:nth-child(odd) { background: rgba(96, 140, 255, 0.06); }
+  .tp-top-name { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  .tp-top-name b { font-weight: 700; color: #eaf1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tp-top-name i { flex: none; font-style: normal; font-size: 10px; color: rgba(169, 140, 245, 0.95); }
+  .tp-top-ver { font-size: 11px; color: rgba(127, 146, 196, 0.95); }
+  .tp-top-num { text-align: right; font-weight: 700; color: #9cc2ff; }
+  .tp-top-num.is-use { color: #ffd489; }
+  .tp-top-own { font-size: 11px; color: #b9cdf5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 底部口径滚动条 ===== */
+  .tp-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .tp-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .tp-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: tp-blink 1.6s ease-in-out infinite; }
+  @keyframes tp-blink { 50% { opacity: 0.35; } }
+  .tp-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .tp-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: tp-ticker 68s linear infinite; will-change: transform; }
+  .tp-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .tp-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes tp-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .tp-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="tp-stage" id="tp-stage">
+    <!-- mockflag:begin --><div class="tp-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="tp-error" id="tp-error" role="alert">ECharts 资源加载失败，KPI、Top 复用组件与待改进族清单不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="tp-header">
+      <div class="tp-head-left">
+        <div class="tp-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="tp-crumb-up" href="大屏样板间-研发技术资产与复用1920.html" title="返回上级专题页（Esc）">‹ 返回 技术资产与复用</a><i>›</i>
+          <em id="tp-crumb-obj">--</em>
+        </div>
+        <div class="tp-head-title-row">
+          <div class="tp-head-title" id="tp-title">-- · 单CBB域详情</div>
+          <div class="tp-head-meta">
+            <span>组件 <b id="tp-meta-n">--</b> 个 · 组件族 <b id="tp-meta-fam">--</b> 个</span><i>|</i>
+            <span>复用率 <b id="tp-meta-rate">--</b> · 被复用 <b id="tp-meta-uses">--</b> 次</span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="tp-head-right">
+        <div class="tp-switcher" id="tp-switcher" aria-label="CBB 资产域切换"></div>
+        <div class="tp-chips">
+          <a class="tp-chip" href="大屏样板间-研发开源合规与技术债台账1920.html" title="外购视角：10 个开源组件的许可证合规风险与四类技术债台账"><span>同父页 · 外购视角</span><b>开源合规与技术债 ›</b></a>
+        </div>
+        <div class="tp-clock" aria-label="实时时钟">
+          <span class="tp-clock-time" id="tp-clock-time">--:--:--</span>
+          <span class="tp-clock-date" id="tp-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：组件数 / 复用率 / 被复用次数 / Top 组件复用数 / 节省人月 / 维护责任团队 -->
+    <section class="tp-kpis" aria-label="本域 CBB 核心指标">
+      <div class="tp-kpi">
+        <div class="tp-kpi-label">本域 CBB 组件数</div>
+        <div class="tp-kpi-num"><span class="tp-kpi-val" id="tp-kpi-0">0</span><span class="tp-kpi-unit">个</span></div>
+        <div class="tp-kpi-sub" id="tp-kpi-0s">--</div>
+      </div>
+      <div class="tp-kpi is-good" id="tp-kpi-1box">
+        <div class="tp-kpi-label">本域组件复用率</div>
+        <div class="tp-kpi-num"><span class="tp-kpi-val" id="tp-kpi-1">0</span><span class="tp-kpi-unit">%</span></div>
+        <div class="tp-kpi-sub" id="tp-kpi-1s">--</div>
+      </div>
+      <div class="tp-kpi is-amber">
+        <div class="tp-kpi-label">本域被复用次数</div>
+        <div class="tp-kpi-num"><span class="tp-kpi-val" id="tp-kpi-2">0</span><span class="tp-kpi-unit">次</span></div>
+        <div class="tp-kpi-sub" id="tp-kpi-2s">--</div>
+      </div>
+      <div class="tp-kpi">
+        <div class="tp-kpi-label">Top 组件复用数</div>
+        <div class="tp-kpi-num"><span class="tp-kpi-val" id="tp-kpi-3">0</span><span class="tp-kpi-unit">次</span></div>
+        <div class="tp-kpi-sub" id="tp-kpi-3s">--</div>
+      </div>
+      <div class="tp-kpi is-amber">
+        <div class="tp-kpi-label">复用节省 · 估算</div>
+        <div class="tp-kpi-num"><span class="tp-kpi-val" id="tp-kpi-4">0</span><span class="tp-kpi-unit">人月</span></div>
+        <div class="tp-kpi-sub" id="tp-kpi-4s">--</div>
+      </div>
+      <div class="tp-kpi is-violet">
+        <div class="tp-kpi-label">维护责任团队</div>
+        <div class="tp-kpi-num"><span class="tp-kpi-val" id="tp-kpi-5">0</span><span class="tp-kpi-unit">支</span></div>
+        <div class="tp-kpi-sub" id="tp-kpi-5s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：复用率构成 + 待改进组件族 -->
+    <div class="tp-col">
+      <section class="tp-panel" style="flex: 1;">
+        <div class="tp-panel-head">
+          <h2>复用率构成</h2>
+          <span class="tp-panel-tag" id="tp-tag-ring">--</span>
+        </div>
+        <div class="tp-chart" id="tp-chart-ring"></div>
+      </section>
+      <section class="tp-panel tp-weakwrap">
+        <div class="tp-panel-head">
+          <h2>待改进组件族 · 复用洼地</h2>
+          <span class="tp-panel-tag" id="tp-tag-weak">--</span>
+        </div>
+        <ul class="tp-weak" id="tp-weak"></ul>
+      </section>
+    </div>
+
+    <!-- 中栏：组件族货架（主视觉）+ 复用趋势 -->
+    <div class="tp-col">
+      <section class="tp-panel" style="flex: 1.12;">
+        <div class="tp-panel-head">
+          <h2>本域组件族货架</h2>
+          <span class="tp-panel-tag" id="tp-tag-fams">--
+            <span class="tp-ramp" aria-label="颜色代表组件族复用率"><i>复用率低</i><u></u><i>高</i></span>
+          </span>
+        </div>
+        <div class="tp-chart" id="tp-chart-fams"></div>
+      </section>
+      <section class="tp-panel" style="flex: 0.88;">
+        <div class="tp-panel-head">
+          <h2>复用趋势 · 近 24 月</h2>
+          <span class="tp-panel-tag" id="tp-tag-trend">--</span>
+        </div>
+        <div class="tp-chart" id="tp-chart-trend"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：Top 复用组件 + 复用收益估算 -->
+    <div class="tp-col">
+      <section class="tp-panel tp-topwrap">
+        <div class="tp-panel-head">
+          <h2>Top 复用组件</h2>
+          <span class="tp-panel-tag" id="tp-tag-top">--</span>
+        </div>
+        <div class="tp-thead"><span>组件（所属族）</span><span>版本</span><span>复用项目</span><span>复用次数</span><span>维护责任人</span></div>
+        <ul class="tp-top" id="tp-top"></ul>
+      </section>
+      <section class="tp-panel" style="flex: 1;">
+        <div class="tp-panel-head">
+          <h2>复用收益估算</h2>
+          <span class="tp-panel-tag" id="tp-tag-benefit">--</span>
+        </div>
+        <div class="tp-chart" id="tp-chart-benefit"></div>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条 -->
+    <footer class="tp-foot" aria-label="单CBB域详情口径说明">
+      <div class="tp-foot-label"><span class="tp-foot-dot"></span>复用口径</div>
+      <div class="tp-foot-viewport"><div class="tp-foot-track" id="tp-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("tp-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  /* ===== 1.1 ★ kiosk 状态量前置声明（必须早于任何 hold() 调用） =====
+     let 有暂时性死区：带 hash 冷启动时若先 hold() 再声明，会抛
+     ReferenceError: Cannot access 'holdUntil' before initialization —— 主脚本整段中断，
+     而页面此时已渲染完，肉眼看不出问题（契约 §8 批次四实测坑）。
+     因此 idx / timer / holdUntil / hold() / restart() 全部提到这里，
+     首次 hold() 调用在下方第 11 节（boot 段），行号严格大于本块。 */
+  let idx = 0;
+  let timer = null;
+  let holdUntil = 0;
+  let holdCalls = 0;                                           /* 供页尾自检做构造性断言 */
+  function hold() { holdCalls += 1; holdUntil = Date.now() + 20000; }
+  function restart() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (Date.now() < holdUntil) return; applyDom(idx + 1); }, 14000);
+  }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexMix = (hex, t, to) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v + (to - v) * t);
+    const r = ch(n >> 16), g = ch((n >> 8) & 255), b = ch(n & 255);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
+  const darken = (hex, t) => hexMix(hex, t, 0);
+
+  /* ===== 3. 数据层：单一数据源，五大资产域全部视图由此派生 =====
+     勾稽到契约基准盘（docs/RndIpdThemed.md §2.2）与父页「技术资产与复用」（前缀 ta）CBB 货架：
+     · 五大资产域名与 25 个组件族名、各族组件数 n / 已复用组件数 r / 被复用次数 uses
+       与父页 treemap 数据层**逐字同源**，域名同时是下钻 hash 键（契约 §6 二期锚点）。
+     · Σ n = 216 个组件、Σ r = 136 个已复用组件 → 整体复用率 136 ÷ 216 = 63.0%（契约 §2.2 三重硬校验）。
+     · Σ uses = 1,041 次（父页货架面积口径合计），本页逐域拆到族级与组件级。
+     · 复用收益系数 SAVE_COEF / 单组件维护投入 / 人力投入 12.6 亿 / 研发人员 3,860 人
+       与父页收益口径逐字同源，本页只做**单域**收益的拆解，不重复父页全量结论。
+     · 组件级台账（Top 复用组件）、24 月复用趋势、待改进原因为二级自编，
+       但一律满足「族级 Σ ≤ 族被复用次数」「累计末值 = 域被复用次数」，页尾 checks 硬校验。
+
+     与兄弟子页「研发开源合规与技术债台账」（前缀 sm）的分工：
+       sm 看**外购**——10 个开源组件的许可证合规风险与四类技术债存量；
+       本页看**自研沉淀**——单个 CBB 资产域的复用画像（货架 / 复用率 / Top 组件 / 趋势 / 收益 / 洼地）。
+       两页同挂父页「技术资产与复用」，口径不交叉、数字不重复。 */
+
+  /* 3.1 五大资产域 × 25 个组件族（与父页 ta 逐字同源；名称即 hash 键） */
+  const DOMAINS = [
+    { name: "软件基础库", short: "软件库", color: C.blue,
+      role: "四域共用的语言级与框架级基础能力", team: "软件平台部 · CBB 基础库委员会",
+      newComp: 16, new24: 268,
+      fams: [
+        { name: "网络通信",   n: 14, r: 11, uses: 96 },
+        { name: "数据存储",   n: 12, r: 9,  uses: 78 },
+        { name: "UI与渲染",   n: 13, r: 8,  uses: 62 },
+        { name: "安全与加密", n: 11, r: 8,  uses: 71 },
+        { name: "通用工具",   n: 18, r: 12, uses: 104 }
+      ] },
+    { name: "硬件模块", short: "硬件", color: C.amber,
+      role: "可复用参考设计、模组与结构件", team: "硬件工程部 · 平台化设计组",
+      newComp: 8, new24: 88,
+      fams: [
+        { name: "电源管理",     n: 9,  r: 6, uses: 38 },
+        { name: "无线射频",     n: 8,  r: 5, uses: 31 },
+        { name: "传感器驱动",   n: 10, r: 5, uses: 27 },
+        { name: "结构与散热",   n: 7,  r: 3, uses: 16 },
+        { name: "接口与连接器", n: 8,  r: 5, uses: 29 }
+      ] },
+    { name: "云服务组件", short: "云服务", color: C.cyan,
+      role: "云平台侧中台能力与接入 SDK", team: "云平台部 · 中台能力组",
+      newComp: 13, new24: 172,
+      fams: [
+        { name: "认证与网关", n: 10, r: 8, uses: 74 },
+        { name: "消息与队列", n: 9,  r: 6, uses: 52 },
+        { name: "可观测性",   n: 8,  r: 6, uses: 48 },
+        { name: "设备接入",   n: 11, r: 7, uses: 57 },
+        { name: "计费与配额", n: 8,  r: 4, uses: 26 }
+      ] },
+    { name: "AI模型组件", short: "AI", color: C.violet,
+      role: "端云推理、数据管道与预训练资产", team: "AI 算法部 · 模型工程组",
+      newComp: 12, new24: 92,
+      fams: [
+        { name: "推理引擎",       n: 8, r: 6, uses: 44 },
+        { name: "特征与数据管道", n: 9, r: 5, uses: 33 },
+        { name: "预训练骨干",     n: 7, r: 4, uses: 25 },
+        { name: "端侧量化",       n: 6, r: 3, uses: 18 },
+        { name: "评测与标注",     n: 4, r: 1, uses: 6 }
+      ] },
+    { name: "工具链", short: "工具", color: C.green,
+      role: "研发流程侧的流水线、测试与度量工具", team: "工程效能部 · 工具链组",
+      newComp: 7, new24: 68,
+      fams: [
+        { name: "CI流水线模板", n: 7, r: 5, uses: 41 },
+        { name: "测试脚手架",   n: 6, r: 4, uses: 29 },
+        { name: "代码质量插件", n: 5, r: 2, uses: 14 },
+        { name: "构建与制品",   n: 5, r: 2, uses: 15 },
+        { name: "研发度量埋点", n: 3, r: 1, uses: 7 }
+      ] }
+  ];
+
+  /* 构造性断言用的域名/族级权威串（与父页 ta 数据层逐字对齐） */
+  const DOM_AUTH = "软件基础库;硬件模块;云服务组件;AI模型组件;工具链";
+  const FAM_AUTH =
+    "软件基础库:网络通信|14|11|96,数据存储|12|9|78,UI与渲染|13|8|62,安全与加密|11|8|71,通用工具|18|12|104;" +
+    "硬件模块:电源管理|9|6|38,无线射频|8|5|31,传感器驱动|10|5|27,结构与散热|7|3|16,接口与连接器|8|5|29;" +
+    "云服务组件:认证与网关|10|8|74,消息与队列|9|6|52,可观测性|8|6|48,设备接入|11|7|57,计费与配额|8|4|26;" +
+    "AI模型组件:推理引擎|8|6|44,特征与数据管道|9|5|33,预训练骨干|7|4|25,端侧量化|6|3|18,评测与标注|4|1|6;" +
+    "工具链:CI流水线模板|7|5|41,测试脚手架|6|4|29,代码质量插件|5|2|14,构建与制品|5|2|15,研发度量埋点|3|1|7";
+  const DOM_N_AUTH = [68, 42, 46, 34, 26];                     /* 各域组件数（回父页逐域值） */
+  const DOM_R_AUTH = [48, 24, 31, 19, 14];                     /* 各域已复用组件数 */
+  const DOM_U_AUTH = [411, 141, 257, 126, 106];                /* 各域被复用次数 */
+  const CBB_N = 216;                                           /* 契约 §2.2 CBB 组件总数 */
+  const CBB_R = 136;                                           /* 已复用组件（父页同源） */
+  const CBB_RATE = 63;                                         /* 契约 §2.2 复用率（%） */
+
+  /* 3.2 Top 复用组件台账（每域 9 个具体组件；fam 必须是本域族名，
+         同族组件复用次数之和 ≤ 该族被复用次数 → 逐层 Σ ≤ 域被复用次数） */
+  const TOPS = {
+    "软件基础库": [
+      { name: "lm-utils 基础库",  fam: "通用工具",   ver: "3.8.2", proj: 24, uses: 62, own: "王岚 · 软件平台组" },
+      { name: "lm-net 传输栈",    fam: "网络通信",   ver: "2.6.0", proj: 21, uses: 54, own: "陈序 · 网络中间件组" },
+      { name: "lm-store 本地库",  fam: "数据存储",   ver: "4.1.3", proj: 18, uses: 45, own: "周珂 · 数据存储组" },
+      { name: "lm-crypto 套件",   fam: "安全与加密", ver: "1.9.4", proj: 17, uses: 41, own: "何昀 · 安全工程组" },
+      { name: "lm-ui 控件集",     fam: "UI与渲染",   ver: "5.2.1", proj: 15, uses: 36, own: "林牧 · 终端体验组" },
+      { name: "lm-log 日志框架",  fam: "通用工具",   ver: "2.2.6", proj: 13, uses: 28, own: "王岚 · 软件平台组" },
+      { name: "lm-mqtt 长连接",   fam: "网络通信",   ver: "1.7.0", proj: 11, uses: 25, own: "陈序 · 网络中间件组" },
+      { name: "lm-cache 本地缓存", fam: "数据存储",  ver: "3.0.5", proj: 10, uses: 21, own: "周珂 · 数据存储组" },
+      { name: "lm-chart 图形渲染", fam: "UI与渲染",  ver: "1.4.2", proj: 8,  uses: 17, own: "林牧 · 终端体验组" }
+    ],
+    "硬件模块": [
+      { name: "PMIC 参考设计",   fam: "电源管理",     ver: "R3.2", proj: 11, uses: 24, own: "苏铭 · 电源硬件组" },
+      { name: "2.4G/5G 射频板",  fam: "无线射频",     ver: "R2.5", proj: 9,  uses: 20, own: "顾岩 · 射频与天线组" },
+      { name: "板对板连接器",    fam: "接口与连接器", ver: "R1.8", proj: 9,  uses: 18, own: "邵珉 · 结构互连组" },
+      { name: "多合一环境传感",  fam: "传感器驱动",   ver: "R2.1", proj: 7,  uses: 15, own: "汪清 · 传感器组" },
+      { name: "均热板结构件",    fam: "结构与散热",   ver: "R1.4", proj: 5,  uses: 10, own: "邵珉 · 结构互连组" },
+      { name: "低功耗电源域",    fam: "电源管理",     ver: "R1.6", proj: 5,  uses: 9,  own: "苏铭 · 电源硬件组" },
+      { name: "BLE 射频前端",    fam: "无线射频",     ver: "R1.9", proj: 4,  uses: 8,  own: "顾岩 · 射频与天线组" },
+      { name: "六轴姿态驱动",    fam: "传感器驱动",   ver: "R1.2", proj: 4,  uses: 7,  own: "汪清 · 传感器组" },
+      { name: "Type-C 接口模组", fam: "接口与连接器", ver: "R1.1", proj: 3,  uses: 6,  own: "邵珉 · 结构互连组" }
+    ],
+    "云服务组件": [
+      { name: "统一鉴权网关",   fam: "认证与网关", ver: "3.4.1", proj: 19, uses: 46, own: "孟迪 · 云平台架构组" },
+      { name: "IoT 接入 SDK",   fam: "设备接入",   ver: "2.9.0", proj: 16, uses: 35, own: "卢韬 · 设备接入组" },
+      { name: "设备消息总线",   fam: "消息与队列", ver: "4.0.2", proj: 14, uses: 33, own: "卢韬 · 设备接入组" },
+      { name: "指标与链路追踪", fam: "可观测性",   ver: "2.3.7", proj: 13, uses: 30, own: "岳程 · 可观测性组" },
+      { name: "租户与权限中心", fam: "认证与网关", ver: "2.2.4", proj: 9,  uses: 20, own: "孟迪 · 云平台架构组" },
+      { name: "配额与限流中台", fam: "计费与配额", ver: "1.6.3", proj: 8,  uses: 17, own: "孟迪 · 云平台架构组" },
+      { name: "设备影子服务",   fam: "设备接入",   ver: "1.8.5", proj: 7,  uses: 15, own: "卢韬 · 设备接入组" },
+      { name: "日志聚合管道",   fam: "可观测性",   ver: "3.1.0", proj: 6,  uses: 13, own: "岳程 · 可观测性组" },
+      { name: "延迟队列组件",   fam: "消息与队列", ver: "1.5.2", proj: 6,  uses: 12, own: "卢韬 · 设备接入组" }
+    ],
+    "AI模型组件": [
+      { name: "端云统一推理层", fam: "推理引擎",       ver: "2.4.0", proj: 12, uses: 26, own: "邱野 · AI 平台组" },
+      { name: "特征工程流水线", fam: "特征与数据管道", ver: "1.9.3", proj: 9,  uses: 20, own: "温澈 · 数据智能组" },
+      { name: "视觉骨干 V3",    fam: "预训练骨干",     ver: "3.0.1", proj: 8,  uses: 16, own: "邱野 · AI 平台组" },
+      { name: "INT8 量化工具",  fam: "端侧量化",       ver: "1.5.4", proj: 6,  uses: 12, own: "蒋沐 · 端侧算法组" },
+      { name: "算子融合加速库", fam: "推理引擎",       ver: "1.3.0", proj: 6,  uses: 11, own: "蒋沐 · 端侧算法组" },
+      { name: "样本回流管道",   fam: "特征与数据管道", ver: "1.2.6", proj: 5,  uses: 9,  own: "温澈 · 数据智能组" },
+      { name: "语音骨干 V2",    fam: "预训练骨干",     ver: "2.1.0", proj: 4,  uses: 7,  own: "邱野 · AI 平台组" },
+      { name: "稀疏剪枝工具",   fam: "端侧量化",       ver: "1.0.8", proj: 3,  uses: 5,  own: "蒋沐 · 端侧算法组" },
+      { name: "多模态评测集",   fam: "评测与标注",     ver: "0.9.2", proj: 3,  uses: 4,  own: "温澈 · 数据智能组" }
+    ],
+    "工具链": [
+      { name: "四域通用流水线",   fam: "CI流水线模板", ver: "4.2.0", proj: 12, uses: 26, own: "郝迅 · 工程效能组" },
+      { name: "接口契约测试框架", fam: "测试脚手架",   ver: "2.7.1", proj: 9,  uses: 18, own: "童羽 · 测试架构组" },
+      { name: "制品仓库客户端",   fam: "构建与制品",   ver: "1.6.0", proj: 6,  uses: 10, own: "郝迅 · 工程效能组" },
+      { name: "流水线模板校验",   fam: "CI流水线模板", ver: "1.0.9", proj: 5,  uses: 9,  own: "郝迅 · 工程效能组" },
+      { name: "静态扫描规则集",   fam: "代码质量插件", ver: "3.3.2", proj: 5,  uses: 9,  own: "童羽 · 测试架构组" },
+      { name: "硬件在环测试台",   fam: "测试脚手架",   ver: "1.4.3", proj: 4,  uses: 8,  own: "童羽 · 测试架构组" },
+      { name: "效能数据采集器",   fam: "研发度量埋点", ver: "1.1.4", proj: 3,  uses: 5,  own: "郝迅 · 工程效能组" },
+      { name: "增量构建缓存",     fam: "构建与制品",   ver: "1.2.1", proj: 3,  uses: 4,  own: "郝迅 · 工程效能组" },
+      { name: "提交规范检查器",   fam: "代码质量插件", ver: "2.0.5", proj: 3,  uses: 4,  own: "童羽 · 测试架构组" }
+    ]
+  };
+
+  /* 3.3 组件族的改进原因与建议动作（25 族全覆盖，待改进清单按复用率取用） */
+  const REASONS = {
+    "网络通信":   ["接口不稳", "api", "冻结 v3 接口契约，破坏性变更走双版本并行"],
+    "数据存储":   ["文档缺失", "doc", "补齐迁移指南与容量基线，纳入接入自助文档"],
+    "UI与渲染":   ["性能不达标", "perf", "低端机首帧优化，建立渲染性能门禁"],
+    "安全与加密": ["文档缺失", "doc", "输出合规接入清单与密钥托管示例工程"],
+    "通用工具":   ["无人维护", "own", "拆分僵尸工具类，指定专职 Owner 与退役计划"],
+    "电源管理":   ["文档缺失", "doc", "补充选型手册与热仿真模型，降低复用门槛"],
+    "无线射频":   ["性能不达标", "perf", "重做阻抗匹配基线，统一认证测试用例"],
+    "传感器驱动": ["接口不稳", "api", "抽象统一传感 HAL，屏蔽厂商差异"],
+    "结构与散热": ["无人维护", "own", "结构件库缺 Owner，先冻结现有件并指派责任人"],
+    "接口与连接器": ["文档缺失", "doc", "补齐机械公差与选型对照表"],
+    "认证与网关": ["接口不稳", "api", "网关鉴权协议收敛到一套，废弃旧版签名"],
+    "消息与队列": ["性能不达标", "perf", "高并发下重投递抖动，需压测后重定容量基线"],
+    "可观测性":   ["文档缺失", "doc", "补埋点规范与看板模板，降低接入成本"],
+    "设备接入":   ["接口不稳", "api", "SDK 版本碎片化，统一到 LTS 分支"],
+    "计费与配额": ["无人维护", "own", "长期无 Owner，先做资产盘点再定去留"],
+    "推理引擎":   ["性能不达标", "perf", "端侧算子覆盖不足，补齐后再推广"],
+    "特征与数据管道": ["文档缺失", "doc", "补样例工程与数据契约说明"],
+    "预训练骨干": ["文档缺失", "doc", "补齐权重许可与微调基线说明"],
+    "端侧量化":   ["性能不达标", "perf", "精度损失超标，需重训校准集"],
+    "评测与标注": ["无人维护", "own", "评测集长期未更新，先立责任人再扩样本"],
+    "CI流水线模板": ["文档缺失", "doc", "补模板参数说明与迁移剧本"],
+    "测试脚手架": ["接口不稳", "api", "断言 DSL 频繁变更，需版本化并给迁移工具"],
+    "代码质量插件": ["无人维护", "own", "规则集停更，指派 Owner 并对齐最新语言版本"],
+    "构建与制品": ["性能不达标", "perf", "大仓构建缓存命中低，需重做缓存键"],
+    "研发度量埋点": ["无人维护", "own", "采集器仅一人维护，需补备份 Owner 与文档"]
+  };
+
+  /* 3.4 复用收益估算系数（与父页 ta 逐字同源，非财务决算）
+         节省人月 = 该域被复用次数 × 单次重建等效系数；单次系数 = 重建一套等效能力的平均工作量。 */
+  const SAVE_COEF = { "软件基础库": 2.8, "硬件模块": 4.5, "云服务组件": 3.6, "AI模型组件": 5.2, "工具链": 2.0 };
+  const MAINT_PM_PER_CBB = 2.4;                                /* CBB 单组件年均维护投入（人月） */
+  const LABOR_YI = 12.6;                                       /* 年度人力投入（亿元，契约 §2.2 五类之一） */
+  const HEADCOUNT = 3860;                                      /* 研发人员（契约 §2.2） */
+  const MONTHS_PER_YEAR = 12;
+  const WEAK_TH = CBB_RATE;                                    /* 待改进阈值 = 整体复用率 63% */
+
+  /* 近 24 个月（2024-09 ~ 2026-08），与父页专利/技术债序列同一时间窗 */
+  const MONTHS = [];
+  for (let i = 0; i < 24; i++) {
+    const off = 8 + i;
+    MONTHS.push(String(2024 + Math.floor(off / 12)).slice(2) + "/" + pad(off % 12 + 1));
+  }
+
+  /* ===== 3.5 派生量：全部现算，不复制数字 ===== */
+  /* 最大余数法整数分配：Σ 结果严格等于 total */
+  function allocate(total, weights) {
+    const wsum = sum(weights);
+    const raw = weights.map((w) => total * w / wsum);
+    const base = raw.map(Math.floor);
+    const rest = total - sum(base);
+    const order = raw.map((v, i) => [v - base[i], i]).sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+    for (let k = 0; k < rest; k += 1) base[order[k][1]] += 1;
+    return base;
+  }
+
+  DOMAINS.forEach((d, k) => {
+    d.n = sum(d.fams.map((f) => f.n));
+    d.r = sum(d.fams.map((f) => f.r));
+    d.uses = sum(d.fams.map((f) => f.uses));
+    d.rate = d.r / d.n * 100;
+    d.unused = d.n - d.r;
+    d.fams.forEach((f) => {
+      f.rate = f.r / f.n * 100;
+      f.perComp = f.uses / f.n;                                /* 族内单组件平均被复用次数 */
+    });
+
+    /* Top 组件台账：族归属校验 + 族内合计 */
+    d.tops = TOPS[d.name].slice();
+    d.topUses = sum(d.tops.map((t) => t.uses));
+    d.topProj = sum(d.tops.map((t) => t.proj));
+    d.topByFam = {};
+    d.tops.forEach((t) => { d.topByFam[t.fam] = (d.topByFam[t.fam] || 0) + t.uses; });
+    d.owners = [];
+    d.tops.forEach((t) => { if (d.owners.indexOf(t.own) < 0) d.owners.push(t.own); });
+
+    /* 24 月复用趋势：月度新增复用次数（确定性权重 + 最大余数法），
+       期初存量 = 域被复用次数 − 近 24 月新增 → 累计末值恒等于域被复用次数 */
+    d.useW = MONTHS.map((m, i) => 60 + i * 2.4 + Math.round(Math.sin((i + 1) * (k + 2) * 0.7) * 9));
+    d.useMon = allocate(d.new24, d.useW);
+    d.useOpen = d.uses - d.new24;
+    d.useCum = [];
+    (function () {
+      let acc = d.useOpen;
+      for (let i = 0; i < d.useMon.length; i += 1) { acc += d.useMon[i]; d.useCum.push(acc); }
+    })();
+
+    /* 24 月新增组件（个）：期初组件数 + Σ新增 = 域组件数 */
+    d.compW = MONTHS.map((m, i) => 40 + Math.round(Math.cos((i + 1) * (k + 3) * 0.55) * 14) + (i > 11 ? 8 : 0));
+    d.compMon = allocate(d.newComp, d.compW);
+    d.compOpen = d.n - d.newComp;
+
+    /* 复用收益（估算口径，与父页同源） */
+    d.coef = SAVE_COEF[d.name];
+    d.savePM = d.uses * d.coef;                                /* 毛节省人月 */
+    d.maintPM = d.n * MAINT_PM_PER_CBB;                        /* 本域维护投入人月 */
+    d.netPM = d.savePM - d.maintPM;                            /* 净节省人月 */
+    d.famSavePM = d.fams.map((f) => f.uses * d.coef);          /* 族级节省，Σ = 域毛节省 */
+    d.roi = d.savePM / d.maintPM;
+
+    /* 待改进组件族：低于阈值者优先，不足 3 条按复用率升序补齐到 3 条，最多 5 条 */
+    const asc = d.fams.map((f, j) => j).sort((a, b) => (d.fams[a].rate - d.fams[b].rate) || (a - b));
+    const below = asc.filter((j) => d.fams[j].rate < WEAK_TH);
+    const want = Math.min(5, Math.max(3, below.length));
+    d.weak = asc.slice(0, want);
+    d.belowCnt = below.length;
+  });
+
+  const pmPrice = LABOR_YI * 1e8 / (HEADCOUNT * MONTHS_PER_YEAR);            /* 元 / 人月 */
+  DOMAINS.forEach((d) => { d.netYi = d.netPM * pmPrice / 1e8; d.grossYi = d.savePM * pmPrice / 1e8; });
+
+  const allN = sum(DOMAINS.map((d) => d.n));                                 /* 216 */
+  const allR = sum(DOMAINS.map((d) => d.r));                                 /* 136 */
+  const allUses = sum(DOMAINS.map((d) => d.uses));                           /* 1,041 */
+  const allRate = allR / allN * 100;                                         /* 62.96% ≈ 63% */
+  const allFam = sum(DOMAINS.map((d) => d.fams.length));                     /* 25 */
+  const allSave = sum(DOMAINS.map((d) => d.savePM));
+  const allMaint = sum(DOMAINS.map((d) => d.maintPM));
+
+  /* ===== 4. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("tp-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("tp-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. 资产域切换器（tab 文本 = 父页 treemap 内圈域名 = hash 键，逐字一致） ===== */
+  const switcher = $("tp-switcher");
+  switcher.innerHTML = DOMAINS.map((d, i) => (
+    '<button class="tp-sw-tab" type="button" data-i="' + i + '" title="切换到' + d.name + '（← → 方向键）">' +
+      "<b>" + d.name + "</b><span>" + d.n + " 个 · " + fmtDec(d.rate, 0) + "%</span>" +
+    "</button>"
+  )).join("");
+  const swTabs = Array.from(switcher.querySelectorAll(".tp-sw-tab"));
+
+  /* ===== 6. 非图表区渲染（不依赖 echarts；★ 全部在 echarts.init 之前完成首屏填充） ===== */
+  function countUp(el, target, fmt) {
+    const t0 = performance.now(), dur = 1400;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+
+  function renderKpi(d) {
+    const defs = [
+      { v: d.n, f: (x) => fmtInt(x),
+        sub: "占 CBB 全量 <b>" + fmtDec(d.n / allN * 100, 1) + "%</b>（÷ " + allN + " 个现算）· 组件族 <b>" + d.fams.length + "</b> 个" },
+      { v: d.rate, f: (x) => fmtDec(x, 1),
+        sub: "已复用 <b>" + d.r + "</b> ÷ 组件 <b>" + d.n + "</b> 现算 · 全域基线 " + fmtDec(allRate, 1) + "%" },
+      { v: d.uses, f: (x) => fmtInt(x),
+        sub: "占货架 <b>" + fmtDec(d.uses / allUses * 100, 1) + "%</b>（÷ " + fmtInt(allUses) + " 次）· 均 " + fmtDec(d.uses / d.n, 1) + " 次/组件" },
+      { v: d.topUses, f: (x) => fmtInt(x),
+        sub: "<b>" + d.tops.length + "</b> 个 Top 组件合计 · 占本域 <b>" + fmtDec(d.topUses / d.uses * 100, 1) + "%</b>（≤ 100%）" },
+      { v: d.savePM, f: (x) => fmtDec(x, 1),
+        sub: "被复用 " + fmtInt(d.uses) + " 次 × <b>" + fmtDec(d.coef, 1) + "</b> 人月/次 · 净 <b>" + fmtDec(d.netPM, 1) + "</b> 人月" },
+      { v: d.owners.length, f: (x) => fmtInt(x),
+        sub: d.team.split(" · ")[0] + " · <b>" + d.owners.map((o) => o.split(" · ")[1]).join("／") + "</b>" }
+    ];
+    defs.forEach((def, i) => {
+      countUp($("tp-kpi-" + i), def.v, def.f);
+      $("tp-kpi-" + i + "s").innerHTML = def.sub;
+    });
+    const box = $("tp-kpi-1box");
+    box.classList.toggle("is-good", d.rate >= allRate);
+    box.classList.toggle("is-amber", d.rate < allRate);
+
+    $("tp-tag-ring").innerHTML = "已复用 <b>" + d.r + "</b> + 未复用 <b>" + d.unused + "</b> = <b>" + d.n +
+      "</b> 个 · 外环 = 五族组件数 Σ";
+    $("tp-tag-fams").innerHTML = "长度 = 被复用次数 <b>" + fmtInt(d.uses) + "</b> 次 · 组件 <b>" + d.n +
+      "</b> 个（五族之和）" +
+      '<span class="tp-ramp" aria-label="颜色代表组件族复用率"><i>复用率低</i><u></u><i>高</i></span>';
+    $("tp-tag-trend").innerHTML = "累计末值 <b>" + fmtInt(d.useCum[d.useCum.length - 1]) +
+      "</b> 次 = 本域被复用次数 · 24 月新增组件 <b>" + d.newComp + "</b> 个";
+    $("tp-tag-top").innerHTML = "<b>" + d.tops.length + "</b> 个 · 复用 <b>" + fmtInt(d.topUses) +
+      "</b> 次（占本域 " + fmtDec(d.topUses / d.uses * 100, 1) + "%）";
+    $("tp-tag-benefit").innerHTML = "毛节省 <b>" + fmtDec(d.savePM, 1) + "</b> 人月 − 维护 " + fmtDec(d.maintPM, 1) +
+      " = 净 <b>" + fmtDec(d.netPM, 1) + "</b> 人月（≈ " + fmtDec(d.netYi, 2) + " 亿元）";
+    $("tp-tag-weak").innerHTML = "阈值 <b>" + fmtDec(WEAK_TH, 1) + "%</b> · 低于阈值 <b>" + d.belowCnt +
+      "</b> 族 · 列示 " + d.weak.length + " 族";
+  }
+
+  function renderTop(d) {
+    $("tp-top").innerHTML = d.tops.map((t) => (
+      "<li>" +
+        '<span class="tp-top-name"><b>' + t.name + "</b><i>" + t.fam + "</i></span>" +
+        '<span class="tp-top-ver">' + t.ver + "</span>" +
+        '<span class="tp-top-num">' + t.proj + "</span>" +
+        '<span class="tp-top-num is-use">' + t.uses + "</span>" +
+        '<span class="tp-top-own">' + t.own + "</span>" +
+      "</li>"
+    )).join("");
+  }
+
+  function renderWeak(d) {
+    $("tp-weak").innerHTML = d.weak.map((j) => {
+      const f = d.fams[j];
+      const rs = REASONS[f.name];
+      const low = f.rate < WEAK_TH;
+      return "<li>" +
+        '<span class="tp-weak-top">' +
+          '<span class="tp-weak-name">' + f.name + "</span>" +
+          '<span class="tp-weak-meta">组件 ' + f.n + " 个 · 已复用 " + f.r + " 个 · 被复用 " + f.uses + " 次</span>" +
+          '<u class="tp-badge is-' + rs[1] + '">' + rs[0] + "</u>" +
+        "</span>" +
+        '<span class="tp-weak-bar">' +
+          '<u style="width:' + fmtDec(f.rate, 1) + "%;background:" + rampColorCss(f.rate) + '"></u>' +
+          '<s style="left:' + fmtDec(WEAK_TH, 1) + '%"></s>' +
+        "</span>" +
+        '<span class="tp-weak-foot">复用率 <b>' + fmtDec(f.rate, 1) + "%</b>" +
+          "<span>" + (low ? "低于阈值 " + fmtDec(WEAK_TH, 1) + "%" : "接近阈值 " + fmtDec(WEAK_TH, 1) + "%") + "</span>" +
+          "<em>建议：" + rs[2] + "</em>" +
+        "</span>" +
+      "</li>";
+    }).join("");
+  }
+
+  /* 底部口径滚动（与资产域无关，只建一次；★ 图表 init 之前填充） */
+  (function buildFoot() {
+    const items = [
+      ["契约", C.amber, "CBB 组件 " + allN + " 个、已复用 " + allR + " 个、整体复用率 " +
+        fmtDec(allRate, 1) + "%（契约 §2.2 逐字 63%）；五域组件数 " +
+        DOMAINS.map((d) => d.name + " " + d.n).join(" + ") + " = " + allN + " 个"],
+      ["同源", C.amber, "五大资产域与 " + allFam + " 个组件族的名称、组件数、已复用数、被复用次数与父页「技术资产与复用」CBB 货架 treemap 逐字同源；" +
+        "五域被复用次数 " + DOMAINS.map((d) => d.uses).join(" + ") + " = " + fmtInt(allUses) + " 次（货架面积口径合计）"],
+      ["口径", C.blue, "复用率 = 已复用组件数 ÷ 组件数（组件被源项目之外的项目引用过即计入已复用）；" +
+        "被复用次数 = 跨项目引用调用计数，一个组件被 N 个项目引用记 N 次，与组件数不同量纲"],
+      ["口径", C.blue, "Top 复用组件为组件级二级台账：同族组件复用次数之和 ≤ 该族被复用次数，" +
+        "故 Top 合计恒 ≤ 本域被复用次数；复用趋势累计末值 = 本域被复用次数（期初存量 + 近 24 月新增）"],
+      ["估算", C.violet, "复用收益为**估算口径、非财务决算**：节省人月 = 本域被复用次数 × 单次重建等效系数（" +
+        DOMAINS.map((d) => d.short + " " + fmtDec(d.coef, 1)).join("／") + " 人月·次），" +
+        "扣减 CBB 维护投入（" + fmtDec(MAINT_PM_PER_CBB, 1) + " 人月/组件·年）后为净节省；" +
+        "折算单价 = 人力投入 " + LABOR_YI + " 亿元 ÷（" + fmtInt(HEADCOUNT) + " 人 × 12 月）= " +
+        fmtInt(pmPrice) + " 元/人月——系数与折算口径与父页收益瀑布逐字同源，五域净节省之和即父页结论"],
+      ["改进", C.orange, "待改进组件族 = 复用率低于阈值 " + fmtDec(WEAK_TH, 1) +
+        "%（取整体复用率作阈值）的族，不足 3 族时按复用率升序补齐到 3 族、最多 5 族；" +
+        "原因四分类：文档缺失 / 接口不稳 / 性能不达标 / 无人维护"],
+      ["分工", C.green, "本页看**自研沉淀**——单个 CBB 资产域的复用画像（货架 / 复用率构成 / Top 组件 / 24 月趋势 / 收益 / 洼地）；" +
+        "兄弟子页「研发开源合规与技术债台账」看**外购与欠账**——10 个开源组件的许可证合规风险与四类技术债存量。" +
+        "两页同挂父页「技术资产与复用」，口径不交叉、数字不重复"],
+      ["说明", C.textDim, "全部数据为模拟数据，与任何真实企业无关；页内合计与比率均由单一数据源现算，页尾控制台有逐条勾稽自检"]
+    ];
+    const html = items.map((a) => '<span class="tp-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("tp-foot-track").innerHTML = html + html;                 /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* 复用率 → 颜色的连续色阶（与 .tp-ramp 图例同一组停靠色，与父页 ta 同源） */
+  const RAMP = [
+    { p: 25, c: "#ff5f6b" }, { p: 42, c: "#ff9d5c" }, { p: 58, c: "#ffc24d" },
+    { p: 72, c: "#6fe09a" }, { p: 85, c: "#46d6c8" }
+  ];
+  const hex2rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  function rampColorCss(pct) {
+    if (pct <= RAMP[0].p) return RAMP[0].c;
+    if (pct >= RAMP[RAMP.length - 1].p) return RAMP[RAMP.length - 1].c;
+    for (let i = 1; i < RAMP.length; i++) {
+      if (pct <= RAMP[i].p) {
+        const a = RAMP[i - 1], b = RAMP[i], t = (pct - a.p) / (b.p - a.p);
+        const ca = hex2rgb(a.c), cb = hex2rgb(b.c);
+        return "rgb(" + ca.map((v, k) => Math.round(v + (cb[k] - v) * t)).join(",") + ")";
+      }
+    }
+    return RAMP[RAMP.length - 1].c;
+  }
+
+  /* ===== 7. 静态层整页重绘（不依赖 echarts） ===== */
+  function paintStatic(d) {
+    $("tp-title").textContent = d.name + " · 单CBB域详情";
+    $("tp-crumb-obj").textContent = d.name + " · " + d.role;
+    $("tp-meta-n").textContent = d.n;
+    $("tp-meta-fam").textContent = d.fams.length;
+    $("tp-meta-rate").textContent = fmtDec(d.rate, 1) + "%";
+    $("tp-meta-uses").textContent = fmtInt(d.uses);
+    renderKpi(d);
+    renderTop(d);
+    renderWeak(d);
+  }
+
+  /* hash 契约：decodeURIComponent → trim + 全角空白剔除归一 → 匹配五大域名（父页 treemap 内圈域名） */
+  const HASH_ALIAS = {
+    "软件库": "软件基础库", "软件": "软件基础库", "基础库": "软件基础库", "软件基础": "软件基础库",
+    "硬件": "硬件模块", "硬件模组": "硬件模块", "硬件组件": "硬件模块",
+    "云服务": "云服务组件", "云": "云服务组件", "云组件": "云服务组件", "云平台组件": "云服务组件",
+    "AI": "AI模型组件", "AI组件": "AI模型组件", "AI模型": "AI模型组件", "模型组件": "AI模型组件", "算法组件": "AI模型组件",
+    "工具": "工具链", "工具链组件": "工具链", "工程工具": "工具链"
+  };
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    if (HASH_ALIAS[s]) s = HASH_ALIAS[s];
+    else if (HASH_ALIAS[s.toUpperCase()]) s = HASH_ALIAS[s.toUpperCase()];
+    let k = DOMAINS.findIndex((x) => x.name === s);
+    if (k < 0) k = DOMAINS.findIndex((x) => x.name.toUpperCase() === s.toUpperCase());
+    return k;
+  }
+  const bootHit = resolveHash(location.hash);
+  const bootIdx = bootHit >= 0 ? bootHit : 0;
+  paintStatic(DOMAINS[bootIdx]);                                /* ★ 非图表区先填充，再 init 图表 */
+  swTabs.forEach((b, k) => b.classList.toggle("is-active", k === bootIdx));
+
+  /* ===== 8. 资源守卫（KPI / Top 台账 / 待改进清单已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("tp-error").classList.add("is-visible");
+
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const ringChart = hasEcharts ? echarts.init($("tp-chart-ring")) : null;
+  const famsChart = hasEcharts ? echarts.init($("tp-chart-fams")) : null;
+  const trendChart = hasEcharts ? echarts.init($("tp-chart-trend")) : null;
+  const benefitChart = hasEcharts ? echarts.init($("tp-chart-benefit")) : null;
+
+  /* ===== 9. option 构造（★ 只放标量与数组，DOMAINS / fams / tops 对象一律不进 option，
+         对象之间也不做任何回指——setOption 深拷贝遇循环引用会整页图表全空） ===== */
+
+  /* 9.1 本域组件族货架（主视觉）：横向条，长度 ∝ 被复用次数、色 ∝ 复用率，Σ 组件数 = 本域组件数 */
+  function famsOption(d) {
+    const names = d.fams.map((f) => f.name);
+    const uses = d.fams.map((f) => f.uses);
+    const ns = d.fams.map((f) => f.n);
+    const rs = d.fams.map((f) => f.r);
+    const rates = d.fams.map((f) => f.rate);
+    const per = d.fams.map((f) => f.perComp);
+    const domN = d.n, domUses = d.uses, domName = d.name;
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 154, top: 8, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const j = p.dataIndex;
+          return "<b>" + names[j] + "</b>　<span style=\"color:" + C.textDim + "\">" + domName + "</span><br/>" +
+            "组件 <b style=\"color:" + C.blue + "\">" + ns[j] + "</b> 个 · 已复用 <b style=\"color:" + C.green + "\">" + rs[j] +
+            "</b> 个 · 复用率 <b>" + fmtDec(rates[j], 1) + "%</b><br/>" +
+            "被复用 <b style=\"color:" + C.amber + "\">" + fmtInt(uses[j]) + "</b> 次 · 占本域 <b>" +
+            fmtDec(uses[j] / domUses * 100, 1) + "%</b><br/>" +
+            "族内均 " + fmtDec(per[j], 1) + " 次/组件 · 占本域组件 " + fmtDec(ns[j] / domN * 100, 1) + "%";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max.apply(null, uses) * 1.04 },
+      yAxis: {
+        type: "category", inverse: true, data: names,
+        axisLabel: { color: C.text, fontSize: 12, fontWeight: 700 },
+        axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "bar", barWidth: 22,
+        showBackground: true, backgroundStyle: { color: "rgba(96,140,255,0.08)", borderRadius: 9 },
+        data: uses.map((v, j) => {
+          const col = rampColorCss(rates[j]);
+          return {
+            value: v,
+            itemStyle: {
+              borderRadius: 9,
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                { offset: 0, color: "rgba(20,38,92,0.9)" }, { offset: 1, color: col }])
+            }
+          };
+        }),
+        label: {
+          show: true, position: "right", fontSize: 11.5, fontWeight: 700, color: "#dce8ff",
+          formatter: (p) => {
+            const j = p.dataIndex;
+            return fmtInt(uses[j]) + " 次 · " + ns[j] + " 个 · 复用率 " + fmtDec(rates[j], 0) + "%";
+          }
+        }
+      }]
+    };
+  }
+
+  /* 9.2 复用率构成：内环 已复用 / 未复用（Σ = 本域组件数），外环 五族组件数（Σ = 本域组件数） */
+  function ringOption(d) {
+    const inner = [
+      { value: d.r, name: "已复用", itemStyle: { color: C.green } },
+      { value: d.unused, name: "未复用", itemStyle: { color: "rgba(96,140,255,0.32)" } }
+    ];
+    const outer = d.fams.map((f) => ({
+      value: f.n, name: f.name,
+      itemStyle: { color: rampColorCss(f.rate) }
+    }));
+    const famRate = {};
+    d.fams.forEach((f) => { famRate[f.name] = [f.n, f.r, f.rate, f.uses]; });
+    const domN = d.n, domRate = d.rate;
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          if (p.seriesIndex === 0) {
+            return "<b>" + p.name + "</b><br/>组件 <b>" + fmtInt(p.value) + "</b> 个 · 占本域 " +
+              fmtDec(p.value / domN * 100, 1) + "%<br/>口径：已复用 = 被源项目之外的项目引用过";
+          }
+          const a = famRate[p.name] || [0, 0, 0, 0];
+          return "<b>" + p.name + "</b>　组件族<br/>组件 <b>" + a[0] + "</b> 个 · 已复用 <b>" + a[1] +
+            "</b> 个 · 复用率 <b>" + fmtDec(a[2], 1) + "%</b><br/>被复用 " + fmtInt(a[3]) + " 次";
+        }
+      }, TIP),
+      legend: {
+        bottom: 0, left: "center", itemWidth: 10, itemHeight: 10,
+        data: ["已复用", "未复用"], textStyle: { color: C.textDim, fontSize: 11 }
+      },
+      series: [
+        {
+          name: "复用构成", type: "pie", radius: ["31%", "47%"], center: ["50%", "47%"],
+          itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 2, borderRadius: 3 },
+          label: { show: false }, labelLine: { show: false },
+          data: inner
+        },
+        {
+          name: "组件族", type: "pie", radius: ["55%", "70%"], center: ["50%", "47%"],
+          itemStyle: { borderColor: "rgba(8,18,49,.9)", borderWidth: 2, borderRadius: 3 },
+          label: {
+            show: true, fontSize: 10.5, color: C.text, lineHeight: 14,
+            formatter: (p) => p.name + "\n" + p.value + " 个"
+          },
+          labelLine: { length: 6, length2: 8, lineStyle: { color: "rgba(96,140,255,.4)" } },
+          data: outer
+        },
+        {
+          type: "pie", radius: ["0%", "0%"], center: ["50%", "47%"], silent: true,
+          label: {
+            show: true, position: "center",
+            formatter: fmtDec(domRate, 1) + "%\n复用率",
+            color: "#eaf1ff", fontSize: 20, fontWeight: 700, lineHeight: 22
+          },
+          data: [{ value: 1 }]
+        }
+      ]
+    };
+  }
+
+  /* 9.3 复用趋势：24 月累计被复用次数（线，末值 = 本域被复用次数）+ 月新增组件（柱） */
+  function trendOption(d) {
+    const cum = d.useCum.slice();
+    const mon = d.useMon.slice();
+    const comp = d.compMon.slice();
+    const cmin = Math.min.apply(null, cum), cmax = Math.max.apply(null, cum);
+    const compMax = Math.max.apply(null, comp);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 6, top: 32, bottom: 2, containLabel: true },
+      legend: {
+        top: 0, right: 2, itemWidth: 12, itemHeight: 8,
+        data: ["累计被复用次数", "月新增组件"], textStyle: { color: C.textDim, fontSize: 11 }
+      },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex;
+          return "<b>20" + MONTHS[i] + "</b><br/>累计被复用 <b>" + fmtInt(cum[i]) + "</b> 次（当月新增 " + mon[i] +
+            " 次）<br/>当月新增组件 <b>" + comp[i] + "</b> 个<br/>口径：期初存量 " + fmtInt(d.useOpen) +
+            " 次 + 近 24 月新增 " + fmtInt(d.new24) + " 次";
+        }
+      }, TIP),
+      xAxis: {
+        type: "category", data: MONTHS.slice(),
+        axisLabel: Object.assign({}, AXIS_LABEL, { interval: 2, fontSize: 10 }),
+        axisLine: { lineStyle: { color: C.line } }, axisTick: { show: false }
+      },
+      yAxis: [
+        {
+          type: "value", name: "次", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          min: Math.floor((cmin - (cmax - cmin) * 0.35) / 10) * 10,
+          max: Math.ceil((cmax + (cmax - cmin) * 0.12) / 10) * 10,
+          axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE
+        },
+        {
+          type: "value", name: "个/月", nameTextStyle: { color: C.textDim, fontSize: 10 },
+          min: 0, max: Math.max(2, compMax * 3),
+          axisLabel: AXIS_LABEL, splitLine: { show: false }
+        }
+      ],
+      series: [
+        {
+          name: "月新增组件", type: "bar", barWidth: "52%", yAxisIndex: 1, data: comp,
+          itemStyle: {
+            borderRadius: [3, 3, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "rgba(169,140,245,0.85)" }, { offset: 1, color: "rgba(169,140,245,0.16)" }])
+          }
+        },
+        {
+          name: "累计被复用次数", type: "line", yAxisIndex: 0, data: cum, smooth: true,
+          symbol: "circle", symbolSize: 4,
+          lineStyle: { color: C.amber, width: 2.2 }, itemStyle: { color: C.amber },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "rgba(255,194,77,0.22)" }, { offset: 1, color: "rgba(255,194,77,0)" }])
+          },
+          markPoint: {
+            symbol: "pin", symbolSize: 34,
+            data: [{ coord: [MONTHS.length - 1, cum[cum.length - 1]], value: fmtInt(cum[cum.length - 1]) }],
+            itemStyle: { color: "rgba(255,194,77,0.88)" }, label: { color: "#08122f", fontSize: 10, fontWeight: 700 }
+          }
+        }
+      ]
+    };
+  }
+
+  /* 9.4 复用收益估算瀑布（横向）：五族节省逐级累加 → 扣本域维护投入 → 净节省
+         口径：节省人月 = 被复用次数 × 单次重建等效系数（估算，非财务决算） */
+  function benefitOption(d) {
+    const names = [], base = [], vals = [], kinds = [];
+    let run = 0;
+    d.fams.forEach((f, j) => {
+      names.push(f.name); base.push(run); vals.push(d.famSavePM[j]); kinds.push("up");
+      run += d.famSavePM[j];
+    });
+    names.push("维护投入"); base.push(run - d.maintPM); vals.push(d.maintPM); kinds.push("down");
+    run -= d.maintPM;
+    names.push("净节省"); base.push(0); vals.push(run); kinds.push("net");
+    const usesArr = d.fams.map((f) => f.uses);
+    const coef = d.coef, maint = d.maintPM, nComp = d.n, gross = d.savePM;
+    const price = pmPrice;
+    const colOf = (k) => (k === "down" ? C.red : (k === "net" ? C.amber : C.cyan));
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 4, right: 110, top: 8, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const p = ps[ps.length - 1];
+          const j = p.dataIndex, k = kinds[j];
+          if (k === "up") {
+            return "<b>" + names[j] + "</b><br/>节省 <b>" + fmtDec(vals[j], 1) + "</b> 人月 = 被复用 " +
+              fmtInt(usesArr[j]) + " 次 × " + fmtDec(coef, 1) + " 人月/次<br/>占本域毛节省 " +
+              fmtDec(vals[j] / gross * 100, 1) + "%";
+          }
+          if (k === "down") {
+            return "<b>CBB 维护投入</b><br/>扣减 <b>" + fmtDec(maint, 1) + "</b> 人月 = " + nComp + " 个组件 × " +
+              fmtDec(MAINT_PM_PER_CBB, 1) + " 人月/组件·年";
+          }
+          return "<b>净节省</b><br/><b>" + fmtDec(vals[j], 1) + "</b> 人月 = 毛节省 " + fmtDec(gross, 1) +
+            " − 维护 " + fmtDec(maint, 1) + "<br/>折合 <b>" + fmtDec(vals[j] * price / 1e8, 2) +
+            "</b> 亿元 · 投入产出比 " + fmtDec(gross / maint, 2) + " : 1<br/>口径：估算，非财务决算";
+        }
+      }, TIP),
+      xAxis: { type: "value", show: false, max: Math.max(gross, run) * 1.28 },
+      yAxis: {
+        type: "category", inverse: true, data: names,
+        axisLabel: { color: C.text, fontSize: 11.5 }, axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [
+        {
+          name: "占位", type: "bar", stack: "wf", silent: true,
+          itemStyle: { color: "transparent" }, emphasis: { disabled: true }, data: base
+        },
+        {
+          name: "人月", type: "bar", stack: "wf", barWidth: 17,
+          data: vals.map((v, j) => ({
+            value: v,
+            itemStyle: {
+              borderRadius: 5,
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                { offset: 0, color: darken(colOf(kinds[j]), 0.42) }, { offset: 1, color: colOf(kinds[j]) }])
+            }
+          })),
+          label: {
+            show: true, position: "right", fontSize: 11, fontWeight: 700, color: "#dce8ff",
+            formatter: (p) => (kinds[p.dataIndex] === "down" ? "−" : "") + fmtDec(p.value, 1) + " 人月" +
+              (kinds[p.dataIndex] === "net" ? "（≈ " + fmtDec(p.value * price / 1e8, 2) + " 亿元）" : "")
+          }
+        }
+      ]
+    };
+  }
+
+  /* ===== 10. 资产域切换主流程：整页重绘 ===== */
+  function applyDom(i) {
+    const n = DOMAINS.length;
+    idx = ((i % n) + n) % n;
+    const d = DOMAINS[idx];
+    paintStatic(d);
+    swTabs.forEach((b, k) => b.classList.toggle("is-active", k === idx));
+    if (hasEcharts) {
+      ringChart.setOption(ringOption(d), true);                 /* 分类与轴上限随域变化 → notMerge */
+      famsChart.setOption(famsOption(d), true);
+      trendChart.setOption(trendOption(d), true);
+      benefitChart.setOption(benefitOption(d), true);
+    }
+    /* hash 同步：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    history.replaceState(null, "", "#" + encodeURIComponent(d.name));
+  }
+
+  /* ===== 11. 交互：切换器 / 返回上级 / 键盘 / hash 契约 / kiosk 轮换 =====
+     ★ 本节只做「调用」，kiosk 状态量（idx / timer / holdUntil）与 hold() / restart()
+       已在第 1.1 节声明——声明行号严格小于此处首次 hold() 调用行号（TDZ 防护）。 */
+  const PARENT = "大屏样板间-研发技术资产与复用1920.html";
+
+  swTabs.forEach((b) => b.addEventListener("click", () => { applyDom(Number(b.dataset.i)); restart(); }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyDom(idx - 1); restart(); }
+    else if (e.key === "ArrowRight") { applyDom(idx + 1); restart(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  applyDom(bootIdx);
+  if (bootHit >= 0) hold();                                     /* 父页下钻进来：先保持 20 秒不轮换 */
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== idx) { applyDom(k); restart(); hold(); }
+  });
+
+  /* kiosk 常驻：每 14 秒切下一资产域；鼠标停在切换器上时暂停 */
+  restart();
+  switcher.addEventListener("mouseenter", () => clearInterval(timer));
+  switcher.addEventListener("mouseleave", restart);
+
+  /* ===== 12. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const famAuthNow = DOMAINS.map((d) => d.name + ":" +
+    d.fams.map((f) => [f.name, f.n, f.r, f.uses].join("|")).join(",")).join(";");
+  const checks = [
+    ["五大资产域名与父页 CBB 货架内圈逐字一致（软件基础库/硬件模块/云服务组件/AI模型组件/工具链）",
+      DOMAINS.map((d) => d.name).join(";") === DOM_AUTH],
+    ["25 个组件族名与各族 组件数/已复用数/被复用次数 与父页 treemap 逐字同源（构造性断言）",
+      famAuthNow === FAM_AUTH && allFam === 25 && DOMAINS.every((d) => d.fams.length === 5)],
+    ["各域组件数与父页逐域相等（68/42/46/34/26）",
+      DOMAINS.every((d, i) => d.n === DOM_N_AUTH[i])],
+    ["各域已复用组件数与父页逐域相等（48/24/31/19/14）",
+      DOMAINS.every((d, i) => d.r === DOM_R_AUTH[i])],
+    ["各域被复用次数与父页逐域相等（411/141/257/126/106）",
+      DOMAINS.every((d, i) => d.uses === DOM_U_AUTH[i])],
+    ["★ 三重收敛之一：五域组件数 Σ = 216（契约 §2.2）", allN === CBB_N && allN === 216],
+    ["★ 三重收敛之二：五域已复用组件 Σ = 136", allR === CBB_R && allR === 136],
+    ["★ 三重收敛之三：整体复用率 = 136 ÷ 216 ≈ 63%（现算，容差 0.05pp）",
+      Math.abs(allRate - CBB_RATE) < 0.05],
+    ["各域族级 Σ 组件数 = 该域组件数、Σ 已复用 = 该域已复用、Σ 被复用 = 该域被复用次数",
+      DOMAINS.every((d) => sum(d.fams.map((f) => f.n)) === d.n &&
+        sum(d.fams.map((f) => f.r)) === d.r && sum(d.fams.map((f) => f.uses)) === d.uses)],
+    ["逐族已复用组件数 ≤ 组件数且 ≥ 0；复用率 = r ÷ n × 100 现算",
+      DOMAINS.every((d) => d.fams.every((f) => f.r <= f.n && f.r >= 0 &&
+        Math.abs(f.rate - f.r / f.n * 100) < 1e-9))],
+    ["五域被复用次数 Σ = 1,041 次（父页货架面积口径合计）", allUses === 1041],
+    ["Top 复用组件每域 9 个，所属族均属本域，且同族组件复用次数之和 ≤ 该族被复用次数",
+      DOMAINS.every((d) => d.tops.length === 9 &&
+        d.tops.every((t) => d.fams.some((f) => f.name === t.fam)) &&
+        d.fams.every((f) => (d.topByFam[f.name] || 0) <= f.uses))],
+    ["Top 组件复用数合计 ≤ 该域被复用次数（逐域）",
+      DOMAINS.every((d) => d.topUses === sum(d.tops.map((t) => t.uses)) && d.topUses <= d.uses)],
+    ["复用趋势累计末值 = 该域被复用次数（期初存量 + 近 24 月新增，逐域）",
+      DOMAINS.every((d) => d.useCum.length === 24 && d.useCum[23] === d.uses &&
+        d.useOpen + sum(d.useMon) === d.uses && d.useOpen > 0 && sum(d.useMon) === d.new24)],
+    ["复用趋势累计单调不减，且 24 月新增复用次数逐月 ≥ 0",
+      DOMAINS.every((d) => d.useMon.every((v) => v >= 0) &&
+        d.useCum.every((v, i) => i === 0 || v >= d.useCum[i - 1]))],
+    ["24 月新增组件 Σ = 期末组件数 − 期初组件数（逐域，期初 > 0）",
+      DOMAINS.every((d) => sum(d.compMon) === d.newComp && d.compOpen === d.n - d.newComp && d.compOpen > 0)],
+    ["复用收益：毛节省 = 被复用次数 × 单次系数；族级节省 Σ = 域毛节省；净 = 毛 − 维护（维护 = 组件数 × 2.4）",
+      DOMAINS.every((d) => Math.abs(d.savePM - d.uses * d.coef) < 1e-9 &&
+        Math.abs(sum(d.famSavePM) - d.savePM) < 1e-9 &&
+        Math.abs(d.maintPM - d.n * MAINT_PM_PER_CBB) < 1e-9 &&
+        Math.abs(d.netPM - (d.savePM - d.maintPM)) < 1e-9 && d.netPM > 0)],
+    ["复用收益与父页口径同源：五域毛节省 Σ = 3,577.7 人月、维护投入 Σ = 216 × 2.4 = 518.4 人月",
+      Math.abs(allSave - 3577.7) < 1e-6 && Math.abs(allMaint - CBB_N * MAINT_PM_PER_CBB) < 1e-9],
+    ["折算单价 = 人力投入 12.6 亿 ÷（3,860 人 × 12 月）现算（契约 §2.2 同源）",
+      Math.abs(pmPrice - LABOR_YI * 1e8 / (HEADCOUNT * MONTHS_PER_YEAR)) < 1e-9],
+    ["待改进组件族 3~5 条，按复用率升序，且低于阈值者全部入选（阈值 = 整体复用率 63%）",
+      DOMAINS.every((d) => d.weak.length >= 3 && d.weak.length <= 5 &&
+        d.weak.every((j, q) => q === 0 || d.fams[d.weak[q - 1]].rate <= d.fams[j].rate) &&
+        d.fams.filter((f) => f.rate < WEAK_TH).every((f) => d.weak.some((j) => d.fams[j] === f)))],
+    ["待改进原因四分类齐备，25 个组件族全部有原因与建议动作",
+      DOMAINS.every((d) => d.fams.every((f) => REASONS[f.name] && REASONS[f.name].length === 3 &&
+        ["文档缺失", "接口不稳", "性能不达标", "无人维护"].indexOf(REASONS[f.name][0]) >= 0))],
+    ["hash 五大域名均可解析（构造性断言，含父页 encodeURIComponent 编码路径）",
+      DOMAINS.every((d, i) => resolveHash("#" + encodeURIComponent(d.name)) === i)],
+    ["HASH_ALIAS 简写（软件库/硬件/云服务/AI/工具）均能落到对应域",
+      resolveHash("#软件库") === 0 && resolveHash("#硬件") === 1 && resolveHash("#云服务") === 2 &&
+      resolveHash("#AI") === 3 && resolveHash("#ai") === 3 && resolveHash("#工具") === 4],
+    ["切换器 tab 数 = 5 且文本与父页 treemap 内圈域名逐字（下钻 hash 键）",
+      swTabs.length === DOMAINS.length && swTabs.every((b, i) => b.querySelector("b").textContent === DOMAINS[i].name)],
+    /* ★ TDZ 防护的构造性断言：holdUntil / hold() 声明在第 1.1 节（行号远小于第 11 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 holdCalls ≥ 1」即证明声明早于首次调用。 */
+    ["holdUntil 声明早于首次 hold() 调用（TDZ 防护，构造性断言）",
+      typeof holdUntil === "number" && typeof hold === "function" &&
+      (bootHit < 0 ? holdCalls === 0 : (holdCalls >= 1 && holdUntil > Date.now()))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[单CBB域详情] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>

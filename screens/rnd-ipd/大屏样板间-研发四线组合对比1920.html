@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏样板间 · 研发四线组合对比</title>
+<style>
+  :root {
+  /* rndpalette:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+    --rnd-bg: #050a1c;
+    --rnd-stage: #081231;
+    --rnd-panel: rgba(18,34,78,.55);
+    --rnd-line: rgba(96,140,255,.22);
+    --rnd-blue: #5c9dff;
+    --rnd-blue-deep: #2f6fd6;
+    --rnd-cyan: #46d6c8;
+    --rnd-green: #6fe09a;
+    --rnd-orange: #ff9d5c;
+    --rnd-amber: #ffc24d;
+    --rnd-red: #ff5f6b;
+    --rnd-violet: #a98cf5;
+    --rnd-text: #dce8ff;
+    --rnd-text-dim: #7f92c4;
+  /* rndpalette:end */
+    --zc-mono: "Bahnschrift", "DIN Alternate", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--rnd-bg); }
+  body { color: var(--rnd-text); font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif; }
+
+  /* ===== 1920x1080 固定设计舞台 + 整体 scale 适配 ===== */
+  .zc-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(92, 157, 255, 0.10), transparent 44%),
+      radial-gradient(circle at 88% 6%, rgba(255, 194, 77, 0.07), transparent 46%),
+      radial-gradient(ellipse at 50% 118%, rgba(20, 38, 96, 0.42), transparent 56%),
+      linear-gradient(rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96, 140, 255, 0.045) 1px, transparent 1px),
+      var(--rnd-stage);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    display: grid;
+    grid-template-columns: 452px 1fr 452px;
+    grid-template-rows: 84px 96px 1fr 46px;
+    gap: 14px;
+    padding: 12px 18px 16px;
+  }
+
+  .zc-error {
+    display: none; position: absolute; z-index: 30; left: 50%; top: 96px; transform: translateX(-50%);
+    padding: 14px 22px; border-radius: 12px;
+    border: 1px solid rgba(255, 122, 122, 0.5); background: rgba(96, 26, 38, 0.85);
+    color: #ffd9d9; font-size: 15px;
+  }
+  .zc-error.is-visible { display: block; }
+
+  /* ===== 顶栏（正中留空给 mockflag 工具注入） ===== */
+  .zc-header {
+    grid-column: 1 / -1; position: relative;
+    display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 8px 8px;
+  }
+  .zc-header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 194, 77, 0.55) 16%, rgba(92, 157, 255, 0.9) 50%, rgba(255, 194, 77, 0.55) 84%, transparent);
+    box-shadow: 0 0 14px rgba(92, 157, 255, 0.35);
+  }
+  .zc-head-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .zc-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.1em; color: var(--rnd-text-dim); }
+  .zc-crumb b { font-weight: 400; color: var(--rnd-blue); }
+  .zc-crumb i { font-style: normal; color: rgba(127, 146, 196, 0.55); }
+  .zc-crumb em { font-style: normal; color: #d3e2ff; }
+  .zc-crumb-up {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 7px;
+    text-decoration: none; color: #a9c4f5; font-size: 12.5px; letter-spacing: 0.06em;
+    border: 1px solid rgba(92, 157, 255, 0.4); background: rgba(24, 44, 104, 0.45);
+    transition: color .18s, border-color .18s, box-shadow .18s;
+  }
+  .zc-crumb-up:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.85); box-shadow: 0 0 14px rgba(92, 157, 255, 0.32); }
+  .zc-head-title-row { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
+  .zc-head-title {
+    font-size: 30px; font-weight: 700; letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 26%, #9cc2ff 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgba(92, 157, 255, 0.35));
+  }
+  .zc-head-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--rnd-text-dim); letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
+  .zc-head-meta b { font-weight: 400; color: #9cc2ff; }
+  .zc-head-meta i { font-style: normal; color: rgba(127, 146, 196, 0.4); }
+
+  .zc-head-right { display: flex; align-items: center; gap: 14px; flex: none; }
+
+  /* 四线聚焦条：C 型只做「高亮」不做「切换」——四条线始终同屏，点击已选项取消聚焦 */
+  .zc-lines { display: flex; align-items: center; gap: 6px; }
+  .zc-line-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 92px; padding: 3px 9px 4px; border-radius: 8px; cursor: pointer; user-select: none;
+    font-family: inherit; color: #a9c4f5;
+    border: 1px solid rgba(92, 157, 255, 0.3); background: rgba(14, 26, 66, 0.5);
+    transition: color .18s, border-color .18s, box-shadow .18s, background .18s;
+  }
+  .zc-line-tab b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; }
+  .zc-line-tab span { font-size: 9.5px; letter-spacing: 0.03em; color: rgba(127, 146, 196, 0.9); font-variant-numeric: tabular-nums; }
+  .zc-line-tab u { display: block; width: 100%; height: 3px; border-radius: 2px; margin-top: 2px; }
+  .zc-line-tab:hover { color: #eaf1ff; border-color: rgba(92, 157, 255, 0.62); }
+  .zc-line-tab.is-active { color: #eaf1ff; border-color: rgba(255, 194, 77, 0.85); background: rgba(52, 40, 14, 0.5); box-shadow: 0 0 16px rgba(255, 194, 77, 0.32); }
+  .zc-line-tab.is-active span { color: #ffd489; }
+
+  /* chips 紧邻 clock（subnav / carousel 注入锚点依赖此结构） */
+  .zc-chips { display: flex; align-items: center; gap: 9px; }
+  .zc-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 146px; padding: 7px 14px; border-radius: 9px; text-decoration: none;
+    border: 1px solid rgba(169, 140, 245, 0.42); background: linear-gradient(160deg, rgba(169, 140, 245, 0.16), rgba(18, 34, 78, 0.6));
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .zc-chip span { font-size: 10.5px; letter-spacing: 0.16em; color: #8f7fc4; white-space: nowrap; }
+  .zc-chip b { font-size: 14px; font-weight: 700; letter-spacing: 0.05em; color: #cbbcf7; white-space: nowrap; }
+  .zc-chip:hover { border-color: rgba(169, 140, 245, 0.92); box-shadow: 0 0 16px -2px rgba(169, 140, 245, 0.7); }
+  .zc-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; padding-left: 18px; border-left: 1px solid rgba(96, 140, 255, 0.25); }
+  .zc-clock-time { font: 700 26px/1 var(--zc-mono); color: #eaf1ff; letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(92, 157, 255, 0.4); }
+  .zc-clock-date { font-size: 12px; color: var(--rnd-text-dim); letter-spacing: 0.08em; }
+
+  /* ===== KPI 条（整行 6 枚，行高写死 96px） ===== */
+  .zc-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .zc-kpi {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 8px 16px;
+  }
+  .zc-kpi::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 3px; background: linear-gradient(90deg, var(--rnd-blue), transparent); }
+  .zc-kpi::after {
+    content: ""; position: absolute; right: -30px; bottom: -46px; width: 122px; height: 122px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92, 157, 255, 0.12), transparent 68%);
+  }
+  .zc-kpi.is-amber::before { background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .zc-kpi.is-amber::after { background: radial-gradient(circle, rgba(255, 194, 77, 0.14), transparent 68%); }
+  .zc-kpi.is-good::before { background: linear-gradient(90deg, var(--rnd-green), transparent); }
+  .zc-kpi.is-good::after { background: radial-gradient(circle, rgba(111, 224, 154, 0.13), transparent 68%); }
+  .zc-kpi.is-warn::before { background: linear-gradient(90deg, var(--rnd-orange), transparent); }
+  .zc-kpi.is-warn::after { background: radial-gradient(circle, rgba(255, 157, 92, 0.14), transparent 68%); }
+  .zc-kpi-label { font-size: 12px; letter-spacing: 0.07em; color: var(--rnd-text-dim); white-space: nowrap; }
+  .zc-kpi-num { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  .zc-kpi-val { font: 700 28px/1 var(--zc-mono); color: #eaf1ff; letter-spacing: 0.02em; }
+  .zc-kpi.is-amber .zc-kpi-val { color: #ffd489; }
+  .zc-kpi.is-good .zc-kpi-val { color: #b8f2cf; }
+  .zc-kpi.is-warn .zc-kpi-val { color: #ffc0a2; }
+  .zc-kpi-unit { font-size: 12px; color: var(--rnd-text-dim); }
+  .zc-kpi-sub { font-size: 10.5px; color: rgba(127, 146, 196, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zc-kpi-sub b { font-weight: 700; color: #b9cdf5; }
+
+  /* ===== 三栏主体 ===== */
+  .zc-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+  .zc-panel {
+    position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 10px 14px 12px; overflow: hidden;
+  }
+  .zc-panel::before {
+    content: ""; position: absolute; left: 14px; top: -1px; width: 62px; height: 2px;
+    background: linear-gradient(90deg, var(--rnd-blue), transparent);
+  }
+  .zc-panel.is-hero::before { width: 108px; background: linear-gradient(90deg, var(--rnd-amber), transparent); }
+  .zc-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex: none; margin-bottom: 6px; }
+  .zc-panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.08em; color: #d6e2fa; white-space: nowrap; }
+  .zc-panel-head h2::before { content: "▎"; color: var(--rnd-blue); margin-right: 2px; }
+  .zc-panel.is-hero .zc-panel-head h2::before { color: var(--rnd-amber); }
+  .zc-panel-tag { font-size: 11.5px; letter-spacing: 0.05em; color: rgba(127, 146, 196, 0.85); white-space: nowrap; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+  .zc-panel-tag b { font-weight: 700; color: var(--rnd-amber); }
+  .zc-chart { flex: 1; min-height: 0; width: 100%; }
+
+  /* ===== 左栏下：此消彼长洞察（★ 高度写死，DOM 在 echarts.init 之前填充完） ===== */
+  .zc-inswrap { flex: none; height: 296px; }
+  .zc-ins { flex: 1; min-height: 0; margin: 2px 0 0; padding: 0; list-style: none; display: grid; grid-auto-rows: 1fr; gap: 6px; overflow: hidden; }
+  .zc-ins li {
+    min-height: 0; display: grid; grid-template-columns: 46px 1fr; align-items: start; gap: 9px;
+    padding: 6px 10px; border-radius: 9px; overflow: hidden;
+    border: 1px solid rgba(96, 140, 255, 0.16); background: linear-gradient(120deg, rgba(20, 38, 92, 0.62), rgba(14, 26, 66, 0.5));
+  }
+  .zc-ins-tag {
+    display: inline-block; text-align: center; padding: 2px 0 3px; border-radius: 6px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; color: #0b1630;
+  }
+  .zc-ins-txt { font-size: 11px; line-height: 1.42; color: #c8d6f2; }
+  .zc-ins-txt b { font-weight: 700; color: #eaf1ff; }
+  .zc-ins-txt em { font-style: normal; font-weight: 700; color: #ffd489; }
+
+  /* ===== 底部口径滚动条 ===== */
+  .zc-foot {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--rnd-line); border-radius: 12px; background: var(--rnd-panel);
+    padding: 0 16px; overflow: hidden;
+  }
+  .zc-foot-label {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; color: #9cc2ff;
+    padding-right: 16px; border-right: 1px solid rgba(96, 140, 255, 0.25);
+  }
+  .zc-foot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rnd-blue); box-shadow: 0 0 8px rgba(92, 157, 255, 0.9); animation: zc-blink 1.6s ease-in-out infinite; }
+  @keyframes zc-blink { 50% { opacity: 0.35; } }
+  .zc-foot-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .zc-foot-track { display: inline-flex; gap: 54px; white-space: nowrap; animation: zc-ticker 78s linear infinite; will-change: transform; }
+  .zc-foot-item { display: inline-flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: #bcd0ef; font-variant-numeric: tabular-nums; }
+  .zc-foot-item i { font-style: normal; font-size: 11.5px; font-weight: 700; }
+  @keyframes zc-ticker { to { transform: translateX(-50%); } }
+  /* mockflag:begin —— 由 tools/inject_mock_flag.py 注入，勿手改 */
+  .zc-mockflag {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000;
+    padding: 3px 20px 4px; border-radius: 0 0 10px 10px; pointer-events: none;
+    background: linear-gradient(180deg, #f2ab42, #de8524); color: #24130a;
+    font-size: 13px; line-height: 1.15; font-weight: 700;
+    letter-spacing: 0.3em; text-indent: 0.3em; white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  }
+  /* mockflag:end */
+</style>
+</head>
+<body>
+  <div class="zc-stage" id="zc-stage">
+    <!-- mockflag:begin --><div class="zc-mockflag" role="note" aria-label="本页为模拟数据">模拟数据</div><!-- mockflag:end -->
+    <div class="zc-error" id="zc-error" role="alert">ECharts 资源加载失败，KPI、洞察结论与口径说明不受影响，图表区请联网后重新打开此文件。</div>
+
+    <!-- 顶栏（正中留空给 mockflag 工具注入，勿放内容；chips 紧邻 clock） -->
+    <header class="zc-header">
+      <div class="zc-head-left">
+        <div class="zc-crumb">
+          <b>云麓智联科技</b><i>›</i>
+          <a class="zc-crumb-up" href="大屏样板间-研发产品组合与路标1920.html" title="返回上级专题页（Esc）">‹ 返回 产品组合与路标</a><i>›</i>
+          <em id="zc-crumb-obj">四线横向 PK · 未聚焦</em>
+        </div>
+        <div class="zc-head-title-row">
+          <div class="zc-head-title">四产品线组合对比</div>
+          <div class="zc-head-meta">
+            <span>对比维度 <b>8</b> 维 · 产品线 <b>4</b> 条</span><i>|</i>
+            <span>刷选 <b id="zc-meta-brush">全部 4 条</b></span><i>|</i>
+            <span>期次 <b>2026 年 8 月</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="zc-head-right">
+        <div class="zc-lines" id="zc-lines" aria-label="四产品线聚焦（点击高亮，再点取消；← → 移动）"></div>
+        <div class="zc-chips">
+          <a class="zc-chip" id="zc-chip-dl" href="大屏样板间-研发单产品线路标详情1920.html" title="切到单线 360 度视角：单产品线路标详情"><span>兄弟页 · 单线视角</span><b>单产品线路标详情 ›</b></a>
+        </div>
+        <div class="zc-clock" aria-label="实时时钟">
+          <span class="zc-clock-time" id="zc-clock-time">--:--:--</span>
+          <span class="zc-clock-date" id="zc-clock-date">----年--月--日 星期-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 条：产品线数 / Σ在研 / Σ投入 / 综合得分首位 / ROI 最高 / 投入产出最错位 -->
+    <section class="zc-kpis" aria-label="组合对比核心指标">
+      <div class="zc-kpi">
+        <div class="zc-kpi-label">对比产品线</div>
+        <div class="zc-kpi-num"><span class="zc-kpi-val" id="zc-kpi-0">0</span><span class="zc-kpi-unit">条</span></div>
+        <div class="zc-kpi-sub" id="zc-kpi-0s">--</div>
+      </div>
+      <div class="zc-kpi">
+        <div class="zc-kpi-label">Σ 在研项目</div>
+        <div class="zc-kpi-num"><span class="zc-kpi-val" id="zc-kpi-1">0</span><span class="zc-kpi-unit">个</span></div>
+        <div class="zc-kpi-sub" id="zc-kpi-1s">--</div>
+      </div>
+      <div class="zc-kpi is-amber">
+        <div class="zc-kpi-label">Σ 年度研发投入</div>
+        <div class="zc-kpi-num"><span class="zc-kpi-val" id="zc-kpi-2">0</span><span class="zc-kpi-unit">亿元</span></div>
+        <div class="zc-kpi-sub" id="zc-kpi-2s">--</div>
+      </div>
+      <div class="zc-kpi is-good">
+        <div class="zc-kpi-label">综合得分首位线</div>
+        <div class="zc-kpi-num"><span class="zc-kpi-val" id="zc-kpi-3">0</span><span class="zc-kpi-unit">分</span></div>
+        <div class="zc-kpi-sub" id="zc-kpi-3s">--</div>
+      </div>
+      <div class="zc-kpi is-good">
+        <div class="zc-kpi-label">ROI 最高产品线</div>
+        <div class="zc-kpi-num"><span class="zc-kpi-val" id="zc-kpi-4">0</span><span class="zc-kpi-unit">倍</span></div>
+        <div class="zc-kpi-sub" id="zc-kpi-4s">--</div>
+      </div>
+      <div class="zc-kpi is-warn">
+        <div class="zc-kpi-label">投入产出最错位</div>
+        <div class="zc-kpi-num"><span class="zc-kpi-val" id="zc-kpi-5">0</span><span class="zc-kpi-unit">位</span></div>
+        <div class="zc-kpi-sub" id="zc-kpi-5s">--</div>
+      </div>
+    </section>
+
+    <!-- 左栏：组合矩阵（BCG 风格四象限） + 此消彼长洞察 -->
+    <div class="zc-col">
+      <section class="zc-panel" style="flex: 1;">
+        <div class="zc-panel-head">
+          <h2>组合矩阵 · 吸引力×可行性</h2>
+          <span class="zc-panel-tag">气泡 = 年度投入 · Σ <b id="zc-tag-quad">--</b> 亿</span>
+        </div>
+        <div class="zc-chart" id="zc-chart-quad"></div>
+      </section>
+      <section class="zc-panel zc-inswrap">
+        <div class="zc-panel-head">
+          <h2>此消彼长 · 对比洞察</h2>
+          <span class="zc-panel-tag">由排名矩阵现算 · <b id="zc-tag-ins">--</b> 条</span>
+        </div>
+        <ul class="zc-ins" id="zc-ins"></ul>
+      </section>
+    </div>
+
+    <!-- 中栏：★ 主视觉 四线 × 8 维平行坐标 + 多指标排名矩阵 -->
+    <div class="zc-col">
+      <section class="zc-panel is-hero" style="flex: 1.34;">
+        <div class="zc-panel-head">
+          <h2>四线 × 8 维平行坐标</h2>
+          <span class="zc-panel-tag">轴名 ↑ = 正向（大者优）· ◈ = 规模维（大≠优）· 拖动轴段可刷选</span>
+        </div>
+        <div class="zc-chart" id="zc-chart-pc"></div>
+      </section>
+      <section class="zc-panel" style="flex: 1;">
+        <div class="zc-panel-head">
+          <h2>多指标排名矩阵 · 4 线 × 8 指标</h2>
+          <span class="zc-panel-tag">每列为 1~4 名的一个排列 · 每列位次和 <b id="zc-tag-rank">--</b></span>
+        </div>
+        <div class="zc-chart" id="zc-chart-rank"></div>
+      </section>
+    </div>
+
+    <!-- 右栏：健康度雷达叠加 + 投入产出对比 + 资源占用对比 -->
+    <div class="zc-col">
+      <section class="zc-panel" style="flex: 1;">
+        <div class="zc-panel-head">
+          <h2>组合健康度雷达叠加</h2>
+          <span class="zc-panel-tag">六维相对分 · 组内归一映射 <b>20~100</b></span>
+        </div>
+        <div class="zc-chart" id="zc-chart-radar"></div>
+      </section>
+      <section class="zc-panel" style="flex: 1;">
+        <div class="zc-panel-head">
+          <h2>投入产出对比 · ROI</h2>
+          <span class="zc-panel-tag">ROI = 营收 ÷ 投入 现算 · 综合 <b id="zc-tag-roi">--</b></span>
+        </div>
+        <div class="zc-chart" id="zc-chart-roi"></div>
+      </section>
+      <section class="zc-panel" style="flex: 1;">
+        <div class="zc-panel-head">
+          <h2>资源占用对比</h2>
+          <span class="zc-panel-tag">人力 Σ <b id="zc-tag-hc">--</b> 人 · 项目 Σ <b id="zc-tag-proj">--</b> 个</span>
+        </div>
+        <div class="zc-chart" id="zc-chart-res"></div>
+      </section>
+    </div>
+
+    <!-- 底部：口径滚动条（含本页与兄弟页 dl / ch 的分工说明） -->
+    <footer class="zc-foot" aria-label="四线组合对比口径说明">
+      <div class="zc-foot-label"><span class="zc-foot-dot"></span>对比口径</div>
+      <div class="zc-foot-viewport"><div class="zc-foot-track" id="zc-foot-track"></div></div>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 1. 舞台等比缩放 ===== */
+  const stage = document.getElementById("zc-stage");
+  function fitStage() {
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  fitStage();
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const fmtDec = (n, dec) => Number(n).toFixed(dec == null ? 1 : dec);
+  const fmtInt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const argmax = (arr) => arr.reduce((best, v, i) => (v > arr[best] ? i : best), 0);
+  const argmin = (arr) => arr.reduce((best, v, i) => (v < arr[best] ? i : best), 0);
+
+  /* ===== 1.1 ★ kiosk 状态量前置声明（必须早于任何 pauseRotate() 调用） =====
+     let 有暂时性死区：带 hash 冷启动时若先 pauseRotate() 再声明，会抛
+     ReferenceError: Cannot access 'pauseUntil' before initialization —— 主脚本整段中断，
+     而页面此时已渲染完，肉眼看不出问题（契约 §8 批次四实测坑）。
+     因此 focusIdx / timer / pauseUntil / pauseRotate() / restartRotate() 全部提到这里，
+     首次 pauseRotate() 调用在下方第 12 节（boot 段），行号严格大于本块。 */
+  let focusIdx = -1;                                           /* −1 = 未聚焦（四条线同权全亮） */
+  let timer = null;
+  let pauseUntil = 0;
+  let pauseCalls = 0;                                          /* 供页尾自检做构造性断言 */
+  function pauseRotate(ms) { pauseCalls += 1; pauseUntil = Date.now() + (ms || 20000); }
+  function restartRotate() {
+    clearInterval(timer);
+    timer = setInterval(function () {
+      if (Date.now() < pauseUntil) return;
+      applyFocus((focusIdx + 1) % LINES.length, true);         /* 逐线轮巡高亮，4 秒一线 */
+    }, 4000);
+  }
+
+  /* ===== 2. 公共色板（--rnd-* 的 JS 镜像，ECharts option 里读不到 CSS 变量） ===== */
+  /* rndpalette-js:begin —— 由 tools/sync_rnd_palette.py 注入，勿手改 */
+  const PAL = {
+    bg: "#050a1c",
+    stage: "#081231",
+    panel: "rgba(18,34,78,.55)",
+    line: "rgba(96,140,255,.22)",
+    blue: "#5c9dff",
+    "blue-deep": "#2f6fd6",
+    cyan: "#46d6c8",
+    green: "#6fe09a",
+    orange: "#ff9d5c",
+    amber: "#ffc24d",
+    red: "#ff5f6b",
+    violet: "#a98cf5",
+    text: "#dce8ff",
+    "text-dim": "#7f92c4",
+    series: ["#5c9dff", "#ffc24d", "#46d6c8", "#6fe09a", "#a98cf5", "#ff9d5c"]
+  };
+  /* rndpalette-js:end */
+  /* 便利别名层（手写，不在同步块内）：驼峰访问 + 常用衍生色 */
+  const C = Object.assign({}, PAL, {
+    blueDeep: PAL["blue-deep"],
+    textDim: PAL["text-dim"],
+    grid: "rgba(96,140,255,.13)"
+  });
+  const hexA = (hex, a) => {
+    const n = parseInt(hex.slice(1), 16);
+    return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+  };
+
+  /* ===== 3. 数据层：单一数据源，四条产品线全部视图由此派生 =====
+     契约勾稽（docs/RndIpdThemed.md §2.2 四产品线一级拆分，逐字）：
+     · 在研项目   智家终端 15 + 云平台服务 12 + AIoT模组 11 + 行业方案 10 = 48 个
+     · 年度投入   智家终端 6.8 + 云平台服务 5.9 + AIoT模组 4.6 + 行业方案 4.1 = 21.4 亿元
+     · 四线人力   与父页「产品组合与路标」资源 treemap 逐字：1,420 + 1,010 + 780 + 650 = 3,860 人
+     · 四象限坐标 市场吸引力 / 技术可行性 与父页「组合四象限」逐点相等，分割线同为 70
+     二级自编（Σ 或口径由页尾 checks 硬校验）：
+     · 回报系数 ROI_K 与兄弟页「单产品线路标详情」的 ROI_K 逐字同源（2.9 / 2.4 / 2.1 / 2.6）
+     · 年营收贡献 = 年度投入 × 回报系数；增长率、毛利率为自编经营口径。 */
+
+  /* 3.1 四条产品线主表（名/在研/投入/吸引力/可行性/健康度 = 契约与父页逐字；growth/margin 为二级自编） */
+  const LINES = [
+    { name: "智家终端",   short: "智家终端", active: 15, inv: 6.8, attract: 86, feas: 74, health: 92, growth: 18.5, margin: 32.6 },
+    { name: "云平台服务", short: "云平台服务", active: 12, inv: 5.9, attract: 78, feas: 82, health: 88, growth: 26.4, margin: 58.4 },
+    { name: "AIoT模组",   short: "AIoT模组", active: 11, inv: 4.6, attract: 62, feas: 79, health: 76, growth: 31.2, margin: 41.2 },
+    { name: "行业方案",   short: "行业方案", active: 10, inv: 4.1, attract: 74, feas: 58, health: 84, growth: 14.8, margin: 46.5 }
+  ];
+  const LINE_COL = [C.series[0], C.series[1], C.series[2], C.series[3]];
+  const QUAD_SPLIT = 70;                                       /* 四象限分割线（与父页逐字） */
+  const PROJ_ALL = 48;                                         /* 契约 §2.2 在研项目 */
+  const INV_ALL = 21.4;                                        /* 契约 §2.2 年度研发投入（亿元） */
+  const PEOPLE_ALL = 3860;                                     /* 契约 §2.2 研发人员 */
+
+  /* 构造性断言基线串（契约 §2.2 / §6 逐字） */
+  const LINE_AUTH = "智家终端|15|6.8;云平台服务|12|5.9;AIoT模组|11|4.6;行业方案|10|4.1";
+  const QUAD_AUTH = "智家终端|86|74;云平台服务|78|82;AIoT模组|62|79;行业方案|74|58";   /* 父页组合四象限逐点 */
+
+  /* 3.2 四线人力二级拆分（与父页资源 treemap 逐字，线内职能构成 Σ = 线合计，四线 Σ = 3,860） */
+  const MANPOWER = [
+    { line: "智家终端",   kids: [["硬件", 520], ["软件", 480], ["测试", 260], ["PM与管理", 160]] },
+    { line: "云平台服务", kids: [["软件", 430], ["云平台", 340], ["测试", 150], ["PM与管理", 90]] },
+    { line: "AIoT模组",   kids: [["硬件", 300], ["软件", 230], ["AI算法", 140], ["测试", 110]] },
+    { line: "行业方案",   kids: [["软件", 250], ["方案集成", 180], ["AI算法", 120], ["测试", 100]] }
+  ];
+  const FUNCS = ["硬件", "软件", "云平台", "AI算法", "测试", "方案集成", "PM与管理"];
+  const FUNC_COL = [C.amber, C.blue, C.cyan, C.violet, C.green, C.orange, C.blueDeep];
+
+  /* 3.3 回报系数（★ 与兄弟页「单产品线路标详情」dl 的 ROI_K 逐字同源，不另立口径） */
+  const ROI_K = [2.9, 2.4, 2.1, 2.6];
+  const REV = [19.72, 14.16, 9.66, 10.66];                     /* 年营收贡献（亿元）= 投入 × 回报系数 */
+  const REV_SUM_AUTH = 54.2;
+
+  /* ===== 3.4 八个对比维（★ 逆向维口径写在这里，轴名后缀同步标注） =====
+     dir = +1 正向（数值大 = 位次靠前）；dir = 0 规模维（数值大 = 体量大，大≠优，位次仅表体量）。
+     原始经营指标里唯一的逆向维是「研发投入率 = 年度投入 ÷ 年营收，越低越好」——
+     本页对它做**倒数处理**转成正向的 ROI（= 年营收 ÷ 年度投入），
+     ROI 不上平行坐标轴（它与第 2、4 维线性相关，同轴会重复计权），
+     改在「投入产出对比」面板以折线呈现，并作为 KPI「投入产出最错位」的排序依据。
+     故平行坐标 8 轴全部为正向或规模口径，排名一律「降序，1 = 最大」，无需再翻向。 */
+  const DIMS = [
+    { key: "active",  name: "在研项目",   axis: "在研项目 个↑",   unit: " 个",  dec: 0, dir: 1, min: 8,   max: 17,   get: (l) => l.active },
+    { key: "inv",     name: "年度投入",   axis: "年度投入 亿◈",   unit: " 亿",  dec: 1, dir: 0, min: 3.5, max: 7.5,  get: (l) => l.inv },
+    { key: "hc",      name: "人力投入",   axis: "人力投入 人◈",   unit: " 人",  dec: 0, dir: 0, min: 500, max: 1600, get: (l) => l.hc },
+    { key: "rev",     name: "营收贡献",   axis: "营收贡献 亿↑",   unit: " 亿",  dec: 2, dir: 1, min: 8,   max: 22,   get: (l) => l.rev },
+    { key: "growth",  name: "增长率",     axis: "增长率 %↑",      unit: "%",    dec: 1, dir: 1, min: 12,  max: 34,   get: (l) => l.growth },
+    { key: "margin",  name: "毛利率",     axis: "毛利率 %↑",      unit: "%",    dec: 1, dir: 1, min: 28,  max: 62,   get: (l) => l.margin },
+    { key: "attract", name: "市场吸引力", axis: "市场吸引力 分↑", unit: " 分",  dec: 0, dir: 1, min: 55,  max: 92,   get: (l) => l.attract },
+    { key: "feas",    name: "技术可行性", axis: "技术可行性 分↑", unit: " 分",  dec: 0, dir: 1, min: 52,  max: 88,   get: (l) => l.feas }
+  ];
+  const SCALE_DIMS = [1, 2];                                   /* 规模维下标（dir = 0） */
+  const RADAR_DIMS = [1, 3, 4, 5, 6, 7];                       /* 雷达六维 = 8 维去掉两个与投入共线的体量维 */
+  const RADAR_LO = 20, RADAR_HI = 100;                         /* 组内归一后线性映射区间（避免最弱线塌到圆心） */
+
+  /* ===== 3.5 派生量：全部现算，页面不出现硬编码合计 ===== */
+  MANPOWER.forEach((m) => { m.total = sum(m.kids.map((k) => k[1])); });
+  LINES.forEach((l, i) => {
+    l.hc = MANPOWER[i].total;                                  /* 线人力 = 线内职能之和 */
+    l.rev = REV[i];
+    l.roi = l.rev / l.inv;                                     /* ★ ROI 现算，不复制 ROI_K */
+    l.costRate = l.inv / l.rev * 100;                          /* 研发投入率（逆向口径，= 1 / ROI） */
+    l.quad = l.attract >= QUAD_SPLIT
+      ? (l.feas >= QUAD_SPLIT ? "明星" : "潜力")
+      : (l.feas >= QUAD_SPLIT ? "夯实" : "观察");
+  });
+
+  const projSum = sum(LINES.map((l) => l.active));             /* 48 */
+  const invSum = sum(LINES.map((l) => l.inv));                 /* 21.4 */
+  const hcSum = sum(LINES.map((l) => l.hc));                   /* 3,860 */
+  const revSum = sum(LINES.map((l) => l.rev));                 /* 54.20 */
+  const roiAll = revSum / invSum;                              /* 组合综合 ROI */
+
+  /* 8 维取值矩阵（维 × 线），纯标量 */
+  const VAL = DIMS.map((d) => LINES.map((l) => d.get(l)));
+
+  /* 降序排名（1 = 最大）；本页四线 8 维无并列，rankOf 仍按 值降序 + 下标升序 稳定定名次 */
+  function rankOf(vals) {
+    const order = vals.map((v, i) => [v, i]).sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+    const r = new Array(vals.length);
+    order.forEach((o, k) => { r[o[1]] = k + 1; });
+    return r;
+  }
+  const RANK = VAL.map(rankOf);                                /* RANK[维][线] = 1~4 */
+  const rankVec = LINES.map((l, i) => DIMS.map((d, k) => RANK[k][i]));   /* 线的 8 维位次向量 */
+  const roiRank = rankOf(LINES.map((l) => l.roi));             /* ROI 位次（倒数处理后的正向口径） */
+
+  /* 综合得分：8 维位次积分，每维 (线数 + 1 − 名次) 分，满分 8 × 4 = 32；四线 Σ 恒 = 80 */
+  const SCORE_MAX = DIMS.length * LINES.length;
+  const score = LINES.map((l, i) => sum(rankVec[i].map((r) => LINES.length + 1 - r)));
+  const scorePct = score.map((s) => s / SCORE_MAX * 100);
+  const scoreRank = rankOf(score);
+  const topIdx = argmax(score);
+  const lastIdx = argmin(score);
+  const roiTopIdx = argmax(LINES.map((l) => l.roi));
+
+  /* 投入产出错位：|年度投入位次 − ROI 位次|，最大者 = 投入强度与产出效率最不匹配的线 */
+  const misfit = LINES.map((l, i) => Math.abs(RANK[1][i] - roiRank[i]));
+  const misIdx = argmax(misfit);
+
+  /* 雷达六维：组内 min-max 归一后线性映射到 [20,100]（相对分，非绝对水平） */
+  const radarNorm = RADAR_DIMS.map((k) => {
+    const vs = VAL[k], lo = Math.min.apply(null, vs), hi = Math.max.apply(null, vs);
+    return vs.map((v) => RADAR_LO + (RADAR_HI - RADAR_LO) * (hi === lo ? 1 : (v - lo) / (hi - lo)));
+  });
+  const radarOf = (i) => RADAR_DIMS.map((k, kk) => Number(fmtDec(radarNorm[kk][i], 1)));
+
+  /* 平行坐标数据：★ 每线一条，data 只放 8 个数值组成的数组，绝不放业务对象 */
+  const PC = LINES.map((l, i) => DIMS.map((d) => Number(d.get(l))));
+
+  /* 排名矩阵热力数据：[维下标, 线下标, 名次]，纯标量 */
+  const HEAT = [];
+  DIMS.forEach((d, k) => LINES.forEach((l, i) => { HEAT.push([k, i, RANK[k][i]]); }));
+  const colRankSum = RANK.map((r) => sum(r));                  /* 每列位次和，恒 = 10 */
+
+  /* ===== 3.6 此消彼长洞察：全部由排名矩阵现算，不硬编码结论 ===== */
+  const orderNames = (r) => LINES.map((l, i) => [r[i], l.name])
+    .sort((a, b) => a[0] - b[0]).map((a) => a[1]).join(" > ");
+  const dimsWithRank = (i, want) => DIMS.filter((d, k) => RANK[k][i] === want).map((d) => d.name);
+  const valTxt = (k, i) => fmtDec(VAL[k][i], DIMS[k].dec) + DIMS[k].unit;
+
+  const INSIGHTS = [];
+  (function buildInsights() {
+    /* ① 规模三维（在研项目 / 年度投入 / 人力投入）是否同序 */
+    const scaleOrder = [0].concat(SCALE_DIMS);
+    const same = scaleOrder.every((k) => RANK[k].join(",") === RANK[scaleOrder[0]].join(","));
+    INSIGHTS.push({ tag: "结构", color: C.blue, text: same
+      ? "规模三维（在研项目 / 年度投入 / 人力投入）排名<b>完全同序</b>：<em>" + orderNames(RANK[0]) +
+        "</em>——资源按体量线性分配，四线之间无结构性倾斜。"
+      : "规模三维排名<b>不同序</b>：项目数 <em>" + orderNames(RANK[0]) + "</em> 与投入 <em>" +
+        orderNames(RANK[1]) + "</em> 错位，存在结构性倾斜。" });
+
+    /* ② 投入产出最错位（|投入位次 − ROI 位次| 最大） */
+    INSIGHTS.push({ tag: "错位", color: C.amber, text: "<b>" + LINES[misIdx].name + "</b>：年度投入第 <em>" +
+      RANK[1][misIdx] + "</em> 名（" + valTxt(1, misIdx) + "），ROI 第 <em>" + roiRank[misIdx] + "</em> 名（" +
+      fmtDec(LINES[misIdx].roi, 2) + " 倍）——错位 <em>" + misfit[misIdx] +
+      "</em> 位，投入强度与产出效率最不匹配，是组合评审的首要复盘对象。" });
+
+    /* ③ 内部反差最大的线（8 维位次跨度最大；同跨度取综合得分低者，短板更痛） */
+    const spread = rankVec.map((v) => Math.max.apply(null, v) - Math.min.apply(null, v));
+    let sIdx = 0;
+    LINES.forEach((l, i) => {
+      if (spread[i] > spread[sIdx] || (spread[i] === spread[sIdx] && score[i] < score[sIdx])) sIdx = i;
+    });
+    const sBest = Math.min.apply(null, rankVec[sIdx]), sWorst = Math.max.apply(null, rankVec[sIdx]);
+    INSIGHTS.push({ tag: "反差", color: C.violet, text: "<b>" + LINES[sIdx].name + "</b>：8 维位次跨度最大（第 <em>" +
+      sBest + "</em> ~ 第 <em>" + sWorst + "</em> 名）——<em>" + dimsWithRank(sIdx, sBest).join(" / ") +
+      "</em> 领先，<em>" + dimsWithRank(sIdx, sWorst).join(" / ") + "</em> 垫底，典型的此消彼长。" });
+
+    /* ④ 综合首位线靠什么拉分（对照其规模位次） */
+    const tBest = Math.min.apply(null, rankVec[topIdx]);
+    INSIGHTS.push({ tag: "首位", color: C.green, text: "<b>" + LINES[topIdx].name + "</b> 综合得分第 <em>" +
+      scoreRank[topIdx] + "</em>（" + score[topIdx] + "/" + SCORE_MAX + " = " + fmtDec(scorePct[topIdx], 1) +
+      " 分），而规模维仅第 <em>" + RANK[1][topIdx] + "</em>——靠 <em>" + dimsWithRank(topIdx, tBest).join(" / ") +
+      "</em> 拿第 " + tBest + " 名拉分，属效率型领先而非体量型领先。" });
+
+    /* ⑤ 综合末位线的唯一亮点与短板面 */
+    const lBest = Math.min.apply(null, rankVec[lastIdx]);
+    const weak = rankVec[lastIdx].filter((r) => r >= 3).length;
+    INSIGHTS.push({ tag: "末位", color: C.orange, text: "<b>" + LINES[lastIdx].name + "</b> 综合得分末位（" +
+      score[lastIdx] + "/" + SCORE_MAX + " = " + fmtDec(scorePct[lastIdx], 1) + " 分）：最好位次为 <em>" +
+      dimsWithRank(lastIdx, lBest).join(" / ") + "</em> 第 " + lBest + " 名，其余 <em>" + (weak - (lBest >= 3 ? 1 : 0)) +
+      "</em> 维落在第 3~4 名，需在组合评审上明确「收缩还是加注」。" });
+  })();
+
+  /* ===== 4. 时钟 ===== */
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  function tickClock() {
+    const t = new Date();
+    $("zc-clock-time").textContent = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+    $("zc-clock-date").textContent = t.getFullYear() + "年" + pad(t.getMonth() + 1) + "月" + pad(t.getDate()) + "日 星期" + WEEK[t.getDay()];
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ===== 5. 四线聚焦条（tab 文本与契约 §6 hash 键逐字一致） ===== */
+  const linesBox = $("zc-lines");
+  linesBox.innerHTML = LINES.map((l, i) => (
+    '<button class="zc-line-tab" type="button" data-i="' + i + '" title="高亮' + l.name + '（再点取消 · ← → 移动）">' +
+      "<b>" + l.name + "</b><span>综合 " + fmtDec(scorePct[i], 1) + " 分</span>" +
+      '<u style="background:' + LINE_COL[i] + '"></u>' +
+    "</button>"
+  )).join("");
+  const lineTabs = Array.from(linesBox.querySelectorAll(".zc-line-tab"));
+
+  /* ===== 6. 非图表区渲染（★ 全部在 echarts.init 之前完成填充，避免同 flex 容器压矮图表） ===== */
+  function countUp(el, target, fmt) {
+    const t0 = performance.now(), dur = 1400;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+  (function renderKpi() {
+    const defs = [
+      { v: LINES.length, f: (x) => fmtInt(x),
+        sub: "同屏横向 PK · <b>" + LINES.map((l) => l.name).join(" / ") + "</b>" },
+      { v: projSum, f: (x) => fmtInt(x),
+        sub: LINES.map((l) => l.active).join(" + ") + " = <b>" + projSum + "</b>（契约 §2.2 逐字）" },
+      { v: invSum, f: (x) => fmtDec(x, 1),
+        sub: LINES.map((l) => fmtDec(l.inv, 1)).join(" + ") + " = <b>" + fmtDec(invSum, 1) + "</b> 亿" },
+      { v: scorePct[topIdx], f: (x) => fmtDec(x, 1),
+        sub: "<b>" + LINES[topIdx].name + "</b> · 8 维位次积分 " + score[topIdx] + "/" + SCORE_MAX },
+      { v: LINES[roiTopIdx].roi, f: (x) => fmtDec(x, 2),
+        sub: "<b>" + LINES[roiTopIdx].name + "</b> · 营收 " + fmtDec(LINES[roiTopIdx].rev, 2) + " ÷ 投入 " +
+          fmtDec(LINES[roiTopIdx].inv, 1) + " 现算" },
+      { v: misfit[misIdx], f: (x) => fmtInt(x),
+        sub: "<b>" + LINES[misIdx].name + "</b> · 投入第 " + RANK[1][misIdx] + " / ROI 第 " + roiRank[misIdx] }
+    ];
+    defs.forEach((d, i) => {
+      countUp($("zc-kpi-" + i), d.v, d.f);
+      $("zc-kpi-" + i + "s").innerHTML = d.sub;
+    });
+    $("zc-tag-quad").textContent = fmtDec(invSum, 1);
+    $("zc-tag-ins").textContent = INSIGHTS.length;
+    $("zc-tag-rank").textContent = colRankSum[0];
+    $("zc-tag-roi").textContent = fmtDec(roiAll, 2) + " 倍";
+    $("zc-tag-hc").textContent = fmtInt(hcSum);
+    $("zc-tag-proj").textContent = fmtInt(projSum);
+  })();
+
+  (function renderInsights() {
+    $("zc-ins").innerHTML = INSIGHTS.map((s) => (
+      "<li>" +
+        '<span class="zc-ins-tag" style="background:' + s.color + '">' + s.tag + "</span>" +
+        '<span class="zc-ins-txt">' + s.text + "</span>" +
+      "</li>"
+    )).join("");
+  })();
+
+  (function buildFoot() {
+    const items = [
+      ["分工", C.amber, "三页分工（同源契约 §2.2 四产品线口径，互不重复展示）：本页「四线组合对比」= 四条产品线同屏横向 PK（谁强谁弱 / 短板在哪 / 有没有此消彼长）；" +
+        "兄弟页「单产品线路标详情」= 单条产品线 360 度（版本火车放大、特性台账、竞品雷达、24 月投入营收）；" +
+        "兄弟页「Charter 立项台账」= 年度 Charter 提案全量台账与单条评审流转"],
+      ["口径", C.blue, "四产品线在研项目 " + LINES.map((l) => l.name + " " + l.active).join(" + ") + " = " + projSum +
+        " 个；年度投入 " + LINES.map((l) => fmtDec(l.inv, 1)).join(" + ") + " = " + fmtDec(invSum, 1) +
+        " 亿元——均为契约 §2.2 一级拆分逐字，页内合计一律由分项求和"],
+      ["口径", C.blue, "四线人力 " + LINES.map((l) => l.name + " " + fmtInt(l.hc)).join(" + ") + " = " + fmtInt(hcSum) +
+        " 人（契约 §2.2）；线内职能构成为二级自编，与父页「产品组合与路标」资源 treemap 逐字，仅要求 Σ 回契约"],
+      ["方向", C.violet, "平行坐标 8 轴方向标注：轴名后缀 ↑ = 正向（数值大者位次靠前，共 6 维）、◈ = 规模维（数值大仅表体量，大≠优，共 2 维：年度投入 / 人力投入）；" +
+        "全部维统一「降序，1 = 最大」定名次，无需逐维翻向"],
+      ["逆向", C.orange, "逆向维处理：原始经营指标里唯一的逆向维是「研发投入率 = 年度投入 ÷ 年营收，越低越好」——本页做**倒数处理**转成正向的 ROI（= 年营收 ÷ 年度投入）。" +
+        "ROI 与投入、营收两维线性相关，同轴会重复计权，故不上平行坐标，改由「投入产出对比」折线呈现：" +
+        LINES.map((l) => l.name + " " + fmtDec(l.roi, 2) + " 倍（投入率 " + fmtDec(l.costRate, 1) + "%）").join(" · ")],
+      ["矩阵", C.cyan, "排名矩阵口径：4 线 × 8 指标各自独立降序排名，每列恰为 1~4 名的一个排列（无并列），每列位次和恒 = " +
+        colRankSum[0] + "，全表位次和 = " + sum(colRankSum) + "；综合得分 = Σ(5 − 名次)，满分 " + SCORE_MAX +
+        " 分，四线 Σ = " + sum(score) + " 分"],
+      ["象限", C.green, "组合矩阵与父页「组合四象限」逐点相等：分割线同为 " + QUAD_SPLIT + " 分，气泡直径 = √投入 × 20（面积 ∝ 年度投入，Σ = " +
+        fmtDec(invSum, 1) + " 亿）；象限归属现算 —— " + LINES.map((l) => l.name + " " + l.quad).join(" / ")],
+      ["雷达", C.blue, "健康度雷达六维 = 8 维去掉两个与投入共线的体量维（在研项目 / 人力投入）；取值为组内 min-max 归一后线性映射到 " +
+        RADAR_LO + "~" + RADAR_HI + " 的**相对分**（每维最高线恒 " + RADAR_HI + "、最低线恒 " + RADAR_LO + "），不代表绝对水平"],
+      ["营收", C.amber, "年营收贡献 = 年度投入 × 回报系数（回报系数 " + ROI_K.map((k) => fmtDec(k, 1)).join(" / ") +
+        " 与兄弟页「单产品线路标详情」ROI_K 逐字同源）：" + LINES.map((l) => fmtDec(l.rev, 2)).join(" + ") + " = " +
+        fmtDec(revSum, 2) + " 亿；组合综合 ROI = " + fmtDec(revSum, 2) + " ÷ " + fmtDec(invSum, 1) + " = " + fmtDec(roiAll, 2) + " 倍"],
+      ["交互", C.violet, "C 型「横向对比」子页：四条线始终同屏可比，交互只做高亮与刷选，不做整页重绘——点击顶部线签或拖动平行坐标轴段即可；" +
+        "kiosk 常驻每 4 秒轮巡高亮一条线，人工介入后暂停 20 秒"]
+    ];
+    const html = items.map((a) => '<span class="zc-foot-item"><i style="color:' + a[1] + '">[' + a[0] + "]</i>" + a[2] + "</span>").join("");
+    $("zc-foot-track").innerHTML = html + html;                /* 严格两份，配合 translateX(-50%) 无缝循环 */
+  })();
+
+  /* ===== 7. hash 契约：decodeURIComponent → trim + 全角空白剔除归一 → 匹配四产品线名 ===== */
+  const HASH_ALIAS = {
+    "智家": "智家终端", "智家线": "智家终端", "终端": "智家终端",
+    "云平台": "云平台服务", "云服务": "云平台服务", "云": "云平台服务",
+    "AIoT": "AIoT模组", "模组": "AIoT模组",
+    "行业": "行业方案", "方案": "行业方案"
+  };
+  function resolveHash(raw) {
+    const h = String(raw == null ? "" : raw).replace(/^#/, "");
+    let s;
+    try { s = decodeURIComponent(h); } catch (e) { s = h; }
+    s = s.replace(/[\s　]+/g, "");
+    if (!s) return -1;
+    let k = LINES.findIndex((x) => x.name === s);
+    if (k >= 0) return k;
+    let alias = HASH_ALIAS[s];
+    if (!alias) {
+      const low = s.toLowerCase();
+      const hit = Object.keys(HASH_ALIAS).filter((a) => a.toLowerCase() === low)[0];
+      if (hit) alias = HASH_ALIAS[hit];
+      else {
+        const nameHit = LINES.filter((x) => x.name.toLowerCase() === low)[0];
+        if (nameHit) alias = nameHit.name;
+      }
+    }
+    return alias ? LINES.findIndex((x) => x.name === alias) : -1;
+  }
+  const bootHit = resolveHash(location.hash);
+
+  /* ===== 8. 资源守卫（KPI / 洞察 / 口径条已渲染完毕，图表区可选） ===== */
+  const hasEcharts = !!window.echarts;
+  if (!hasEcharts) $("zc-error").classList.add("is-visible");
+
+  const AXIS_LABEL = { color: C.textDim, fontSize: 11 };
+  const SPLIT_LINE = { lineStyle: { color: C.grid, type: "dashed" } };
+  const TIP = { backgroundColor: "rgba(8,18,49,.94)", borderColor: C.line, textStyle: { color: C.text, fontSize: 12 } };
+  const mk = (id) => (hasEcharts ? echarts.init($(id)) : null);
+  /* ★ 整台靠 CSS transform 缩放，容器像素尺寸恒定，故 init 后不调 chart.resize() */
+  const pcChart = mk("zc-chart-pc");
+  const quadChart = mk("zc-chart-quad");
+  const rankChart = mk("zc-chart-rank");
+  const radarChart = mk("zc-chart-radar");
+  const roiChart = mk("zc-chart-roi");
+  const resChart = mk("zc-chart-res");
+
+  /* ===== 9. option 构造（★ 只放标量与数组；业务对象一律不进 option，避免深拷贝循环引用） ===== */
+
+  /* 焦点透明度：focus < 0 时四条线同权全亮；否则被选线满亮、其余压到 dim */
+  const foc = (i, on, off, dim) => (focusIdx < 0 ? on : (focusIdx === i ? on : (dim == null ? off : dim)));
+
+  /* 9.1 ★ 主视觉：四线 × 8 维平行坐标（每线一个 series，data 只放 8 个数值组成的数组） */
+  function pcOption() {
+    return {
+      backgroundColor: "transparent",
+      legend: {
+        top: 2, left: "center", itemWidth: 14, itemHeight: 8, itemGap: 18,
+        icon: "roundRect", textStyle: { color: C.textDim, fontSize: 11 },
+        data: LINES.map((l) => l.name)
+      },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const i = p.seriesIndex;
+          return '<b style="color:' + LINE_COL[i] + '">' + LINES[i].name + "</b>　综合 " +
+            fmtDec(scorePct[i], 1) + " 分（第 " + scoreRank[i] + "）<br/>" +
+            DIMS.map((d, k) => d.name + " <b>" + valTxt(k, i) + "</b> · 第 " + RANK[k][i] + " 名").join("<br/>");
+        }
+      }, TIP),
+      parallel: {
+        left: 48, right: 34, top: 52, bottom: 26,
+        parallelAxisDefault: {
+          type: "value", nameLocation: "end", nameGap: 15, nameRotate: 0,
+          nameTextStyle: { color: "#9cc2ff", fontSize: 10, fontWeight: 700 },
+          axisLine: { lineStyle: { color: "rgba(96,140,255,.4)", width: 1.2 } },
+          axisTick: { lineStyle: { color: "rgba(96,140,255,.4)" } },
+          axisLabel: { color: C.textDim, fontSize: 9.5 },
+          splitLine: { show: false },
+          areaSelectStyle: { width: 16, borderWidth: 1, borderColor: C.amber, color: hexA(C.amber, 0.22), opacity: 1 }
+        }
+      },
+      parallelAxis: DIMS.map((d, k) => ({
+        dim: k, name: d.axis, min: d.min, max: d.max,
+        nameTextStyle: { color: d.dir === 0 ? C.amber : "#9cc2ff", fontSize: 10, fontWeight: 700 }
+      })),
+      series: LINES.map((l, i) => ({
+        name: l.name, type: "parallel", parallelIndex: 0, smooth: 0.22,
+        lineStyle: {
+          color: LINE_COL[i],
+          width: focusIdx === i ? 5 : (focusIdx < 0 ? 2.8 : 1.2),
+          opacity: foc(i, 0.95, 0.14),
+          shadowBlur: focusIdx === i ? 16 : 0,
+          shadowColor: hexA(LINE_COL[i], 0.75)
+        },
+        emphasis: { lineStyle: { width: 5, opacity: 1 } },
+        data: [PC[i]]                                          /* ★ 纯数值数组，无对象回指 */
+      }))
+    };
+  }
+
+  /* 9.2 组合矩阵（BCG 风格四象限）：x 市场吸引力 · y 技术可行性 · 气泡面积 = 年度投入
+         ★ 坐标、分割线、气泡口径与父页「组合四象限」逐点一致（页尾 checks 硬校验） */
+  const QUAD_LABELS = [
+    { area: [[QUAD_SPLIT, QUAD_SPLIT], [100, 100]], name: "明星 · 加码", color: "rgba(111,224,154,.06)", pos: "insideTopRight" },
+    { area: [[40, QUAD_SPLIT], [QUAD_SPLIT, 100]],  name: "夯实 · 深耕", color: "rgba(92,157,255,.06)",  pos: "insideTopLeft" },
+    { area: [[QUAD_SPLIT, 40], [100, QUAD_SPLIT]],  name: "潜力 · 培育", color: "rgba(255,194,77,.06)",  pos: "insideBottomRight" },
+    { area: [[40, 40], [QUAD_SPLIT, QUAD_SPLIT]],   name: "观察 · 审视", color: "rgba(127,146,196,.06)", pos: "insideBottomLeft" }
+  ];
+  function quadOption() {
+    const data = LINES.map((l, i) => [l.attract, l.feas, l.inv, i]);   /* 纯标量：末位放 LINES 下标 */
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 6, right: 24, top: 30, bottom: 4, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const i = p.data[3], l = LINES[i];
+          return "<b>" + l.name + '</b>　<span style="color:' + C.amber + '">' + l.quad + "象限</span><br/>" +
+            "市场吸引力 <b>" + l.attract + "</b>（第 " + RANK[6][i] + "）· 技术可行性 <b>" + l.feas + "</b>（第 " + RANK[7][i] + "）<br/>" +
+            "年度投入 <b>" + fmtDec(l.inv, 1) + "</b> 亿 · 在研 <b>" + l.active + "</b> 个 · ROI <b>" + fmtDec(l.roi, 2) + "</b> 倍";
+        }
+      }, TIP),
+      xAxis: {
+        type: "value", min: 40, max: 100, name: "市场吸引力 →", nameLocation: "end", nameGap: 6,
+        nameTextStyle: { color: C.textDim, fontSize: 10.5, align: "right", verticalAlign: "top", padding: [8, 0, 0, 0] },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "value", min: 40, max: 100, name: "技术可行性 ↑", nameGap: 12,
+        nameTextStyle: { color: C.textDim, fontSize: 10.5 },
+        axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, axisLine: { show: false }, axisTick: { show: false }
+      },
+      series: [{
+        type: "scatter",
+        data: data,
+        symbolSize: (v) => Math.sqrt(v[2]) * 20,               /* 与父页逐字：面积 ∝ 年度投入 */
+        label: {
+          show: true, color: "#eaf1ff", fontSize: 11.5, fontWeight: 700,
+          formatter: (p) => LINES[p.data[3]].name
+        },
+        itemStyle: {
+          color: (p) => hexA(LINE_COL[p.data[3]], foc(p.data[3], 0.55, 0.1)),
+          borderColor: (p) => hexA(LINE_COL[p.data[3]], foc(p.data[3], 1, 0.22)),
+          borderWidth: 1.8,
+          shadowBlur: 12, shadowColor: "rgba(92,157,255,.3)"
+        },
+        markLine: {
+          silent: true, symbol: "none",
+          lineStyle: { color: "rgba(127,146,196,.5)", type: "dashed", width: 1.2 },
+          label: { show: false },
+          data: [{ xAxis: QUAD_SPLIT }, { yAxis: QUAD_SPLIT }]
+        },
+        markArea: {
+          silent: true,
+          data: QUAD_LABELS.map((q) => [
+            { coord: q.area[0], name: q.name, itemStyle: { color: q.color },
+              label: { show: true, position: q.pos, color: "rgba(188,210,248,.55)", fontSize: 11, fontWeight: 700, padding: [4, 6] } },
+            { coord: q.area[1] }
+          ])
+        }
+      }]
+    };
+  }
+
+  /* 9.3 多指标排名矩阵（4 线 × 8 指标名次热力）
+         ★ piecewise 一旦设了两端 text，showLabel 默认变 false、每档 label 被整体吞掉——这里显式补 showLabel: true */
+  const RANK_COLOR = ["#6fe09a", "#46d6c8", "#ffc24d", "#ff8f6b"];
+  function rankOption() {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 96, right: 22, top: 34, bottom: 30, containLabel: false },
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const k = p.value[0], i = p.value[1];
+          return "<b>" + LINES[i].name + "</b> · " + DIMS[k].name + "<br/>" +
+            "取值 <b>" + valTxt(k, i) + "</b>　位次 <b>第 " + p.value[2] + " 名</b><br/>" +
+            "同维四线：" + LINES.map((l, j) => l.name + " " + valTxt(k, j)).join(" / ");
+        }
+      }, TIP),
+      visualMap: {
+        type: "piecewise", orient: "horizontal", left: "center", top: 2,
+        itemWidth: 13, itemHeight: 10, itemGap: 8, textGap: 5,
+        text: ["优 ←", "→ 劣"],                                /* ★ 设了 text 必须显式补 showLabel */
+        showLabel: true,
+        textStyle: { color: C.textDim, fontSize: 10 },
+        pieces: [
+          { value: 1, label: "第 1 名", color: RANK_COLOR[0] },
+          { value: 2, label: "第 2 名", color: RANK_COLOR[1] },
+          { value: 3, label: "第 3 名", color: RANK_COLOR[2] },
+          { value: 4, label: "第 4 名", color: RANK_COLOR[3] }
+        ]
+      },
+      xAxis: {
+        type: "category", data: DIMS.map((d) => d.name), splitArea: { show: false },
+        axisLabel: { color: C.textDim, fontSize: 10.5, interval: 0 },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.28)" } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: "category", data: LINES.map((l) => l.name), inverse: true, splitArea: { show: false },
+        axisLabel: {
+          fontSize: 11.5, fontWeight: 700, interval: 0,
+          color: (v) => {
+            const i = LINES.findIndex((l) => l.name === v);
+            return focusIdx < 0 || focusIdx === i ? "#eaf1ff" : "rgba(127,146,196,.55)";
+          }
+        },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.28)" } }, axisTick: { show: false }
+      },
+      series: [{
+        type: "heatmap",
+        data: HEAT.map((h) => ({ value: h, itemStyle: { opacity: foc(h[1], 1, 0.2) } })),
+        label: {
+          show: true, fontSize: 11, fontWeight: 700, color: "#0b1630",
+          formatter: (p) => p.value[2]
+        },
+        itemStyle: { borderColor: "rgba(8,18,49,.85)", borderWidth: 2, borderRadius: 6 },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: "rgba(0,0,0,.45)" } }
+      }]
+    };
+  }
+
+  /* 9.4 组合健康度雷达叠加（六维同图四线叠加，颜色区分） */
+  function radarOption() {
+    return {
+      backgroundColor: "transparent",
+      tooltip: Object.assign({
+        trigger: "item",
+        formatter: (p) => {
+          const i = p.seriesIndex === 0 ? p.dataIndex : 0;
+          return '<b style="color:' + LINE_COL[i] + '">' + LINES[i].name + "</b>　相对分（20~100）<br/>" +
+            RADAR_DIMS.map((k, kk) => DIMS[k].name + " <b>" + fmtDec(radarNorm[kk][i], 1) + "</b>　实测 " +
+              valTxt(k, i) + " · 第 " + RANK[k][i] + " 名").join("<br/>");
+        }
+      }, TIP),
+      legend: {
+        bottom: 0, left: "center", itemWidth: 12, itemHeight: 8, itemGap: 12,
+        icon: "roundRect", textStyle: { color: C.textDim, fontSize: 10 },
+        data: LINES.map((l) => l.name)
+      },
+      radar: {
+        center: ["50%", "48%"], radius: "62%",
+        indicator: RADAR_DIMS.map((k) => ({ name: DIMS[k].name, min: 0, max: 100 })),
+        axisName: { color: "#a9c4f5", fontSize: 10.5 },
+        splitLine: { lineStyle: { color: "rgba(96,140,255,.18)" } },
+        splitArea: { areaStyle: { color: ["rgba(20,38,92,.28)", "rgba(14,26,66,.18)"] } },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.2)" } }
+      },
+      series: [{
+        type: "radar", symbolSize: 4,
+        data: LINES.map((l, i) => ({
+          name: l.name, value: radarOf(i),
+          lineStyle: { color: LINE_COL[i], width: focusIdx === i ? 3.2 : 1.8, opacity: foc(i, 1, 0.18) },
+          itemStyle: { color: LINE_COL[i], opacity: foc(i, 1, 0.18) },
+          areaStyle: { color: hexA(LINE_COL[i], focusIdx === i ? 0.26 : (focusIdx < 0 ? 0.1 : 0.02)) }
+        }))
+      }]
+    };
+  }
+
+  /* 9.5 投入产出对比：投入 / 营收双柱 + ROI 折线（ROI 现算，右轴） */
+  function roiOption() {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 40, right: 42, top: 32, bottom: 26, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex, l = LINES[i];
+          return "<b>" + l.name + "</b><br/>投入 <b>" + fmtDec(l.inv, 1) + "</b> 亿（第 " + RANK[1][i] + "）· 营收 <b>" +
+            fmtDec(l.rev, 2) + "</b> 亿（第 " + RANK[3][i] + "）<br/>ROI = " + fmtDec(l.rev, 2) + " ÷ " + fmtDec(l.inv, 1) +
+            " = <b>" + fmtDec(l.roi, 2) + "</b> 倍（第 " + roiRank[i] + "）<br/>研发投入率（逆向）= <b>" + fmtDec(l.costRate, 1) + "%</b>";
+        }
+      }, TIP),
+      legend: {
+        top: 0, left: "center", itemWidth: 13, itemHeight: 8, itemGap: 12,
+        icon: "roundRect", textStyle: { color: C.textDim, fontSize: 10 },
+        data: ["年度投入", "年营收贡献", "ROI"]
+      },
+      xAxis: {
+        type: "category", data: LINES.map((l) => l.short),
+        axisLabel: { color: "#c8d6f2", fontSize: 10, interval: 0 },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.28)" } }, axisTick: { show: false }
+      },
+      yAxis: [
+        { type: "value", name: "亿元", nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 9.5 }), splitLine: SPLIT_LINE, axisLine: { show: false } },
+        { type: "value", name: "ROI 倍", nameTextStyle: { color: C.textDim, fontSize: 9.5 }, min: 0, max: 4,
+          axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 9.5 }), splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: [
+        { name: "年度投入", type: "bar", barWidth: 15, barGap: "12%", z: 3,
+          itemStyle: { borderRadius: [4, 4, 0, 0] },
+          data: LINES.map((l, i) => ({ value: Number(fmtDec(l.inv, 2)), itemStyle: { color: hexA(C.blue, foc(i, 0.9, 0.16)) } })) },
+        { name: "年营收贡献", type: "bar", barWidth: 15, z: 3,
+          itemStyle: { borderRadius: [4, 4, 0, 0] },
+          data: LINES.map((l, i) => ({ value: Number(fmtDec(l.rev, 2)), itemStyle: { color: hexA(C.amber, foc(i, 0.9, 0.16)) } })) },
+        { name: "ROI", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", z: 6,
+          symbolSize: (v, p) => (focusIdx === p.dataIndex ? 11 : 7),
+          lineStyle: { color: C.green, width: 2.4 },
+          itemStyle: { color: C.green, borderColor: "#0b1630", borderWidth: 1.4 },
+          label: { show: true, position: "top", fontSize: 10, fontWeight: 700, color: "#b8f2cf",
+            formatter: (p) => fmtDec(p.value, 2) + "x" },
+          data: LINES.map((l) => Number(fmtDec(l.roi, 3))) }
+      ]
+    };
+  }
+
+  /* 9.6 资源占用对比：四线人力按职能堆叠（Σ = 3,860）+ 在研项目数折线（右轴，Σ = 48） */
+  function resOption() {
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 40, right: 40, top: 34, bottom: 30, containLabel: true },
+      tooltip: Object.assign({
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: (ps) => {
+          const i = ps[0].dataIndex, l = LINES[i];
+          return "<b>" + l.name + "</b><br/>人力 <b>" + fmtInt(l.hc) + "</b> 人（占 " +
+            fmtDec(l.hc / hcSum * 100, 1) + "%，第 " + RANK[2][i] + "）· 在研 <b>" + l.active + "</b> 个（第 " + RANK[0][i] + "）<br/>" +
+            MANPOWER[i].kids.map((k) => k[0] + " " + fmtInt(k[1])).join(" · ") +
+            "<br/>人均在研 " + fmtDec(l.hc / l.active, 0) + " 人/项目";
+        }
+      }, TIP),
+      legend: {
+        top: 0, left: "center", itemWidth: 11, itemHeight: 7, itemGap: 8,
+        icon: "roundRect", textStyle: { color: C.textDim, fontSize: 9 },
+        data: FUNCS.concat(["在研项目"])
+      },
+      xAxis: {
+        type: "category", data: LINES.map((l) => l.short),
+        axisLabel: { color: "#c8d6f2", fontSize: 10, interval: 0 },
+        axisLine: { lineStyle: { color: "rgba(96,140,255,.28)" } }, axisTick: { show: false }
+      },
+      yAxis: [
+        { type: "value", name: "人", nameTextStyle: { color: C.textDim, fontSize: 9.5 },
+          axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 9.5 }), splitLine: SPLIT_LINE, axisLine: { show: false } },
+        { type: "value", name: "个", nameTextStyle: { color: C.textDim, fontSize: 9.5 }, min: 0, max: 20,
+          axisLabel: Object.assign({}, AXIS_LABEL, { fontSize: 9.5 }), splitLine: { show: false }, axisLine: { show: false } }
+      ],
+      series: FUNCS.map((f, j) => ({
+        name: f, type: "bar", stack: "hc", barWidth: 26,
+        itemStyle: { borderRadius: j === FUNCS.length - 1 ? [4, 4, 0, 0] : 0 },
+        data: LINES.map((l, i) => {
+          const hit = MANPOWER[i].kids.filter((k) => k[0] === f)[0];
+          return { value: hit ? hit[1] : 0, itemStyle: { color: hexA(FUNC_COL[j], foc(i, 0.88, 0.14)) } };
+        })
+      })).concat([{
+        name: "在研项目", type: "line", yAxisIndex: 1, smooth: true, symbol: "circle", z: 6,
+        symbolSize: (v, p) => (focusIdx === p.dataIndex ? 11 : 7),
+        lineStyle: { color: C.text, width: 2, type: "dashed" },
+        itemStyle: { color: "#eaf1ff", borderColor: "#0b1630", borderWidth: 1.4 },
+        label: { show: true, position: "top", fontSize: 10, fontWeight: 700, color: "#eaf1ff",
+          formatter: (p) => p.value + " 个" },
+        data: LINES.map((l) => l.active)
+      }])
+    };
+  }
+
+  /* ===== 10. 聚焦主流程：★ 不做整页重绘——四条线始终同屏，只改高亮/压暗样式 ===== */
+  function applyFocus(i, writeHash) {
+    focusIdx = (i == null || i < 0) ? -1 : ((i % LINES.length) + LINES.length) % LINES.length;
+    lineTabs.forEach((b, k) => b.classList.toggle("is-active", k === focusIdx));
+    $("zc-crumb-obj").textContent = focusIdx < 0
+      ? "四线横向 PK · 未聚焦"
+      : LINES[focusIdx].name + " · 综合 " + fmtDec(scorePct[focusIdx], 1) + " 分（第 " + scoreRank[focusIdx] + "）";
+    if (hasEcharts) {
+      /* ★ 用 merge（不传 notMerge）：C 型子页数据恒定，聚焦只改 lineStyle/itemStyle，
+         echarts 会就地平滑过渡；若传 true 会每 4 秒整图重建并重播入场动画。 */
+      pcChart.setOption(pcOption());
+      quadChart.setOption(quadOption());
+      rankChart.setOption(rankOption());
+      radarChart.setOption(radarOption());
+      roiChart.setOption(roiOption());
+      resChart.setOption(resOption());
+    }
+    /* hash 回写：便于分享与父页回跳（replaceState 不触发 hashchange，不会自激） */
+    if (writeHash && focusIdx >= 0) {
+      history.replaceState(null, "", "#" + encodeURIComponent(LINES[focusIdx].name));
+    }
+  }
+
+  /* ===== 11. 平行坐标刷选联动（拖动轴段筛选；内部 API 用 try/catch 兜底，失败不影响页面） ===== */
+  function updateBrush(active) {
+    if (!active || active.length === 0 || active.length === LINES.length) {
+      $("zc-meta-brush").textContent = "全部 " + LINES.length + " 条";
+    } else {
+      $("zc-meta-brush").textContent = active.length + " 条 · " + active.map((k) => LINES[k].name).join("、");
+    }
+  }
+  if (hasEcharts) {
+    pcChart.on("axisareaselected", function () {
+      let act = null;
+      try {
+        const ss = pcChart.getModel().getSeries();
+        act = [];
+        ss.forEach(function (s, si) {
+          const idxs = s.getRawIndicesByActiveState("active");
+          if (idxs && idxs.length) act.push(si);
+        });
+      } catch (err) { act = null; }
+      updateBrush(act);
+      pauseRotate(20000);
+    });
+  }
+
+  /* ===== 12. 交互：线签聚焦 / 键盘 / 返回上级 / hash 契约 / kiosk 轮巡 =====
+     ★ 本节只做「调用」，kiosk 状态量（focusIdx / timer / pauseUntil）与 pauseRotate() / restartRotate()
+       已在第 1.1 节声明——声明行号严格小于此处首次 pauseRotate() 调用行号（TDZ 防护）。 */
+  const PARENT = "大屏样板间-研发产品组合与路标1920.html";
+
+  applyFocus(bootHit >= 0 ? bootHit : -1, true);               /* 冷启动：命中 hash 则高亮该线，否则四线全亮 */
+  if (bootHit >= 0) pauseRotate(20000);                        /* 父页下钻进来：先保持 20 秒不轮巡 */
+
+  lineTabs.forEach((b) => b.addEventListener("click", () => {
+    const k = Number(b.dataset.i);
+    applyFocus(k === focusIdx ? -1 : k, true);                 /* 再点同一枚 = 取消聚焦，回到四线全亮 */
+    pauseRotate(20000);
+    restartRotate();
+  }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { applyFocus((focusIdx <= 0 ? LINES.length : focusIdx) - 1, true); pauseRotate(20000); restartRotate(); }
+    else if (e.key === "ArrowRight") { applyFocus(focusIdx + 1, true); pauseRotate(20000); restartRotate(); }
+    else if (e.key === "Escape") { location.href = PARENT; }
+  });
+
+  /* 父页可多次跳转同一子页（只变 hash），靠 hashchange 接住 */
+  window.addEventListener("hashchange", () => {
+    const k = resolveHash(location.hash);
+    if (k >= 0 && k !== focusIdx) { applyFocus(k, true); pauseRotate(20000); restartRotate(); }
+  });
+
+  /* kiosk 常驻：每 4 秒轮巡高亮下一条线；鼠标停在线签条上时暂停 */
+  restartRotate();
+  linesBox.addEventListener("mouseenter", () => clearInterval(timer));
+  linesBox.addEventListener("mouseleave", restartRotate);
+
+  /* ===== 13. 页尾勾稽自检（不依赖 echarts，任何一条不过即 console.warn） ===== */
+  const permOf = (arr) => arr.slice().sort((a, b) => a - b).join(",") === "1,2,3,4";
+  const checks = [
+    ["四线名 / 在研项目 / 年度投入与契约 §2.2 逐字（构造性断言）",
+      LINES.map((l) => l.name + "|" + l.active + "|" + fmtDec(l.inv, 1)).join(";") === LINE_AUTH],
+    ["四线在研项目 Σ = 48 个（分项求和，非硬编码）",
+      projSum === PROJ_ALL && projSum === 48],
+    ["四线年度投入 Σ = 21.4 亿元（|Δ| < 1e-9）",
+      Math.abs(invSum - INV_ALL) < 1e-9 && Math.abs(invSum - 21.4) < 1e-9],
+    ["组合矩阵四象限坐标与父页「组合四象限」逐点相等，分割线同为 70（构造性断言）",
+      LINES.map((l) => l.name + "|" + l.attract + "|" + l.feas).join(";") === QUAD_AUTH && QUAD_SPLIT === 70],
+    ["象限归属由坐标现算：明星 = 双高 / 潜力 = 高吸引低可行 / 夯实 = 低吸引高可行 / 观察 = 双低",
+      LINES.every((l) => l.quad === (l.attract >= QUAD_SPLIT
+        ? (l.feas >= QUAD_SPLIT ? "明星" : "潜力")
+        : (l.feas >= QUAD_SPLIT ? "夯实" : "观察")))],
+    ["四线人力 Σ = 3,860 人；每线人力 = 线内职能之和（与父页资源 treemap 逐字）",
+      hcSum === PEOPLE_ALL && hcSum === 3860 &&
+      LINES.every((l, i) => l.hc === sum(MANPOWER[i].kids.map((k) => k[1])) && MANPOWER[i].line === l.name)],
+    ["资源面板堆叠列（7 职能）Σ = 3,860 人；折线项目数 Σ = 48 个",
+      sum(FUNCS.map((f) => sum(MANPOWER.map((m) => {
+        const hit = m.kids.filter((k) => k[0] === f)[0]; return hit ? hit[1] : 0;
+      })))) === PEOPLE_ALL && sum(LINES.map((l) => l.active)) === PROJ_ALL],
+    ["年营收贡献 = 年度投入 × 回报系数（与兄弟页 dl 的 ROI_K 逐字同源，|Δ| < 1e-9）",
+      LINES.every((l, i) => Math.abs(l.rev - l.inv * ROI_K[i]) < 1e-9)],
+    ["ROI = 年营收 ÷ 年度投入 现算，且回归回报系数；Σ营收 = 54.20 亿",
+      LINES.every((l, i) => Math.abs(l.roi - l.rev / l.inv) < 1e-12 && Math.abs(l.roi - ROI_K[i]) < 1e-9) &&
+      Math.abs(revSum - REV_SUM_AUTH) < 1e-9],
+    ["组合综合 ROI = Σ营收 ÷ Σ投入 现算（非四线 ROI 的算术平均）",
+      Math.abs(roiAll - revSum / invSum) < 1e-12 &&
+      Math.abs(roiAll - sum(LINES.map((l) => l.roi)) / LINES.length) > 1e-6],
+    ["逆向维倒数处理：研发投入率 = 投入 ÷ 营收 × 100，且与 ROI 互为倒数（率 × ROI = 100）",
+      LINES.every((l) => Math.abs(l.costRate * l.roi - 100) < 1e-9)],
+    ["排名矩阵每列恰为 1~4 名的一个排列（8 列全过，无并列）",
+      RANK.length === DIMS.length && RANK.every((r) => r.length === LINES.length && permOf(r))],
+    ["排名矩阵每列位次和恒 = 10，全表位次和 = 80",
+      colRankSum.every((v) => v === 10) && sum(colRankSum) === DIMS.length * 10],
+    ["ROI 位次亦为 1~4 的排列（供「投入产出最错位」排序）",
+      permOf(roiRank)],
+    ["综合得分 = Σ(5 − 名次)，满分 32，四线 Σ = 80；首位线与 KPI 一致",
+      score.every((s, i) => s === sum(rankVec[i].map((r) => LINES.length + 1 - r))) &&
+      SCORE_MAX === 32 && sum(score) === DIMS.length * 10 && topIdx === argmax(score)],
+    ["投入产出最错位线 = |投入位次 − ROI 位次| 最大者，与 KPI 一致",
+      misIdx === argmax(misfit) && misfit.every((m, i) => m === Math.abs(RANK[1][i] - roiRank[i]))],
+    ["洞察结论条数 3~5，且引用的位次与排名矩阵同源（构造性：全部由 RANK / roiRank 现算）",
+      INSIGHTS.length >= 3 && INSIGHTS.length <= 5 &&
+      INSIGHTS[1].text.indexOf("年度投入第 <em>" + RANK[1][misIdx] + "</em> 名") > 0 &&
+      INSIGHTS[1].text.indexOf("ROI 第 <em>" + roiRank[misIdx]) > 0 &&
+      INSIGHTS[3].text.indexOf("综合得分第 <em>" + scoreRank[topIdx]) > 0],
+    ["雷达六维为组内归一映射到 20~100：每维最高线恒 100、最低线恒 20",
+      radarNorm.length === RADAR_DIMS.length && radarNorm.every((row) =>
+        Math.abs(Math.max.apply(null, row) - RADAR_HI) < 1e-9 && Math.abs(Math.min.apply(null, row) - RADAR_LO) < 1e-9)],
+    ["平行坐标 data 只放数值数组（8 个有限数），无对象回指",
+      PC.length === LINES.length && PC.every((row) =>
+        Array.isArray(row) && row.length === DIMS.length &&
+        row.every((v) => typeof v === "number" && isFinite(v)))],
+    ["平行坐标每轴 min < 该维最小值、max > 该维最大值（四条线全部落在轴内）",
+      DIMS.every((d, k) => d.min < Math.min.apply(null, VAL[k]) && d.max > Math.max.apply(null, VAL[k]))],
+    ["8 维方向标注自洽：6 维正向（轴名带 ↑）+ 2 维规模（轴名带 ◈，dir = 0）",
+      DIMS.filter((d) => d.dir === 1).length === 6 && DIMS.filter((d) => d.dir === 0).length === 2 &&
+      DIMS.every((d) => (d.dir === 0 ? d.axis.indexOf("◈") > 0 : d.axis.indexOf("↑") > 0)) &&
+      SCALE_DIMS.every((k) => DIMS[k].dir === 0)],
+    ["hash 四产品线名均可解析（构造性断言，含 encodeURIComponent 往返）",
+      LINES.every((l, i) => resolveHash("#" + encodeURIComponent(l.name)) === i)],
+    ["HASH_ALIAS 简写（智家 / 云平台 / AIoT / 行业）全部可解析到契约 §6 逐字名",
+      Object.keys(HASH_ALIAS).every((a) => resolveHash("#" + encodeURIComponent(a)) >= 0) &&
+      resolveHash("#智家") === 0 && resolveHash("#云平台") === 1 &&
+      resolveHash("#AIoT") === 2 && resolveHash("#行业") === 3],
+    ["聚焦线签 4 枚且文本与契约 §6 hash 键逐字",
+      lineTabs.length === LINES.length && lineTabs.every((b, i) => b.querySelector("b").textContent === LINES[i].name)],
+    /* ★ TDZ 防护的构造性断言：pauseUntil / pauseRotate() 声明在第 1.1 节（行号远小于第 12 节首次调用）。
+       若声明晚于调用，带 hash 冷启动会抛 ReferenceError、主脚本中断、本自检根本不会执行——
+       因此「跑到这里且带 hash 时 pauseCalls ≥ 1」即证明声明早于首次调用。 */
+    ["pauseUntil 声明早于首次 pauseRotate() 调用（TDZ 防护，构造性断言）",
+      typeof pauseUntil === "number" && typeof pauseRotate === "function" &&
+      (bootHit < 0 ? pauseCalls === 0 : (pauseCalls >= 1 && pauseUntil > Date.now()))]
+  ];
+  const failed = checks.filter((c) => !c[1]);
+  if (failed.length) console.warn("[四线组合对比] 勾稽自检未通过：", failed.map((c) => c[0]));
+})();
+</script>
+</body>
+</html>
